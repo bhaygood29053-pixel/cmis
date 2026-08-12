@@ -344,6 +344,7 @@ def wants_asset_analysis(question):
         "concerning", "concern", "worry", "worried",
         "why ", "what does this mean", "what does that mean",
         "explain", "analyze", "analyse", "analysis",
+        "tell me about", "overview",
         "outlook", "pressure", "bullish", "bearish",
         "worth buying", "worth selling", "should i buy", "should i sell",
         "is it safe", "how safe", "is this safe",
@@ -756,6 +757,18 @@ def format_asset_analysis_answer(question, term, matches, catalog):
     """
     snap = compact_asset_snapshot(term, matches, catalog)
     fields = requested_asset_fields(question)
+
+    # Broad asset-analysis questions should automatically show the
+    # most useful verified market facts.
+    if not fields:
+        fields = [
+            "price",
+            "liquidity",
+            "volume24",
+            "change24h",
+            "market_cap",
+            "safety",
+        ]
 
     lines = [
         "Liquidity Scout XDEX analysis:",

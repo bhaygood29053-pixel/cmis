@@ -86,9 +86,13 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "symbol": "AGI",
             "token_address": "AGI_TEST_ADDRESS",
             "price": "$0.000067681",
-            "liquidity": 3522,
+            "age": "6mo",
+            "holders": 1000,
+            "txns24": 250,
             "vol24": 1399,
+            "change1": -0.50,
             "change24": -5.57,
+            "liquidity": 3522,
             "market_cap": 31105,
             "safety": "A (86/100)",
         }
@@ -345,6 +349,68 @@ class LiquidityScoutV12Tests(unittest.TestCase):
 
         self.assertFalse(matches)
 
+
+
+    def test_broad_asset_overview_shows_core_metrics(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        snap = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_SECRET_TEST_ADDRESS",
+            "pool_address": "POOL_SECRET_TEST_ADDRESS",
+            "price": "$0.000067681",
+            "age": "6mo",
+            "holders": 1000,
+            "txns24": 250,
+            "vol24": 1399,
+            "change1": -0.50,
+            "change24": -5.57,
+            "liquidity": 3522,
+            "market_cap": 31105,
+            "safety": "A (86/100)",
+        }
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            return_value=snap,
+        ), patch.object(
+            scout,
+            "ai_asset_analysis",
+            return_value="Verified market analysis.",
+        ):
+            answer = scout.format_asset_analysis_answer(
+                "Tell me about AGI",
+                "AGI",
+                ["dummy"],
+                {},
+            )
+
+        self.assertIn("• Price: $0.000067681", answer)
+        self.assertIn("• Liquidity: $3,522", answer)
+        self.assertIn("• Volume 24h: $1,399", answer)
+        self.assertIn("• Change 24h: -5.57%", answer)
+        self.assertIn("• Market Cap: $31,105", answer)
+        self.assertIn("• Tokenomics Safety: A (86/100)", answer)
+
+        # Privacy rules must remain intact.
+        self.assertNotIn("AGI_SECRET_TEST_ADDRESS", answer)
+        self.assertNotIn("POOL_SECRET_TEST_ADDRESS", answer)
+
+
+    def test_broad_asset_question_routes_to_analysis(self):
+        import moltgrid_signal_v12_ollama as scout
+
+        self.assertTrue(
+            scout.wants_asset_analysis("Tell me about AGI")
+        )
+
+        # A specific metric request should remain deterministic.
+        self.assertFalse(
+            scout.wants_asset_analysis("What is AGI's liquidity?")
+        )
 
 
 if __name__ == "__main__":
