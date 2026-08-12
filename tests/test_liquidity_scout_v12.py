@@ -400,6 +400,162 @@ class LiquidityScoutV12Tests(unittest.TestCase):
         self.assertNotIn("POOL_SECRET_TEST_ADDRESS", answer)
 
 
+
+    def test_broad_asset_analysis_only_sends_visible_core_metrics_to_ai(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        snap = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_SECRET_TEST_ADDRESS",
+            "pool": "AGI/XNT",
+            "pool_address": "POOL_SECRET_TEST_ADDRESS",
+            "price": "$0.000067681",
+            "age": "6mo",
+            "holders": 1000,
+            "txns24": 250,
+            "vol24": 1399,
+            "change1": -0.50,
+            "change24": -5.57,
+            "liquidity": 3522,
+            "market_cap": 31105,
+            "safety": "A (86/100)",
+        }
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            return_value=snap,
+        ), patch.object(
+            scout,
+            "ai_text",
+            return_value="Verified market analysis.",
+        ) as mock_ai:
+            scout.format_asset_analysis_answer(
+                "Tell me about AGI",
+                "AGI",
+                ["dummy"],
+                {},
+            )
+
+        ai_context = mock_ai.call_args.args[1]
+
+        # Broad overview: Ollama receives only the six visible core metrics.
+        self.assertIn("Price: $0.000067681", ai_context)
+        self.assertIn("Liquidity: $3,522", ai_context)
+        self.assertIn("Volume 24h: $1,399", ai_context)
+        self.assertIn("Change 24h: -5.57%", ai_context)
+        self.assertIn("Market Cap: $31,105", ai_context)
+        self.assertIn("Tokenomics Safety: A (86/100)", ai_context)
+
+        # Extra/internal details must not be supplied unless requested.
+        self.assertNotIn("Age:", ai_context)
+        self.assertNotIn("Holders:", ai_context)
+        self.assertNotIn("Transactions 24h:", ai_context)
+        self.assertNotIn("Change 1h:", ai_context)
+        self.assertNotIn("Token address:", ai_context)
+        self.assertNotIn("Pool:", ai_context)
+        self.assertNotIn("Pool address:", ai_context)
+
+
+
+    def test_asset_analysis_removes_unsupported_risk_severity_labels(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        snap = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_SECRET_TEST_ADDRESS",
+            "pool": "AGI/XNT",
+            "pool_address": "POOL_SECRET_TEST_ADDRESS",
+            "price": "$0.0000652032",
+            "age": "6mo",
+            "holders": 1000,
+            "txns24": 250,
+            "vol24": 947.1685,
+            "change1": -0.50,
+            "change24": -12.20,
+            "liquidity": 3429,
+            "market_cap": 29965,
+            "safety": "A (86/100)",
+        }
+
+        model_text = (
+            "Trading risk is elevated due to very thin liquidity and "
+            "a sharp price drop, increasing execution risk and slippage."
+        )
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            return_value=snap,
+        ), patch.object(
+            scout,
+            "ai_text",
+            return_value=model_text,
+        ):
+            answer = scout.format_asset_analysis_answer(
+                "Tell me about AGI",
+                "AGI",
+                ["dummy"],
+                {},
+            )
+
+        self.assertNotIn("risk is elevated", answer.lower())
+        self.assertIn("very thin liquidity", answer.lower())
+        self.assertIn("slippage", answer.lower())
+
+
+
+    def test_asset_analysis_removes_unsupported_execution_risk_severity(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        snap = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_SECRET_TEST_ADDRESS",
+            "pool": "AGI/XNT",
+            "pool_address": "POOL_SECRET_TEST_ADDRESS",
+            "price": "$0.0000670363",
+            "age": "6mo",
+            "holders": 1000,
+            "txns24": 250,
+            "vol24": 947.6046,
+            "change1": -0.50,
+            "change24": -12.73,
+            "liquidity": 3452,
+            "market_cap": 30144,
+            "safety": "A (86/100)",
+        }
+
+        model_text = (
+            "This combination of thin liquidity and sharp price decline "
+            "suggests elevated execution risk."
+        )
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            return_value=snap,
+        ), patch.object(
+            scout,
+            "ai_text",
+            return_value=model_text,
+        ):
+            answer = scout.format_asset_analysis_answer(
+                "Tell me about AGI",
+                "AGI",
+                ["dummy"],
+                {},
+            )
+
+        self.assertNotIn("elevated execution risk", answer.lower())
+        self.assertIn("thin liquidity", answer.lower())
+
+
     def test_broad_asset_question_routes_to_analysis(self):
         import moltgrid_signal_v12_ollama as scout
 

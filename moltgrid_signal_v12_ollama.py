@@ -629,33 +629,107 @@ def price_movement_label(change24):
     return "relatively modest movement"
 
 
-def verified_snapshot_context(snap):
+def verified_snapshot_context(snap, fields):
     """
-    Serialize deterministic XDEX values for the intelligence layer.
-    The model is never asked to discover or estimate these values.
+    Serialize only the verified XDEX values approved for this answer.
+    Omitted metrics are not exposed to the AI analysis layer.
     """
-    return (
-        f"Token: {snap['title']}\n"
-        f"Token address: {snap['token_address'] or 'N/A'}\n"
-        f"Pool: {snap['pool']}\n"
-        f"Pool address: {snap['pool_address'] or 'N/A'}\n"
-        f"Price: {snap['price']}\n"
-        f"Age: {snap['age']}\n"
-        f"Holders: {snap['holders']:,}\n"
-        f"Transactions 24h: {snap['txns24']:,}\n"
-        f"Volume 24h: {format_usd(snap['vol24'])}\n"
-        f"Volume classification: {volume_activity_label(snap['vol24'])}\n"
-        f"Change 1h: {snap['change1']:+.2f}%\n"
-        f"Change 24h: {snap['change24']:+.2f}%\n"
-        f"24h price-movement classification: {price_movement_label(snap['change24'])}\n"
-        f"Liquidity: {format_usd(snap['liquidity'])}\n"
-        f"Liquidity classification: {liquidity_depth_label(snap['liquidity'])}\n"
-        f"Market Cap: {format_usd(snap['market_cap'])}\n"
-        f"Tokenomics Safety: {snap['safety']}"
+    lines = [f"Token: {snap['title']}"]
+
+    for field in fields:
+        if field == "price":
+            lines.append(f"Price: {snap['price']}")
+
+        elif field == "age":
+            lines.append(f"Age: {snap['age']}")
+
+        elif field == "holders":
+            lines.append(f"Holders: {snap['holders']:,}")
+
+        elif field == "txns24":
+            lines.append(f"Transactions 24h: {snap['txns24']:,}")
+
+        elif field == "volume24":
+            lines.append(f"Volume 24h: {format_usd(snap['vol24'])}")
+            lines.append(
+                f"Volume classification: "
+                f"{volume_activity_label(snap['vol24'])}"
+            )
+
+        elif field == "change1h":
+            lines.append(f"Change 1h: {snap['change1']:+.2f}%")
+
+        elif field == "change24h":
+            lines.append(f"Change 24h: {snap['change24']:+.2f}%")
+            lines.append(
+                f"24h price-movement classification: "
+                f"{price_movement_label(snap['change24'])}"
+            )
+
+        elif field == "liquidity":
+            lines.append(f"Liquidity: {format_usd(snap['liquidity'])}")
+            lines.append(
+                f"Liquidity classification: "
+                f"{liquidity_depth_label(snap['liquidity'])}"
+            )
+
+        elif field == "market_cap":
+            lines.append(f"Market Cap: {format_usd(snap['market_cap'])}")
+
+        elif field == "safety":
+            lines.append(f"Tokenomics Safety: {snap['safety']}")
+
+        elif field == "pool_address":
+            lines.append(
+                f"Pool address: {snap['pool_address'] or 'N/A'}"
+            )
+
+    return "\n".join(lines)
+
+
+
+def sanitize_asset_analysis(text):
+    """
+    Remove unsupported qualitative trading-risk severity labels from
+    model-generated asset analysis while preserving the underlying
+    verified risk mechanism.
+    """
+    if not text:
+        return text
+
+    forbidden = (
+        "significant",
+        "moderate",
+        "high",
+        "low",
+        "elevated",
+        "severe",
+        "acceptable",
+    )
+    severity = "|".join(forbidden)
+
+    # Example:
+    # "Trading risk is elevated due to very thin liquidity..."
+    # -> "Risk factors include very thin liquidity..."
+    text = re.sub(
+        rf"\b(?:trading\s+)?risk\s+is\s+(?:{severity})\s+due\s+to\s+",
+        "Risk factors include ",
+        text,
+        flags=re.IGNORECASE,
     )
 
+    # Also guard forms such as "high trading risk" or
+    # "elevated market risk".
+    text = re.sub(
+        rf"\b(?:{severity})\s+(?:trading|market|execution)\s+risk\b",
+        "market risk",
+        text,
+        flags=re.IGNORECASE,
+    )
 
-def ai_asset_analysis(question, snap):
+    return text
+
+def ai_asset_analysis(question, snap, fields):
     """
     AI may INTERPRET the verified snapshot, but may not change or invent
     XDEX values, token addresses, pool addresses, or safety data.
@@ -664,6 +738,7 @@ def ai_asset_analysis(question, snap):
 
 You are given VERIFIED LIVE XDEX DATA from the application.
 Rules:
+- Discuss only metrics present in VERIFIED LIVE XDEX DATA. Do not mention metrics that were omitted from the supplied data.
 - Interpret the supplied data; do not discover, estimate, replace, or invent market numbers.
 - Never invent prices, holders, liquidity, volume, market cap, token addresses, pool addresses, transaction counts, safety grades, or percentages.
 - If you mention a numeric market value, copy it exactly from VERIFIED LIVE XDEX DATA.
@@ -696,10 +771,10 @@ Rules:
         "USER QUESTION:\n"
         f"{question}\n\n"
         "VERIFIED LIVE XDEX DATA:\n"
-        f"{verified_snapshot_context(snap)}"
+        f"{verified_snapshot_context(snap, fields)}"
     )
 
-    return ai_text(instructions, user_input)
+    return sanitize_asset_analysis(ai_text(instructions, user_input))
 
 
 def ai_general_answer(question):
@@ -783,7 +858,7 @@ def format_asset_analysis_answer(question, term, matches, catalog):
             for field in fields
         )
 
-    analysis = ai_asset_analysis(question, snap)
+    analysis = ai_asset_analysis(question, snap, fields)
 
     if analysis:
         lines.extend([
