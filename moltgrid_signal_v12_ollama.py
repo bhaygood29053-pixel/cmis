@@ -825,6 +825,61 @@ def format_ai_unavailable(question, asset_matched=False):
     )
 
 
+
+def is_broad_asset_overview(question):
+    """Return True for simple asset-overview requests."""
+    q = s(question).lower()
+
+    return any(
+        phrase in q
+        for phrase in (
+            "tell me about",
+            "overview",
+        )
+    )
+
+
+def deterministic_asset_overview_analysis(snap):
+    """
+    Fast overview interpretation using only deterministic classifications.
+    No Ollama call is needed for routine asset summaries.
+    """
+    liquidity_label = liquidity_depth_label(snap["liquidity"])
+    volume_label = volume_activity_label(snap["vol24"])
+    movement_label = price_movement_label(snap["change24"])
+
+    parts = []
+
+    if liquidity_label == "not qualitatively classified":
+        parts.append(
+            "Liquidity has no qualitative depth classification."
+        )
+    else:
+        parts.append(
+            f"Available liquidity is {liquidity_label}, which can increase "
+            "slippage and price impact during trades."
+        )
+
+    if volume_label == "not qualitatively classified":
+        parts.append(
+            "24-hour trading activity has no qualitative classification."
+        )
+    else:
+        parts.append(
+            f"24-hour trading activity is {volume_label}."
+        )
+
+    parts.append(
+        f"The 24-hour price movement is {movement_label}."
+    )
+
+    parts.append(
+        "Tokenomics safety is separate from current market trading conditions."
+    )
+
+    return " ".join(parts)
+
+
 def format_asset_analysis_answer(question, term, matches, catalog):
     """
     Route 3: retrieve the complete verified XDEX snapshot internally,
@@ -858,7 +913,10 @@ def format_asset_analysis_answer(question, term, matches, catalog):
             for field in fields
         )
 
-    analysis = ai_asset_analysis(question, snap, fields)
+    if is_broad_asset_overview(question):
+        analysis = deterministic_asset_overview_analysis(snap)
+    else:
+        analysis = ai_asset_analysis(question, snap, fields)
 
     if analysis:
         lines.extend([

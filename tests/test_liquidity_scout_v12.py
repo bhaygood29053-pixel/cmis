@@ -401,7 +401,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
 
 
 
-    def test_broad_asset_analysis_only_sends_visible_core_metrics_to_ai(self):
+    def test_deep_asset_analysis_only_sends_requested_metrics_to_ai(self):
         import moltgrid_signal_v12_ollama as scout
         from unittest.mock import patch
 
@@ -433,7 +433,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             return_value="Verified market analysis.",
         ) as mock_ai:
             scout.format_asset_analysis_answer(
-                "Tell me about AGI",
+                "Analyze AGI price liquidity volume 24h change market cap safety",
                 "AGI",
                 ["dummy"],
                 {},
@@ -497,7 +497,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             return_value=model_text,
         ):
             answer = scout.format_asset_analysis_answer(
-                "Tell me about AGI",
+                "Analyze AGI market risk using price liquidity volume 24h change market cap safety",
                 "AGI",
                 ["dummy"],
                 {},
@@ -546,7 +546,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             return_value=model_text,
         ):
             answer = scout.format_asset_analysis_answer(
-                "Tell me about AGI",
+                "Analyze AGI market risk using price liquidity volume 24h change market cap safety",
                 "AGI",
                 ["dummy"],
                 {},
@@ -554,6 +554,60 @@ class LiquidityScoutV12Tests(unittest.TestCase):
 
         self.assertNotIn("elevated execution risk", answer.lower())
         self.assertIn("thin liquidity", answer.lower())
+
+
+
+    def test_broad_asset_overview_does_not_call_ollama(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        snap = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_SECRET_TEST_ADDRESS",
+            "pool": "AGI/XNT",
+            "pool_address": "POOL_SECRET_TEST_ADDRESS",
+            "price": "$0.0000669498",
+            "age": "6mo",
+            "holders": 1000,
+            "txns24": 250,
+            "vol24": 924.814,
+            "change1": -0.50,
+            "change24": -13.82,
+            "liquidity": 3452,
+            "market_cap": 30103,
+            "safety": "A (86/100)",
+        }
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            return_value=snap,
+        ), patch.object(
+            scout,
+            "ai_asset_analysis",
+            side_effect=AssertionError(
+                "Broad overview should not call Ollama."
+            ),
+        ):
+            answer = scout.format_asset_analysis_answer(
+                "Tell me about AGI",
+                "AGI",
+                ["dummy"],
+                {},
+            )
+
+        self.assertIn("• Price: $0.0000669498", answer)
+        self.assertIn("• Liquidity: $3,452", answer)
+        self.assertIn("• Volume 24h: $924.814", answer)
+        self.assertIn("• Change 24h: -13.82%", answer)
+        self.assertIn("• Market Cap: $30,103", answer)
+        self.assertIn("• Tokenomics Safety: A (86/100)", answer)
+
+        self.assertIn("very thin", answer.lower())
+        self.assertIn("slippage", answer.lower())
+        self.assertIn("light", answer.lower())
+        self.assertIn("down sharply", answer.lower())
 
 
     def test_broad_asset_question_routes_to_analysis(self):
