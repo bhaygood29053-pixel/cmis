@@ -624,7 +624,7 @@ def price_movement_label(change24):
     if change24 >= 10:
         return "up sharply"
     if change24 >= 3:
-        return "solid upward move"
+        return "a solid upward move"
 
     return "relatively modest movement"
 

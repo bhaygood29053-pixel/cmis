@@ -55,7 +55,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
         )
         self.assertEqual(
             price_movement_label(3),
-            "solid upward move",
+            "a solid upward move",
         )
         self.assertEqual(price_movement_label(10), "up sharply")
 
