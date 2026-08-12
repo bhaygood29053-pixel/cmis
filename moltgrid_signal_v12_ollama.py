@@ -524,7 +524,7 @@ def format_hxmp_identity_answer(question):
     )
 
 
-def ai_text(instructions, user_input):
+def ai_text(instructions, user_input, max_output_tokens=None):
     """
     Call the local Ollama /api/chat endpoint directly.
 
@@ -532,6 +532,12 @@ def ai_text(instructions, user_input):
     The function returns None instead of crashing the Signal listener if
     Ollama is unavailable or the local model fails.
     """
+    output_token_limit = (
+        AI_MAX_OUTPUT_TOKENS
+        if max_output_tokens is None
+        else int(max_output_tokens)
+    )
+
     payload = {
         "model": AI_MODEL,
         "messages": [
@@ -550,7 +556,7 @@ def ai_text(instructions, user_input):
         "think": False,
         "options": {
             "temperature": OLLAMA_TEMPERATURE,
-            "num_predict": AI_MAX_OUTPUT_TOKENS,
+            "num_predict": output_token_limit,
         },
         # Keep the model warm between Signal questions.
         "keep_alive": "10m",
@@ -727,6 +733,51 @@ def sanitize_asset_analysis(text):
         flags=re.IGNORECASE,
     )
 
+    # Remove unsupported model-added interpretations.
+    text = re.sub(
+        r",?\s*(?:indicating|suggesting)\s+limited\s+trading\s+activity"
+        r"(?:\s+and\s+positive\s+momentum)?",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(
+        r"\bpositive\s+momentum\b",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Remove volatility commentary when no volatility metric is supplied.
+    text = re.sub(
+        r",?\s*which\s+does\s+not\s+indicate\s+"
+        r"(?:security\s+or\s+)?volatility\s+levels",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(
+        r"\s+and\s+does\s+not\s+indicate\s+"
+        r"(?:security\s+or\s+)?volatility\s+levels",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(
+        r"(?:^|(?<=[.!?])\s+)"
+        r"(?:No\b[^.!?]*\bvolatility\b|Volatility\b[^.!?]*"
+        r"|There\s+is\s+no\b[^.!?]*\bvolatility\b)"
+        r"[^.!?]*[.!?]?",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(r"\s{2,}", " ", text).strip()
+
     return text
 
 def ai_asset_analysis(question, snap, fields):
@@ -763,7 +814,10 @@ Rules:
 - In visible answers say "available liquidity" or "liquidity"; do not say "liquidity pool" or "pool liquidity" unless the user explicitly asks about the pool.
 - Explain risk in plain English using only classifications and observations supported by the verified data.
 - Answer the user's actual question first.
-- Keep the answer compact: normally 2 to 5 sentences.
+- Keep this analysis to exactly 2 concise sentences.
+- Do not repeat numeric market values already displayed to the user.
+- Do not invent momentum, volatility, activity, or risk labels beyond classifications explicitly supplied in VERIFIED LIVE XDEX DATA.
+- Explain the main observed market mechanism and keep tokenomics safety separate from market trading risk.
 - Do not give a command to buy or sell. You may explain what conditions look favorable or unfavorable.
 """
 
@@ -774,7 +828,13 @@ Rules:
         f"{verified_snapshot_context(snap, fields)}"
     )
 
-    return sanitize_asset_analysis(ai_text(instructions, user_input))
+    return sanitize_asset_analysis(
+        ai_text(
+            instructions,
+            user_input,
+            max_output_tokens=90,
+        )
+    )
 
 
 def ai_general_answer(question):

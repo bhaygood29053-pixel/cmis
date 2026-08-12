@@ -557,6 +557,56 @@ class LiquidityScoutV12Tests(unittest.TestCase):
 
 
 
+    def test_deep_asset_analysis_removes_unsupported_activity_and_omitted_metrics(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        snap = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_SECRET_TEST_ADDRESS",
+            "pool": "AGI/XNT",
+            "pool_address": "POOL_SECRET_TEST_ADDRESS",
+            "price": "$0.0000670363",
+            "age": "6mo",
+            "holders": 1000,
+            "txns24": 250,
+            "vol24": 947.6046,
+            "change1": -0.50,
+            "change24": 8.73,
+            "liquidity": 3452,
+            "market_cap": 30144,
+            "safety": "A (86/100)",
+        }
+
+        model_text = (
+            "AGI has light trading volume, indicating limited trading activity "
+            "and positive momentum. The tokenomics safety grade is A (86/100), "
+            "which does not indicate security or volatility levels."
+        )
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            return_value=snap,
+        ), patch.object(
+            scout,
+            "ai_text",
+            return_value=model_text,
+        ):
+            answer = scout.format_asset_analysis_answer(
+                "Analyze AGI market risk using price liquidity volume 24h change market cap safety",
+                "AGI",
+                ["dummy"],
+                {},
+            )
+
+        self.assertIn("light trading volume", answer.lower())
+        self.assertNotIn("limited trading activity", answer.lower())
+        self.assertNotIn("positive momentum", answer.lower())
+        self.assertNotIn("volatility", answer.lower())
+
+
     def test_broad_asset_overview_does_not_call_ollama(self):
         import moltgrid_signal_v12_ollama as scout
         from unittest.mock import patch
