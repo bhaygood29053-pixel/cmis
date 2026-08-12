@@ -1,0 +1,36 @@
+.env
+__pycache__/
+*.pyc
+data/state.json
+data/trades.csv
+data/decisions.jsonl
+data/hxmp_queue.jsonl
+
+# Python virtual environment
+.venv/
+
+# Development backups
+*.before-*
+*.pre-*
+
+# Logs and caches
+*.log
+.pytest_cache/
+
+# Node dependencies
+node_modules/
+
+# Sensitive key material
+*.key
+*.pem
+*.p12
+*.pfx
+
+# OS/editor clutter
+.DS_Store
+
+# MoltGrid runtime state
+data/moltgrid_conversation_state.json
+data/moltgrid_reply_state.json
+data/moltgrid_state.json
+integrations/hxmp/scripts/ledger_roberta_test.cjs.old

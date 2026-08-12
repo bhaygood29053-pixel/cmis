@@ -1,0 +1,351 @@
+import unittest
+
+from moltgrid_signal_v12_ollama import (
+    liquidity_depth_label,
+    volume_activity_label,
+    price_movement_label,
+    wants_token_address,
+)
+
+
+class LiquidityScoutV12Tests(unittest.TestCase):
+
+    def test_liquidity_classification(self):
+        self.assertEqual(liquidity_depth_label(4999), "very thin")
+        self.assertEqual(liquidity_depth_label(5000), "fairly thin")
+        self.assertEqual(liquidity_depth_label(24999), "fairly thin")
+        self.assertEqual(
+            liquidity_depth_label(25000),
+            "not qualitatively classified",
+        )
+        self.assertEqual(
+            liquidity_depth_label(99999),
+            "not qualitatively classified",
+        )
+        self.assertEqual(
+            liquidity_depth_label(100000),
+            "comparatively deep",
+        )
+
+    def test_volume_classification(self):
+        self.assertEqual(volume_activity_label(999), "light")
+        self.assertEqual(
+            volume_activity_label(1000),
+            "not qualitatively classified",
+        )
+        self.assertEqual(
+            volume_activity_label(24999),
+            "not qualitatively classified",
+        )
+        self.assertEqual(volume_activity_label(25000), "strong")
+
+    def test_price_movement_classification(self):
+        self.assertEqual(price_movement_label(-10), "down sharply")
+        self.assertEqual(
+            price_movement_label(-3),
+            "under noticeable selling pressure",
+        )
+        self.assertEqual(
+            price_movement_label(-2.99),
+            "relatively modest movement",
+        )
+        self.assertEqual(
+            price_movement_label(2.99),
+            "relatively modest movement",
+        )
+        self.assertEqual(
+            price_movement_label(3),
+            "solid upward move",
+        )
+        self.assertEqual(price_movement_label(10), "up sharply")
+
+    def test_token_address_is_opt_in(self):
+        self.assertTrue(
+            wants_token_address("What is AGI's token address?")
+        )
+        self.assertTrue(
+            wants_token_address("Show me the AGI mint address")
+        )
+        self.assertFalse(
+            wants_token_address("What is AGI doing?")
+        )
+        self.assertFalse(
+            wants_token_address("What is AGI's liquidity?")
+        )
+        self.assertFalse(
+            wants_token_address("Show me the pool address")
+        )
+
+
+    def test_two_asset_analyst_comparison(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        agi = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_TEST_ADDRESS",
+            "price": "$0.000067681",
+            "liquidity": 3522,
+            "vol24": 1399,
+            "change24": -5.57,
+            "market_cap": 31105,
+            "safety": "A (86/100)",
+        }
+
+        xnt = {
+            "title": "XNT (Wrapped XNT)",
+            "symbol": "XNT",
+            "token_address": "XNT_TEST_ADDRESS",
+            "price": "$0.5407",
+            "liquidity": 33289,
+            "vol24": 6651,
+            "change24": 0.38,
+            "market_cap": 7_460_000,
+            "safety": "A (100/100)",
+        }
+
+        resolved = [
+            ("AGI", ["dummy"]),
+            ("XNT", ["dummy"]),
+        ]
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            side_effect=[agi, xnt],
+        ):
+            answer = scout.format_multi_asset_answer(
+                "Compare AGI vs XNT",
+                resolved,
+                {},
+            )
+
+        self.assertIn(
+            "Liquidity Scout XDEX comparison:",
+            answer,
+        )
+
+        self.assertIn(
+            "• Liquidity: $3,522 (very thin)",
+            answer,
+        )
+
+        self.assertIn(
+            "• Liquidity: $33,289",
+            answer,
+        )
+
+        self.assertIn(
+            "• Liquidity: XNT has 9.5× more available liquidity",
+            answer,
+        )
+
+        self.assertIn(
+            "• Trading activity: XNT has 4.8× more 24h volume",
+            answer,
+        )
+
+        self.assertIn(
+            "• Largest absolute 24h price move: AGI (-5.57%).",
+            answer,
+        )
+
+        self.assertIn(
+            "• Best 24h return: XNT (+0.38%).",
+            answer,
+        )
+
+        self.assertIn(
+            "• Tokenomics: AGI A (86/100) • XNT A (100/100)",
+            answer,
+        )
+
+        self.assertIn(
+            "XNT's deeper available liquidity should generally "
+            "reduce slippage and price-impact pressure relative to AGI.",
+            answer,
+        )
+
+        # Privacy rule: token addresses remain hidden unless requested.
+        self.assertNotIn("AGI_TEST_ADDRESS", answer)
+        self.assertNotIn("XNT_TEST_ADDRESS", answer)
+
+    def test_comparison_token_addresses_are_opt_in(self):
+        import moltgrid_signal_v12_ollama as scout
+        from unittest.mock import patch
+
+        agi = {
+            "title": "AGI",
+            "symbol": "AGI",
+            "token_address": "AGI_TEST_ADDRESS",
+            "price": "$0.000067681",
+            "liquidity": 3522,
+            "vol24": 1399,
+            "change24": -5.57,
+            "market_cap": 31105,
+            "safety": "A (86/100)",
+        }
+
+        xnt = {
+            "title": "XNT (Wrapped XNT)",
+            "symbol": "XNT",
+            "token_address": "XNT_TEST_ADDRESS",
+            "price": "$0.5407",
+            "liquidity": 33289,
+            "vol24": 6651,
+            "change24": 0.38,
+            "market_cap": 7_460_000,
+            "safety": "A (100/100)",
+        }
+
+        resolved = [
+            ("AGI", ["dummy"]),
+            ("XNT", ["dummy"]),
+        ]
+
+        with patch.object(
+            scout,
+            "compact_asset_snapshot",
+            side_effect=[agi, xnt],
+        ):
+            answer = scout.format_multi_asset_answer(
+                "Compare AGI vs XNT and show token address",
+                resolved,
+                {},
+            )
+
+        self.assertIn("Token Addresses:", answer)
+        self.assertIn("AGI_TEST_ADDRESS", answer)
+        self.assertIn("XNT_TEST_ADDRESS", answer)
+
+
+    def test_general_defi_question_does_not_resolve_asset(self):
+        import moltgrid_signal_v12_ollama as scout
+
+        pools = [
+            {
+                "address": "POOL_AGI_XNT",
+                "liquidity": 3500,
+                "volume24h": 1400,
+                "baseToken": {
+                    "symbol": "AGI",
+                    "name": "Artificial General Intelligence",
+                    "mint": "AGI_MINT",
+                    "address": "AGI_MINT",
+                },
+                "quoteToken": {
+                    "symbol": "XNT",
+                    "name": "Wrapped XNT",
+                    "mint": "XNT_MINT",
+                    "address": "XNT_MINT",
+                },
+            }
+        ]
+
+        term, matches = scout.resolve_asset(
+            "What is slippage in a liquidity pool?",
+            pools,
+        )
+
+        self.assertFalse(matches)
+
+    def test_exact_agi_resolves_correctly(self):
+        import moltgrid_signal_v12_ollama as scout
+
+        pools = [
+            {
+                "address": "POOL_AGI_XNT",
+                "liquidity": 3500,
+                "volume24h": 1400,
+                "baseToken": {
+                    "symbol": "AGI",
+                    "name": "Artificial General Intelligence",
+                    "mint": "AGI_MINT",
+                    "address": "AGI_MINT",
+                },
+                "quoteToken": {
+                    "symbol": "XNT",
+                    "name": "Wrapped XNT",
+                    "mint": "XNT_MINT",
+                    "address": "XNT_MINT",
+                },
+            }
+        ]
+
+        term, matches = scout.resolve_asset(
+            "What is AGI doing?",
+            pools,
+        )
+
+        self.assertTrue(matches)
+        self.assertEqual(term.upper(), "AGI")
+        self.assertGreaterEqual(matches[0][3], 90)
+
+    def test_compare_agi_vs_xnt_resolves_two_assets(self):
+        import moltgrid_signal_v12_ollama as scout
+
+        pools = [
+            {
+                "address": "POOL_AGI_XNT",
+                "liquidity": 3500,
+                "volume24h": 1400,
+                "baseToken": {
+                    "symbol": "AGI",
+                    "name": "Artificial General Intelligence",
+                    "mint": "AGI_MINT",
+                    "address": "AGI_MINT",
+                },
+                "quoteToken": {
+                    "symbol": "XNT",
+                    "name": "Wrapped XNT",
+                    "mint": "XNT_MINT",
+                    "address": "XNT_MINT",
+                },
+            }
+        ]
+
+        resolved = scout.resolve_multiple_assets(
+            "Compare AGI vs XNT",
+            pools,
+        )
+
+        self.assertEqual(len(resolved), 2)
+
+        terms = {term.upper() for term, _matches in resolved}
+        self.assertEqual(terms, {"AGI", "XNT"})
+
+    def test_unknown_asset_does_not_substitute_known_asset(self):
+        import moltgrid_signal_v12_ollama as scout
+
+        pools = [
+            {
+                "address": "POOL_AGI_XNT",
+                "liquidity": 3500,
+                "volume24h": 1400,
+                "baseToken": {
+                    "symbol": "AGI",
+                    "name": "Artificial General Intelligence",
+                    "mint": "AGI_MINT",
+                    "address": "AGI_MINT",
+                },
+                "quoteToken": {
+                    "symbol": "XNT",
+                    "name": "Wrapped XNT",
+                    "mint": "XNT_MINT",
+                    "address": "XNT_MINT",
+                },
+            }
+        ]
+
+        term, matches = scout.resolve_asset(
+            "What is TOTALLYUNKNOWNCOIN doing?",
+            pools,
+        )
+
+        self.assertFalse(matches)
+
+
+
+if __name__ == "__main__":
+    unittest.main()
