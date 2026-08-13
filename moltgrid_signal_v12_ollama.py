@@ -58,6 +58,24 @@ AI_MAX_OUTPUT_TOKENS = int(os.getenv("AI_MAX_OUTPUT_TOKENS", "450"))
 OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
 OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", "0.2"))
 
+# Cloud AI provider for deep XDEX analysis.
+# Ollama remains the local fallback if DeepSeek is unavailable.
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
+DEEPSEEK_BASE_URL = os.getenv(
+    "DEEPSEEK_BASE_URL",
+    "https://api.deepseek.com",
+).rstrip("/")
+DEEPSEEK_MODEL = os.getenv(
+    "DEEPSEEK_MODEL",
+    "deepseek-v4-flash",
+).strip()
+DEEPSEEK_TIMEOUT_SECONDS = int(
+    os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "30")
+)
+DEEPSEEK_TEMPERATURE = float(
+    os.getenv("DEEPSEEK_TEMPERATURE", "0.1")
+)
+
 DATA_DIR = Path(__file__).resolve().parent / "data"
 STATE_PATH = DATA_DIR / "moltgrid_conversation_state.json"
 
@@ -588,6 +606,78 @@ def ai_text(instructions, user_input, max_output_tokens=None):
         return None
 
 
+
+def deepseek_text(instructions, user_input, max_output_tokens=None):
+    """
+    Call DeepSeek as an optional cloud AI provider.
+
+    HXMP memory is intentionally NOT attached here. Verified identity
+    and persistent memory remain local unless explicitly designed
+    otherwise.
+
+    Returns None instead of crashing the Signal listener if DeepSeek
+    is unavailable or the API request fails.
+    """
+    if not DEEPSEEK_API_KEY:
+        print("DeepSeek unavailable: DEEPSEEK_API_KEY is not configured.")
+        return None
+
+    output_token_limit = (
+        AI_MAX_OUTPUT_TOKENS
+        if max_output_tokens is None
+        else int(max_output_tokens)
+    )
+
+    payload = {
+        "model": DEEPSEEK_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": instructions,
+            },
+            {
+                "role": "user",
+                "content": user_input,
+            },
+        ],
+        "thinking": {
+            "type": "disabled",
+        },
+        "temperature": DEEPSEEK_TEMPERATURE,
+        "max_tokens": output_token_limit,
+        "stream": False,
+    }
+
+    try:
+        response = requests.post(
+            f"{DEEPSEEK_BASE_URL}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=DEEPSEEK_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        choices = data.get("choices") or []
+
+        if not choices:
+            print("DeepSeek response error: no choices returned.")
+            return None
+
+        message = choices[0].get("message") or {}
+        text = s(message.get("content"))
+        return text or None
+
+    except requests.RequestException as exc:
+        print(f"DeepSeek connection error: {exc}")
+        return None
+    except (ValueError, TypeError, KeyError, IndexError) as exc:
+        print(f"DeepSeek response error: {exc}")
+        return None
+
 def liquidity_depth_label(liquidity):
     """
     Deterministic Liquidity Scout liquidity classification.
@@ -828,13 +918,21 @@ Rules:
         f"{verified_snapshot_context(snap, fields)}"
     )
 
-    return sanitize_asset_analysis(
-        ai_text(
+    analysis = deepseek_text(
+        instructions,
+        user_input,
+        max_output_tokens=90,
+    )
+
+    if not analysis:
+        print("DeepSeek unavailable; falling back to Ollama.")
+        analysis = ai_text(
             instructions,
             user_input,
             max_output_tokens=90,
         )
-    )
+
+    return sanitize_asset_analysis(analysis)
 
 
 def ai_general_answer(question):

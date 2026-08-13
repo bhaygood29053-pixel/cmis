@@ -429,7 +429,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             return_value=snap,
         ), patch.object(
             scout,
-            "ai_text",
+            "deepseek_text",
             return_value="Verified market analysis.",
         ) as mock_ai:
             scout.format_asset_analysis_answer(
@@ -493,7 +493,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             return_value=snap,
         ), patch.object(
             scout,
-            "ai_text",
+            "deepseek_text",
             return_value=model_text,
         ):
             answer = scout.format_asset_analysis_answer(
@@ -542,7 +542,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             return_value=snap,
         ), patch.object(
             scout,
-            "ai_text",
+            "deepseek_text",
             return_value=model_text,
         ):
             answer = scout.format_asset_analysis_answer(
@@ -591,7 +591,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             return_value=snap,
         ), patch.object(
             scout,
-            "ai_text",
+            "deepseek_text",
             return_value=model_text,
         ):
             answer = scout.format_asset_analysis_answer(
