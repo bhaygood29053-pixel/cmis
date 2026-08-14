@@ -60,8 +60,36 @@ class SnapshotMetricsTests(unittest.TestCase):
         self.assertEqual(agi["pool_count"], 2)
         self.assertEqual(agi["liquidity"], 6000)
         self.assertEqual(agi["volume24"], 1000)
-        self.assertEqual(agi["holders"], 125)
+        # Holder count is asset-wide. Conflicting LP observations must remain
+        # unavailable instead of selecting the maximum observation.
+        self.assertIsNone(agi["holders"])
         self.assertEqual(agi["price"], 1.2)
+
+    def test_snapshot_rows_preserve_agreed_holder_count(self):
+        pools = [
+            pool(
+                "P1",
+                self.agi,
+                self.xnt,
+                liquidity=1000,
+                volume24h=300,
+                price_usd=1.0,
+                holders=125,
+            ),
+            pool(
+                "P2",
+                self.agi,
+                self.usdc,
+                liquidity=5000,
+                volume24h=700,
+                price_usd=1.2,
+                holders=125,
+            ),
+        ]
+
+        rows = {row["mint"]: row for row in build_snapshot_rows(pools)}
+
+        self.assertEqual(rows["MINT_AGI"]["holders"], 125)
 
     def test_xnt_reference_price_overrides_pool_price(self):
         pools = [
