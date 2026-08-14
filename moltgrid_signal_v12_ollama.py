@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 """
 Liquidity Scout v0.12 — Hybrid XDEX + Ollama Signal Listener
 
@@ -40,6 +40,14 @@ import xdex_rankings as rankings
 
 
 from config import SETTINGS
+
+from liquidity_scout.services import (
+    FIELD_ORDER as CORE_FIELD_ORDER,
+    format_field_line as core_format_field_line,
+    full_snapshot_lines as core_full_snapshot_lines,
+    requested_asset_fields as core_requested_asset_fields,
+    wants_token_address,
+)
 
 MOLTGRID_URL = "https://moltgridx1.vercel.app/api/post"
 POOLS_URL = "https://api.x1.ninja/v1/pools"
@@ -100,14 +108,6 @@ STOPWORDS = {
 
 
 
-def round_token_amount(value):
-    """Round to nearest whole token; .5 and above rounds up."""
-    return int(
-        Decimal(str(value)).quantize(
-            Decimal("1"),
-            rounding=ROUND_HALF_UP,
-        )
-    )
 
 def n(value, default=0.0):
     try:
@@ -1659,298 +1659,42 @@ def format_token_amount(value):
 
     return whole
 
-FIELD_ORDER = [
-    "price", "age", "holders", "txns24", "volume24",
-    "change1h", "change24h", "liquidity", "market_cap",
-    "fdv", "total_supply_valuation", "safety",
-]
+FIELD_ORDER = CORE_FIELD_ORDER
 
 
 def requested_asset_fields(question):
-    """
-    Detect only explicitly requested XDEX fields.
-    Uses word/phrase boundaries so concepts such as "slippage" do not
-    accidentally match the field "age".
-    """
-    q = s(question).lower()
-
-    if history.parse_historical_comparison(question):
-        return []
-
-    fields = []
-
-    def add(field):
-        if field not in fields:
-            fields.append(field)
-
-    def word(term):
-        return re.search(rf"\b{re.escape(term)}\b", q) is not None
-
-    if any(word(x) for x in ("price", "worth", "cost")) or "trading at" in q:
-        add("price")
-
-    if word("age") or "how old" in q or word("created") or word("launched"):
-        add("age")
-
-    if word("holder") or word("holders"):
-        add("holders")
-
-    if any(word(x) for x in ("transaction", "transactions", "txn", "txns")):
-        add("txns24")
-
-    if word("volume") and not wants_volume_rank(question):
-        add("volume24")
-
-    one_hour_patterns = (
-        r"\b1h\b", r"\b1\s*h\b", r"\b1hr\b", r"\b1\s*hr\b",
-        r"\b1\s*hour\b", r"\bone hour\b", r"\bhourly\b",
+    """Legacy-compatible adapter to reusable field-selection policy."""
+    return core_requested_asset_fields(
+        question,
+        historical_comparison=bool(
+            history.parse_historical_comparison(question)
+        ),
+        volume_rank=wants_volume_rank(question),
+        historical_liquidity=wants_historical_liquidity(question),
     )
-    day_24_patterns = (
-        r"\b24h\b", r"\b24\s*h\b", r"\b24hr\b", r"\b24\s*hr\b",
-        r"\b24\s*hour\b", r"\b24-hour\b", r"\btwenty[- ]four hour\b",
-        r"\bdaily\b",
-    )
-
-    has_change = (
-        word("change")
-        or word("move")
-        or word("performance")
-        or "how much up" in q
-        or "how much down" in q
-    )
-
-    if has_change and any(re.search(p, q) for p in one_hour_patterns):
-        add("change1h")
-
-    if has_change and any(re.search(p, q) for p in day_24_patterns):
-        add("change24h")
-
-    # "What is the change?" -> show both rather than guessing a timeframe.
-    if has_change and "change1h" not in fields and "change24h" not in fields:
-        add("change1h")
-        add("change24h")
-
-    if (
-        (word("liquidity") or word("liq"))
-        and not wants_historical_liquidity(question)
-    ):
-        add("liquidity")
-
-    if (
-        (
-            "total supply" in q
-            and "total supply valuation" not in q
-            and "current supply valuation" not in q
-        )
-        or (
-            "current supply" in q
-            and "current supply valuation" not in q
-        )
-    ):
-        add("total_supply")
-
-    if (
-        "current supply valuation" in q
-        or "total supply valuation" in q
-        or "supply valuation" in q
-    ):
-        add("total_supply_valuation")
-
-    if (
-        "circulating supply" in q
-        or "circulating tokens" in q
-        or "tokens circulating" in q
-    ):
-        add("circulating_supply")
-
-    if (
-        "max supply" in q
-        or "maximum supply" in q
-    ):
-        add("max_supply")
-
-    if (
-        ("market cap" in q and "fully diluted market cap" not in q)
-        or word("marketcap")
-        or word("mcap")
-    ):
-        add("market_cap")
-
-    if (
-        word("fdv")
-        or "fully diluted valuation" in q
-        or "fully diluted market cap" in q
-    ):
-        add("fdv")
-
-    if word("safety") or word("safe"):
-        add("safety")
-
-    if any(
-        phrase in q
-        for phrase in (
-            "pool address",
-            "pool contract address",
-            "pool id",
-            "pool identifier",
-        )
-    ):
-        add("pool_address")
-
-    ordered = [f for f in FIELD_ORDER if f in fields]
-
-    if "total_supply" in fields:
-        ordered.append("total_supply")
-
-    if "circulating_supply" in fields:
-        ordered.append("circulating_supply")
-
-    if "max_supply" in fields:
-        ordered.append("max_supply")
-
-    if "pool_address" in fields:
-        ordered.append("pool_address")
-
-    return ordered
 
 
 def format_field_line(field, snap):
-    if field == "circulating_supply":
-        return (
-            "• Circulating Supply: "
-            "Not available from verified data"
-        )
-
-    if field == "total_supply":
-        amount = get_token_total_supply(snap.get("token_address"))
-
-        if amount:
-            value = f"{round_token_amount(amount):,} {snap['symbol']}"
-        else:
-            value = "Not available from verified X1 RPC data"
-
-        return f"• Total Supply: {value}"
-
-    if field == "max_supply":
-        info = get_token_mint_info(
-            snap.get("token_address")
-        )
-
-        if not info:
-            return (
-                "• Max Supply: "
-                "Not available from verified X1 RPC data"
-            )
-
-        if info["mint_authority"] is None:
-            return (
-                "• Max Supply: Original maximum issuance not verified "
-                "• Mint authority revoked"
-            )
-
-        return (
-            "• Max Supply: Not fixed "
-            "• Mint authority active"
-        )
-
-
-    if field == "market_cap":
-        return (
-            "• Market Cap: Not verified "
-            "— circulating supply unavailable from verified data"
-        )
-
-    if field == "fdv":
-        amount = get_token_total_supply(
-            snap.get("token_address")
-        )
-        price = n(snap.get("price_usd_value"))
-
-        current_valuation = None
-        if amount and price > 0:
-            current_valuation = (
-                Decimal(str(amount))
-                * Decimal(str(price))
-            )
-
-        if current_valuation is not None:
-            return (
-                "• Fully Diluted Valuation (FDV): Not verified "
-                "— maximum supply unavailable from verified data "
-                f"• Current Supply Valuation: "
-                f"{format_usd(float(current_valuation))} "
-                "• Current Supply Valuation is price × current total supply; "
-                "it is not FDV unless current total supply equals maximum supply."
-            )
-
-        return (
-            "• Fully Diluted Valuation (FDV): Not verified "
-            "— maximum supply unavailable from verified data"
-        )
-
-    if field == "total_supply_valuation":
-        amount = get_token_total_supply(
-            snap.get("token_address")
-        )
-        price = n(snap.get("price_usd_value"))
-
-        if not amount or price <= 0:
-            return (
-                "• Current Supply Valuation: "
-                "Not available from verified data"
-            )
-
-        valuation = Decimal(str(amount)) * Decimal(str(price))
-
-        return (
-            "• Current Supply Valuation: "
-            f"{format_usd(float(valuation))} "
-            "• This is price × current total supply. "
-            "It is not FDV unless current total supply equals maximum supply. "
-            "Market Cap separately requires verified circulating supply."
-        )
-
-    label = {
-        "price": "Price",
-        "age": "Age",
-        "holders": "Holders",
-        "txns24": "Transactions 24h",
-        "volume24": "Volume 24h",
-        "change1h": "Change 1h",
-        "change24h": "Change 24h",
-        "liquidity": "Liquidity",
-        "market_cap": "Market Cap",
-        "fdv": "FDV",
-        "safety": "Tokenomics Safety",
-        "pool_address": "Pool Address",
-    }[field]
-
-    value = {
-        "price": snap["price"],
-        "age": snap["age"],
-        "holders": f"{snap['holders']:,}",
-        "txns24": f"{snap['txns24']:,}",
-        "volume24": format_usd(snap["vol24"]),
-        "change1h": f"{snap['change1']:+.2f}%",
-        "change24h": f"{snap['change24']:+.2f}%",
-        "liquidity": format_usd(snap["liquidity"]),
-        "market_cap": format_usd(snap["market_cap"]),
-        "fdv": format_usd(snap["fdv"]),
-        "safety": snap["safety"],
-        "pool_address": snap["pool_address"] or "N/A",
-    }[field]
-
-    if field == "liquidity":
-        return (
-            f"• {label}: {value} "
-            f"• Pools: {snap.get('pool_count', 1)}"
-        )
-
-    return f"• {label}: {value}"
+    """Legacy-compatible adapter to reusable public field formatting."""
+    return core_format_field_line(
+        field,
+        snap,
+        format_usd=format_usd,
+        get_total_supply=get_token_total_supply,
+        get_mint_info=get_token_mint_info,
+    )
 
 
 def full_snapshot_lines(snap):
-    return [format_field_line(field, snap) for field in FIELD_ORDER]
+    """Legacy-compatible adapter to reusable default snapshot formatting."""
+    return core_full_snapshot_lines(
+        snap,
+        format_usd=format_usd,
+        get_total_supply=get_token_total_supply,
+        get_mint_info=get_token_mint_info,
+    )
+
+
 
 
 def compact_asset_snapshot(term, matches, catalog):
@@ -2024,19 +1768,6 @@ def compact_asset_snapshot(term, matches, catalog):
     }
 
 
-def wants_token_address(question):
-    """Only expose a token/mint address when explicitly requested."""
-    q = s(question).lower()
-
-    return any(
-        phrase in q
-        for phrase in (
-            "token address",
-            "mint address",
-            "token mint",
-            "contract address",
-        )
-    )
 
 
 def asset_identity_lines(snap, question=None):
