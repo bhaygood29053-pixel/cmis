@@ -251,13 +251,8 @@ def get_token_mint_info(listener_module, mint):
 
     return {
         "mint_authority": record.get("mint_authority"),
-        "mint_authority_verified": True,
         "freeze_authority": record.get("freeze_authority"),
-        "freeze_authority_verified": bool(
-            record.get("freeze_authority_verified")
-        ),
         "supply": record.get("total_supply"),
-        "supply_verified": bool(record.get("supply_verified")),
         "raw_supply": record.get("raw_supply") or "",
         "decimals": (
             record.get("decimals")
