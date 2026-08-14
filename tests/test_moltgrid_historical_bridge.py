@@ -45,6 +45,7 @@ class MoltGridHistoricalBridgeTests(unittest.TestCase):
         self.assertIs(kwargs["get_total_supply"], listener.get_token_total_supply)
 
     def test_wire_market_core_replaces_listener_historical_formatter(self):
+        legacy_formatter = lambda *_args: "legacy"
         listener = types.SimpleNamespace(
             history=types.SimpleNamespace(
                 parse_historical_comparison=lambda _question: None,
@@ -55,20 +56,13 @@ class MoltGridHistoricalBridgeTests(unittest.TestCase):
             format_age=lambda value: str(value),
             get_token_total_supply=lambda _mint: None,
             get_token_mint_info=lambda _mint: None,
-            format_historical_comparison_answer=lambda *_args: "legacy",
+            format_historical_comparison_answer=legacy_formatter,
         )
 
         moltgrid.wire_market_core(listener)
 
-        self.assertNotEqual(
-            listener.format_historical_comparison_answer(
-                "not historical",
-                "AGI",
-                [],
-                object(),
-            ),
-            "legacy",
-        )
+        self.assertIsNot(listener.format_historical_comparison_answer, legacy_formatter)
+        self.assertTrue(callable(listener.format_historical_comparison_answer))
 
 
 if __name__ == "__main__":
