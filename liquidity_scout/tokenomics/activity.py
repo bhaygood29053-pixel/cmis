@@ -67,9 +67,10 @@ def scale_raw_amount(raw_amount, decimals):
 def extract_token_events(tx, mint):
     """Extract explicit parsed mint/burn events for one token mint.
 
-    Failed transactions are ignored. Both top-level and inner CPI parsed token
-    instructions are inspected. Events with malformed or missing raw amounts
-    are ignored rather than coerced to zero.
+    Only transactions with an explicitly present, successful ``meta.err``
+    field are eligible. Both top-level and inner CPI parsed token instructions
+    are inspected. Malformed or missing raw amounts are ignored rather than
+    coerced to zero.
     """
     mint = _text(mint)
     if not mint:
@@ -78,7 +79,9 @@ def extract_token_events(tx, mint):
     if not isinstance(tx, dict):
         return []
 
-    meta = tx.get("meta") or {}
+    meta = tx.get("meta")
+    if not isinstance(meta, dict) or "err" not in meta:
+        return []
     if meta.get("err") is not None:
         return []
 
