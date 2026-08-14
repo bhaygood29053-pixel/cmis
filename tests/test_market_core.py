@@ -2,7 +2,11 @@ import unittest
 
 from liquidity_scout.market.aggregation import aggregate_assets
 from liquidity_scout.market.client import fetch_all_pools
-from liquidity_scout.market.resolver import resolve_asset, resolve_multiple_assets
+from liquidity_scout.market.resolver import (
+    AmbiguousAssetError,
+    resolve_asset,
+    resolve_multiple_assets,
+)
 
 
 def token(symbol, mint, name=None):
@@ -85,6 +89,45 @@ class MarketCoreTests(unittest.TestCase):
         resolved = resolve_multiple_assets("Compare AGI vs XNT", pools)
 
         self.assertEqual({term.upper() for term, _ in resolved}, {"AGI", "XNT"})
+
+    def test_shared_symbol_is_rejected_as_ambiguous(self):
+        same_one = token("SAME", "MintOne123", "Same One")
+        same_two = token("SAME", "MintTwo456", "Same Two")
+        pools = [
+            pool("P1", same_one, self.xnt, 5000, 100),
+            pool("P2", same_two, self.usdc, 10000, 200),
+        ]
+
+        with self.assertRaises(AmbiguousAssetError) as ctx:
+            resolve_asset("What is SAME doing?", pools)
+
+        self.assertEqual(ctx.exception.term.upper(), "SAME")
+        self.assertEqual(set(ctx.exception.asset_keys), {"MintOne123", "MintTwo456"})
+
+    def test_exact_mint_disambiguates_shared_symbol(self):
+        same_one = token("SAME", "MintOne123", "Same One")
+        same_two = token("SAME", "MintTwo456", "Same Two")
+        pools = [
+            pool("P1", same_one, self.xnt, 5000, 100),
+            pool("P2", same_two, self.usdc, 10000, 200),
+        ]
+
+        term, matches = resolve_asset("MintOne123", pools)
+
+        self.assertEqual(term, "MintOne123")
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0][2]["mint"], "MintOne123")
+
+    def test_multi_asset_resolution_rejects_ambiguous_ticker(self):
+        same_one = token("SAME", "MintOne123", "Same One")
+        same_two = token("SAME", "MintTwo456", "Same Two")
+        pools = [
+            pool("P1", same_one, self.xnt, 5000, 100),
+            pool("P2", same_two, self.usdc, 10000, 200),
+        ]
+
+        with self.assertRaises(AmbiguousAssetError):
+            resolve_multiple_assets("Compare SAME vs XNT", pools)
 
     def test_aggregation_sums_unique_pools_and_selects_deepest_price(self):
         pools = [
