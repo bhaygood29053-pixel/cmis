@@ -1,8 +1,8 @@
 """Deterministic XDEX asset ranking and public ranking presentation.
 
-This module owns the existing v0.12 ranking semantics while moving ranking
-policy into the Liquidity Scout service package. Metric-semantics cleanup
-(e.g. holder disagreement and missing-value coercion) is intentionally separate.
+Exact ranks are assigned only when the requested metric is complete. Missing or
+partial XDEX observations remain unavailable/incomplete rather than becoming
+fabricated zeroes, and holder disagreement remains unverified.
 """
 
 from liquidity_scout.market.aggregation import aggregate_assets
@@ -12,57 +12,133 @@ def _s(value):
     return str(value or "").strip()
 
 
-def ranking_value(asset, metric, use_txns_for_trending=True):
+def _metric_field(metric, use_txns_for_trending=True):
     if metric == "volume":
-        return asset["volume24"]
+        return "volume24", "volume24"
     if metric == "liquidity":
-        return asset["liquidity"]
+        return "liquidity", "liquidity"
     if metric == "holders":
-        return asset["holders"]
+        return "holders", "holders"
     if metric == "safety":
-        return asset["safety_score"]
+        return "safety_score", "safety"
     if metric in ("gainers", "losers"):
-        return asset["change24"]
+        return "change24", "change24"
     if metric == "trending":
-        return asset["txns1h"] if use_txns_for_trending else asset["volume1h"]
+        return (
+            ("txns1h", "txns1h")
+            if use_txns_for_trending
+            else ("volume1h", "volume1h")
+        )
     raise ValueError(f"Unsupported ranking metric: {metric}")
+
+
+def ranking_value(asset, metric, use_txns_for_trending=True):
+    field, _complete_key = _metric_field(metric, use_txns_for_trending)
+    return asset.get(field)
+
+
+def ranking_complete(asset, metric, use_txns_for_trending=True):
+    _field, complete_key = _metric_field(metric, use_txns_for_trending)
+    return bool((asset.get("completeness") or {}).get(complete_key))
+
+
+def _positive_value_required(metric):
+    return metric in {
+        "volume",
+        "liquidity",
+        "holders",
+        "safety",
+        "trending",
+    }
+
+
+def _summary(asset, metric, use_txns_for_trending, reason):
+    return {
+        "symbol": asset.get("symbol"),
+        "name": asset.get("name"),
+        "mint": asset.get("mint"),
+        "value": ranking_value(asset, metric, use_txns_for_trending),
+        "reason": reason,
+    }
+
+
+def _matches_query(asset, query):
+    return (
+        _s(asset.get("symbol")).upper() == query
+        or _s(asset.get("mint")).upper() == query
+        or _s(asset.get("name")).upper() == query
+    )
 
 
 def rank_assets(pools, metric="volume", limit=50):
     assets = aggregate_assets(pools)
 
-    use_txns_for_trending = any(asset["txns1h"] > 0 for asset in assets)
-
-    reverse = metric != "losers"
-    ranked = sorted(
-        assets,
-        key=lambda asset: (
-            ranking_value(asset, metric, use_txns_for_trending),
-            asset["liquidity"],
-        ),
-        reverse=reverse,
+    # Preserve the established trending preference: use transaction activity
+    # when at least one exact positive 1h transaction observation exists.
+    use_txns_for_trending = any(
+        ranking_complete(asset, "trending", True)
+        and (asset.get("txns1h") or 0) > 0
+        for asset in assets
     )
 
-    if metric == "volume":
-        ranked = [asset for asset in ranked if asset["volume24"] > 0]
-    elif metric == "liquidity":
-        ranked = [asset for asset in ranked if asset["liquidity"] > 0]
-    elif metric == "holders":
-        ranked = [asset for asset in ranked if asset["holders"] > 0]
-    elif metric == "safety":
-        ranked = [asset for asset in ranked if asset["safety_score"] > 0]
-    elif metric == "trending":
-        key = "txns1h" if use_txns_for_trending else "volume1h"
-        ranked = [asset for asset in ranked if asset[key] > 0]
+    rankable = []
+    incomplete = []
+    excluded_zero = []
+
+    for asset in assets:
+        value = ranking_value(asset, metric, use_txns_for_trending)
+        complete = ranking_complete(asset, metric, use_txns_for_trending)
+
+        if not complete or value is None:
+            incomplete.append(
+                _summary(
+                    asset,
+                    metric,
+                    use_txns_for_trending,
+                    "requested_metric_incomplete",
+                )
+            )
+            continue
+
+        if _positive_value_required(metric) and value <= 0:
+            excluded_zero.append(
+                _summary(
+                    asset,
+                    metric,
+                    use_txns_for_trending,
+                    "verified_non_positive_value",
+                )
+            )
+            continue
+
+        rankable.append(asset)
+
+    # Stable deterministic tie order independent of catalog row ordering.
+    rankable.sort(key=lambda asset: _s(asset.get("mint")))
+    ranked = sorted(
+        rankable,
+        key=lambda asset: ranking_value(
+            asset,
+            metric,
+            use_txns_for_trending,
+        ),
+        reverse=(metric != "losers"),
+    )
 
     for index, asset in enumerate(ranked, 1):
         asset["rank"] = index
 
-    return ranked[:limit], {
+    meta = {
         "trending_basis": (
             "1h transactions" if use_txns_for_trending else "1h volume"
-        )
+        ),
+        "ranked_count": len(ranked),
+        "incomplete_count": len(incomplete),
+        "unranked_incomplete": incomplete,
+        "unranked_zero": excluded_zero,
     }
+
+    return ranked[:limit], meta
 
 
 def find_asset_rank(pools, query, metric="volume"):
@@ -74,34 +150,55 @@ def find_asset_rank(pools, query, metric="volume"):
         limit=100000,
     )
 
-    for asset in ranked:
-        if (
-            asset["symbol"].upper() == query
-            or asset["mint"].upper() == query
-            or asset["name"].upper() == query
-        ):
-            return asset, len(ranked), meta
+    result_meta = dict(meta)
 
-    return None, len(ranked), meta
+    for asset in ranked:
+        if _matches_query(asset, query):
+            result_meta["query_status"] = "ranked"
+            return asset, meta["ranked_count"], result_meta
+
+    for asset in meta.get("unranked_incomplete", []):
+        if _matches_query(asset, query):
+            result_meta["query_status"] = "incomplete"
+            result_meta["query_asset"] = asset
+            return None, meta["ranked_count"], result_meta
+
+    for asset in meta.get("unranked_zero", []):
+        if _matches_query(asset, query):
+            result_meta["query_status"] = "verified_non_positive"
+            result_meta["query_asset"] = asset
+            return None, meta["ranked_count"], result_meta
+
+    result_meta["query_status"] = "not_found"
+    return None, meta["ranked_count"], result_meta
 
 
 def metric_text(asset, metric, meta=None):
     if metric == "volume":
-        return f"${asset['volume24']:,.2f}"
+        value = asset.get("volume24")
+        return "unavailable" if value is None else f"${value:,.2f}"
     if metric == "liquidity":
-        return f"${asset['liquidity']:,.2f}"
+        value = asset.get("liquidity")
+        return "unavailable" if value is None else f"${value:,.2f}"
     if metric == "holders":
-        return f"{asset['holders']:,.0f}"
+        value = asset.get("holders")
+        return "unavailable" if value is None else f"{value:,.0f}"
     if metric == "safety":
+        value = asset.get("safety_score")
+        if value is None:
+            return "unavailable"
         grade = asset["safety_grade"] or "N/A"
-        return f"{grade} ({asset['safety_score']:.0f}/100)"
+        return f"{grade} ({value:.0f}/100)"
     if metric in ("gainers", "losers"):
-        return f"{asset['change24']:+.2f}%"
+        value = asset.get("change24")
+        return "unavailable" if value is None else f"{value:+.2f}%"
     if metric == "trending":
         basis = (meta or {}).get("trending_basis")
         if basis == "1h transactions":
-            return f"{asset['txns1h']:,.0f} txns"
-        return f"${asset['volume1h']:,.2f}"
+            value = asset.get("txns1h")
+            return "unavailable" if value is None else f"{value:,.0f} txns"
+        value = asset.get("volume1h")
+        return "unavailable" if value is None else f"${value:,.2f}"
     return ""
 
 
@@ -192,6 +289,15 @@ def ranking_separator(metric):
     return "-----+--------------+----------------+----------------+------"
 
 
+def _liquidity_text(asset):
+    value = asset.get("liquidity")
+    if value is None:
+        return "unavailable"
+    if (asset.get("completeness") or {}).get("liquidity"):
+        return f"${value:,.2f}"
+    return f">=${value:,.2f}"
+
+
 def ranking_row(asset, metric, meta=None):
     value = metric_text(asset, metric, meta)
     rank_text = f"#{asset['rank']}"
@@ -206,7 +312,7 @@ def ranking_row(asset, metric, meta=None):
             f"{lp_count:>5}"
         )
 
-    liquidity_text = f"${asset['liquidity']:,.2f}"
+    liquidity_text = _liquidity_text(asset)
 
     return (
         f"{rank_text:<4} | "
@@ -248,6 +354,17 @@ def format_top(pools, metric="volume", limit=10):
     for asset in ranked:
         lines.append(ranking_row(asset, metric, meta))
 
+    if meta.get("incomplete_count"):
+        lines.extend([
+            "",
+            (
+                "Data note: "
+                f"{meta['incomplete_count']} asset"
+                f"{'s' if meta['incomplete_count'] != 1 else ''} excluded "
+                "from the exact ranking because the requested metric is incomplete."
+            ),
+        ])
+
     return "\n".join(lines)
 
 
@@ -257,6 +374,7 @@ __all__ = [
     "format_top",
     "metric_text",
     "rank_assets",
+    "ranking_complete",
     "ranking_header",
     "ranking_row",
     "ranking_separator",
