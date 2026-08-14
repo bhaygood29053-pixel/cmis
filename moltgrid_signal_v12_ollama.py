@@ -41,6 +41,24 @@ import xdex_rankings as rankings
 
 from config import SETTINGS
 
+from liquidity_scout.integrations.moltgrid import (
+    MoltGridXDEXCatalog as XDEXCatalog,
+    resolve_asset,
+    resolve_multiple_assets,
+)
+from liquidity_scout.market.resolver import (
+    asset_key,
+    candidate_terms,
+    exact_token_match,
+    explicitly_requests_multiple_assets,
+    find_matches_for_term,
+    normalize_text,
+    pair_name,
+    partial_token_match,
+    pool_address,
+    token_fields,
+)
+
 from liquidity_scout.services import (
     FIELD_ORDER as CORE_FIELD_ORDER,
     format_field_line as core_format_field_line,
@@ -50,13 +68,11 @@ from liquidity_scout.services import (
 )
 
 MOLTGRID_URL = "https://moltgridx1.vercel.app/api/post"
-POOLS_URL = "https://api.x1.ninja/v1/pools"
 
 BOT_NAME = "Liquidity Scout"
 LOOKBACK_HOURS = 24
 POLL_SECONDS = int(os.getenv("MOLTGRID_REPLY_POLL_SECONDS", "15"))
 CATALOG_REFRESH_SECONDS = int(os.getenv("XDEX_CATALOG_REFRESH_SECONDS", "300"))
-PAGE_SIZE = 100
 
 # Hybrid intelligence layer.
 # XDEX facts always come from X1.Ninja. Ollama is used only to interpret
@@ -98,13 +114,6 @@ BOT_CONTENT_MARKERS = (
 )
 
 # Common words we do NOT want to mistake for ticker symbols.
-STOPWORDS = {
-    "WHAT", "IS", "THE", "OF", "DOING", "TODAY", "PRICE", "LIQUIDITY",
-    "VOLUME", "SHOW", "ME", "TELL", "ABOUT", "FIND", "HOW", "DOES", "HAVE",
-    "POOL", "POOLS", "ON", "XDEX", "RIGHT", "NOW", "CURRENT", "CURRENTLY",
-    "MARKET", "CAP", "HOLDERS", "SAFETY", "TOKEN", "COIN", "ASSET",
-    "BUY", "SELL", "HOLD", "SIGNAL", "PLEASE", "WHATS", "WHAT'S",
-}
 
 
 
@@ -1293,244 +1302,28 @@ def find_unanswered_messages(
     return incoming
 
 
-class XDEXCatalog:
-    def __init__(self):
-        self.pools: List[Dict[str, Any]] = []
-        self.xnt_price_usd = None
-        self.last_refresh = 0.0
-
-    def refresh_if_needed(self):
-        age = time.time() - self.last_refresh
-        if not self.pools or age >= CATALOG_REFRESH_SECONDS:
-            self.refresh()
-
-    def refresh(self):
-        if not SETTINGS.api_key:
-            raise RuntimeError("X1_NINJA_API_KEY is missing from .env")
-
-        headers = {"Authorization": f"Bearer {SETTINGS.api_key}"}
-        pools = []
-        offset = 0
-        total = None
-        xnt_price_usd = None
-
-        while True:
-            r = requests.get(
-                POOLS_URL,
-                params={"limit": PAGE_SIZE, "offset": offset},
-                headers=headers,
-                timeout=20,
-            )
-            r.raise_for_status()
-            body = r.json()
-
-            page = body.get("pools", []) if isinstance(body, dict) else []
-            if not isinstance(page, list):
-                page = []
-
-            if total is None:
-                total = int(body.get("total") or body.get("totalCount") or 0)
-
-            if xnt_price_usd is None:
-                xnt_price_usd = body.get("xntPriceUsd")
-
-            pools.extend(page)
-
-            if not page:
-                break
-
-            offset += len(page)
-
-            if total and offset >= total:
-                break
-
-            if offset > 10000:
-                break
-
-            time.sleep(0.03)
-
-        self.pools = pools
-        self.xnt_price_usd = xnt_price_usd
-        self.last_refresh = time.time()
-
-        print(
-            f"[catalog] Loaded {len(self.pools)} XDEX pools"
-            + (
-                f" | XNT ${n(self.xnt_price_usd):,.6f}"
-                if self.xnt_price_usd is not None
-                else ""
-            )
-        )
-
-
-def token_fields(token):
-    if not isinstance(token, dict):
-        return []
-    return [
-        s(token.get("symbol")),
-        s(token.get("name")),
-        s(token.get("mint")),
-        s(token.get("address")),
-    ]
-
-
-def pool_address(pool):
-    return s(pool.get("address") or pool.get("poolAddress") or pool.get("id"))
-
-
-def pair_name(pool):
-    base = pool.get("baseToken") or {}
-    quote = pool.get("quoteToken") or {}
-    return f"{s(base.get('symbol'))}/{s(quote.get('symbol'))}"
-
-
-def normalize_text(text):
-    return re.sub(r"[^A-Za-z0-9.]+", " ", s(text)).strip()
-
-
-def candidate_terms(question):
-    """
-    Produce possible asset identifiers from a natural-language question.
-    Longer phrases are tried first, then individual words.
-    """
-    clean = normalize_text(question)
-    words = [w for w in clean.split() if w]
-
-    candidates = []
-
-    # Consecutive 3-word and 2-word phrases can match token names.
-    for size in (3, 2):
-        for i in range(len(words) - size + 1):
-            phrase = " ".join(words[i:i+size])
-            if phrase.upper() not in STOPWORDS:
-                candidates.append(phrase)
-
-    # Individual ticker/name/mint candidates.
-    for word in words:
-        if word.upper() in STOPWORDS:
-            continue
-        if len(word) >= 2:
-            candidates.append(word)
-
-    # Preserve order while deduplicating.
-    seen = set()
-    out = []
-    for c in candidates:
-        key = c.lower()
-        if key not in seen:
-            seen.add(key)
-            out.append(c)
-
-    return out
-
-
-def exact_token_match(token, query):
-    q = s(query).lower()
-    if not q:
-        return False
-    fields = [f.lower() for f in token_fields(token) if f]
-    return q in fields
-
-
-def partial_token_match(token, query):
-    q = s(query).lower()
-    if len(q) < 3:
-        return False
-    fields = [f.lower() for f in token_fields(token) if f]
-    return any(q in f for f in fields)
-
-
-def find_matches_for_term(term, pools):
-    matches = []
-
-    for pool in pools:
-        base = pool.get("baseToken") or {}
-        quote = pool.get("quoteToken") or {}
-        addr = pool_address(pool)
-
-        if term.lower() == addr.lower():
-            matches.append((pool, "pool", None, 100))
-            continue
-
-        if exact_token_match(base, term):
-            matches.append((pool, "base", base, 90))
-        elif exact_token_match(quote, term):
-            matches.append((pool, "quote", quote, 90))
-        elif partial_token_match(base, term):
-            matches.append((pool, "base", base, 60))
-        elif partial_token_match(quote, term):
-            matches.append((pool, "quote", quote, 60))
-
-    return matches
 
 
 
 
-def explicitly_requests_multiple_assets(question):
-    """
-    Only use multi-asset mode when the wording clearly asks for more than one
-    asset. This prevents a token/pair name such as 'FOREST X1X' from being
-    split into two separate answers by accident.
-    """
-    q = f" {s(question).lower()} "
-
-    strong_multi_markers = (
-        " compare ",
-        " compared ",
-        " versus ",
-        " vs ",
-        " vs. ",
-        " between ",
-    )
-
-    # Words such as "and" occur constantly in normal conceptual questions.
-    # Never treat "and" by itself as proof of a multi-asset request.
-    return any(marker in q for marker in strong_multi_markers)
 
 
-def resolve_multiple_assets(question, pools, max_assets=4):
-    """
-    Resolve multiple distinct XDEX assets mentioned in one question.
-    Example: "What's happening with AGI and XIX?"
-    """
-    terms = candidate_terms(question)
-    found = []
-    seen_assets = set()
 
-    for term in terms:
-        matches = find_matches_for_term(term, pools)
 
-        # Routing requires an exact token name/symbol, mint, or pool address.
-        # Ignore quality-60 substring matches from ordinary language.
-        matches = [m for m in matches if m[3] >= 90]
 
-        if not matches:
-            continue
 
-        matches.sort(
-            key=lambda item: (
-                item[3],
-                n(item[0].get("liquidity")),
-                n(item[0].get("volume24h")),
-            ),
-            reverse=True,
-        )
 
-        pool, side, asset, _quality = matches[0]
-        if not asset:
-            asset = pool.get("baseToken") or {}
 
-        key = asset_key(asset) or f"term:{term.lower()}"
-        if key in seen_assets:
-            continue
 
-        seen_assets.add(key)
-        found.append((term, matches))
 
-        if len(found) >= max_assets:
-            break
 
-    return found
+
+
+
+
+
+
+
 
 
 
@@ -1955,36 +1748,6 @@ def format_multi_asset_answer(question, resolved_assets, catalog):
     return "\n".join(lines)
 
 
-def resolve_asset(question, pools):
-    """
-    Return (query_term, matches).
-
-    We choose the first candidate term that actually matches the XDEX catalog.
-    This prevents a question like "What is SolXen doing today?" from
-    accidentally falling back to AGI.
-    """
-    terms = candidate_terms(question)
-
-    for term in terms:
-        matches = find_matches_for_term(term, pools)
-
-        # Do not let fuzzy substring matches turn normal crypto/DeFi words
-        # into unrelated XDEX assets. Exact token matches score 90 and
-        # exact pool-address matches score 100.
-        matches = [m for m in matches if m[3] >= 90]
-
-        if matches:
-            matches.sort(
-                key=lambda item: (
-                    item[3],                       # match quality
-                    n(item[0].get("liquidity")),  # strongest pool
-                    n(item[0].get("volume24h")),
-                ),
-                reverse=True,
-            )
-            return term, matches
-
-    return None, []
 
 
 def describe_direction(change):
@@ -2034,21 +1797,6 @@ def format_number(value):
     return f"{value:,.2f}".rstrip("0").rstrip(".")
 
 
-def asset_key(token):
-    if not isinstance(token, dict):
-        return None
-
-    mint = s(token.get("mint") or token.get("address"))
-    symbol = s(token.get("symbol"))
-    name = s(token.get("name"))
-
-    if mint:
-        return mint
-    if symbol:
-        return f"symbol:{symbol.upper()}"
-    if name:
-        return f"name:{name.lower()}"
-    return None
 
 
 def aggregate_asset_activity(pools):
