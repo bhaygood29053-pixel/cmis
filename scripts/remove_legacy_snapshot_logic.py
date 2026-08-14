@@ -33,6 +33,14 @@ def _replace_lines(lines: list[str], start: int, end: int, replacement: str) -> 
     lines[start - 1 : end] = replacement.splitlines(keepends=True)
 
 
+def _snapshot_function(source: str) -> ast.FunctionDef | None:
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == "compact_asset_snapshot":
+            return node
+    return None
+
+
 def main() -> None:
     source = TARGET.read_text(encoding="utf-8")
 
@@ -43,14 +51,7 @@ def main() -> None:
         print("Legacy compact snapshot cleanup already applied.")
         return
 
-    tree = ast.parse(source)
-    snapshot = None
-
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == "compact_asset_snapshot":
-            snapshot = node
-            break
-
+    snapshot = _snapshot_function(source)
     if snapshot is None:
         raise RuntimeError("legacy compact_asset_snapshot function not found")
 
@@ -76,7 +77,21 @@ def main() -> None:
             1,
         )
 
-    ast.parse(updated)
+    # Validate the rewritten function itself instead of scanning the entire
+    # legacy listener for generic statements that may legitimately occur in
+    # unrelated functions.
+    rewritten_snapshot = _snapshot_function(updated)
+    if rewritten_snapshot is None:
+        raise RuntimeError("rewritten compact_asset_snapshot function not found")
+
+    rewritten_text = ast.get_source_segment(updated, rewritten_snapshot) or ""
+    required = (
+        "bridge_compact_asset_snapshot(",
+        "sys.modules[__name__]",
+    )
+    missing = [marker for marker in required if marker not in rewritten_text]
+    if missing:
+        raise RuntimeError(f"legacy snapshot wrapper incomplete: {missing}")
 
     forbidden = (
         'price_usd = n(pool.get("priceUsd"))',
@@ -84,12 +99,13 @@ def main() -> None:
         "Public asset liquidity = total across all matching XDEX pools.",
         'market_cap = n(pool.get("marketCap"))',
     )
-    remaining = [marker for marker in forbidden if marker in updated]
+    remaining = [marker for marker in forbidden if marker in rewritten_text]
     if remaining:
-        raise RuntimeError(f"legacy compact snapshot implementation remains: {remaining}")
+        raise RuntimeError(
+            f"legacy compact snapshot implementation remains in wrapper: {remaining}"
+        )
 
-    if "sys.modules[__name__]" not in updated:
-        raise RuntimeError("legacy snapshot wrapper was not installed")
+    ast.parse(updated)
 
     old_lines = len(source.splitlines())
     new_lines = len(updated.splitlines())
