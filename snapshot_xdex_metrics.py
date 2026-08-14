@@ -1,105 +1,53 @@
 import historical_metrics as history
-import moltgrid_signal_v12_ollama as scout
+from liquidity_scout.market import XDEXCatalog, aggregate_assets
+
+
+def build_snapshot_rows(pools, xnt_price_usd=None):
+    """Build one historical snapshot row per mint from XDEX pool data."""
+    rows = []
+
+    for asset in aggregate_assets(pools):
+        price = asset["price"]
+
+        if asset["symbol"] == "XNT" and xnt_price_usd is not None:
+            try:
+                price = float(xnt_price_usd)
+            except (TypeError, ValueError):
+                price = asset["price"]
+
+        rows.append(
+            {
+                "mint": asset["mint"],
+                "symbol": asset["symbol"],
+                "price": price,
+                "liquidity": asset["liquidity"],
+                "volume24": asset["volume24"],
+                "holders": asset["holders"],
+                "pool_count": asset["pool_count"],
+            }
+        )
+
+    return rows
+
+
+def record_catalog_snapshot(catalog):
+    """Persist the current catalog snapshot and return the asset count."""
+    rows = build_snapshot_rows(
+        catalog.pools,
+        xnt_price_usd=catalog.xnt_price_usd,
+    )
+
+    for row in rows:
+        history.record_snapshot(**row)
+
+    return len(rows)
 
 
 def main():
-    catalog = scout.XDEXCatalog()
+    catalog = XDEXCatalog()
     catalog.refresh()
 
-    assets = {}
-
-    for pool in catalog.pools:
-        for side_name in ("baseToken", "quoteToken"):
-            token = pool.get(side_name) or {}
-
-            symbol = scout.s(token.get("symbol")).upper()
-            mint = scout.s(
-                token.get("mint")
-                or token.get("address")
-            )
-
-            if not symbol or not mint:
-                continue
-
-            key = mint
-
-            if key not in assets:
-                assets[key] = {
-                    "symbol": symbol,
-                    "mint": mint,
-                    "pools": [],
-                }
-
-            assets[key]["pools"].append(pool)
-
-    recorded = 0
-
-    for item in assets.values():
-        symbol = item["symbol"]
-        mint = item["mint"]
-        pools = item["pools"]
-
-        # Remove duplicate pool objects for this asset.
-        unique_pools = []
-        seen = set()
-
-        for pool in pools:
-            pool_key = (
-                scout.s(pool.get("address"))
-                or scout.s(pool.get("poolAddress"))
-                or scout.s(pool.get("id"))
-                or str(id(pool))
-            )
-
-            if pool_key in seen:
-                continue
-
-            seen.add(pool_key)
-            unique_pools.append(pool)
-
-        if not unique_pools:
-            continue
-
-        # Use the deepest pool as the representative price source.
-        primary = max(
-            unique_pools,
-            key=lambda p: scout.n(p.get("liquidity")),
-        )
-
-        if symbol == "XNT" and catalog.xnt_price_usd is not None:
-            price = scout.n(catalog.xnt_price_usd)
-        else:
-            price = scout.n(primary.get("priceUsd"))
-
-        liquidity = sum(
-            scout.n(p.get("liquidity"))
-            for p in unique_pools
-        )
-
-        volume24 = sum(
-            scout.n(p.get("volume24h"))
-            for p in unique_pools
-        )
-
-        holders = max(
-            (
-                scout.n(p.get("holders"))
-                for p in unique_pools
-            ),
-            default=0,
-        )
-
-        history.record_snapshot(
-            mint=mint,
-            symbol=symbol,
-            price=price,
-            liquidity=liquidity,
-            volume24=volume24,
-            holders=holders,
-            pool_count=len(unique_pools),
-        )
-
-        recorded += 1
+    recorded = record_catalog_snapshot(catalog)
 
     print(
         f"Historical snapshot complete: "
