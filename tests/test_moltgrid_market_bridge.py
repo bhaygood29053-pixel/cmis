@@ -30,14 +30,19 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
         self.agi = token("AGI", "MINT_AGI", "Artificial General Intelligence")
         self.usdc = token("USDC", "MINT_USDC", "USD Coin")
 
-    def test_wire_market_core_replaces_market_globals_and_snapshot(self):
+    def test_wire_market_core_replaces_market_globals_snapshot_and_context(self):
         original_main = object()
         original_snapshot = object()
+        original_context = object()
         listener = SimpleNamespace(
             XDEXCatalog=object(),
             resolve_asset=object(),
             resolve_multiple_assets=object(),
             compact_asset_snapshot=original_snapshot,
+            liquidity_depth_label=object(),
+            volume_activity_label=object(),
+            price_movement_label=object(),
+            verified_snapshot_context=original_context,
             format_usd=lambda value: str(value),
             format_age=lambda value: str(value),
             main=original_main,
@@ -54,6 +59,11 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
         )
         self.assertTrue(callable(listener.compact_asset_snapshot))
         self.assertIsNot(listener.compact_asset_snapshot, original_snapshot)
+        self.assertIs(listener.liquidity_depth_label, moltgrid.liquidity_depth_label)
+        self.assertIs(listener.volume_activity_label, moltgrid.volume_activity_label)
+        self.assertIs(listener.price_movement_label, moltgrid.price_movement_label)
+        self.assertTrue(callable(listener.verified_snapshot_context))
+        self.assertIsNot(listener.verified_snapshot_context, original_context)
         self.assertIs(listener.main, original_main)
 
     def test_single_asset_resolution_uses_core_pool_ordering(self):
@@ -123,6 +133,95 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
         self.assertEqual(snap["pool_address"], "P2")
         self.assertEqual(snap["safety"], "A (90/100)")
         self.assertEqual(snap["age"], "7mo")
+        self.assertEqual(snap["_market_report"]["liquidity_usd"], 6000)
+        self.assertTrue(snap["_market_report"]["completeness"]["liquidity"])
+
+    def test_verified_context_does_not_classify_compatibility_zero_as_fact(self):
+        primary = pool("P2", self.agi, self.usdc, None, 100)
+        primary.update(
+            {
+                "txns24h": 10,
+                "holders": 1000,
+                "priceUsd": 0.25,
+                "createdAt": "2026-01-01T00:00:00Z",
+            }
+        )
+        matches = [(primary, "base", self.agi, 90)]
+        listener = SimpleNamespace(
+            format_usd=lambda value: f"${value:,.0f}",
+            format_age=lambda _value: "7mo",
+        )
+        catalog = SimpleNamespace(xnt_price_usd=None, last_refresh=123.0)
+
+        snap = moltgrid.compact_asset_snapshot(
+            listener,
+            "AGI",
+            matches,
+            catalog,
+        )
+        context = moltgrid.verified_snapshot_context(
+            listener,
+            snap,
+            ["liquidity"],
+        )
+
+        # v0.12 public compatibility remains zero-coerced for now.
+        self.assertEqual(snap["liquidity"], 0)
+        # AI context consumes the structured report instead of that zero.
+        self.assertIn("Liquidity: Not available from verified data", context)
+        self.assertNotIn("Liquidity: $0", context)
+        self.assertNotIn("Liquidity classification:", context)
+
+    def test_verified_context_marks_partial_sum_without_classifying_it(self):
+        primary = pool("P2", self.agi, self.usdc, 5000, 100)
+        secondary = pool("P1", self.agi, self.xnt, None, 500)
+        matches = [
+            (primary, "base", self.agi, 90),
+            (secondary, "base", self.agi, 90),
+        ]
+        listener = SimpleNamespace(
+            format_usd=lambda value: f"${value:,.0f}",
+            format_age=lambda _value: "7mo",
+        )
+        catalog = SimpleNamespace(xnt_price_usd=None, last_refresh=123.0)
+
+        snap = moltgrid.compact_asset_snapshot(
+            listener,
+            "AGI",
+            matches,
+            catalog,
+        )
+        context = moltgrid.verified_snapshot_context(
+            listener,
+            snap,
+            ["liquidity"],
+        )
+
+        self.assertEqual(snap["liquidity"], 5000)
+        self.assertIn(
+            "Liquidity: at least $5,000 — incomplete XDEX pool data",
+            context,
+        )
+        self.assertNotIn("Liquidity classification:", context)
+
+    def test_legacy_context_fallback_preserves_existing_snapshot_behavior(self):
+        listener = SimpleNamespace(
+            format_usd=lambda value: f"${value:,.0f}",
+            format_age=lambda _value: "7mo",
+        )
+        legacy_snap = {
+            "title": "AGI",
+            "liquidity": 3522,
+        }
+
+        context = moltgrid.verified_snapshot_context(
+            listener,
+            legacy_snap,
+            ["liquidity"],
+        )
+
+        self.assertIn("Liquidity: $3,522", context)
+        self.assertIn("Liquidity classification: very thin", context)
 
     def test_ambiguous_symbol_fails_closed_for_listener(self):
         same_one = token("SAME", "MINT_ONE", "Same One")
