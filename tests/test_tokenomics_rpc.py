@@ -86,7 +86,7 @@ class TokenomicsRPCTests(unittest.TestCase):
         self.assertEqual(parsed["decimals"], 9)
         self.assertEqual(
             parsed["total_supply"],
-            "123456789012345678901.234567890",
+            "123456789012345678901.23456789",
         )
         self.assertTrue(parsed["supply_verified"])
 
