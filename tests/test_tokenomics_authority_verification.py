@@ -57,9 +57,16 @@ class TokenomicsAuthorityVerificationTests(unittest.TestCase):
         with patch.object(moltgrid, "core_get_mint_info", return_value=record):
             info = moltgrid.get_token_mint_info(self.listener, "MintA")
 
-        self.assertIsNotNone(info)
-        self.assertTrue(info["mint_authority_verified"])
-        self.assertTrue(info["freeze_authority_verified"])
+        self.assertEqual(
+            info,
+            {
+                "mint_authority": None,
+                "freeze_authority": None,
+                "supply": "1",
+                "raw_supply": "1000000",
+                "decimals": 6,
+            },
+        )
 
         line = format_field_line(
             "max_supply",
@@ -84,8 +91,16 @@ class TokenomicsAuthorityVerificationTests(unittest.TestCase):
         with patch.object(moltgrid, "core_get_mint_info", return_value=record):
             info = moltgrid.get_token_mint_info(self.listener, "MintA")
 
-        self.assertEqual(info["mint_authority"], "AuthorityA")
-        self.assertFalse(info["freeze_authority_verified"])
+        self.assertEqual(
+            info,
+            {
+                "mint_authority": "AuthorityA",
+                "freeze_authority": None,
+                "supply": "1",
+                "raw_supply": "1000000",
+                "decimals": 6,
+            },
+        )
 
         line = format_field_line(
             "max_supply",
