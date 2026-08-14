@@ -8,6 +8,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from dotenv import load_dotenv
 
+from liquidity_scout.market import XDEXCatalog, resolve_asset
+
 load_dotenv()
 
 RPC = os.getenv(
@@ -87,34 +89,33 @@ def looks_like_mint(value):
     )
 
 
-def resolve_token(value):
+def resolve_token(value, catalog=None):
     """
     Accept either:
       AGI
       XENCAT
       <mint address>
 
+    Symbol/name resolution uses the shared XDEX market core. A caller may
+    provide an already-loaded catalog for tests or batch workflows.
+
     Returns:
       symbol, mint
     """
 
-    value = value.strip()
+    value = str(value or "").strip()
+
+    if not value:
+        raise ValueError("Token identifier is required.")
 
     if looks_like_mint(value):
         return value[:8] + "...", value
 
-    try:
-        import moltgrid_signal_v12_ollama as scout
-    except Exception as exc:
-        raise RuntimeError(
-            "Could not load Liquidity Scout for symbol resolution: "
-            f"{exc}"
-        )
+    if catalog is None:
+        catalog = XDEXCatalog()
+        catalog.refresh()
 
-    catalog = scout.XDEXCatalog()
-    catalog.refresh()
-
-    term, matches = scout.resolve_asset(
+    term, matches = resolve_asset(
         value,
         catalog.pools,
     )
@@ -124,41 +125,24 @@ def resolve_token(value):
             f"Token '{value}' was not found in the XDEX catalog."
         )
 
-    snap = scout.compact_asset_snapshot(
-        term,
-        matches,
-        catalog,
-    )
+    _pool, side, asset, _quality = matches[0]
+
+    if side == "pool" or not isinstance(asset, dict):
+        raise RuntimeError(
+            f"Could not determine X1 mint address for '{value}'."
+        )
 
     mint = str(
-        snap.get("token_address") or ""
+        asset.get("mint")
+        or asset.get("address")
+        or ""
     ).strip()
 
     symbol = str(
-        snap.get("symbol") or value
+        asset.get("symbol")
+        or term
+        or value
     ).strip().upper()
-
-    # Fallback if snapshot does not expose token_address.
-    if not mint:
-        try:
-            _pool, _side, asset, _quality = matches[0]
-
-            for key in (
-                "address",
-                "mint",
-                "tokenAddress",
-                "token_address",
-            ):
-                candidate = str(
-                    asset.get(key) or ""
-                ).strip()
-
-                if candidate:
-                    mint = candidate
-                    break
-
-        except Exception:
-            pass
 
     if not mint:
         raise RuntimeError(
