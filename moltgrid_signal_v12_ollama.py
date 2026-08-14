@@ -63,6 +63,7 @@ from liquidity_scout.market.resolver import (
 )
 
 from liquidity_scout.services import (
+    format_market_comparison as core_format_market_comparison,
     FIELD_ORDER as CORE_FIELD_ORDER,
     format_field_line as core_format_field_line,
     full_snapshot_lines as core_full_snapshot_lines,
@@ -1423,181 +1424,21 @@ def asset_identity_lines(snap, question=None):
 
 
 def format_multi_asset_answer(question, resolved_assets, catalog):
+    """Legacy-compatible adapter to reusable multi-asset comparison policy."""
+    snapshots = [
+        compact_asset_snapshot(term, matches, catalog)
+        for term, matches in resolved_assets
+    ]
     fields = requested_asset_fields(question)
-    snaps = []
 
-    for term, matches in resolved_assets:
-        snaps.append(
-            compact_asset_snapshot(term, matches, catalog)
-        )
-
-    lines = ["Liquidity Scout XDEX comparison:"]
-
-    # If the user requested specific fields, preserve the concise field-only mode.
-    if fields:
-        for i, snap in enumerate(snaps):
-            if i:
-                lines.append("")
-
-            lines.extend(asset_identity_lines(snap, question))
-            lines.extend(
-                format_field_line(field, snap)
-                for field in fields
-            )
-
-    else:
-        # Default comparison view: show only the metrics that matter most
-        # for market-structure comparison instead of dumping every field.
-        for i, snap in enumerate(snaps):
-            if i:
-                lines.append("")
-
-            liquidity_class = liquidity_depth_label(snap["liquidity"])
-            volume_class = volume_activity_label(snap["vol24"])
-            move_class = price_movement_label(snap["change24"])
-
-            liquidity_text = format_usd(snap["liquidity"])
-            if liquidity_class != "not qualitatively classified":
-                liquidity_text += f" ({liquidity_class})"
-
-            volume_text = format_usd(snap["vol24"])
-            if volume_class != "not qualitatively classified":
-                volume_text += f" ({volume_class})"
-
-            lines.extend([
-                snap["title"],
-                f"• Price: {snap['price']}",
-                f"• Liquidity: {liquidity_text}",
-                f"• Volume 24h: {volume_text}",
-                f"• Change 24h: {snap['change24']:+.2f}% ({move_class})",
-                "• Market Cap: Not verified — "
-                "circulating supply unavailable from verified data",
-                f"• Tokenomics Safety: {snap['safety']}",
-            ])
-
-        if len(snaps) >= 2:
-            by_volume = max(snaps, key=lambda x: x["vol24"])
-            by_liquidity = max(snaps, key=lambda x: x["liquidity"])
-
-            # Largest move means absolute magnitude, regardless of direction.
-            largest_move = max(
-                snaps,
-                key=lambda x: abs(x["change24"])
-            )
-
-            # Best return means highest signed 24h percentage.
-            best_return = max(
-                snaps,
-                key=lambda x: x["change24"]
-            )
-
-            lines.extend([
-                "",
-                "Analyst comparison:",
-            ])
-
-            if len(snaps) == 2:
-                a, b = snaps
-
-                # Liquidity comparison.
-                liq_winner = a if a["liquidity"] >= b["liquidity"] else b
-                liq_other = b if liq_winner is a else a
-
-                if liq_other["liquidity"] > 0:
-                    liq_ratio = (
-                        liq_winner["liquidity"] /
-                        liq_other["liquidity"]
-                    )
-
-                    lines.append(
-                        f"• Liquidity: {liq_winner['symbol']} has "
-                        f"{liq_ratio:.1f}× more available liquidity "
-                        f"({format_usd(liq_winner['liquidity'])} vs "
-                        f"{format_usd(liq_other['liquidity'])})."
-                    )
-                else:
-                    lines.append(
-                        f"• Liquidity: {liq_winner['symbol']} has deeper "
-                        f"available liquidity "
-                        f"({format_usd(liq_winner['liquidity'])} vs "
-                        f"{format_usd(liq_other['liquidity'])})."
-                    )
-
-                # Volume comparison.
-                vol_winner = a if a["vol24"] >= b["vol24"] else b
-                vol_other = b if vol_winner is a else a
-
-                if vol_other["vol24"] > 0:
-                    vol_ratio = (
-                        vol_winner["vol24"] /
-                        vol_other["vol24"]
-                    )
-
-                    lines.append(
-                        f"• Trading activity: {vol_winner['symbol']} has "
-                        f"{vol_ratio:.1f}× more 24h volume "
-                        f"({format_usd(vol_winner['vol24'])} vs "
-                        f"{format_usd(vol_other['vol24'])})."
-                    )
-                else:
-                    lines.append(
-                        f"• Trading activity: {vol_winner['symbol']} has "
-                        f"higher 24h volume "
-                        f"({format_usd(vol_winner['vol24'])} vs "
-                        f"{format_usd(vol_other['vol24'])})."
-                    )
-
-            else:
-                lines.extend([
-                    f"• Highest 24h volume: {by_volume['symbol']} "
-                    f"({format_usd(by_volume['vol24'])})",
-                    f"• Deepest liquidity: {by_liquidity['symbol']} "
-                    f"({format_usd(by_liquidity['liquidity'])})",
-                ])
-
-            lines.extend([
-                f"• Largest absolute 24h price move: "
-                f"{largest_move['symbol']} "
-                f"({largest_move['change24']:+.2f}%).",
-
-                f"• Best 24h return: "
-                f"{best_return['symbol']} "
-                f"({best_return['change24']:+.2f}%).",
-
-                "• Tokenomics: "
-                + " • ".join(
-                    f"{snap['symbol']} {snap['safety']}"
-                    for snap in snaps
-                ),
-            ])
-
-            # Explain execution implications from liquidity only.
-            if len(snaps) == 2:
-                a, b = snaps
-                deeper = a if a["liquidity"] >= b["liquidity"] else b
-                thinner = b if deeper is a else a
-
-                if deeper["liquidity"] > thinner["liquidity"]:
-                    lines.append(
-                        f"• Execution: For similarly sized AMM trades, "
-                        f"{deeper['symbol']}'s deeper available liquidity "
-                        f"should generally reduce slippage and price-impact "
-                        f"pressure relative to {thinner['symbol']}."
-                    )
-
-    if wants_token_address(question):
-        lines.extend([
-            "",
-            "Token Addresses:",
-        ])
-
-        for snap in snaps:
-            lines.append(
-                f"• {snap['symbol']}: "
-                f"{snap.get('token_address') or 'N/A'}"
-            )
-
-    return "\n".join(lines)
+    return core_format_market_comparison(
+        question,
+        snapshots,
+        fields=fields,
+        format_usd=format_usd,
+        format_field_line=format_field_line,
+        include_token_addresses=wants_token_address(question),
+    )
 
 
 
