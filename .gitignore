@@ -34,3 +34,13 @@ data/moltgrid_conversation_state.json
 data/moltgrid_reply_state.json
 data/moltgrid_state.json
 integrations/hxmp/scripts/ledger_roberta_test.cjs.old
+
+# Liquidity Scout runtime databases
+*.db
+
+# Liquidity Scout development backups
+*.before_*
+
+# Generated XDEX ranking exports
+top50_xdex_assets.csv
+top50_xdex_assets.json

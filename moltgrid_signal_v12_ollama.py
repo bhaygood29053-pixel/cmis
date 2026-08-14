@@ -1,3 +1,4 @@
+from decimal import Decimal, ROUND_HALF_UP
 """
 Liquidity Scout v0.12 — Hybrid XDEX + Ollama Signal Listener
 
@@ -34,6 +35,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import requests
+import historical_metrics as history
+import xdex_rankings as rankings
 
 
 from config import SETTINGS
@@ -83,7 +86,7 @@ BOT_CONTENT_MARKERS = (
     "Liquidity Scout |",
     "Liquidity Scout Trader v0.1",
     "Liquidity Scout reply:",
-    "Liquidity Scout XDEX reply:",
+    "Liquidity Scout reply:",
 )
 
 # Common words we do NOT want to mistake for ticker symbols.
@@ -95,6 +98,16 @@ STOPWORDS = {
     "BUY", "SELL", "HOLD", "SIGNAL", "PLEASE", "WHATS", "WHAT'S",
 }
 
+
+
+def round_token_amount(value):
+    """Round to nearest whole token; .5 and above rounds up."""
+    return int(
+        Decimal(str(value)).quantize(
+            Decimal("1"),
+            rounding=ROUND_HALF_UP,
+        )
+    )
 
 def n(value, default=0.0):
     try:
@@ -345,6 +358,38 @@ def looks_like_general_question(content):
     return lower.startswith(starters)
 
 
+def wants_historical_liquidity(question):
+    """Detect questions asking about liquidity changes over time."""
+    q = s(question).lower()
+
+    if "liquidity" not in q and not re.search(r"\bliq\b", q):
+        return False
+
+    historical_terms = (
+        "fallen", "falling", "fell",
+        "dropped", "drop", "declined", "decreased",
+        "increased", "increasing", "risen", "rose",
+        "changed", "change", "trend", "trending",
+        "this week", "last week",
+        "7d", "7 days", "seven days",
+        "24h", "24 hours",
+        "30d", "30 days",
+        "yesterday", "ago",
+        "over the last",
+        "since",
+    )
+
+    if any(term in q for term in historical_terms):
+        return True
+
+    # Percentage comparison such as:
+    # "Has liquidity fallen more than 30%?"
+    if "%" in q:
+        return True
+
+    return False
+
+
 def wants_asset_analysis(question):
     """
     Distinguish raw-data requests from interpretation requests.
@@ -355,6 +400,11 @@ def wants_asset_analysis(question):
       "Why is AGI falling?" -> True
     """
     q = s(question).lower()
+
+    # Historical comparisons are deterministic and should not be
+    # answered by the LLM analysis route.
+    if history.parse_historical_comparison(question):
+        return False
 
     analysis_phrases = (
         "dangerous", "risky", "risk", "healthy", "unhealthy",
@@ -722,7 +772,7 @@ def price_movement_label(change24):
     if change24 >= 3:
         return "a solid upward move"
 
-    return "relatively modest movement"
+    return "relatively modest"
 
 
 def verified_snapshot_context(snap, fields):
@@ -770,7 +820,10 @@ def verified_snapshot_context(snap, fields):
             )
 
         elif field == "market_cap":
-            lines.append(f"Market Cap: {format_usd(snap['market_cap'])}")
+            lines.append(
+                "Market Cap: Not verified — "
+                "circulating supply unavailable from verified data"
+            )
 
         elif field == "safety":
             lines.append(f"Tokenomics Safety: {snap['safety']}")
@@ -965,7 +1018,19 @@ Rules:
         f"USER QUESTION:\n{question}"
     )
 
-    return ai_text(instructions, user_input)
+    answer = deepseek_text(
+        instructions,
+        user_input,
+    )
+
+    if not answer:
+        print("DeepSeek unavailable; falling back to Ollama.")
+        answer = ai_text(
+            instructions,
+            user_input,
+        )
+
+    return answer
 
 
 def format_ai_unavailable(question, asset_matched=False):
@@ -1059,7 +1124,7 @@ def format_asset_analysis_answer(question, term, matches, catalog):
         ]
 
     lines = [
-        "Liquidity Scout XDEX analysis:",
+        "Liquidity Scout analysis:",
         snap["title"],
     ]
 
@@ -1469,9 +1534,135 @@ def resolve_multiple_assets(question, pools, max_assets=4):
 
 
 
+
+def x1_rpc_request(method, params, retries=4):
+    """Reliable X1 RPC request with retry/backoff."""
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": params,
+    }
+
+    for attempt in range(retries):
+        try:
+            response = requests.post(
+                SETTINGS.x1_rpc_url,
+                json=payload,
+                timeout=15,
+            )
+
+            if response.status_code == 429 or response.status_code >= 500:
+                raise RuntimeError(
+                    f"X1 RPC HTTP {response.status_code}"
+                )
+
+            response.raise_for_status()
+
+            data = response.json()
+
+            if data.get("error"):
+                raise RuntimeError(data["error"])
+
+            return data.get("result")
+
+        except Exception as exc:
+            if attempt == retries - 1:
+                print(
+                    f"X1 RPC {method} failed after "
+                    f"{retries} attempts: {exc}"
+                )
+                return None
+
+            time.sleep(0.75 * (2 ** attempt))
+
+
+def get_token_total_supply(mint):
+    """Return exact current token supply from X1 mainnet RPC."""
+    mint = s(mint)
+    if not mint:
+        return None
+
+    result = x1_rpc_request(
+        "getTokenSupply",
+        [mint],
+    )
+
+    value = (result or {}).get("value") or {}
+    amount = s(value.get("uiAmountString"))
+
+    return amount or None
+
+
+def get_token_mint_info(mint):
+    """Return verified X1 mint authority and current supply information."""
+    mint = s(mint)
+    if not mint:
+        return None
+
+    result = x1_rpc_request(
+        "getAccountInfo",
+        [
+            mint,
+            {"encoding": "jsonParsed"},
+        ],
+    )
+
+    info = (
+        (result or {})
+        .get("value", {})
+        .get("data", {})
+        .get("parsed", {})
+        .get("info", {})
+    )
+
+    if not info:
+        return None
+
+    raw_supply = s(info.get("supply"))
+    decimals = int(info.get("decimals") or 0)
+
+    supply = None
+
+    if raw_supply:
+        supply = str(
+            Decimal(raw_supply)
+            / (Decimal(10) ** decimals)
+        )
+
+    return {
+        "mint_authority": info.get("mintAuthority"),
+        "freeze_authority": info.get("freezeAuthority"),
+        "supply": supply,
+        "raw_supply": raw_supply,
+        "decimals": decimals,
+    }
+
+
+
+def format_token_amount(value):
+    """Add thousands separators without losing RPC decimal precision."""
+    value = s(value)
+
+    if not value:
+        return ""
+
+    whole, dot, fraction = value.partition(".")
+
+    try:
+        whole = f"{int(whole):,}"
+    except ValueError:
+        return value
+
+    if dot:
+        return f"{whole}.{fraction}"
+
+    return whole
+
 FIELD_ORDER = [
     "price", "age", "holders", "txns24", "volume24",
-    "change1h", "change24h", "liquidity", "market_cap", "safety",
+    "change1h", "change24h", "liquidity", "market_cap",
+    "fdv", "total_supply_valuation", "safety",
 ]
 
 
@@ -1482,6 +1673,10 @@ def requested_asset_fields(question):
     accidentally match the field "age".
     """
     q = s(question).lower()
+
+    if history.parse_historical_comparison(question):
+        return []
+
     fields = []
 
     def add(field):
@@ -1535,11 +1730,58 @@ def requested_asset_fields(question):
         add("change1h")
         add("change24h")
 
-    if word("liquidity") or word("liq"):
+    if (
+        (word("liquidity") or word("liq"))
+        and not wants_historical_liquidity(question)
+    ):
         add("liquidity")
 
-    if "market cap" in q or word("marketcap") or word("mcap"):
+    if (
+        (
+            "total supply" in q
+            and "total supply valuation" not in q
+            and "current supply valuation" not in q
+        )
+        or (
+            "current supply" in q
+            and "current supply valuation" not in q
+        )
+    ):
+        add("total_supply")
+
+    if (
+        "current supply valuation" in q
+        or "total supply valuation" in q
+        or "supply valuation" in q
+    ):
+        add("total_supply_valuation")
+
+    if (
+        "circulating supply" in q
+        or "circulating tokens" in q
+        or "tokens circulating" in q
+    ):
+        add("circulating_supply")
+
+    if (
+        "max supply" in q
+        or "maximum supply" in q
+    ):
+        add("max_supply")
+
+    if (
+        ("market cap" in q and "fully diluted market cap" not in q)
+        or word("marketcap")
+        or word("mcap")
+    ):
         add("market_cap")
+
+    if (
+        word("fdv")
+        or "fully diluted valuation" in q
+        or "fully diluted market cap" in q
+    ):
+        add("fdv")
 
     if word("safety") or word("safe"):
         add("safety")
@@ -1557,6 +1799,15 @@ def requested_asset_fields(question):
 
     ordered = [f for f in FIELD_ORDER if f in fields]
 
+    if "total_supply" in fields:
+        ordered.append("total_supply")
+
+    if "circulating_supply" in fields:
+        ordered.append("circulating_supply")
+
+    if "max_supply" in fields:
+        ordered.append("max_supply")
+
     if "pool_address" in fields:
         ordered.append("pool_address")
 
@@ -1564,6 +1815,101 @@ def requested_asset_fields(question):
 
 
 def format_field_line(field, snap):
+    if field == "circulating_supply":
+        return (
+            "• Circulating Supply: "
+            "Not available from verified data"
+        )
+
+    if field == "total_supply":
+        amount = get_token_total_supply(snap.get("token_address"))
+
+        if amount:
+            value = f"{round_token_amount(amount):,} {snap['symbol']}"
+        else:
+            value = "Not available from verified X1 RPC data"
+
+        return f"• Total Supply: {value}"
+
+    if field == "max_supply":
+        info = get_token_mint_info(
+            snap.get("token_address")
+        )
+
+        if not info:
+            return (
+                "• Max Supply: "
+                "Not available from verified X1 RPC data"
+            )
+
+        if info["mint_authority"] is None:
+            return (
+                "• Max Supply: Original maximum issuance not verified "
+                "• Mint authority revoked"
+            )
+
+        return (
+            "• Max Supply: Not fixed "
+            "• Mint authority active"
+        )
+
+
+    if field == "market_cap":
+        return (
+            "• Market Cap: Not verified "
+            "— circulating supply unavailable from verified data"
+        )
+
+    if field == "fdv":
+        amount = get_token_total_supply(
+            snap.get("token_address")
+        )
+        price = n(snap.get("price_usd_value"))
+
+        current_valuation = None
+        if amount and price > 0:
+            current_valuation = (
+                Decimal(str(amount))
+                * Decimal(str(price))
+            )
+
+        if current_valuation is not None:
+            return (
+                "• Fully Diluted Valuation (FDV): Not verified "
+                "— maximum supply unavailable from verified data "
+                f"• Current Supply Valuation: "
+                f"{format_usd(float(current_valuation))} "
+                "• Current Supply Valuation is price × current total supply; "
+                "it is not FDV unless current total supply equals maximum supply."
+            )
+
+        return (
+            "• Fully Diluted Valuation (FDV): Not verified "
+            "— maximum supply unavailable from verified data"
+        )
+
+    if field == "total_supply_valuation":
+        amount = get_token_total_supply(
+            snap.get("token_address")
+        )
+        price = n(snap.get("price_usd_value"))
+
+        if not amount or price <= 0:
+            return (
+                "• Current Supply Valuation: "
+                "Not available from verified data"
+            )
+
+        valuation = Decimal(str(amount)) * Decimal(str(price))
+
+        return (
+            "• Current Supply Valuation: "
+            f"{format_usd(float(valuation))} "
+            "• This is price × current total supply. "
+            "It is not FDV unless current total supply equals maximum supply. "
+            "Market Cap separately requires verified circulating supply."
+        )
+
     label = {
         "price": "Price",
         "age": "Age",
@@ -1574,6 +1920,7 @@ def format_field_line(field, snap):
         "change24h": "Change 24h",
         "liquidity": "Liquidity",
         "market_cap": "Market Cap",
+        "fdv": "FDV",
         "safety": "Tokenomics Safety",
         "pool_address": "Pool Address",
     }[field]
@@ -1588,9 +1935,16 @@ def format_field_line(field, snap):
         "change24h": f"{snap['change24']:+.2f}%",
         "liquidity": format_usd(snap["liquidity"]),
         "market_cap": format_usd(snap["market_cap"]),
+        "fdv": format_usd(snap["fdv"]),
         "safety": snap["safety"],
         "pool_address": snap["pool_address"] or "N/A",
     }[field]
+
+    if field == "liquidity":
+        return (
+            f"• {label}: {value} "
+            f"• Pools: {snap.get('pool_count', 1)}"
+        )
 
     return f"• {label}: {value}"
 
@@ -1608,36 +1962,51 @@ def compact_asset_snapshot(term, matches, catalog):
     name = s(asset.get("name"))
 
     price_usd = n(pool.get("priceUsd"))
-    liquidity = n(pool.get("liquidity"))
+    # Public asset liquidity = total across all matching XDEX pools.
+    # Keep strongest/primary pool liquidity separately for route/slippage analysis.
+    primary_liquidity = n(pool.get("liquidity"))
+    liquidity = sum(
+        n(item[0].get("liquidity"))
+        for item in matches
+    )
+    pool_count = len(matches)
+
     vol24 = n(pool.get("volume24h"))
     change1 = n(pool.get("priceChange1h"))
     change24 = n(pool.get("priceChange24h"))
     holders = int(n(pool.get("holders")))
     txns24 = int(n(pool.get("txns24h")))
     market_cap = n(pool.get("marketCap"))
+    fdv = n(pool.get("fdv"))
     safety_grade = s(pool.get("safetyGrade")) or "N/A"
     safety_score = n(pool.get("safetyScore"))
     age = format_age(pool.get("createdAt"))
 
     is_xnt = symbol.upper() == "XNT" or term.upper() == "XNT"
     if is_xnt and catalog.xnt_price_usd is not None:
-        price_text = format_usd(catalog.xnt_price_usd)
+        price_value = n(catalog.xnt_price_usd)
+        price_text = format_usd(price_value)
     else:
-        price_text = format_usd(price_usd)
+        price_value = price_usd
+        price_text = format_usd(price_value)
 
     safety_text = safety_grade
     if safety_score > 0:
         safety_text += f" ({safety_score:g}/100)"
 
-    title = symbol
-    if name and name.upper() != symbol.upper():
-        title += f" ({name})"
+    if is_xnt:
+        title = "XNT"
+    else:
+        title = symbol
+        if name and name.upper() != symbol.upper():
+            title += f" ({name})"
 
     return {
         "title": title,
         "symbol": symbol,
         "token_address": s(asset.get("mint") or asset.get("address")),
         "price": price_text,
+        "price_usd_value": price_value,
         "age": age,
         "holders": holders,
         "txns24": txns24,
@@ -1645,7 +2014,10 @@ def compact_asset_snapshot(term, matches, catalog):
         "change1": change1,
         "change24": change24,
         "liquidity": liquidity,
+        "primary_liquidity": primary_liquidity,
+        "pool_count": pool_count,
         "market_cap": market_cap,
+        "fdv": fdv,
         "safety": safety_text,
         "pool": pair_name(pool),
         "pool_address": pool_address(pool),
@@ -1722,7 +2094,8 @@ def format_multi_asset_answer(question, resolved_assets, catalog):
                 f"• Liquidity: {liquidity_text}",
                 f"• Volume 24h: {volume_text}",
                 f"• Change 24h: {snap['change24']:+.2f}% ({move_class})",
-                f"• Market Cap: {format_usd(snap['market_cap'])}",
+                "• Market Cap: Not verified — "
+                "circulating supply unavailable from verified data",
                 f"• Tokenomics Safety: {snap['safety']}",
             ])
 
@@ -2053,6 +2426,211 @@ def plain_language_summary(change24, liquidity, volume24, safety_grade):
     return text[:1].upper() + text[1:] + "."
 
 
+
+def xdex_ranking_metric(question):
+    """Resolve the requested X1.Ninja/XDEX ranking metric."""
+    q = s(question).lower()
+
+    if (
+        "trending" in q
+        or "trend" in q
+        or "most active" in q
+    ):
+        return "trending"
+
+    if (
+        "gainer" in q
+        or "gainers" in q
+        or "biggest gain" in q
+        or "best performing" in q
+    ):
+        return "gainers"
+
+    if (
+        "loser" in q
+        or "losers" in q
+        or "biggest loss" in q
+        or "worst performing" in q
+    ):
+        return "losers"
+
+    if "liquidity" in q or re.search(r"\bliq\b", q):
+        return "liquidity"
+
+    if "holder" in q:
+        return "holders"
+
+    if (
+        "safety" in q
+        or "safest" in q
+        or "safe tokens" in q
+    ):
+        return "safety"
+
+    # Volume is the default XDEX activity ranking.
+    return "volume"
+
+
+def xdex_ranking_limit(question, default=10):
+    q = s(question).lower()
+
+    match = re.search(r"\btop\s+(\d+)\b", q)
+
+    if not match:
+        return default
+
+    try:
+        value = int(match.group(1))
+    except ValueError:
+        return default
+
+    # Avoid enormous Signal replies.
+    return max(1, min(value, 50))
+
+
+def wants_global_xdex_ranking(question):
+    """
+    Global leaderboard requests such as:
+      Top 10 by volume
+      What are the top 20 tokens on XDEX?
+      What's trending on X1.Ninja?
+      Show me the biggest gainers
+    """
+    q = s(question).lower().strip()
+
+    global_patterns = (
+        r"^top\s+\d+",
+        r"\bwhat are the top\s+\d+",
+        r"\bshow me the top\s+\d+",
+        r"\blist the top\s+\d+",
+        r"\bgive me the top\s+\d+",
+        r"\btop gainers\b",
+        r"\bbiggest gainers\b",
+        r"\btop losers\b",
+        r"\bbiggest losers\b",
+        r"\bsafest tokens\b",
+        r"\btop safest\b",
+        r"\bwhat tokens are trending\b",
+        r"\bwhich tokens are trending\b",
+        r"\bwhat is trending\b",
+        r"\bwhat's trending\b",
+    )
+
+    return any(
+        re.search(pattern, q)
+        for pattern in global_patterns
+    )
+
+
+def wants_asset_rank(question):
+    """
+    Specific-asset ranking requests such as:
+      Where does AGI rank by volume?
+      What is X1X's liquidity rank?
+      Is AGI in the top 50?
+    """
+    if wants_global_xdex_ranking(question):
+        return False
+
+    q = s(question).lower()
+
+    return (
+        bool(re.search(r"\brank(?:ed|ing)?\b", q))
+        or bool(re.search(r"\bin\s+(?:the\s+)?top\s+\d+\b", q))
+    )
+
+
+def xdex_ranking_title(metric):
+    return {
+        "volume": "24h Volume",
+        "liquidity": "Liquidity",
+        "holders": "Holders",
+        "safety": "Tokenomics Safety",
+        "gainers": "24h Gainers",
+        "losers": "24h Losers",
+        "trending": "1h Trending",
+    }.get(metric, metric)
+
+
+def format_global_xdex_ranking_answer(question, catalog):
+    metric = xdex_ranking_metric(question)
+    limit = xdex_ranking_limit(question)
+
+    return rankings.format_top(
+        catalog.pools,
+        metric=metric,
+        limit=limit,
+    )
+
+
+def format_asset_rank_answer(question, term, matches, catalog):
+    metric = xdex_ranking_metric(question)
+
+    snap = compact_asset_snapshot(
+        term,
+        matches,
+        catalog,
+    )
+
+    symbol = snap.get("symbol") or term
+    mint = snap.get("token_address")
+    lookup = mint or symbol
+
+    asset_rank, total_ranked, meta = rankings.find_asset_rank(
+        catalog.pools,
+        lookup,
+        metric=metric,
+    )
+
+    if not asset_rank:
+        return (
+            f"Liquidity Scout reply: {symbol} • "
+            f"I found the asset on XDEX, but I could not calculate "
+            f"a reliable {xdex_ranking_title(metric)} rank right now."
+        )
+
+    style = rankings.ranking_style(
+        metric,
+        meta,
+    )
+
+    lines = [
+        f"{style['icon']} X1.NINJA / XDEX ASSET RANK",
+        style["label"],
+        "",
+        rankings.ranking_header(
+            metric,
+            meta,
+        ),
+        rankings.ranking_separator(
+            metric,
+        ),
+        rankings.ranking_row(
+            asset_rank,
+            metric,
+            meta,
+        ),
+    ]
+
+    top_match = re.search(
+        r"\b(?:the\s+)?top\s+(\d+)\b",
+        s(question).lower(),
+    )
+
+    if top_match:
+        top_n = int(top_match.group(1))
+
+        lines.extend([
+            "",
+            (
+                f"TOP {top_n}: "
+                f"{'YES' if asset_rank['rank'] <= top_n else 'NO'}"
+            ),
+        ])
+
+    return "\n".join(lines)
+
+
 def wants_volume_rank(question):
     q = s(question).lower()
     return (
@@ -2072,7 +2650,7 @@ def format_volume_rank_answer(question, term, matches, catalog):
 
     if not rank_data:
         return (
-            "Liquidity Scout XDEX reply:\n"
+            "Liquidity Scout reply:\n"
             f"I found {symbol} on XDEX, but I could not calculate a reliable "
             "XDEX-wide volume rank for it right now."
         )
@@ -2094,7 +2672,13 @@ def format_volume_rank_answer(question, term, matches, catalog):
         tier = "in the lower half of XDEX trading activity"
 
     price_usd = n(pool.get("priceUsd"))
-    liquidity = n(pool.get("liquidity"))
+
+    # Total liquidity across every matching pool for this asset.
+    liquidity = sum(
+        n(item[0].get("liquidity"))
+        for item in matches
+    )
+
     change1 = n(pool.get("priceChange1h"))
     change24 = n(pool.get("priceChange24h"))
     market_cap = n(pool.get("marketCap"))
@@ -2124,7 +2708,7 @@ def format_volume_rank_answer(question, term, matches, catalog):
         address_suffix = f"\n\nToken Address: {token_address}"
 
     return (
-        "Liquidity Scout XDEX reply:\n"
+        "Liquidity Scout reply:\n"
         f"{symbol}\n"
         f"{symbol} ranks #{rank} out of {total} XDEX assets by 24h pool volume.\n\n"
         f"• Price: {headline_price}\n"
@@ -2134,8 +2718,9 @@ def format_volume_rank_answer(question, term, matches, catalog):
         f"• Volume 24h: {format_usd(total_vol)}\n"
         f"• Change 1h: {change1:+.2f}%\n"
         f"• Change 24h: {change24:+.2f}%\n"
-        f"• Liquidity: {format_usd(liquidity)}\n"
-        f"• Market Cap: {format_usd(market_cap)}\n"
+        f"• Liquidity: {format_usd(liquidity)} • Pools: {pools_count}\n"
+        "• Market Cap: Not verified — "
+        "circulating supply unavailable from verified data\n"
         f"• Tokenomics Safety: {safety_text}\n\n"
         f"Bottom line: {symbol} is {tier}, currently around the top {top_pct}% "
         f"of XDEX assets by 24h volume. It appears in {pools_count} XDEX "
@@ -2144,15 +2729,193 @@ def format_volume_rank_answer(question, term, matches, catalog):
     )
 
 
+def format_historical_comparison_answer(
+    question,
+    term,
+    matches,
+    catalog,
+):
+    request = history.parse_historical_comparison(question)
+
+    if not request:
+        return None
+
+    snap = compact_asset_snapshot(
+        term,
+        matches,
+        catalog,
+    )
+
+    metric = request["metric"]
+    period = request["period"]
+    period_seconds = request["period_seconds"]
+
+    mint = snap.get("token_address")
+    symbol = snap.get("symbol") or term
+
+    if not period_seconds:
+        return (
+            f"Liquidity Scout reply: {symbol} • "
+            "Please specify a comparison period such as "
+            "24h, 7d, or 30d."
+        )
+
+    current_map = {
+        "price": n(snap.get("price_usd_value")),
+        "liquidity": n(snap.get("liquidity")),
+        "volume": n(snap.get("vol24")),
+        "holders": n(snap.get("holders")),
+    }
+
+    # Supply is retrieved from verified X1 RPC.
+    if metric == "supply":
+        amount = get_token_total_supply(mint)
+        current_value = (
+            float(amount)
+            if amount
+            else None
+        )
+    else:
+        current_value = current_map.get(metric)
+
+    # Burn percentage comparisons will use the verified burn DB
+    # in the next burn-integration step.
+    if metric == "burns":
+        return (
+            f"Liquidity Scout reply: {symbol} • "
+            "Historical burn percentage comparisons are not yet "
+            "enabled in the live listener. Verified burn history "
+            "is maintained separately by the X1 burn scanner."
+        )
+
+    if current_value is None:
+        return (
+            f"Liquidity Scout reply: {symbol} • "
+            f"Current {metric} data is not available from a "
+            "verified source."
+        )
+
+    # Always store the current observation.
+    history.record_snapshot(
+        mint=mint,
+        symbol=symbol,
+        price=n(snap.get("price_usd_value")),
+        liquidity=n(snap.get("liquidity")),
+        volume24=n(snap.get("vol24")),
+        holders=n(snap.get("holders")),
+        total_supply=(
+            current_value
+            if metric == "supply"
+            else None
+        ),
+        pool_count=snap.get("pool_count"),
+    )
+
+    old = history.historical_value(
+        mint,
+        metric,
+        period_seconds,
+    )
+
+    if not old:
+        current_text = history.format_number(
+            metric,
+            current_value,
+        )
+
+        return (
+            history.history_not_ready_message(
+                symbol,
+                metric,
+                period,
+                mint,
+            )
+            + f" Current {metric}: {current_text}."
+        )
+
+    old_value = old["value"]
+
+    change = history.percent_change(
+        old_value,
+        current_value,
+    )
+
+    if change is None:
+        return (
+            f"Liquidity Scout reply: {symbol} • "
+            f"Historical {metric} percentage change cannot "
+            "be calculated because the earlier value was zero."
+        )
+
+    current_text = history.format_number(
+        metric,
+        current_value,
+    )
+
+    old_text = history.format_number(
+        metric,
+        old_value,
+    )
+
+    answer = (
+        f"Liquidity Scout reply: {symbol} • "
+        f"Current {metric}: {current_text} "
+        f"• {period} ago: {old_text} "
+        f"• Change: {change:+.2f}%"
+    )
+
+    threshold = request.get("threshold")
+    direction = request.get("direction")
+
+    if threshold is not None:
+        result = history.threshold_result(
+            change,
+            direction,
+            threshold,
+        )
+
+        if result is not None:
+            direction_text = (
+                "decline"
+                if direction == "down"
+                else "increase"
+                if direction == "up"
+                else "change"
+            )
+
+            answer += (
+                f" • {direction_text.title()} of at least "
+                f"{threshold:g}%: "
+                f"{'YES' if result else 'NO'}"
+            )
+
+    return answer
+
+
 def format_pool_answer(question, term, matches, catalog):
-    if wants_volume_rank(question):
-        return format_volume_rank_answer(question, term, matches, catalog)
+    historical_answer = format_historical_comparison_answer(
+        question,
+        term,
+        matches,
+        catalog,
+    )
+
+    if historical_answer:
+        return historical_answer
+
+    if wants_asset_rank(question):
+        return format_asset_rank_answer(
+            question,
+            term,
+            matches,
+            catalog,
+        )
 
     snap = compact_asset_snapshot(term, matches, catalog)
     fields = requested_asset_fields(question)
 
     lines = [
-        "Liquidity Scout XDEX reply:",
+        "Liquidity Scout reply:",
         *asset_identity_lines(snap, question),
         "",
     ]
@@ -2197,7 +2960,7 @@ def format_pool_answer(question, term, matches, catalog):
 
 def format_not_found(question):
     return (
-        "Liquidity Scout XDEX reply:\n"
+        "Liquidity Scout reply:\n"
         "I couldn't find a matching XDEX asset for that request.\n\n"
         "Try the token symbol or full name — for example:\n"
         "• What is XNT doing?\n"
@@ -2274,7 +3037,18 @@ def process_cycle(catalog, implicit_mode_started_at):
 
         # Agent identity / HXMP questions always take priority over
         # fuzzy XDEX asset resolution.
-        if looks_like_agent_identity_question(question):
+        if wants_global_xdex_ranking(question):
+            metric = xdex_ranking_metric(question)
+            print(
+                "Route: GLOBAL XDEX RANKING | "
+                f"metric: {metric}"
+            )
+            answer = format_global_xdex_ranking_answer(
+                question,
+                catalog,
+            )
+
+        elif looks_like_agent_identity_question(question):
             print("Route 4: AGENT IDENTITY / HXMP QUESTION")
             answer = format_hxmp_identity_answer(question)
 
@@ -2350,14 +3124,19 @@ def main():
 
     catalog = XDEXCatalog()
 
-    print("Liquidity Scout v0.12 — Hybrid XDEX + Ollama Signal Listener")
+    print("Liquidity Scout v0.12 — Hybrid XDEX + DeepSeek Signal Listener")
     print(f"Polling MoltGrid every {POLL_SECONDS} seconds")
     print(f"Refreshing XDEX catalog every {CATALOG_REFRESH_SECONDS} seconds")
     print("Asset scope: full XDEX pool catalog")
     print("Input: replies + explicit Signals + owner asset/general questions")
+    print(f"Primary LLM: DeepSeek V4 Flash ({DEEPSEEK_MODEL})")
     print(
-        "Ollama layer: "
-        + (f"ON ({AI_MODEL})" if ai_available() else "OFF — XDEX lookup still works")
+        "DeepSeek cloud: "
+        + ("ON" if DEEPSEEK_API_KEY else "OFF")
+    )
+    print(
+        "Local fallback: "
+        + (f"ON ({AI_MODEL})" if ai_available() else "OFF")
     )
     print("Live XDEX facts: deterministic only")
 
