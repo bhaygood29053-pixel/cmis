@@ -47,11 +47,11 @@ class LiquidityScoutV12Tests(unittest.TestCase):
         )
         self.assertEqual(
             price_movement_label(-2.99),
-            "relatively modest movement",
+            "relatively modest",
         )
         self.assertEqual(
             price_movement_label(2.99),
-            "relatively modest movement",
+            "relatively modest",
         )
         self.assertEqual(
             price_movement_label(3),
@@ -94,6 +94,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "change24": -5.57,
             "liquidity": 3522,
             "market_cap": 31105,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -106,6 +107,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "vol24": 6651,
             "change24": 0.38,
             "market_cap": 7_460_000,
+            "fdv": 0,
             "safety": "A (100/100)",
         }
 
@@ -188,6 +190,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "vol24": 1399,
             "change24": -5.57,
             "market_cap": 31105,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -200,6 +203,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "vol24": 6651,
             "change24": 0.38,
             "market_cap": 7_460_000,
+            "fdv": 0,
             "safety": "A (100/100)",
         }
 
@@ -369,6 +373,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "change24": -5.57,
             "liquidity": 3522,
             "market_cap": 31105,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -392,7 +397,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
         self.assertIn("• Liquidity: $3,522", answer)
         self.assertIn("• Volume 24h: $1,399", answer)
         self.assertIn("• Change 24h: -5.57%", answer)
-        self.assertIn("• Market Cap: $31,105", answer)
+        self.assertIn("• Market Cap: Not verified — circulating supply unavailable from verified data", answer)
         self.assertIn("• Tokenomics Safety: A (86/100)", answer)
 
         # Privacy rules must remain intact.
@@ -420,6 +425,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "change24": -5.57,
             "liquidity": 3522,
             "market_cap": 31105,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -446,7 +452,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
         self.assertIn("Liquidity: $3,522", ai_context)
         self.assertIn("Volume 24h: $1,399", ai_context)
         self.assertIn("Change 24h: -5.57%", ai_context)
-        self.assertIn("Market Cap: $31,105", ai_context)
+        self.assertIn("Market Cap: Not verified — circulating supply unavailable from verified data", ai_context)
         self.assertIn("Tokenomics Safety: A (86/100)", ai_context)
 
         # Extra/internal details must not be supplied unless requested.
@@ -479,6 +485,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "change24": -12.20,
             "liquidity": 3429,
             "market_cap": 29965,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -528,6 +535,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "change24": -12.73,
             "liquidity": 3452,
             "market_cap": 30144,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -576,6 +584,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "change24": 8.73,
             "liquidity": 3452,
             "market_cap": 30144,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -626,6 +635,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
             "change24": -13.82,
             "liquidity": 3452,
             "market_cap": 30103,
+            "fdv": 0,
             "safety": "A (86/100)",
         }
 
@@ -651,7 +661,7 @@ class LiquidityScoutV12Tests(unittest.TestCase):
         self.assertIn("• Liquidity: $3,452", answer)
         self.assertIn("• Volume 24h: $924.814", answer)
         self.assertIn("• Change 24h: -13.82%", answer)
-        self.assertIn("• Market Cap: $30,103", answer)
+        self.assertIn("• Market Cap: Not verified — circulating supply unavailable from verified data", answer)
         self.assertIn("• Tokenomics Safety: A (86/100)", answer)
 
         self.assertIn("very thin", answer.lower())

@@ -1,6 +1,6 @@
 # Liquidity Scout v0.12
 
-Liquidity Scout is an X1/XDEX market-intelligence agent that monitors MoltGrid Signal, resolves assets across the XDEX catalog, retrieves verified market data, builds rankings and historical comparisons, and uses AI to explain verified facts without inventing market data.
+Liquidity Scout is an X1/XDEX market-intelligence service that monitors MoltGrid Signal, resolves assets across the XDEX catalog, retrieves verified market data, builds rankings and historical comparisons, and uses AI to explain verified facts without inventing market data.
 
 The project began as a paper-trading prototype and has evolved into a broader X1 market-intelligence service. **Live trading and wallet signing remain disabled.**
 
@@ -12,6 +12,7 @@ Liquidity Scout can:
 
 - search the full XDEX pool catalog from X1.Ninja;
 - resolve assets by symbol, token name, mint address, or pool address;
+- reject ambiguous human-facing identifiers instead of silently selecting the wrong mint;
 - aggregate liquidity and volume across multiple pools for the same asset;
 - identify the deepest matching pool for price-oriented metrics;
 - retrieve XNT pricing using X1.Ninja's XNT reference data;
@@ -29,7 +30,7 @@ What pools does THEO have?
 
 ### XDEX rankings
 
-`xdex_rankings.py` aggregates pool data into one record per asset and supports rankings for:
+`xdex_rankings.py` uses the reusable Liquidity Scout market core to aggregate pool data into one record per asset and supports rankings for:
 
 - 24-hour volume;
 - liquidity;
@@ -38,6 +39,8 @@ What pools does THEO have?
 - biggest 24-hour gainers;
 - biggest 24-hour losers;
 - trending activity using 1-hour transaction counts when available, with 1-hour volume as a fallback.
+
+Public ranking tables use `#LPs` for liquidity-pool count.
 
 Example questions:
 
@@ -54,7 +57,7 @@ Is AGI in the top 50?
 
 ## Historical market intelligence
 
-Liquidity Scout now stores historical XDEX snapshots in SQLite and can compare current metrics with stored observations.
+Liquidity Scout stores historical XDEX snapshots in SQLite and can compare current metrics with stored observations.
 
 Supported historical periods:
 
@@ -89,7 +92,7 @@ Run one XDEX history snapshot with:
 python snapshot_xdex_metrics.py
 ```
 
-The collector is designed to be scheduled periodically, such as hourly, so the local history database grows over time.
+The snapshot collector consumes the reusable `liquidity_scout.market` core rather than the MoltGrid listener. It is designed to be scheduled periodically, such as hourly, so the local history database grows over time.
 
 ## Tokenomics and burn intelligence
 
@@ -140,27 +143,38 @@ Never commit API keys to the repository. Keep secrets in `.env`.
 
 ## MoltGrid Signal listener
 
-The current main listener is:
-
-```text
-moltgrid_signal_v12_ollama.py
-```
-
-It:
-
-- watches MoltGrid Signal replies;
-- detects questions directed to Liquidity Scout;
-- resolves requested XDEX assets;
-- retrieves current market facts;
-- routes ranking and historical questions to deterministic engines;
-- optionally uses DeepSeek or Ollama for grounded explanations;
-- reuses conversation state so previously answered messages are not repeatedly processed.
-
-Run it with:
+The **canonical Liquidity Scout runtime entrypoint** is the package integration:
 
 ```bash
-python moltgrid_signal_v12_ollama.py
+python -m liquidity_scout.integrations.moltgrid
 ```
+
+For normal repository operation, use the launcher:
+
+```bash
+bash run_liquidity_scout.sh
+```
+
+`run_liquidity_scout.sh` automatically uses `.venv/bin/python` when present and otherwise falls back to `python3`.
+
+The package integration wires MoltGrid to the reusable `liquidity_scout.market` core for:
+
+- X1.Ninja/XDEX catalog access;
+- mint-aware asset resolution;
+- multi-asset resolution;
+- ambiguity-safe matching.
+
+It then delegates the existing MoltGrid transport, formatting, conversation state, and AI-routing behavior to the current v0.12 listener implementation.
+
+`moltgrid_signal_v12_ollama.py` remains in the repository as the legacy implementation during the incremental refactor, but it is **not the canonical operator entrypoint**. New deployment configuration should invoke the package integration instead of running that file directly.
+
+An example systemd unit is available at:
+
+```text
+deployment/liquidity-scout.service.example
+```
+
+Copy it to your systemd configuration and replace `/path/to/liquidity-scout` with the real deployment path before enabling it. The repository does not contain or modify a machine's live `/etc/systemd/system/liquidity-scout.service` file.
 
 ## Sentinel development tooling
 
@@ -178,7 +192,7 @@ Run diagnostics with:
 bash sentinel_diagnostics.sh
 ```
 
-The issue utility maintains a small development backlog under `development/`.
+`liquidity_scout_health.sh` and `liquidity_scout_status.sh` inspect the deployed `liquidity-scout.service` by service name; they do not define its `ExecStart` command.
 
 ## Installation
 
@@ -231,18 +245,22 @@ Trading/execution should remain a separate, human-approved capability until the 
 Key files currently include:
 
 ```text
-moltgrid_signal_v12_ollama.py   Main MoltGrid/XDEX intelligence listener
-config.py                       Environment-based configuration
-xdex_rankings.py                Asset aggregation and ranking engine
-historical_metrics.py           Historical comparison engine
-snapshot_xdex_metrics.py        XDEX snapshot collector
-build_top50_xdex.py             Top-50 asset export builder
-agi_burn_scan.py                AGI burn scanner
-x1_burn_scan.py                 Generic X1 token burn scanner
-x1_burn_scan_v2.py              Extended period/cached burn scanner
-sentinel_diagnostics.sh         Service/project diagnostics
-sentinel_issues.py              Development issue utility
-development/issues.json         Current development issue backlog
+liquidity_scout/market/                Reusable deterministic XDEX market core
+liquidity_scout/integrations/moltgrid.py  Canonical MoltGrid integration entrypoint
+run_liquidity_scout.sh                 Canonical repository launcher
+deployment/liquidity-scout.service.example  Example systemd service
+moltgrid_signal_v12_ollama.py          Legacy listener implementation during refactor
+config.py                              Environment-based configuration
+xdex_rankings.py                       Ranking presentation/routing over market core
+historical_metrics.py                  Historical comparison engine
+snapshot_xdex_metrics.py               XDEX snapshot collector
+build_top50_xdex.py                    Top-50 asset export builder
+agi_burn_scan.py                       AGI burn scanner
+x1_burn_scan.py                        Generic X1 token burn scanner
+x1_burn_scan_v2.py                     Extended period/cached burn scanner
+sentinel_diagnostics.sh                Service/project diagnostics
+sentinel_issues.py                     Development issue utility
+development/issues.json                Current development issue backlog
 ```
 
 Runtime databases, generated ranking exports, local backups, virtual environments, caches, logs, and `.env` secrets are excluded through `.gitignore`.
@@ -251,10 +269,10 @@ Runtime databases, generated ranking exports, local backups, virtual environment
 
 ### Working now
 
-- XDEX catalog discovery and asset resolution;
+- reusable XDEX catalog discovery and asset resolution core;
+- multi-LP aggregation and XDEX rankings;
 - live XDEX/X1 market-data retrieval;
-- MoltGrid Signal question/response loop;
-- global and asset-specific XDEX rankings;
+- MoltGrid Signal question/response loop through a package integration bridge;
 - hourly-compatible historical snapshot collection;
 - 24h/7d/30d historical comparison logic;
 - AGI/X1 token burn-scanning tools;
@@ -262,11 +280,15 @@ Runtime databases, generated ranking exports, local backups, virtual environment
 - DeepSeek reasoning with local Ollama fallback;
 - development diagnostics and issue tracking.
 
+### Current refactor direction
+
+The project is incrementally moving deterministic intelligence out of `moltgrid_signal_v12_ollama.py` and into reusable Liquidity Scout service modules. The legacy listener stays operational while each responsibility is extracted and tested.
+
 ### Next major phases
 
-1. Finish and harden tokenomics services, including mint/net-issuance tracking where required.
-2. Build a deterministic Liquidity Scout Risk Engine and Scout Score.
-3. Refactor the main listener into smaller service/integration modules.
+1. Continue shrinking the legacy MoltGrid monolith by moving deterministic market/report logic into reusable modules.
+2. Finish and harden tokenomics services, including mint/net-issuance tracking where required.
+3. Build a deterministic Liquidity Scout Risk Engine and Scout Score.
 4. Expose structured Liquidity Scout data through an API/service layer.
 5. Connect Roberta as the X1 Oracle/coordinator to Liquidity Scout as a specialist service.
 6. Add alert automation and threshold monitoring.
