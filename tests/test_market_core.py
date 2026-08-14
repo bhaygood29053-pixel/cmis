@@ -1,5 +1,6 @@
 import unittest
 
+from xdex_rankings import format_top, rank_assets
 from liquidity_scout.market.aggregation import aggregate_assets
 from liquidity_scout.market.client import fetch_all_pools
 from liquidity_scout.market.resolver import (
@@ -169,6 +170,24 @@ class MarketCoreTests(unittest.TestCase):
 
         self.assertEqual(len(same_assets), 2)
         self.assertEqual({a["mint"] for a in same_assets}, {"MINT_ONE", "MINT_TWO"})
+
+    def test_rankings_use_core_aggregation_and_public_lp_count(self):
+        duplicate = pool("P1", self.agi, self.xnt, 1000, 300, 1.0)
+        pools = [
+            duplicate,
+            dict(duplicate),
+            pool("P2", self.agi, self.usdc, 5000, 700, 1.2),
+        ]
+
+        ranked, _meta = rank_assets(pools, metric="liquidity", limit=10)
+        agi = next(asset for asset in ranked if asset["mint"] == "MINT_AGI")
+
+        self.assertEqual(agi["pool_count"], 2)
+        self.assertEqual(agi["liquidity"], 6000)
+        self.assertEqual(agi["volume24"], 1000)
+
+        rendered = format_top(pools, metric="liquidity", limit=10)
+        self.assertIn("#LPs", rendered)
 
     def test_catalog_client_preserves_pagination_and_xnt_reference(self):
         session = FakeSession(
