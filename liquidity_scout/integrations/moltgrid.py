@@ -1,9 +1,9 @@
 """MoltGrid entrypoint wired to reusable Liquidity Scout services.
 
 This is a migration seam for the current v0.12 listener. It keeps the legacy
-MoltGrid transport, AI routing, RPC transport, and conversation state intact
-while replacing market catalog/resolution, deterministic snapshot construction,
-verified market-analysis context, and public market presentation at runtime.
+MoltGrid transport, AI routing, conversation state, and non-tokenomics RPC
+behavior intact while replacing reusable market intelligence and tokenomics
+lookups at runtime.
 
 Run with:
     python -m liquidity_scout.integrations.moltgrid
@@ -30,6 +30,11 @@ from liquidity_scout.services import (
     requested_asset_fields as core_requested_asset_fields,
     volume_activity_label,
     wants_token_address as core_wants_token_address,
+)
+from liquidity_scout.tokenomics import (
+    X1RPCError,
+    get_mint_info as core_get_mint_info,
+    get_token_supply as core_get_token_supply,
 )
 
 
@@ -197,6 +202,57 @@ def verified_snapshot_context(listener_module, snap, fields):
     return _legacy_verified_snapshot_context(listener_module, snap, fields)
 
 
+def get_token_total_supply(listener_module, mint):
+    """Legacy total-supply shape backed by the reusable X1 tokenomics core."""
+    mint = str(mint or "").strip()
+    if not mint:
+        return None
+
+    try:
+        record = core_get_token_supply(
+            mint,
+            rpc_url=listener_module.SETTINGS.x1_rpc_url,
+        )
+    except (X1RPCError, ValueError) as exc:
+        print(f"X1 RPC getTokenSupply failed: {exc}")
+        return None
+
+    if not isinstance(record, dict) or not record.get("supply_verified"):
+        return None
+
+    return record.get("total_supply")
+
+
+def get_token_mint_info(listener_module, mint):
+    """Legacy mint-info shape backed by the reusable X1 tokenomics core."""
+    mint = str(mint or "").strip()
+    if not mint:
+        return None
+
+    try:
+        record = core_get_mint_info(
+            mint,
+            rpc_url=listener_module.SETTINGS.x1_rpc_url,
+        )
+    except (X1RPCError, ValueError) as exc:
+        print(f"X1 RPC getAccountInfo failed: {exc}")
+        return None
+
+    if not isinstance(record, dict):
+        return None
+
+    return {
+        "mint_authority": record.get("mint_authority"),
+        "freeze_authority": record.get("freeze_authority"),
+        "supply": record.get("total_supply"),
+        "raw_supply": record.get("raw_supply") or "",
+        "decimals": (
+            record.get("decimals")
+            if record.get("decimals") is not None
+            else 0
+        ),
+    }
+
 
 def format_historical_comparison_answer(
     listener_module,
@@ -236,6 +292,7 @@ def format_multi_asset_answer(listener_module, question, resolved_assets, catalo
         include_token_addresses=core_wants_token_address(question),
     )
 
+
 def requested_asset_fields(listener_module, question):
     """Adapt listener routing predicates to the pure field-selection service."""
     historical_comparison = bool(
@@ -254,7 +311,7 @@ def requested_asset_fields(listener_module, question):
 
 
 def format_field_line(listener_module, field, snap):
-    """Format a public field while leaving RPC transport in the listener."""
+    """Format a public field through reusable market and tokenomics services."""
     return core_format_field_line(
         field,
         snap,
@@ -274,7 +331,6 @@ def full_snapshot_lines(listener_module, snap):
     )
 
 
-
 def _multi_asset_adapter(listener_module):
     def adapter(question, resolved_assets, catalog):
         return format_multi_asset_answer(
@@ -285,6 +341,7 @@ def _multi_asset_adapter(listener_module):
         )
 
     return adapter
+
 
 def _historical_comparison_adapter(listener_module):
     def adapter(question, term, matches, catalog):
@@ -334,8 +391,22 @@ def _full_snapshot_adapter(listener_module):
     return adapter
 
 
+def _total_supply_adapter(listener_module):
+    def adapter(mint):
+        return get_token_total_supply(listener_module, mint)
+
+    return adapter
+
+
+def _mint_info_adapter(listener_module):
+    def adapter(mint):
+        return get_token_mint_info(listener_module, mint)
+
+    return adapter
+
+
 def wire_market_core(listener_module):
-    """Replace legacy market globals with reusable core/service implementations."""
+    """Replace legacy globals with reusable market and tokenomics implementations."""
     listener_module.XDEXCatalog = MoltGridXDEXCatalog
     listener_module.resolve_asset = resolve_asset
     listener_module.resolve_multiple_assets = resolve_multiple_assets
@@ -351,6 +422,8 @@ def wire_market_core(listener_module):
     listener_module.format_field_line = _field_line_adapter(listener_module)
     listener_module.full_snapshot_lines = _full_snapshot_adapter(listener_module)
     listener_module.wants_token_address = core_wants_token_address
+    listener_module.get_token_total_supply = _total_supply_adapter(listener_module)
+    listener_module.get_token_mint_info = _mint_info_adapter(listener_module)
     return listener_module
 
 

@@ -9,6 +9,7 @@ import requests
 from dotenv import load_dotenv
 
 from liquidity_scout.market import XDEXCatalog, resolve_asset
+from liquidity_scout.tokenomics import get_mint_info as core_get_mint_info
 
 load_dotenv()
 
@@ -39,7 +40,9 @@ def round_token_amount(value):
         )
     )
 
+
 def rpc(method, params, retries=5):
+    """RPC transport reserved for burn-history and transaction scanning."""
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
@@ -157,32 +160,41 @@ def resolve_token(value, catalog=None):
 # ============================================================
 
 def get_token_info(mint):
-    result = rpc(
-        "getAccountInfo",
-        [
-            mint,
-            {"encoding": "jsonParsed"},
-        ],
+    """Return burn-scanner compatibility fields from shared tokenomics core."""
+    record = core_get_mint_info(
+        mint,
+        rpc_url=RPC,
+        retries=5,
+        timeout=30,
     )
 
-    info = (
-        (result or {})
-        .get("value", {})
-        .get("data", {})
-        .get("parsed", {})
-        .get("info", {})
-    )
-
-    if not info:
+    if not isinstance(record, dict):
         raise RuntimeError(
             "Mint account could not be parsed."
         )
 
+    decimals = record.get("decimals")
+    raw_supply = record.get("raw_supply")
+
+    # Burn conversion cannot be verified without mint decimals. Fail closed
+    # rather than silently treating missing decimals as zero.
+    if decimals is None or raw_supply is None:
+        raise RuntimeError(
+            "Mint account supply/decimals could not be verified."
+        )
+
     return {
-        "decimals": int(info.get("decimals") or 0),
-        "supply": str(info.get("supply") or ""),
-        "mint_authority": info.get("mintAuthority"),
-        "freeze_authority": info.get("freezeAuthority"),
+        "decimals": decimals,
+        # Preserve the scanner's historical raw-integer supply field.
+        "supply": raw_supply,
+        "mint_authority": record.get("mint_authority"),
+        "freeze_authority": record.get("freeze_authority"),
+        "mint_authority_verified": bool(
+            record.get("mint_authority_verified")
+        ),
+        "freeze_authority_verified": bool(
+            record.get("freeze_authority_verified")
+        ),
     }
 
 
@@ -689,14 +701,20 @@ def main():
     mint_authority = token_info[
         "mint_authority"
     ]
+    mint_authority_verified = token_info[
+        "mint_authority_verified"
+    ]
+
+    if not mint_authority_verified:
+        mint_authority_text = "UNAVAILABLE"
+    elif mint_authority is None:
+        mint_authority_text = "REVOKED"
+    else:
+        mint_authority_text = str(mint_authority)
 
     print(
         "Mint authority:   "
-        + (
-            "REVOKED"
-            if mint_authority is None
-            else str(mint_authority)
-        )
+        + mint_authority_text
     )
 
     print("============================================")
