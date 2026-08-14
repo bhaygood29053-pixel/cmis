@@ -107,6 +107,12 @@ class TokenActivityExtractionTests(unittest.TestCase):
 
         self.assertEqual(extract_token_events(transaction, MINT), [])
 
+    def test_missing_success_metadata_is_never_counted(self):
+        transaction = tx(parsed_ix("mintTo", amount="100"))
+        del transaction["meta"]["err"]
+
+        self.assertEqual(extract_token_events(transaction, MINT), [])
+
     def test_malformed_amount_is_not_coerced_to_zero(self):
         transaction = tx(
             parsed_ix("mintTo", amount="not-a-number"),
