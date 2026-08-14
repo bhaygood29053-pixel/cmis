@@ -7,7 +7,7 @@ clients or tokenomics scanning.
 
 from decimal import Decimal, ROUND_HALF_UP
 import re
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 UsdFormatter = Callable[[Any], str]
@@ -34,17 +34,31 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _number_or_zero(value: Any) -> float:
+def _number(value: Any) -> Optional[float]:
+    if value is None:
+        return None
     try:
-        if value is None:
-            return 0.0
         return float(value)
     except (TypeError, ValueError):
-        return 0.0
+        return None
+
+
+def _number_or_zero(value: Any) -> float:
+    value = _number(value)
+    return 0.0 if value is None else value
 
 
 def _word(question: str, term: str) -> bool:
     return re.search(rf"\b{re.escape(term)}\b", question) is not None
+
+
+def _structured_report(snap: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    report = snap.get("_market_report") if isinstance(snap, dict) else None
+    return report if isinstance(report, dict) else None
+
+
+def _complete(report: Dict[str, Any], key: str) -> bool:
+    return bool((report.get("completeness") or {}).get(key))
 
 
 def requested_asset_fields(
@@ -222,6 +236,93 @@ def round_token_amount(value: Any) -> int:
     )
 
 
+def _structured_public_field(
+    field: str,
+    snap: Dict[str, Any],
+    report: Dict[str, Any],
+    format_usd: UsdFormatter,
+) -> Optional[str]:
+    """Format market fields from structured facts without compatibility zeroes."""
+    if field == "price":
+        value = _number(report.get("price_usd"))
+        if value is None:
+            return "• Price: Not available from verified data"
+        return f"• Price: {format_usd(value)}"
+
+    if field == "holders":
+        holders = report.get("holders")
+        if _complete(report, "holders") and holders is not None:
+            return f"• Holders: {int(holders):,}"
+        if report.get("holders_observed"):
+            return (
+                "• Holders: Not verified — conflicting or incomplete "
+                "XDEX pool observations"
+            )
+        return "• Holders: Not available from verified data"
+
+    if field == "txns24":
+        value = _number(report.get("transactions_24h"))
+        if value is None:
+            return "• Transactions 24h: Not available from verified data"
+        if _complete(report, "transactions_24h"):
+            return f"• Transactions 24h: {int(value):,}"
+        return (
+            f"• Transactions 24h: at least {int(value):,} "
+            "— incomplete XDEX pool data"
+        )
+
+    if field == "volume24":
+        value = _number(report.get("volume_24h_usd"))
+        if value is None:
+            return "• Volume 24h: Not available from verified data"
+        if _complete(report, "volume_24h"):
+            return f"• Volume 24h: {format_usd(value)}"
+        return (
+            f"• Volume 24h: at least {format_usd(value)} "
+            "— incomplete XDEX pool data"
+        )
+
+    if field == "change1h":
+        value = _number(report.get("price_change_1h_pct"))
+        if value is None:
+            return "• Change 1h: Not available from verified data"
+        return f"• Change 1h: {value:+.2f}%"
+
+    if field == "change24h":
+        value = _number(report.get("price_change_24h_pct"))
+        if value is None:
+            return "• Change 24h: Not available from verified data"
+        return f"• Change 24h: {value:+.2f}%"
+
+    if field == "liquidity":
+        value = _number(report.get("liquidity_usd"))
+        pools = int(report.get("lp_count") or snap.get("pool_count") or 0)
+        if value is None:
+            return (
+                "• Liquidity: Not available from verified data "
+                f"• Pools: {pools}"
+            )
+        if _complete(report, "liquidity"):
+            return f"• Liquidity: {format_usd(value)} • Pools: {pools}"
+        return (
+            f"• Liquidity: at least {format_usd(value)} "
+            f"— incomplete XDEX pool data • Pools: {pools}"
+        )
+
+    if field == "safety":
+        grade = _text(report.get("safety_grade")) or "N/A"
+        score = _number(report.get("safety_score"))
+        if score is not None and score > 0:
+            grade += f" ({score:g}/100)"
+        return f"• Tokenomics Safety: {grade}"
+
+    if field == "pool_address":
+        primary_pool = report.get("primary_pool") or {}
+        return f"• Pool Address: {primary_pool.get('address') or 'N/A'}"
+
+    return None
+
+
 def format_field_line(
     field: str,
     snap: Dict[str, Any],
@@ -230,10 +331,14 @@ def format_field_line(
     get_total_supply: Optional[SupplyLookup] = None,
     get_mint_info: Optional[MintInfoLookup] = None,
 ) -> str:
-    """Format one v0.12-compatible public field line.
+    """Format one public field with v0.12 compatibility and uncertainty safety.
 
     RPC-dependent values are resolved only through injected lookup callbacks.
+    Structured market reports take precedence over legacy presentation values so
+    unavailable or incomplete XDEX data is not silently displayed as zero.
     """
+    report = _structured_report(snap)
+
     if field == "circulating_supply":
         return "• Circulating Supply: Not available from verified data"
 
@@ -276,10 +381,13 @@ def format_field_line(
             if get_total_supply is not None
             else None
         )
-        price = _number_or_zero(snap.get("price_usd_value"))
+        if report is not None:
+            price = _number(report.get("price_usd"))
+        else:
+            price = _number(snap.get("price_usd_value"))
 
         current_valuation = None
-        if amount and price > 0:
+        if amount and price is not None and price > 0:
             current_valuation = Decimal(str(amount)) * Decimal(str(price))
 
         if current_valuation is not None:
@@ -302,9 +410,12 @@ def format_field_line(
             if get_total_supply is not None
             else None
         )
-        price = _number_or_zero(snap.get("price_usd_value"))
+        if report is not None:
+            price = _number(report.get("price_usd"))
+        else:
+            price = _number(snap.get("price_usd_value"))
 
-        if not amount or price <= 0:
+        if not amount or price is None or price <= 0:
             return "• Current Supply Valuation: Not available from verified data"
 
         valuation = Decimal(str(amount)) * Decimal(str(price))
@@ -315,6 +426,11 @@ def format_field_line(
             "It is not FDV unless current total supply equals maximum supply. "
             "Market Cap separately requires verified circulating supply."
         )
+
+    if report is not None:
+        structured_line = _structured_public_field(field, snap, report, format_usd)
+        if structured_line is not None:
+            return structured_line
 
     labels = {
         "price": "Price",
