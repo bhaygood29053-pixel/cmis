@@ -62,8 +62,8 @@ class MarketComparisonServiceTests(unittest.TestCase):
             format_field_line=lambda field, snap: f"{field}:{snap['symbol']}",
         )
 
-        self.assertIn("• Liquidity: AGI", answer)
-        self.assertIn("• Liquidity: XNT", answer)
+        self.assertIn("• Liquidity: $3,522 (very thin)", answer)
+        self.assertIn("• Liquidity: $33,289", answer)
         self.assertIn("XNT has 9.5× more available liquidity", answer)
         self.assertIn("XNT has 4.8× more 24h volume", answer)
         self.assertIn("Largest absolute 24h price move: AGI (-5.57%).", answer)
