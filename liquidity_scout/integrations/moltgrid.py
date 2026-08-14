@@ -1,9 +1,9 @@
 """MoltGrid entrypoint wired to reusable Liquidity Scout services.
 
 This is a migration seam for the current v0.12 listener. It keeps the legacy
-MoltGrid transport, formatting, AI routing, and conversation state intact while
-replacing market catalog/resolution, deterministic snapshot construction, and
-verified market-analysis context at runtime.
+MoltGrid transport, AI routing, RPC transport, and conversation state intact
+while replacing market catalog/resolution, deterministic snapshot construction,
+verified market-analysis context, and public market presentation at runtime.
 
 Run with:
     python -m liquidity_scout.integrations.moltgrid
@@ -18,11 +18,16 @@ from liquidity_scout.market import (
     resolve_multiple_assets as core_resolve_multiple_assets,
 )
 from liquidity_scout.services import (
+    FIELD_ORDER as CORE_FIELD_ORDER,
     build_market_report,
     build_verified_market_context,
+    format_field_line as core_format_field_line,
+    full_snapshot_lines as core_full_snapshot_lines,
     liquidity_depth_label,
     price_movement_label,
+    requested_asset_fields as core_requested_asset_fields,
     volume_activity_label,
+    wants_token_address as core_wants_token_address,
 )
 
 
@@ -190,6 +195,44 @@ def verified_snapshot_context(listener_module, snap, fields):
     return _legacy_verified_snapshot_context(listener_module, snap, fields)
 
 
+def requested_asset_fields(listener_module, question):
+    """Adapt listener routing predicates to the pure field-selection service."""
+    historical_comparison = bool(
+        listener_module.history.parse_historical_comparison(question)
+    )
+    volume_rank = bool(listener_module.wants_volume_rank(question))
+    historical_liquidity = bool(
+        listener_module.wants_historical_liquidity(question)
+    )
+    return core_requested_asset_fields(
+        question,
+        historical_comparison=historical_comparison,
+        volume_rank=volume_rank,
+        historical_liquidity=historical_liquidity,
+    )
+
+
+def format_field_line(listener_module, field, snap):
+    """Format a public field while leaving RPC transport in the listener."""
+    return core_format_field_line(
+        field,
+        snap,
+        format_usd=listener_module.format_usd,
+        get_total_supply=listener_module.get_token_total_supply,
+        get_mint_info=listener_module.get_token_mint_info,
+    )
+
+
+def full_snapshot_lines(listener_module, snap):
+    """Format the stable default public snapshot through the service layer."""
+    return core_full_snapshot_lines(
+        snap,
+        format_usd=listener_module.format_usd,
+        get_total_supply=listener_module.get_token_total_supply,
+        get_mint_info=listener_module.get_token_mint_info,
+    )
+
+
 def _snapshot_adapter(listener_module):
     def adapter(term, matches, catalog):
         return compact_asset_snapshot(listener_module, term, matches, catalog)
@@ -204,6 +247,27 @@ def _context_adapter(listener_module):
     return adapter
 
 
+def _requested_fields_adapter(listener_module):
+    def adapter(question):
+        return requested_asset_fields(listener_module, question)
+
+    return adapter
+
+
+def _field_line_adapter(listener_module):
+    def adapter(field, snap):
+        return format_field_line(listener_module, field, snap)
+
+    return adapter
+
+
+def _full_snapshot_adapter(listener_module):
+    def adapter(snap):
+        return full_snapshot_lines(listener_module, snap)
+
+    return adapter
+
+
 def wire_market_core(listener_module):
     """Replace legacy market globals with reusable core/service implementations."""
     listener_module.XDEXCatalog = MoltGridXDEXCatalog
@@ -214,11 +278,16 @@ def wire_market_core(listener_module):
     listener_module.volume_activity_label = volume_activity_label
     listener_module.price_movement_label = price_movement_label
     listener_module.verified_snapshot_context = _context_adapter(listener_module)
+    listener_module.FIELD_ORDER = list(CORE_FIELD_ORDER)
+    listener_module.requested_asset_fields = _requested_fields_adapter(listener_module)
+    listener_module.format_field_line = _field_line_adapter(listener_module)
+    listener_module.full_snapshot_lines = _full_snapshot_adapter(listener_module)
+    listener_module.wants_token_address = core_wants_token_address
     return listener_module
 
 
 def load_listener():
-    """Import the legacy listener and wire it to Liquidity Scout Core."""
+    """Import the legacy listener and wire it to Liquidity Scout services."""
     listener = import_module("moltgrid_signal_v12_ollama")
     return wire_market_core(listener)
 
