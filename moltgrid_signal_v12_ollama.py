@@ -29,6 +29,7 @@ Safety:
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -45,6 +46,7 @@ from liquidity_scout.integrations.moltgrid import (
     MoltGridXDEXCatalog as XDEXCatalog,
     resolve_asset,
     resolve_multiple_assets,
+    verified_snapshot_context as bridge_verified_snapshot_context,
 )
 from liquidity_scout.market.resolver import (
     asset_key,
@@ -63,6 +65,9 @@ from liquidity_scout.services import (
     FIELD_ORDER as CORE_FIELD_ORDER,
     format_field_line as core_format_field_line,
     full_snapshot_lines as core_full_snapshot_lines,
+    liquidity_depth_label,
+    price_movement_label,
+    volume_activity_label,
     requested_asset_fields as core_requested_asset_fields,
     wants_token_address,
 )
@@ -737,112 +742,19 @@ def deepseek_text(instructions, user_input, max_output_tokens=None):
         print(f"DeepSeek response error: {exc}")
         return None
 
-def liquidity_depth_label(liquidity):
-    """
-    Deterministic Liquidity Scout liquidity classification.
-    Do not let the AI invent its own depth category.
-    """
-    liquidity = n(liquidity)
-
-    if liquidity < 5_000:
-        return "very thin"
-    if liquidity < 25_000:
-        return "fairly thin"
-    if liquidity >= 100_000:
-        return "comparatively deep"
-
-    return "not qualitatively classified"
 
 
-def volume_activity_label(volume24):
-    """
-    Deterministic Liquidity Scout 24h-volume classification.
-    """
-    volume24 = n(volume24)
-
-    if volume24 < 1_000:
-        return "light"
-    if volume24 >= 25_000:
-        return "strong"
-
-    return "not qualitatively classified"
 
 
-def price_movement_label(change24):
-    """Deterministic 24h price-movement description."""
-    change24 = n(change24)
-
-    if change24 <= -10:
-        return "down sharply"
-    if change24 <= -3:
-        return "under noticeable selling pressure"
-    if change24 >= 10:
-        return "up sharply"
-    if change24 >= 3:
-        return "a solid upward move"
-
-    return "relatively modest"
 
 
 def verified_snapshot_context(snap, fields):
-    """
-    Serialize only the verified XDEX values approved for this answer.
-    Omitted metrics are not exposed to the AI analysis layer.
-    """
-    lines = [f"Token: {snap['title']}"]
-
-    for field in fields:
-        if field == "price":
-            lines.append(f"Price: {snap['price']}")
-
-        elif field == "age":
-            lines.append(f"Age: {snap['age']}")
-
-        elif field == "holders":
-            lines.append(f"Holders: {snap['holders']:,}")
-
-        elif field == "txns24":
-            lines.append(f"Transactions 24h: {snap['txns24']:,}")
-
-        elif field == "volume24":
-            lines.append(f"Volume 24h: {format_usd(snap['vol24'])}")
-            lines.append(
-                f"Volume classification: "
-                f"{volume_activity_label(snap['vol24'])}"
-            )
-
-        elif field == "change1h":
-            lines.append(f"Change 1h: {snap['change1']:+.2f}%")
-
-        elif field == "change24h":
-            lines.append(f"Change 24h: {snap['change24']:+.2f}%")
-            lines.append(
-                f"24h price-movement classification: "
-                f"{price_movement_label(snap['change24'])}"
-            )
-
-        elif field == "liquidity":
-            lines.append(f"Liquidity: {format_usd(snap['liquidity'])}")
-            lines.append(
-                f"Liquidity classification: "
-                f"{liquidity_depth_label(snap['liquidity'])}"
-            )
-
-        elif field == "market_cap":
-            lines.append(
-                "Market Cap: Not verified — "
-                "circulating supply unavailable from verified data"
-            )
-
-        elif field == "safety":
-            lines.append(f"Tokenomics Safety: {snap['safety']}")
-
-        elif field == "pool_address":
-            lines.append(
-                f"Pool address: {snap['pool_address'] or 'N/A'}"
-            )
-
-    return "\n".join(lines)
+    """Legacy-compatible adapter to reusable verified market context."""
+    return bridge_verified_snapshot_context(
+        sys.modules[__name__],
+        snap,
+        fields,
+    )
 
 
 
