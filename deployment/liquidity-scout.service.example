@@ -1,0 +1,15 @@
+[Unit]
+Description=Liquidity Scout X1/XDEX Market Intelligence
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/liquidity-scout
+EnvironmentFile=/path/to/liquidity-scout/.env
+ExecStart=/path/to/liquidity-scout/.venv/bin/python -m liquidity_scout.integrations.moltgrid
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
