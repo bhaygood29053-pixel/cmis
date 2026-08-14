@@ -12,6 +12,19 @@ STOPWORDS = {
 }
 
 
+class AmbiguousAssetError(ValueError):
+    """Raised when an exact human-facing identifier maps to multiple mints."""
+
+    def __init__(self, term: str, asset_keys: Iterable[str]):
+        self.term = str(term or "").strip()
+        self.asset_keys = tuple(sorted({str(key) for key in asset_keys if key}))
+        joined = ", ".join(self.asset_keys) or "multiple assets"
+        super().__init__(
+            f"Ambiguous XDEX asset identifier '{self.term}' matches {joined}. "
+            "Use the mint address or another unique identifier."
+        )
+
+
 def _s(value) -> str:
     return str(value or "").strip()
 
@@ -135,8 +148,39 @@ def asset_key(token: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _exact_match_asset_keys(matches) -> set:
+    """Return distinct token identities represented by exact token matches."""
+    keys = set()
+
+    for _pool, side, asset, quality in matches:
+        if quality < 90 or side == "pool" or not asset:
+            continue
+        key = asset_key(asset)
+        if key:
+            keys.add(key)
+
+    return keys
+
+
+def _reject_ambiguous_term(term, matches) -> None:
+    keys = _exact_match_asset_keys(matches)
+    if len(keys) > 1:
+        raise AmbiguousAssetError(term, keys)
+
+
+def _sort_matches(matches) -> None:
+    matches.sort(
+        key=lambda item: (
+            item[3],
+            _n(item[0].get("liquidity")),
+            _n(item[0].get("volume24h")),
+        ),
+        reverse=True,
+    )
+
+
 def resolve_asset(question, pools):
-    """Return the first exact catalog asset/pool match, sorted by pool depth."""
+    """Return one exact catalog identity; reject identifiers shared by mints."""
     for term in candidate_terms(question):
         matches = [
             match
@@ -145,14 +189,8 @@ def resolve_asset(question, pools):
         ]
 
         if matches:
-            matches.sort(
-                key=lambda item: (
-                    item[3],
-                    _n(item[0].get("liquidity")),
-                    _n(item[0].get("volume24h")),
-                ),
-                reverse=True,
-            )
+            _reject_ambiguous_term(term, matches)
+            _sort_matches(matches)
             return term, matches
 
     return None, []
@@ -187,14 +225,8 @@ def resolve_multiple_assets(question, pools, max_assets: int = 4):
         if not matches:
             continue
 
-        matches.sort(
-            key=lambda item: (
-                item[3],
-                _n(item[0].get("liquidity")),
-                _n(item[0].get("volume24h")),
-            ),
-            reverse=True,
-        )
+        _reject_ambiguous_term(term, matches)
+        _sort_matches(matches)
 
         pool, _side, asset, _quality = matches[0]
         if not asset:
