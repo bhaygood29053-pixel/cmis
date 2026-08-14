@@ -224,7 +224,12 @@ def get_token_total_supply(listener_module, mint):
 
 
 def get_token_mint_info(listener_module, mint):
-    """Legacy mint-info shape backed by the reusable X1 tokenomics core."""
+    """Legacy mint-info shape backed by verified reusable tokenomics facts.
+
+    Fail closed when the mint-authority field was not actually present in the
+    parsed RPC response. Public max-supply presentation must never translate an
+    unavailable authority field into a false claim that minting is revoked.
+    """
     mint = str(mint or "").strip()
     if not mint:
         return None
@@ -241,10 +246,18 @@ def get_token_mint_info(listener_module, mint):
     if not isinstance(record, dict):
         return None
 
+    if not record.get("mint_authority_verified"):
+        return None
+
     return {
         "mint_authority": record.get("mint_authority"),
+        "mint_authority_verified": True,
         "freeze_authority": record.get("freeze_authority"),
+        "freeze_authority_verified": bool(
+            record.get("freeze_authority_verified")
+        ),
         "supply": record.get("total_supply"),
+        "supply_verified": bool(record.get("supply_verified")),
         "raw_supply": record.get("raw_supply") or "",
         "decimals": (
             record.get("decimals")
