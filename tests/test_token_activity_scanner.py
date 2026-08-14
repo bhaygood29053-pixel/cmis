@@ -1,0 +1,277 @@
+import sqlite3
+import unittest
+
+from liquidity_scout.tokenomics import (
+    collect_signature_window,
+    initialize_activity_db,
+    scan_token_activity,
+)
+
+
+MINT = "MintA"
+
+
+def signature(signature, err=None, include_err=True):
+    value = {"signature": signature}
+    if include_err:
+        value["err"] = err
+    return value
+
+
+def parsed_ix(kind, amount, *, mint=MINT):
+    info = {
+        "mint": mint,
+        "account": "TokenAccountA",
+        "authority": "AuthorityA",
+        "amount": str(amount),
+    }
+    return {"parsed": {"type": kind, "info": info}}
+
+
+def transaction(*instructions, err=None, include_err=True, block_time=1700000000):
+    meta = {"innerInstructions": []}
+    if include_err:
+        meta["err"] = err
+    return {
+        "blockTime": block_time,
+        "meta": meta,
+        "transaction": {
+            "message": {
+                "instructions": list(instructions),
+            }
+        },
+    }
+
+
+class FakeRPC:
+    def __init__(self, signature_batches, transactions=None, failures=None):
+        self.signature_batches = list(signature_batches)
+        self.transactions = dict(transactions or {})
+        self.failures = set(failures or [])
+        self.signature_calls = 0
+        self.transaction_calls = []
+
+    def __call__(self, method, params):
+        if method == "getSignaturesForAddress":
+            self.signature_calls += 1
+            if not self.signature_batches:
+                return []
+            value = self.signature_batches.pop(0)
+            if isinstance(value, Exception):
+                raise value
+            return value
+
+        if method == "getTransaction":
+            sig = params[0]
+            self.transaction_calls.append(sig)
+            if sig in self.failures:
+                raise RuntimeError("rpc gap")
+            return self.transactions.get(sig)
+
+        raise AssertionError(f"unexpected RPC method: {method}")
+
+
+class TokenActivitySignatureWindowTests(unittest.TestCase):
+    def test_bounded_window_accounts_for_failed_signatures(self):
+        rpc = FakeRPC(
+            [[
+                signature("sig1"),
+                signature("sig-failed", err={"InstructionError": [0, "x"]}),
+                signature("sig2"),
+            ]]
+        )
+
+        result = collect_signature_window(rpc, MINT, max_signatures=3)
+
+        self.assertEqual(result["signatures"], ["sig1", "sig2"])
+        self.assertEqual(result["history_entries_examined"], 3)
+        self.assertTrue(result["selection_complete"])
+        self.assertFalse(result["history_exhausted"])
+        self.assertEqual(result["newest_signature"], "sig1")
+        self.assertEqual(result["oldest_signature"], "sig2")
+
+    def test_unbounded_window_requires_history_exhaustion(self):
+        rpc = FakeRPC([
+            [signature("sig1")],
+        ])
+
+        result = collect_signature_window(rpc, MINT)
+
+        self.assertTrue(result["selection_complete"])
+        self.assertTrue(result["history_exhausted"])
+        self.assertEqual(result["signatures"], ["sig1"])
+
+    def test_malformed_signature_metadata_fails_closed(self):
+        rpc = FakeRPC(
+            [[signature("sig1", include_err=False)]]
+        )
+
+        result = collect_signature_window(rpc, MINT, max_signatures=1)
+
+        self.assertFalse(result["selection_complete"])
+        self.assertEqual(result["malformed_history_entries"], 1)
+        self.assertEqual(result["signatures"], [])
+
+    def test_signature_rpc_error_fails_closed(self):
+        rpc = FakeRPC([RuntimeError("rate limited")])
+
+        result = collect_signature_window(rpc, MINT, max_signatures=5)
+
+        self.assertFalse(result["selection_complete"])
+        self.assertEqual(result["selection_rpc_errors"], 1)
+        self.assertFalse(result["history_exhausted"])
+
+
+class TokenActivityScannerTests(unittest.TestCase):
+    def setUp(self):
+        self.db = sqlite3.connect(":memory:")
+        initialize_activity_db(self.db)
+
+    def tearDown(self):
+        self.db.close()
+
+    def test_verified_scan_persists_mints_burns_and_coverage(self):
+        rpc = FakeRPC(
+            [[signature("sig1"), signature("sig2")]],
+            transactions={
+                "sig1": transaction(parsed_ix("mintTo", "3000000")),
+                "sig2": transaction(parsed_ix("burn", "1250000")),
+            },
+        )
+
+        report = scan_token_activity(
+            rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=2,
+        )
+
+        self.assertTrue(report["activity_verified"])
+        self.assertEqual(report["minted_tokens_observed"], "3")
+        self.assertEqual(report["burned_tokens_observed"], "1.25")
+        self.assertEqual(report["net_issuance_tokens"], "1.75")
+        self.assertEqual(len(report["events"]), 2)
+        self.assertEqual(
+            self.db.execute(
+                "SELECT COUNT(*) FROM token_activity_events"
+            ).fetchone()[0],
+            2,
+        )
+        scan = self.db.execute(
+            """
+            SELECT signatures_scanned, transactions_retrieved,
+                   rpc_errors, coverage_verified, activity_verified,
+                   newest_signature, oldest_signature
+            FROM token_activity_scans
+            WHERE scan_id = ?
+            """,
+            (report["scan_id"],),
+        ).fetchone()
+        self.assertEqual(scan, (2, 2, 0, 1, 1, "sig1", "sig2"))
+
+    def test_cached_rerun_counts_as_retrieved_without_refetch(self):
+        first_rpc = FakeRPC(
+            [[signature("sig1")]],
+            transactions={
+                "sig1": transaction(parsed_ix("mintTo", "1000000")),
+            },
+        )
+        first = scan_token_activity(
+            first_rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=1,
+        )
+        self.assertTrue(first["activity_verified"])
+
+        second_rpc = FakeRPC([[signature("sig1")]])
+        second = scan_token_activity(
+            second_rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=1,
+        )
+
+        self.assertTrue(second["activity_verified"])
+        self.assertEqual(second["net_issuance_tokens"], "1")
+        self.assertEqual(second["coverage"]["cached_transactions"], 1)
+        self.assertEqual(second["coverage"]["transactions_retrieved"], 1)
+        self.assertEqual(second_rpc.transaction_calls, [])
+
+    def test_transaction_gap_preserves_observed_totals_but_withholds_net(self):
+        rpc = FakeRPC(
+            [[signature("sig1"), signature("sig2")]],
+            transactions={
+                "sig1": transaction(parsed_ix("mintTo", "2000000")),
+            },
+            failures={"sig2"},
+        )
+
+        report = scan_token_activity(
+            rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=2,
+        )
+
+        self.assertEqual(report["minted_tokens_observed"], "2")
+        self.assertEqual(report["burned_tokens_observed"], "0")
+        self.assertFalse(report["coverage_verified"])
+        self.assertFalse(report["activity_verified"])
+        self.assertIsNone(report["net_issuance_tokens"])
+        self.assertEqual(report["coverage"]["transactions_retrieved"], 1)
+        self.assertEqual(report["coverage"]["transaction_errors"], 1)
+        self.assertEqual(
+            self.db.execute(
+                "SELECT COUNT(*) FROM processed_token_activity"
+            ).fetchone()[0],
+            1,
+        )
+
+    def test_each_report_is_restricted_to_its_selected_window(self):
+        first_rpc = FakeRPC(
+            [[signature("old")]],
+            transactions={
+                "old": transaction(parsed_ix("mintTo", "9000000")),
+            },
+        )
+        scan_token_activity(
+            first_rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=1,
+        )
+
+        second_rpc = FakeRPC(
+            [[signature("new")]],
+            transactions={
+                "new": transaction(parsed_ix("burn", "500000")),
+            },
+        )
+        report = scan_token_activity(
+            second_rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=1,
+        )
+
+        self.assertEqual(report["minted_tokens_observed"], "0")
+        self.assertEqual(report["burned_tokens_observed"], "0.5")
+        self.assertEqual(report["net_issuance_tokens"], "-0.5")
+        self.assertEqual([event["signature"] for event in report["events"]], ["new"])
+        self.assertEqual(
+            self.db.execute(
+                "SELECT COUNT(*) FROM token_activity_events"
+            ).fetchone()[0],
+            2,
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
