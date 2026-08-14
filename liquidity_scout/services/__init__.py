@@ -1,5 +1,6 @@
 """Structured Liquidity Scout service capabilities."""
 
+from .market_comparison import format_market_comparison
 from .market_context import (
     build_verified_market_context,
     liquidity_depth_label,
@@ -20,6 +21,7 @@ __all__ = [
     "build_market_report",
     "build_verified_market_context",
     "format_field_line",
+    "format_market_comparison",
     "full_snapshot_lines",
     "liquidity_depth_label",
     "price_movement_label",
