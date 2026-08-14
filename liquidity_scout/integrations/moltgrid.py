@@ -22,6 +22,7 @@ from liquidity_scout.services import (
     build_market_report,
     build_verified_market_context,
     format_field_line as core_format_field_line,
+    format_market_comparison,
     full_snapshot_lines as core_full_snapshot_lines,
     liquidity_depth_label,
     price_movement_label,
@@ -195,6 +196,28 @@ def verified_snapshot_context(listener_module, snap, fields):
     return _legacy_verified_snapshot_context(listener_module, snap, fields)
 
 
+
+def format_multi_asset_answer(listener_module, question, resolved_assets, catalog):
+    """Format a multi-asset comparison through the reusable comparison service."""
+    snapshots = [
+        compact_asset_snapshot(listener_module, term, matches, catalog)
+        for term, matches in resolved_assets
+    ]
+    fields = requested_asset_fields(listener_module, question)
+
+    return format_market_comparison(
+        question,
+        snapshots,
+        fields=fields,
+        format_usd=listener_module.format_usd,
+        format_field_line=lambda field, snap: format_field_line(
+            listener_module,
+            field,
+            snap,
+        ),
+        include_token_addresses=core_wants_token_address(question),
+    )
+
 def requested_asset_fields(listener_module, question):
     """Adapt listener routing predicates to the pure field-selection service."""
     historical_comparison = bool(
@@ -232,6 +255,18 @@ def full_snapshot_lines(listener_module, snap):
         get_mint_info=listener_module.get_token_mint_info,
     )
 
+
+
+def _multi_asset_adapter(listener_module):
+    def adapter(question, resolved_assets, catalog):
+        return format_multi_asset_answer(
+            listener_module,
+            question,
+            resolved_assets,
+            catalog,
+        )
+
+    return adapter
 
 def _snapshot_adapter(listener_module):
     def adapter(term, matches, catalog):
@@ -274,6 +309,7 @@ def wire_market_core(listener_module):
     listener_module.resolve_asset = resolve_asset
     listener_module.resolve_multiple_assets = resolve_multiple_assets
     listener_module.compact_asset_snapshot = _snapshot_adapter(listener_module)
+    listener_module.format_multi_asset_answer = _multi_asset_adapter(listener_module)
     listener_module.liquidity_depth_label = liquidity_depth_label
     listener_module.volume_activity_label = volume_activity_label
     listener_module.price_movement_label = price_movement_label
