@@ -43,6 +43,7 @@ import xdex_rankings as rankings
 from config import SETTINGS
 
 from liquidity_scout.integrations.moltgrid import (
+    compact_asset_snapshot as bridge_compact_asset_snapshot,
     MoltGridXDEXCatalog as XDEXCatalog,
     resolve_asset,
     resolve_multiple_assets,
@@ -1403,74 +1404,13 @@ def full_snapshot_lines(snap):
 
 
 def compact_asset_snapshot(term, matches, catalog):
-    pool, side, asset, _quality = matches[0]
-    if not asset:
-        asset = pool.get("baseToken") or {}
-
-    symbol = s(asset.get("symbol")) or term
-    name = s(asset.get("name"))
-
-    price_usd = n(pool.get("priceUsd"))
-    # Public asset liquidity = total across all matching XDEX pools.
-    # Keep strongest/primary pool liquidity separately for route/slippage analysis.
-    primary_liquidity = n(pool.get("liquidity"))
-    liquidity = sum(
-        n(item[0].get("liquidity"))
-        for item in matches
+    """Legacy-compatible adapter to the structured market-report snapshot."""
+    return bridge_compact_asset_snapshot(
+        sys.modules[__name__],
+        term,
+        matches,
+        catalog,
     )
-    pool_count = len(matches)
-
-    vol24 = n(pool.get("volume24h"))
-    change1 = n(pool.get("priceChange1h"))
-    change24 = n(pool.get("priceChange24h"))
-    holders = int(n(pool.get("holders")))
-    txns24 = int(n(pool.get("txns24h")))
-    market_cap = n(pool.get("marketCap"))
-    fdv = n(pool.get("fdv"))
-    safety_grade = s(pool.get("safetyGrade")) or "N/A"
-    safety_score = n(pool.get("safetyScore"))
-    age = format_age(pool.get("createdAt"))
-
-    is_xnt = symbol.upper() == "XNT" or term.upper() == "XNT"
-    if is_xnt and catalog.xnt_price_usd is not None:
-        price_value = n(catalog.xnt_price_usd)
-        price_text = format_usd(price_value)
-    else:
-        price_value = price_usd
-        price_text = format_usd(price_value)
-
-    safety_text = safety_grade
-    if safety_score > 0:
-        safety_text += f" ({safety_score:g}/100)"
-
-    if is_xnt:
-        title = "XNT"
-    else:
-        title = symbol
-        if name and name.upper() != symbol.upper():
-            title += f" ({name})"
-
-    return {
-        "title": title,
-        "symbol": symbol,
-        "token_address": s(asset.get("mint") or asset.get("address")),
-        "price": price_text,
-        "price_usd_value": price_value,
-        "age": age,
-        "holders": holders,
-        "txns24": txns24,
-        "vol24": vol24,
-        "change1": change1,
-        "change24": change24,
-        "liquidity": liquidity,
-        "primary_liquidity": primary_liquidity,
-        "pool_count": pool_count,
-        "market_cap": market_cap,
-        "fdv": fdv,
-        "safety": safety_text,
-        "pool": pair_name(pool),
-        "pool_address": pool_address(pool),
-    }
 
 
 
