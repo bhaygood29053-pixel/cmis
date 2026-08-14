@@ -21,10 +21,12 @@ from .market_rankings import (
     rank_assets,
 )
 from .market_report import build_market_report
+from .tokenomics import build_tokenomics_report
 
 __all__ = [
     "FIELD_ORDER",
     "build_market_report",
+    "build_tokenomics_report",
     "build_verified_market_context",
     "find_asset_rank",
     "format_field_line",
