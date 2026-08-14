@@ -2,6 +2,7 @@ import inspect
 import unittest
 
 import moltgrid_signal_v12_ollama as legacy
+from liquidity_scout.market import resolver as core_resolver
 
 
 class LegacyVolumeRankingCleanupTests(unittest.TestCase):
@@ -22,6 +23,9 @@ class LegacyVolumeRankingCleanupTests(unittest.TestCase):
         self.assertIn("wants_asset_rank", pool_answer_source)
         self.assertIn("format_asset_rank_answer", pool_answer_source)
         self.assertTrue(callable(legacy.wants_volume_rank))
+
+    def test_resolver_asset_key_compatibility_export_is_preserved(self):
+        self.assertIs(legacy.asset_key, core_resolver.asset_key)
 
 
 if __name__ == "__main__":
