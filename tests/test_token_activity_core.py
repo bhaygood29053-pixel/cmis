@@ -134,6 +134,7 @@ class TokenActivitySummaryTests(unittest.TestCase):
         )
         self.assertEqual(scale_raw_amount("-1500000", 6), "-1.5")
         self.assertEqual(scale_raw_amount("0", 9), "0")
+        self.assertEqual(scale_raw_amount(0, 9), "0")
 
     def test_verified_bounded_coverage_emits_net_issuance(self):
         events = [
