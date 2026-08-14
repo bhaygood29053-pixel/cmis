@@ -1,5 +1,6 @@
 """Structured Liquidity Scout service capabilities."""
 
+from .historical_compare import format_historical_comparison
 from .market_comparison import format_market_comparison
 from .market_context import (
     build_verified_market_context,
@@ -27,6 +28,7 @@ __all__ = [
     "build_verified_market_context",
     "find_asset_rank",
     "format_field_line",
+    "format_historical_comparison",
     "format_market_comparison",
     "format_top",
     "full_snapshot_lines",
