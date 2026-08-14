@@ -3,6 +3,7 @@
 from .aggregation import aggregate_assets
 from .client import XDEXCatalog, fetch_all_pools
 from .resolver import (
+    AmbiguousAssetError,
     asset_key,
     candidate_terms,
     find_matches_for_term,
@@ -12,6 +13,7 @@ from .resolver import (
 )
 
 __all__ = [
+    "AmbiguousAssetError",
     "XDEXCatalog",
     "aggregate_assets",
     "asset_key",
