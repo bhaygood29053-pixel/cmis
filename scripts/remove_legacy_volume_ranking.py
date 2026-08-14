@@ -46,7 +46,6 @@ def main() -> None:
         del lines[start:end]
 
     updated = "".join(lines)
-    updated = updated.replace("    asset_key,\n", "", 1)
 
     compile(updated, str(TARGET), "exec")
 
@@ -64,6 +63,8 @@ def main() -> None:
         raise RuntimeError("packaged asset-rank delegation is missing")
     if "def wants_volume_rank(" not in updated:
         raise RuntimeError("field-selection volume-rank predicate was removed unexpectedly")
+    if "    asset_key,\n" not in updated:
+        raise RuntimeError("legacy resolver compatibility export asset_key was removed unexpectedly")
 
     TARGET.write_text(updated, encoding="utf-8")
     print("Removed dead duplicate legacy volume-ranking implementation.")
