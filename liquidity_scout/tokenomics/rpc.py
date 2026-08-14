@@ -5,7 +5,6 @@ X1 RPC. It does not infer circulating supply, market cap, token safety, burns,
 mints, or net issuance.
 """
 
-from decimal import Decimal, InvalidOperation
 import time
 
 import requests
@@ -38,21 +37,26 @@ def _decimals(value):
 
 
 def _token_amount(raw_supply, decimals):
+    """Scale an RPC raw integer amount exactly, without float/Decimal rounding."""
     raw_supply = _text(raw_supply)
     decimals = _decimals(decimals)
 
-    if not raw_supply or decimals is None:
+    if not raw_supply or decimals is None or not raw_supply.isdigit():
         return None
 
-    try:
-        raw = Decimal(raw_supply)
-    except (InvalidOperation, ValueError):
-        return None
+    digits = raw_supply.lstrip("0") or "0"
 
-    if raw != raw.to_integral_value() or raw < 0:
-        return None
+    if decimals == 0:
+        return digits
 
-    return str(raw / (Decimal(10) ** decimals))
+    digits = digits.rjust(decimals + 1, "0")
+    whole = digits[:-decimals] or "0"
+    fraction = digits[-decimals:].rstrip("0")
+
+    if not fraction:
+        return whole
+
+    return f"{whole}.{fraction}"
 
 
 def rpc_request(
