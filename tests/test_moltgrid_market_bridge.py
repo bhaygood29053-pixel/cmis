@@ -24,17 +24,35 @@ def pool(address, base, quote, liquidity, volume24h=0):
     }
 
 
+def presentation_listener(**overrides):
+    values = {
+        "format_usd": lambda value: f"${value:,.0f}",
+        "format_age": lambda _value: "7mo",
+        "get_token_total_supply": lambda _mint: None,
+        "get_token_mint_info": lambda _mint: None,
+        "history": SimpleNamespace(parse_historical_comparison=lambda _question: None),
+        "wants_volume_rank": lambda _question: False,
+        "wants_historical_liquidity": lambda _question: False,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
 class MoltGridMarketBridgeTests(unittest.TestCase):
     def setUp(self):
         self.xnt = token("XNT", "MINT_XNT", "Wrapped XNT")
         self.agi = token("AGI", "MINT_AGI", "Artificial General Intelligence")
         self.usdc = token("USDC", "MINT_USDC", "USD Coin")
 
-    def test_wire_market_core_replaces_market_globals_snapshot_and_context(self):
+    def test_wire_market_core_replaces_market_globals_snapshot_context_and_presentation(self):
         original_main = object()
         original_snapshot = object()
         original_context = object()
-        listener = SimpleNamespace(
+        original_fields = object()
+        original_field_line = object()
+        original_full_snapshot = object()
+        original_token_address = object()
+        listener = presentation_listener(
             XDEXCatalog=object(),
             resolve_asset=object(),
             resolve_multiple_assets=object(),
@@ -43,8 +61,11 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
             volume_activity_label=object(),
             price_movement_label=object(),
             verified_snapshot_context=original_context,
-            format_usd=lambda value: str(value),
-            format_age=lambda value: str(value),
+            FIELD_ORDER=["legacy"],
+            requested_asset_fields=original_fields,
+            format_field_line=original_field_line,
+            full_snapshot_lines=original_full_snapshot,
+            wants_token_address=original_token_address,
             main=original_main,
         )
 
@@ -64,6 +85,14 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
         self.assertIs(listener.price_movement_label, moltgrid.price_movement_label)
         self.assertTrue(callable(listener.verified_snapshot_context))
         self.assertIsNot(listener.verified_snapshot_context, original_context)
+        self.assertEqual(listener.FIELD_ORDER, list(moltgrid.CORE_FIELD_ORDER))
+        self.assertTrue(callable(listener.requested_asset_fields))
+        self.assertIsNot(listener.requested_asset_fields, original_fields)
+        self.assertTrue(callable(listener.format_field_line))
+        self.assertIsNot(listener.format_field_line, original_field_line)
+        self.assertTrue(callable(listener.full_snapshot_lines))
+        self.assertIsNot(listener.full_snapshot_lines, original_full_snapshot)
+        self.assertIs(listener.wants_token_address, moltgrid.core_wants_token_address)
         self.assertIs(listener.main, original_main)
 
     def test_single_asset_resolution_uses_core_pool_ordering(self):
@@ -107,9 +136,8 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
             (primary, "base", self.agi, 90),
             (secondary, "base", self.agi, 90),
         ]
-        listener = SimpleNamespace(
+        listener = presentation_listener(
             format_usd=lambda value: f"${value:.2f}",
-            format_age=lambda _value: "7mo",
         )
         catalog = SimpleNamespace(xnt_price_usd=None, last_refresh=123.0)
 
@@ -147,10 +175,7 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
             }
         )
         matches = [(primary, "base", self.agi, 90)]
-        listener = SimpleNamespace(
-            format_usd=lambda value: f"${value:,.0f}",
-            format_age=lambda _value: "7mo",
-        )
+        listener = presentation_listener()
         catalog = SimpleNamespace(xnt_price_usd=None, last_refresh=123.0)
 
         snap = moltgrid.compact_asset_snapshot(
@@ -165,9 +190,7 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
             ["liquidity"],
         )
 
-        # v0.12 public compatibility remains zero-coerced for now.
         self.assertEqual(snap["liquidity"], 0)
-        # AI context consumes the structured report instead of that zero.
         self.assertIn("Liquidity: Not available from verified data", context)
         self.assertNotIn("Liquidity: $0", context)
         self.assertNotIn("Liquidity classification:", context)
@@ -179,10 +202,7 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
             (primary, "base", self.agi, 90),
             (secondary, "base", self.agi, 90),
         ]
-        listener = SimpleNamespace(
-            format_usd=lambda value: f"${value:,.0f}",
-            format_age=lambda _value: "7mo",
-        )
+        listener = presentation_listener()
         catalog = SimpleNamespace(xnt_price_usd=None, last_refresh=123.0)
 
         snap = moltgrid.compact_asset_snapshot(
@@ -205,10 +225,7 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
         self.assertNotIn("Liquidity classification:", context)
 
     def test_legacy_context_fallback_preserves_existing_snapshot_behavior(self):
-        listener = SimpleNamespace(
-            format_usd=lambda value: f"${value:,.0f}",
-            format_age=lambda _value: "7mo",
-        )
+        listener = presentation_listener()
         legacy_snap = {
             "title": "AGI",
             "liquidity": 3522,
@@ -222,6 +239,71 @@ class MoltGridMarketBridgeTests(unittest.TestCase):
 
         self.assertIn("Liquidity: $3,522", context)
         self.assertIn("Liquidity classification: very thin", context)
+
+    def test_requested_fields_adapter_uses_listener_route_predicates(self):
+        listener = presentation_listener(
+            history=SimpleNamespace(
+                parse_historical_comparison=lambda question: (
+                    {"period": "30d"} if "30 days" in question else None
+                )
+            ),
+            wants_volume_rank=lambda question: "rank" in question.lower(),
+            wants_historical_liquidity=lambda question: "dropped" in question.lower(),
+        )
+
+        self.assertEqual(
+            moltgrid.requested_asset_fields(
+                listener,
+                "Has AGI liquidity dropped?",
+            ),
+            [],
+        )
+        self.assertEqual(
+            moltgrid.requested_asset_fields(
+                listener,
+                "Rank AGI by volume",
+            ),
+            [],
+        )
+        self.assertEqual(
+            moltgrid.requested_asset_fields(
+                listener,
+                "Has AGI changed over 30 days?",
+            ),
+            [],
+        )
+        self.assertEqual(
+            moltgrid.requested_asset_fields(
+                listener,
+                "What is AGI price and liquidity?",
+            ),
+            ["price", "liquidity"],
+        )
+
+    def test_field_format_adapter_keeps_rpc_transport_in_listener(self):
+        calls = []
+        listener = presentation_listener(
+            format_usd=lambda value: f"${value:,.2f}",
+            get_token_total_supply=lambda mint: (
+                calls.append(("supply", mint)) or "1000"
+            ),
+            get_token_mint_info=lambda mint: (
+                calls.append(("mint", mint)) or {"mint_authority": None}
+            ),
+        )
+        snap = {
+            "symbol": "AGI",
+            "token_address": "MINT_AGI",
+            "price_usd_value": 0.25,
+        }
+
+        fdv = moltgrid.format_field_line(listener, "fdv", snap)
+        max_supply = moltgrid.format_field_line(listener, "max_supply", snap)
+
+        self.assertIn("Current Supply Valuation: $250.00", fdv)
+        self.assertIn("Mint authority revoked", max_supply)
+        self.assertIn(("supply", "MINT_AGI"), calls)
+        self.assertIn(("mint", "MINT_AGI"), calls)
 
     def test_ambiguous_symbol_fails_closed_for_listener(self):
         same_one = token("SAME", "MINT_ONE", "Same One")
