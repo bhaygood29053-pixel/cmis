@@ -2,8 +2,8 @@
 
 This is a migration seam for the current v0.12 listener. It keeps the legacy
 MoltGrid transport, formatting, AI routing, and conversation state intact while
-replacing market catalog/resolution and deterministic snapshot construction at
-runtime.
+replacing market catalog/resolution, deterministic snapshot construction, and
+verified market-analysis context at runtime.
 
 Run with:
     python -m liquidity_scout.integrations.moltgrid
@@ -17,7 +17,13 @@ from liquidity_scout.market import (
     resolve_asset as core_resolve_asset,
     resolve_multiple_assets as core_resolve_multiple_assets,
 )
-from liquidity_scout.services import build_market_report
+from liquidity_scout.services import (
+    build_market_report,
+    build_verified_market_context,
+    liquidity_depth_label,
+    price_movement_label,
+    volume_activity_label,
+)
 
 
 class MoltGridXDEXCatalog(CoreXDEXCatalog):
@@ -107,12 +113,93 @@ def compact_asset_snapshot(listener_module, term, matches, catalog):
         "safety": safety_text,
         "pool": primary_pool.get("pair") or "",
         "pool_address": primary_pool.get("address") or "",
+        # Private integration metadata. Presentation code ignores this key;
+        # verified AI context uses it to avoid compatibility zero-coercion.
+        "_market_report": report,
     }
+
+
+def _legacy_verified_snapshot_context(listener_module, snap, fields):
+    """Preserve v0.12 context behavior for externally supplied legacy snapshots."""
+    lines = [f"Token: {snap['title']}"]
+
+    for field in fields:
+        if field == "price":
+            lines.append(f"Price: {snap['price']}")
+
+        elif field == "age":
+            lines.append(f"Age: {snap['age']}")
+
+        elif field == "holders":
+            lines.append(f"Holders: {snap['holders']:,}")
+
+        elif field == "txns24":
+            lines.append(f"Transactions 24h: {snap['txns24']:,}")
+
+        elif field == "volume24":
+            lines.append(
+                f"Volume 24h: {listener_module.format_usd(snap['vol24'])}"
+            )
+            lines.append(
+                f"Volume classification: {volume_activity_label(snap['vol24'])}"
+            )
+
+        elif field == "change1h":
+            lines.append(f"Change 1h: {snap['change1']:+.2f}%")
+
+        elif field == "change24h":
+            lines.append(f"Change 24h: {snap['change24']:+.2f}%")
+            lines.append(
+                "24h price-movement classification: "
+                f"{price_movement_label(snap['change24'])}"
+            )
+
+        elif field == "liquidity":
+            lines.append(
+                f"Liquidity: {listener_module.format_usd(snap['liquidity'])}"
+            )
+            lines.append(
+                f"Liquidity classification: {liquidity_depth_label(snap['liquidity'])}"
+            )
+
+        elif field == "market_cap":
+            lines.append(
+                "Market Cap: Not verified — "
+                "circulating supply unavailable from verified data"
+            )
+
+        elif field == "safety":
+            lines.append(f"Tokenomics Safety: {snap['safety']}")
+
+        elif field == "pool_address":
+            lines.append(f"Pool address: {snap['pool_address'] or 'N/A'}")
+
+    return "\n".join(lines)
+
+
+def verified_snapshot_context(listener_module, snap, fields):
+    """Build verified AI context from structured facts when available."""
+    report = snap.get("_market_report") if isinstance(snap, dict) else None
+    if isinstance(report, dict):
+        return build_verified_market_context(
+            report,
+            fields,
+            format_usd=listener_module.format_usd,
+            format_age=listener_module.format_age,
+        )
+    return _legacy_verified_snapshot_context(listener_module, snap, fields)
 
 
 def _snapshot_adapter(listener_module):
     def adapter(term, matches, catalog):
         return compact_asset_snapshot(listener_module, term, matches, catalog)
+
+    return adapter
+
+
+def _context_adapter(listener_module):
+    def adapter(snap, fields):
+        return verified_snapshot_context(listener_module, snap, fields)
 
     return adapter
 
@@ -123,6 +210,10 @@ def wire_market_core(listener_module):
     listener_module.resolve_asset = resolve_asset
     listener_module.resolve_multiple_assets = resolve_multiple_assets
     listener_module.compact_asset_snapshot = _snapshot_adapter(listener_module)
+    listener_module.liquidity_depth_label = liquidity_depth_label
+    listener_module.volume_activity_label = volume_activity_label
+    listener_module.price_movement_label = price_movement_label
+    listener_module.verified_snapshot_context = _context_adapter(listener_module)
     return listener_module
 
 
