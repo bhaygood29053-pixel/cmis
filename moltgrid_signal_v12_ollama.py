@@ -1907,161 +1907,17 @@ def format_historical_comparison_answer(
     matches,
     catalog,
 ):
-    request = history.parse_historical_comparison(question)
+    """Legacy-compatible adapter to reusable historical comparison policy."""
+    from liquidity_scout.services import format_historical_comparison
 
-    if not request:
-        return None
-
-    snap = compact_asset_snapshot(
-        term,
-        matches,
-        catalog,
+    snap = compact_asset_snapshot(term, matches, catalog)
+    return format_historical_comparison(
+        question,
+        snap,
+        history_backend=history,
+        get_total_supply=get_token_total_supply,
     )
 
-    metric = request["metric"]
-    period = request["period"]
-    period_seconds = request["period_seconds"]
-
-    mint = snap.get("token_address")
-    symbol = snap.get("symbol") or term
-
-    if not period_seconds:
-        return (
-            f"Liquidity Scout reply: {symbol} • "
-            "Please specify a comparison period such as "
-            "24h, 7d, or 30d."
-        )
-
-    current_map = {
-        "price": n(snap.get("price_usd_value")),
-        "liquidity": n(snap.get("liquidity")),
-        "volume": n(snap.get("vol24")),
-        "holders": n(snap.get("holders")),
-    }
-
-    # Supply is retrieved from verified X1 RPC.
-    if metric == "supply":
-        amount = get_token_total_supply(mint)
-        current_value = (
-            float(amount)
-            if amount
-            else None
-        )
-    else:
-        current_value = current_map.get(metric)
-
-    # Burn percentage comparisons will use the verified burn DB
-    # in the next burn-integration step.
-    if metric == "burns":
-        return (
-            f"Liquidity Scout reply: {symbol} • "
-            "Historical burn percentage comparisons are not yet "
-            "enabled in the live listener. Verified burn history "
-            "is maintained separately by the X1 burn scanner."
-        )
-
-    if current_value is None:
-        return (
-            f"Liquidity Scout reply: {symbol} • "
-            f"Current {metric} data is not available from a "
-            "verified source."
-        )
-
-    # Always store the current observation.
-    history.record_snapshot(
-        mint=mint,
-        symbol=symbol,
-        price=n(snap.get("price_usd_value")),
-        liquidity=n(snap.get("liquidity")),
-        volume24=n(snap.get("vol24")),
-        holders=n(snap.get("holders")),
-        total_supply=(
-            current_value
-            if metric == "supply"
-            else None
-        ),
-        pool_count=snap.get("pool_count"),
-    )
-
-    old = history.historical_value(
-        mint,
-        metric,
-        period_seconds,
-    )
-
-    if not old:
-        current_text = history.format_number(
-            metric,
-            current_value,
-        )
-
-        return (
-            history.history_not_ready_message(
-                symbol,
-                metric,
-                period,
-                mint,
-            )
-            + f" Current {metric}: {current_text}."
-        )
-
-    old_value = old["value"]
-
-    change = history.percent_change(
-        old_value,
-        current_value,
-    )
-
-    if change is None:
-        return (
-            f"Liquidity Scout reply: {symbol} • "
-            f"Historical {metric} percentage change cannot "
-            "be calculated because the earlier value was zero."
-        )
-
-    current_text = history.format_number(
-        metric,
-        current_value,
-    )
-
-    old_text = history.format_number(
-        metric,
-        old_value,
-    )
-
-    answer = (
-        f"Liquidity Scout reply: {symbol} • "
-        f"Current {metric}: {current_text} "
-        f"• {period} ago: {old_text} "
-        f"• Change: {change:+.2f}%"
-    )
-
-    threshold = request.get("threshold")
-    direction = request.get("direction")
-
-    if threshold is not None:
-        result = history.threshold_result(
-            change,
-            direction,
-            threshold,
-        )
-
-        if result is not None:
-            direction_text = (
-                "decline"
-                if direction == "down"
-                else "increase"
-                if direction == "up"
-                else "change"
-            )
-
-            answer += (
-                f" • {direction_text.title()} of at least "
-                f"{threshold:g}%: "
-                f"{'YES' if result else 'NO'}"
-            )
-
-    return answer
 
 
 def format_pool_answer(question, term, matches, catalog):
