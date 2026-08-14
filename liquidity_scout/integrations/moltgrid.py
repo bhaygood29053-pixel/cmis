@@ -21,6 +21,7 @@ from liquidity_scout.services import (
     FIELD_ORDER as CORE_FIELD_ORDER,
     build_market_report,
     build_verified_market_context,
+    format_historical_comparison as core_format_historical_comparison,
     format_field_line as core_format_field_line,
     format_market_comparison,
     full_snapshot_lines as core_full_snapshot_lines,
@@ -197,6 +198,23 @@ def verified_snapshot_context(listener_module, snap, fields):
 
 
 
+def format_historical_comparison_answer(
+    listener_module,
+    question,
+    term,
+    matches,
+    catalog,
+):
+    """Format historical comparison through verified reusable service policy."""
+    snapshot = compact_asset_snapshot(listener_module, term, matches, catalog)
+    return core_format_historical_comparison(
+        question,
+        snapshot,
+        history_backend=listener_module.history,
+        get_total_supply=listener_module.get_token_total_supply,
+    )
+
+
 def format_multi_asset_answer(listener_module, question, resolved_assets, catalog):
     """Format a multi-asset comparison through the reusable comparison service."""
     snapshots = [
@@ -268,6 +286,19 @@ def _multi_asset_adapter(listener_module):
 
     return adapter
 
+def _historical_comparison_adapter(listener_module):
+    def adapter(question, term, matches, catalog):
+        return format_historical_comparison_answer(
+            listener_module,
+            question,
+            term,
+            matches,
+            catalog,
+        )
+
+    return adapter
+
+
 def _snapshot_adapter(listener_module):
     def adapter(term, matches, catalog):
         return compact_asset_snapshot(listener_module, term, matches, catalog)
@@ -310,6 +341,7 @@ def wire_market_core(listener_module):
     listener_module.resolve_multiple_assets = resolve_multiple_assets
     listener_module.compact_asset_snapshot = _snapshot_adapter(listener_module)
     listener_module.format_multi_asset_answer = _multi_asset_adapter(listener_module)
+    listener_module.format_historical_comparison_answer = _historical_comparison_adapter(listener_module)
     listener_module.liquidity_depth_label = liquidity_depth_label
     listener_module.volume_activity_label = volume_activity_label
     listener_module.price_movement_label = price_movement_label
