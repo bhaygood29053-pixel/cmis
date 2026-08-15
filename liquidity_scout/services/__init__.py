@@ -12,6 +12,7 @@ from .cmis_contract import (
 )
 from .cmis_historical import build_historical_compare_response
 from .cmis_market import build_market_report_response
+from .cmis_rank import SUPPORTED_RANK_METRICS, build_rank_response
 from .cmis_risk import build_risk_check_response
 from .cmis_tokenomics import build_tokenomics_response
 from .historical_compare import (
@@ -57,6 +58,7 @@ __all__ = [
     "PARTIAL",
     "PASS",
     "SERVICE_STATUSES",
+    "SUPPORTED_RANK_METRICS",
     "UNAVAILABLE",
     "WARN",
     "build_asset_lookup_response",
@@ -64,6 +66,7 @@ __all__ = [
     "build_historical_comparison",
     "build_market_report",
     "build_market_report_response",
+    "build_rank_response",
     "build_risk_check",
     "build_risk_check_response",
     "build_service_envelope",
