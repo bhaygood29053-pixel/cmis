@@ -22,6 +22,12 @@ from typing import Any, Dict, Optional, Tuple
 
 import historical_metrics as default_history_backend
 
+from liquidity_scout.cmis.assets import (
+    AssetRegistry,
+    DEFAULT_ASSET_REGISTRY,
+    MARKET_PLUS_NATIVE,
+    NATIVE,
+)
 from liquidity_scout.market.resolver import (
     AmbiguousAssetError,
     find_matches_for_term,
@@ -73,15 +79,69 @@ class CMISGateway:
         x1_market_provider: Optional[X1Provider] = None,
         x1_supply_provider: Optional[X1SupplyProvider] = None,
         history_backend: Any = None,
+        asset_registry: Optional[AssetRegistry] = None,
     ):
         self.x1_market_provider = x1_market_provider or X1Provider()
         self.x1_supply_provider = x1_supply_provider or X1SupplyProvider()
         self.history_backend = history_backend or default_history_backend
+        self.asset_registry = asset_registry or DEFAULT_ASSET_REGISTRY
 
     @staticmethod
     def _text(value: Any) -> Optional[str]:
         text = str(value or "").strip()
         return text or None
+
+    def _canonical_definition(self, asset: Any):
+        return self.asset_registry.resolve("x1", asset)
+
+    def _market_query(self, asset: Any, definition: Any = None) -> Any:
+        if isinstance(definition, Mapping):
+            return self.asset_registry.market_query(definition) or asset
+        return asset
+
+    @staticmethod
+    def _provider_asset_from_data(data: Any) -> Dict[str, Any]:
+        if not isinstance(data, Mapping):
+            return {}
+        return {
+            "symbol": data.get("symbol"),
+            "name": data.get("name"),
+            "mint": data.get("mint"),
+        }
+
+    @staticmethod
+    def _market_representation_from_envelope(envelope: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(envelope, Mapping):
+            return None
+        data = envelope.get("data")
+        if not isinstance(data, Mapping):
+            return None
+        representations = data.get("representations")
+        if not isinstance(representations, list):
+            return None
+        for record in representations:
+            if isinstance(record, Mapping) and record.get("role") == "market":
+                return dict(record)
+        return None
+
+    def _canonicalize(
+        self,
+        envelope: Any,
+        definition: Any,
+        *,
+        provider_asset: Any = None,
+        role: str = "market",
+        identity_key: Any = None,
+    ):
+        if not isinstance(definition, Mapping):
+            return envelope
+        return self.asset_registry.canonicalize_envelope(
+            envelope,
+            definition,
+            provider_asset=provider_asset,
+            role=role,
+            identity_key=identity_key,
+        )
 
     def _gateway_error(
         self,
@@ -192,16 +252,31 @@ class CMISGateway:
     def _asset_lookup(self, asset: Any) -> Dict[str, Any]:
         if not self._text(asset):
             return build_asset_lookup_response(asset, [], chain="x1")
+
+        definition = self._canonical_definition(asset)
+        query = self._market_query(asset, definition)
         catalog, failure = self._collect_x1_catalog("asset_lookup")
         if failure is not None:
             return failure
-        return build_asset_lookup_response(
-            asset,
+
+        response = build_asset_lookup_response(
+            query,
             catalog["pools"],
             chain="x1",
             source=catalog.get("source"),
             observed_at=catalog.get("observed_at"),
         )
+        if isinstance(definition, Mapping) and response.get("status") == "ok":
+            data = response.get("data")
+            identity_key = data.get("identity_key") if isinstance(data, Mapping) else None
+            response = self._canonicalize(
+                response,
+                definition,
+                provider_asset=response.get("asset"),
+                role="market",
+                identity_key=identity_key,
+            )
+        return response
 
     def _market_report(self, asset: Any) -> Dict[str, Any]:
         if not self._text(asset):
@@ -211,10 +286,14 @@ class CMISGateway:
                 self.x1_market_provider,
                 chain="x1",
             )
+
+        definition = self._canonical_definition(asset)
+        query = self._market_query(asset, definition)
         catalog, failure = self._collect_x1_catalog("market_report")
         if failure is not None:
             return failure
-        term, matches = self._resolved_matches(asset, catalog["pools"])
+
+        term, matches = self._resolved_matches(query, catalog["pools"])
         response = build_market_report_response(
             term,
             matches,
@@ -225,6 +304,13 @@ class CMISGateway:
         data = response.get("data")
         if isinstance(data, dict) and "lp_count" in data:
             data["#LPs"] = data.get("lp_count")
+        if isinstance(definition, Mapping) and response.get("status") in {"ok", "partial"}:
+            response = self._canonicalize(
+                response,
+                definition,
+                provider_asset=response.get("asset"),
+                role="market",
+            )
         return response
 
     def _rank(self, params: Mapping[str, Any]) -> Dict[str, Any]:
@@ -256,10 +342,38 @@ class CMISGateway:
         lookup = self._asset_lookup(asset)
         if lookup.get("status") != "ok":
             return None, self._propagate_upstream("tokenomics", lookup)
+
         identity = lookup.get("asset")
+        if isinstance(identity, Mapping) and identity.get("mint"):
+            return dict(identity), None
+
+        representation = self._market_representation_from_envelope(lookup)
+        if isinstance(representation, Mapping) and representation.get("mint"):
+            return {
+                "symbol": representation.get("symbol"),
+                "name": representation.get("name"),
+                "mint": representation.get("mint"),
+            }, None
+
         return (dict(identity) if isinstance(identity, Mapping) else None), None
 
-    def _native_xnt_tokenomics(self) -> Dict[str, Any]:
+    def _native_asset_tokenomics(self, definition: Mapping[str, Any]) -> Dict[str, Any]:
+        provider_name = self._text(definition.get("native_tokenomics_provider"))
+        if provider_name != "x1_supply":
+            return build_service_envelope(
+                "tokenomics",
+                "x1",
+                UNAVAILABLE,
+                asset=self.asset_registry.public_identity(definition),
+                warnings=[{
+                    "code": "native_tokenomics_provider_not_implemented",
+                    "message": (
+                        "No native tokenomics provider is implemented for the "
+                        "registered canonical asset."
+                    ),
+                }],
+            )
+
         total_record = None
         circulating_record = None
         provider_warnings = []
@@ -281,20 +395,28 @@ class CMISGateway:
             })
 
         response = build_native_tokenomics_response(
-            symbol="XNT",
-            name="XNT",
-            chain="x1",
+            symbol=definition.get("symbol"),
+            name=definition.get("name"),
+            chain=definition.get("chain") or "x1",
             total_supply_record=total_record,
             circulating_supply_record=circulating_record,
         )
         response["warnings"].extend(provider_warnings)
-        return response
+        return self._canonicalize(
+            response,
+            definition,
+            provider_asset=response.get("asset"),
+            role="native",
+        )
 
     def _tokenomics(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:
         supplied_mint = self._text(params.get("mint"))
-        asset_text = self._text(asset)
-        if not supplied_mint and asset_text and asset_text.upper() == "XNT":
-            return self._native_xnt_tokenomics()
+        definition = self._canonical_definition(asset) if not supplied_mint else None
+        if (
+            isinstance(definition, Mapping)
+            and self.asset_registry.service_mode(definition, "tokenomics") == NATIVE
+        ):
+            return self._native_asset_tokenomics(definition)
 
         identity, failure = self._resolve_tokenomics_identity(asset, params)
         if failure is not None:
@@ -306,12 +428,21 @@ class CMISGateway:
                 "token_mint_required",
                 "A verified mint is required for mint-scoped tokenomics.",
             )
-        return build_tokenomics_response(
+
+        response = build_tokenomics_response(
             identity["mint"],
             symbol=identity.get("symbol"),
             name=identity.get("name"),
             chain="x1",
         )
+        if isinstance(definition, Mapping):
+            response = self._canonicalize(
+                response,
+                definition,
+                provider_asset=identity,
+                role="market",
+            )
+        return response
 
     def _historical_from_market(
         self,
@@ -341,26 +472,39 @@ class CMISGateway:
         )
 
     def _historical_compare(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:
+        definition = self._canonical_definition(asset)
         market = self._market_report(asset)
         if market.get("status") in {ERROR, UNAVAILABLE, AMBIGUOUS}:
             return self._propagate_upstream("historical_compare", market)
-        return self._historical_from_market(params.get("question"), market)
+
+        response = self._historical_from_market(params.get("question"), market)
+        if isinstance(definition, Mapping) and response.get("status") in {"ok", "partial"}:
+            response = self._canonicalize(
+                response,
+                definition,
+                provider_asset=self._provider_asset_from_data(market.get("data")),
+                role="market",
+            )
+        return response
 
     def _risk_check(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:
+        definition = self._canonical_definition(asset)
         market = self._market_report(asset)
         if market.get("status") in {ERROR, UNAVAILABLE, AMBIGUOUS}:
             return self._propagate_upstream("risk_check", market)
 
         market_data = market.get("data")
-        identity = market.get("asset") if isinstance(market.get("asset"), Mapping) else {}
-        asset_text = self._text(asset)
-        if asset_text and asset_text.upper() == "XNT":
-            tokenomics = self._native_xnt_tokenomics()
+        market_identity = self._provider_asset_from_data(market_data)
+        if (
+            isinstance(definition, Mapping)
+            and self.asset_registry.service_mode(definition, "risk_check") == MARKET_PLUS_NATIVE
+        ):
+            tokenomics = self._native_asset_tokenomics(definition)
         else:
             tokenomics = build_tokenomics_response(
-                identity.get("mint"),
-                symbol=identity.get("symbol"),
-                name=identity.get("name"),
+                market_identity.get("mint"),
+                symbol=market_identity.get("symbol"),
+                name=market_identity.get("name"),
                 chain="x1",
             )
         tokenomics_data = (
@@ -385,7 +529,7 @@ class CMISGateway:
                 "params.policy must be a mapping when supplied.",
             )
 
-        return build_risk_check_response(
+        response = build_risk_check_response(
             market_data,
             tokenomics_data,
             historical_data,
@@ -393,6 +537,14 @@ class CMISGateway:
             policy=policy,
             observed_at=market.get("observed_at"),
         )
+        if isinstance(definition, Mapping):
+            response = self._canonicalize(
+                response,
+                definition,
+                provider_asset=market_identity,
+                role="market",
+            )
+        return response
 
     def _pre_trade_check(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:
         trade = params.get("trade")
@@ -404,6 +556,7 @@ class CMISGateway:
                 "params.trade must be a mapping.",
             )
 
+        definition = self._canonical_definition(asset)
         risk_params = {
             key: params[key]
             for key in ("policy", "historical_question")
@@ -415,16 +568,31 @@ class CMISGateway:
         if "chain" not in normalized_trade:
             normalized_trade["chain"] = "x1"
         if not isinstance(normalized_trade.get("asset"), Mapping):
-            risk_asset = risk.get("asset")
-            if isinstance(risk_asset, Mapping):
-                normalized_trade["asset"] = dict(risk_asset)
+            raw_risk = risk.get("risk") if isinstance(risk, Mapping) else None
+            raw_risk_asset = raw_risk.get("asset") if isinstance(raw_risk, Mapping) else None
+            if isinstance(raw_risk_asset, Mapping):
+                normalized_trade["asset"] = dict(raw_risk_asset)
+            else:
+                risk_asset = risk.get("asset") if isinstance(risk, Mapping) else None
+                if isinstance(risk_asset, Mapping):
+                    normalized_trade["asset"] = dict(risk_asset)
 
-        return build_pre_trade_check_response(
+        response = build_pre_trade_check_response(
             risk,
             normalized_trade,
             chain="x1",
             observed_at=risk.get("observed_at"),
         )
+        if isinstance(definition, Mapping):
+            raw_risk = risk.get("risk") if isinstance(risk, Mapping) else None
+            provider_asset = raw_risk.get("asset") if isinstance(raw_risk, Mapping) else None
+            response = self._canonicalize(
+                response,
+                definition,
+                provider_asset=provider_asset,
+                role="market",
+            )
+        return response
 
     def dispatch(self, request: Any) -> Dict[str, Any]:
         """Dispatch one external request and always return a CMIS envelope."""
