@@ -6,6 +6,11 @@ send chain-aware service requests and never receive provider objects or
 provider credentials.
 """
 
+from .assets import (
+    AssetRegistry,
+    DEFAULT_ASSET_DEFINITIONS,
+    DEFAULT_ASSET_REGISTRY,
+)
 from .gateway import (
     KNOWN_CHAINS,
     SUPPORTED_CHAINS,
@@ -14,7 +19,10 @@ from .gateway import (
 )
 
 __all__ = [
+    "AssetRegistry",
     "CMISGateway",
+    "DEFAULT_ASSET_DEFINITIONS",
+    "DEFAULT_ASSET_REGISTRY",
     "KNOWN_CHAINS",
     "SUPPORTED_CHAINS",
     "SUPPORTED_SERVICES",
