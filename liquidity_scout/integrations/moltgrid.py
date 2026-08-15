@@ -705,7 +705,11 @@ def wire_market_core(listener_module):
         listener_module._cmis_legacy_looks_like_general_question = legacy_looks_like_general_question
 
     def routed_wants_asset_analysis(question):
-        return wants_cmis_pre_trade(question) or legacy_wants_asset_analysis(question)
+        if wants_cmis_pre_trade(question):
+            return True
+        if cmis_asset_service(question) == "risk_check":
+            return False
+        return legacy_wants_asset_analysis(question)
 
     def routed_looks_like_general_question(question):
         wants_global_rank = getattr(listener_module, "wants_global_xdex_ranking", None)
