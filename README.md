@@ -251,9 +251,13 @@ That contract defines:
 - ownership and authority boundaries between Roberta and Liquidity Scout;
 - the fresh-data override rule;
 - deterministic data and uncertainty requirements;
-- initial Roberta-callable Liquidity Scout services;
-- response, status, confidence, and source-traceability semantics;
+- the target Roberta-callable service surface and current implementation status;
+- target response, status, confidence, and source-traceability semantics;
 - failure rules and execution approval boundaries.
+
+The contract intentionally distinguishes reusable core capabilities that already exist from Roberta-facing wrappers and services that are still planned. In particular, `risk_check`, `pre_trade_check`, and the common Roberta response envelope must not be treated as live interfaces until their roadmap phases are implemented and tested.
+
+Current reusable core capabilities include asset resolution, market reports, rankings, historical comparisons, and tokenomics verification. Circulating supply remains unavailable unless it can be independently verified; total supply alone must not be relabeled as circulating supply.
 
 ## Repository structure
 
@@ -299,6 +303,8 @@ Runtime databases, generated ranking exports, local backups, virtual environment
 ### Current refactor direction
 
 The project is incrementally moving deterministic intelligence out of `moltgrid_signal_v12_ollama.py` and into reusable Liquidity Scout service modules. The legacy listener stays operational while each responsibility is extracted and tested.
+
+The MoltGrid integration bridge is transitional architecture: it keeps the current listener operational while reusable services replace legacy deterministic logic. The long-term goal is to continue shrinking the legacy listener until integrations consume reusable services directly without runtime rewiring of legacy globals.
 
 ### Next major phases
 
