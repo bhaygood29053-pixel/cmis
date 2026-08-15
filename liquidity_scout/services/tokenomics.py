@@ -53,7 +53,10 @@ def _empty_activity_section(reason="token_activity_not_supplied"):
         "minted_tokens_observed": None,
         "burned_tokens_observed": None,
         "coverage": None,
+        "coverage_scope": None,
         "coverage_verified": False,
+        "lifetime_coverage_verified": False,
+        "lifetime_coverage_reason": reason,
         "scanner_activity_verified": False,
         "activity_verified": False,
         "net_issuance_verified": False,
@@ -79,6 +82,10 @@ def _normalize_activity_report(
     verified current RPC supply metadata. Net issuance is exposed only when the
     scanner reports verified activity *and* the service independently confirms
     the same mint and decimals.
+
+    Scanner window coverage and chain-lifetime coverage are separate concepts.
+    This service exposes the scanner's window scope, but it does not upgrade any
+    scanner lifetime claim to verified without an independent lifetime proof.
     """
     if activity_report is None:
         return _empty_activity_section()
@@ -97,6 +104,27 @@ def _normalize_activity_report(
         and activity_decimals is not None
         and activity_decimals == verified_decimals
     )
+
+    coverage = activity_report.get("coverage")
+    if not isinstance(coverage, dict):
+        coverage = None
+
+    coverage_scope = _text(activity_report.get("coverage_scope"))
+    if coverage_scope is None and coverage is not None:
+        coverage_scope = _text(coverage.get("coverage_scope"))
+
+    scanner_lifetime_claim = (
+        activity_report.get("lifetime_coverage_verified") is True
+    )
+    if scanner_lifetime_claim:
+        lifetime_coverage_reason = (
+            "token_activity_lifetime_claim_not_independently_verified"
+        )
+    else:
+        lifetime_coverage_reason = (
+            _text(activity_report.get("lifetime_coverage_reason"))
+            or "token_activity_lifetime_coverage_unverified"
+        )
 
     verification_reasons = []
     if not coverage_verified:
@@ -121,10 +149,6 @@ def _normalize_activity_report(
     if activity_verified and not net_values_present:
         verification_reasons.append("token_activity_net_issuance_missing")
 
-    coverage = activity_report.get("coverage")
-    if not isinstance(coverage, dict):
-        coverage = None
-
     return {
         "available": True,
         "mint": activity_mint,
@@ -148,7 +172,10 @@ def _normalize_activity_report(
             else None
         ),
         "coverage": dict(coverage) if coverage is not None else None,
+        "coverage_scope": coverage_scope,
         "coverage_verified": coverage_verified,
+        "lifetime_coverage_verified": False,
+        "lifetime_coverage_reason": lifetime_coverage_reason,
         "scanner_activity_verified": scanner_activity_verified,
         "activity_verified": activity_verified,
         "net_issuance_verified": net_issuance_verified,
