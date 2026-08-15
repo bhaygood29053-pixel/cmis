@@ -13,7 +13,6 @@ from liquidity_scout.cmis import CMISGateway
 from liquidity_scout.services.market_rankings import (
     ranking_header as core_ranking_header,
     ranking_row as core_ranking_row,
-    ranking_separator as core_ranking_separator,
     ranking_style as core_ranking_style,
 )
 
@@ -216,7 +215,6 @@ def format_top(_pools, metric="volume", limit=10, *, gateway=None):
         f"Service status: {str(envelope.get('status') or 'unknown').upper()}",
         "",
         core_ranking_header(metric, meta),
-        core_ranking_separator(metric),
     ]
 
     for asset in converted:
