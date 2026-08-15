@@ -248,7 +248,6 @@ def format_cmis_tokenomics_answer(listener_module, question, asset, *, gateway):
         return None
 
     request = build_cmis_tokenomics_request(asset)
-    print(f"CMIS Gateway: TOKENOMICS | asset: {request['asset']}")
     envelope = gateway.dispatch(request)
     if not isinstance(envelope, Mapping):
         return (
