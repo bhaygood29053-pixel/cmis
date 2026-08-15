@@ -1,14 +1,19 @@
-"""CMIS-backed asset lookup, market, and tokenomics presentation for MoltGrid.
+"""CMIS-backed asset lookup, market, tokenomics, and risk presentation for MoltGrid.
 
 This module is intentionally a thin integration layer. MoltGrid supplies the
 already-resolved asset term, CMISGateway performs authoritative collection and
 service composition, and this module renders the standard envelope for a human
-Signal reply. No market or tokenomics values are calculated or invented here.
+Signal reply. No market, tokenomics, or risk values are calculated or invented
+here.
 """
 
 import re
 from collections.abc import Mapping
 
+from liquidity_scout.integrations.moltgrid_risk_cmis import (
+    format_cmis_risk_answer,
+    wants_cmis_risk,
+)
 from liquidity_scout.integrations.moltgrid_tokenomics_cmis import (
     format_cmis_tokenomics_answer,
     wants_cmis_tokenomics,
@@ -26,7 +31,6 @@ _MARKET_CUES = (
     "market cap",
     "marketcap",
     "fdv",
-    "safety",
     "doing",
     "today",
     "right now",
@@ -47,7 +51,8 @@ def cmis_asset_service(question):
     """Choose the CMIS service for one ordinary resolved asset question.
 
     Tokenomics-specific wording selects ``tokenomics`` before generic market
-    cues such as ``current`` are considered. Market-oriented wording selects
+    cues such as ``current`` are considered. Risk/safety wording selects the
+    deterministic ``risk_check`` service. Market-oriented wording selects
     ``market_report``. Everything else defaults to market_report except concise
     lookup/identity forms such as "What is XNT?" and "Find XNT".
     """
@@ -56,6 +61,9 @@ def cmis_asset_service(question):
 
     if wants_cmis_tokenomics(text):
         return "tokenomics"
+
+    if wants_cmis_risk(text):
+        return "risk_check"
 
     if any(cue in lower for cue in _MARKET_CUES):
         return "market_report"
@@ -287,6 +295,14 @@ def format_cmis_asset_answer(listener_module, question, asset, *, gateway):
 
     if request["service"] == "tokenomics":
         return format_cmis_tokenomics_answer(
+            listener_module,
+            question,
+            asset,
+            gateway=gateway,
+        )
+
+    if request["service"] == "risk_check":
+        return format_cmis_risk_answer(
             listener_module,
             question,
             asset,
