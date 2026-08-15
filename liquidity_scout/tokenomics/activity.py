@@ -167,10 +167,21 @@ def _coverage_state(coverage):
     retrieved = coverage.get("transactions_retrieved")
     errors = coverage.get("rpc_errors")
     selection_complete = coverage.get("selection_complete") is True
+    max_signatures = coverage.get("max_signatures")
 
     for value in (signatures, retrieved, errors):
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             return False, "coverage counts are incomplete or malformed"
+
+    if max_signatures is not None:
+        if (
+            isinstance(max_signatures, bool)
+            or not isinstance(max_signatures, int)
+            or max_signatures < 0
+        ):
+            return False, "signature-window bound is malformed"
+        if max_signatures == 0:
+            return False, "no signature-history window was selected"
 
     if not selection_complete:
         return False, "signature-window selection is incomplete"
@@ -188,7 +199,8 @@ def summarize_token_events(events, *, mint, decimals, coverage):
     Observed mint/burn totals are preserved even when coverage is incomplete,
     but net issuance is only emitted when every selected transaction was
     retrieved and all event amounts/decimals are valid for the same bounded
-    signature window.
+    signature window. A configured zero-length signature window is not treated
+    as verified zero activity because no history was actually examined.
     """
     mint = _text(mint)
     if not mint:
