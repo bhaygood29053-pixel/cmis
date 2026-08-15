@@ -2,7 +2,7 @@
 
 CMIS must not infer that every token whose provider name starts with ``Wrapped``
 is a native asset. Canonical relationships are explicit configuration facts.
-Provider/Dex representations remain traceable and may still carry the mint used
+Provider/DEX representations remain traceable and may still carry the mint used
 for market collection, while the public CMIS asset identity stays canonical.
 """
 
@@ -33,6 +33,8 @@ DEFAULT_ASSET_DEFINITIONS = (
                 "kind": "wrapped_token",
                 "provider": "X1.Ninja/XDEX",
                 "query": "XNT",
+                "symbols": ("XNT",),
+                "names": ("Wrapped XNT",),
             },
         },
         "service_modes": {
@@ -53,6 +55,17 @@ def _text(value: Any) -> Optional[str]:
     return text or None
 
 
+def _texts(value: Any) -> set:
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return {
+            text.casefold()
+            for text in (_text(item) for item in value)
+            if text
+        }
+    text = _text(value)
+    return {text.casefold()} if text else set()
+
+
 def _public_identity(definition: Mapping[str, Any]) -> Dict[str, Any]:
     asset_type = _text(definition.get("asset_type"))
     return {
@@ -67,8 +80,10 @@ def _public_identity(definition: Mapping[str, Any]) -> Dict[str, Any]:
 class AssetRegistry:
     """Explicit chain-aware canonical asset registry.
 
-    The registry matches only configured aliases/canonical IDs. It deliberately
-    performs no fuzzy matching and no automatic ``Wrapped X -> X`` conversion.
+    Canonical aliases and provider-representation identifiers are deliberately
+    separate. A configured provider symbol such as a future ``WSOL`` can be
+    recognized as SOL's market representation without making ``WSOL`` an
+    automatic canonical user alias. No fuzzy ``Wrapped X -> X`` rule exists.
     """
 
     def __init__(self, definitions: Optional[Iterable[Mapping[str, Any]]] = None):
@@ -103,12 +118,58 @@ class AssetRegistry:
             self._definitions.append(definition)
 
     def resolve(self, chain: Any, asset: Any) -> Optional[Dict[str, Any]]:
+        """Resolve only canonical user aliases/canonical IDs."""
         chain_text = (_text(chain) or "").lower()
         asset_text = _text(asset)
         if not chain_text or not asset_text:
             return None
         definition = self._by_alias.get((chain_text, asset_text.casefold()))
         return deepcopy(definition) if definition is not None else None
+
+    def match_representation(
+        self,
+        chain: Any,
+        provider_asset: Any,
+        *,
+        role: str = "market",
+    ) -> Optional[Dict[str, Any]]:
+        """Match one provider asset only against explicitly configured IDs."""
+        chain_text = (_text(chain) or "").lower()
+        if not chain_text or not isinstance(provider_asset, Mapping):
+            return None
+
+        symbol = (_text(provider_asset.get("symbol")) or "").casefold()
+        name = (_text(provider_asset.get("name")) or "").casefold()
+        mint = (_text(provider_asset.get("mint") or provider_asset.get("address")) or "").casefold()
+
+        matches = []
+        for definition in self._definitions:
+            if (_text(definition.get("chain")) or "").lower() != chain_text:
+                continue
+            representations = definition.get("representations")
+            representations = representations if isinstance(representations, Mapping) else {}
+            configured = representations.get(role)
+            if not isinstance(configured, Mapping):
+                continue
+
+            symbols = _texts(configured.get("symbols"))
+            names = _texts(configured.get("names"))
+            mints = _texts(configured.get("mints"))
+            verified_match = (
+                (bool(symbol) and symbol in symbols)
+                or (bool(name) and name in names)
+                or (bool(mint) and mint in mints)
+            )
+            if verified_match:
+                matches.append(definition)
+
+        canonical_ids = {
+            definition.get("canonical_id")
+            for definition in matches
+        }
+        if len(canonical_ids) != 1:
+            return None
+        return deepcopy(matches[0])
 
     @staticmethod
     def public_identity(definition: Mapping[str, Any]) -> Dict[str, Any]:
