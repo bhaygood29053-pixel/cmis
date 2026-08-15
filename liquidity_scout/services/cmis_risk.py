@@ -82,16 +82,31 @@ def _sources(
     return result
 
 
-def _warnings(risk_result: Mapping[str, Any]) -> list:
+def _warnings(
+    risk_result: Mapping[str, Any],
+    tokenomics_report: Optional[Mapping[str, Any]] = None,
+) -> list:
     flags = risk_result.get("flags")
     reasons = risk_result.get("reasons")
     flag_list = list(flags) if isinstance(flags, list) else []
     reason_list = list(reasons) if isinstance(reasons, list) else []
+    native_asset = (
+        isinstance(tokenomics_report, Mapping)
+        and tokenomics_report.get("asset_type") == "native"
+    )
+
     warnings = []
     for index, flag in enumerate(flag_list):
         warning = {"code": str(flag)}
         if index < len(reason_list) and reason_list[index]:
-            warning["message"] = str(reason_list[index])
+            message = str(reason_list[index])
+            if (
+                native_asset
+                and str(flag) == "token_activity_unavailable"
+                and message == "Verified bounded mint/burn activity was not supplied."
+            ):
+                message = "Verified native-network issuance/burn activity was not supplied."
+            warning["message"] = message
         warnings.append(warning)
     return warnings
 
@@ -183,7 +198,7 @@ def build_risk_check_response(
         confidence=risk_result.get("confidence"),
         sources=_sources(market_report, tokenomics_report, historical_report),
         observed_at=observed_at,
-        warnings=_warnings(risk_result),
+        warnings=_warnings(risk_result, tokenomics_report),
         errors=[],
     )
 
