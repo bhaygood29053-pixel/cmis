@@ -1,15 +1,15 @@
 import sqlite3
 import unittest
 
-from liquidity_scout.providers.x1 import (
+from liquidity_scout.providers.x1.activity_scanner import (
     ACTIVITY_SOURCE,
+    CHAIN,
     X1ActivityScanner,
     collect_signature_window as provider_collect_signature_window,
     initialize_activity_db as provider_initialize_activity_db,
     open_activity_db as provider_open_activity_db,
     scan_token_activity as provider_scan_token_activity,
 )
-from liquidity_scout.providers.x1.activity_scanner import CHAIN
 from liquidity_scout.tokenomics import (
     collect_signature_window as legacy_collect_signature_window,
     initialize_activity_db as legacy_initialize_activity_db,
