@@ -166,6 +166,16 @@ def _append_envelope_metadata(lines, envelope):
         lines.extend(f"• {message}" for message in errors)
 
 
+def _market_representation(data):
+    records = data.get("representations") if isinstance(data, Mapping) else None
+    if not isinstance(records, list):
+        return None
+    for record in records:
+        if isinstance(record, Mapping) and _text(record.get("role")) == "market":
+            return record
+    return None
+
+
 def _format_asset_lookup(envelope):
     asset = envelope.get("asset") if isinstance(envelope, Mapping) else None
     asset = asset if isinstance(asset, Mapping) else {}
@@ -181,10 +191,25 @@ def _format_asset_lookup(envelope):
 
     name = _text(asset.get("name"))
     mint = _text(asset.get("mint"))
+    asset_type = _text(asset.get("asset_type"))
     if name:
         lines.append(f"Name: {name}")
+    if asset_type == "native":
+        lines.append("Asset type: Native chain asset")
     if mint:
         lines.append(f"Mint: {mint}")
+
+    representation = _market_representation(data)
+    if isinstance(representation, Mapping):
+        rep_name = _text(representation.get("name"))
+        rep_symbol = _text(representation.get("symbol"))
+        rep_mint = _text(representation.get("mint"))
+        provider = _text(representation.get("provider")) or "market provider"
+        display = rep_name or rep_symbol
+        if display and display not in {name, symbol}:
+            lines.append(f"{provider} representation: {display}")
+        if rep_mint:
+            lines.append(f"{provider} representation mint: {rep_mint}")
 
     resolved_by = _text(data.get("resolved_by"))
     if resolved_by:
