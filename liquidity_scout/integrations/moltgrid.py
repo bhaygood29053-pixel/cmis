@@ -9,8 +9,12 @@ Run with:
     python -m liquidity_scout.integrations.moltgrid
 """
 
+import re
+from decimal import Decimal, InvalidOperation
 from importlib import import_module
+from collections.abc import Mapping
 
+from liquidity_scout.cmis import CMISGateway
 from liquidity_scout.market import (
     AmbiguousAssetError,
     XDEXCatalog as CoreXDEXCatalog,
@@ -35,6 +39,16 @@ from liquidity_scout.tokenomics import (
     X1RPCError,
     get_mint_info as core_get_mint_info,
     get_token_supply as core_get_token_supply,
+)
+
+
+_CMIS_GATEWAY = None
+_BUY_RE = re.compile(r"\b(?:buy|buying|purchase|purchasing)\b", re.IGNORECASE)
+_SELL_RE = re.compile(r"\b(?:sell|selling)\b", re.IGNORECASE)
+_USD_NOTIONAL_RE = re.compile(
+    r"(?:\$\s*([0-9][0-9,]*(?:\.[0-9]+)?)|"
+    r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:usd|dollars?))",
+    re.IGNORECASE,
 )
 
 
@@ -69,6 +83,226 @@ def resolve_multiple_assets(question, pools, max_assets=4):
         )
     except AmbiguousAssetError:
         return []
+
+
+def parse_cmis_trade_context(question):
+    """Parse explicit buy/sell intent and optional USD notional deterministically.
+
+    The parser does not infer a side when both buy and sell are present. Dollar
+    notional is recognized only from an explicit ``$`` amount or USD/dollars
+    suffix; bare numbers are not silently treated as dollars.
+    """
+    text = str(question or "").strip()
+    if not text:
+        return None
+
+    buy = bool(_BUY_RE.search(text))
+    sell = bool(_SELL_RE.search(text))
+    if buy == sell:
+        return None
+
+    trade = {
+        "side": "buy" if buy else "sell",
+        "chain": "x1",
+    }
+
+    match = _USD_NOTIONAL_RE.search(text)
+    if match:
+        raw = (match.group(1) or match.group(2) or "").replace(",", "")
+        try:
+            amount = Decimal(raw)
+        except InvalidOperation:
+            amount = None
+        if amount is not None and amount > 0:
+            trade["notional_usd"] = float(amount)
+
+    return trade
+
+
+def wants_cmis_pre_trade(question):
+    """Return True when MoltGrid can build a deterministic pre-trade request."""
+    return parse_cmis_trade_context(question) is not None
+
+
+def _gateway_instance(gateway=None):
+    if gateway is not None:
+        return gateway
+
+    global _CMIS_GATEWAY
+    if _CMIS_GATEWAY is None:
+        _CMIS_GATEWAY = CMISGateway()
+    return _CMIS_GATEWAY
+
+
+def build_cmis_trade_analysis(question, asset, *, gateway=None):
+    """Run market, risk, and pre-trade services through the public CMIS gateway."""
+    trade = parse_cmis_trade_context(question)
+    if trade is None:
+        return None
+
+    asset_text = str(asset or "").strip()
+    client = _gateway_instance(gateway)
+
+    market = client.dispatch({
+        "service": "market_report",
+        "chain": "x1",
+        "asset": asset_text,
+        "params": {},
+    })
+    risk = client.dispatch({
+        "service": "risk_check",
+        "chain": "x1",
+        "asset": asset_text,
+        "params": {},
+    })
+    pre_trade = client.dispatch({
+        "service": "pre_trade_check",
+        "chain": "x1",
+        "asset": asset_text,
+        "params": {"trade": trade},
+    })
+
+    return {
+        "asset_query": asset_text,
+        "trade": trade,
+        "market_report": market,
+        "risk_check": risk,
+        "pre_trade_check": pre_trade,
+    }
+
+
+def _service_messages(envelope):
+    messages = []
+    if not isinstance(envelope, Mapping):
+        return messages
+    for field in ("errors", "warnings"):
+        records = envelope.get(field)
+        if not isinstance(records, list):
+            continue
+        for record in records:
+            if isinstance(record, Mapping):
+                message = str(record.get("message") or record.get("code") or "").strip()
+            else:
+                message = str(record or "").strip()
+            if message and message not in messages:
+                messages.append(message)
+    return messages
+
+
+def format_cmis_pre_trade_answer(listener_module, question, asset, *, gateway=None):
+    """Format one deterministic CMIS pre-trade result for MoltGrid.
+
+    The answer deliberately separates CMIS risk findings from execution-size
+    checks that are not implemented. It never turns PASS into authorization.
+    """
+    analysis = build_cmis_trade_analysis(question, asset, gateway=gateway)
+    if analysis is None:
+        return (
+            "Liquidity Scout reply:\n"
+            "CMIS could not determine one explicit buy or sell side from that request."
+        )
+
+    market = analysis["market_report"]
+    risk = analysis["risk_check"]
+    pre_trade = analysis["pre_trade_check"]
+    trade = analysis["trade"]
+
+    market_asset = market.get("asset") if isinstance(market, Mapping) else {}
+    pre_asset = pre_trade.get("asset") if isinstance(pre_trade, Mapping) else {}
+    identity = pre_asset if isinstance(pre_asset, Mapping) and pre_asset else market_asset
+    identity = identity if isinstance(identity, Mapping) else {}
+    symbol = str(identity.get("symbol") or asset or "Unknown").strip()
+
+    lines = [
+        "Liquidity Scout reply:",
+        f"CMIS pre-trade analysis — {symbol}",
+    ]
+
+    side = str(trade.get("side") or "").upper()
+    notional = trade.get("notional_usd")
+    if notional is not None:
+        lines.append(f"Proposed trade: {side} {listener_module.format_usd(notional)}")
+    else:
+        lines.append(f"Proposed trade: {side} — USD notional not specified")
+
+    if isinstance(market, Mapping):
+        lines.append(f"Market service: {str(market.get('status') or 'unknown').upper()}")
+        data = market.get("data")
+        data = data if isinstance(data, Mapping) else {}
+        completeness = data.get("completeness")
+        completeness = completeness if isinstance(completeness, Mapping) else {}
+
+        price = data.get("price_usd")
+        if completeness.get("price") is True and price is not None:
+            lines.append(f"Verified price: {listener_module.format_usd(price)}")
+        else:
+            lines.append("Verified price: unavailable")
+
+        liquidity = data.get("liquidity_usd")
+        if completeness.get("liquidity") is True and liquidity is not None:
+            lines.append(f"Verified asset-wide liquidity: {listener_module.format_usd(liquidity)}")
+        else:
+            lines.append("Verified asset-wide liquidity: unavailable or incomplete")
+
+        volume = data.get("volume_24h_usd")
+        if completeness.get("volume_24h") is True and volume is not None:
+            lines.append(f"Verified 24h volume: {listener_module.format_usd(volume)}")
+        else:
+            lines.append("Verified 24h volume: unavailable or incomplete")
+
+        lp_count = data.get("#LPs")
+        if lp_count is None:
+            lp_count = data.get("lp_count")
+        if lp_count is not None:
+            lines.append(f"#LPs: {lp_count}")
+
+    risk_result = risk.get("risk") if isinstance(risk, Mapping) else None
+    risk_result = risk_result if isinstance(risk_result, Mapping) else {}
+    risk_recommendation = str(risk_result.get("recommendation") or "UNAVAILABLE")
+    lines.append(f"CMIS risk result: {risk_recommendation}")
+
+    confidence = risk_result.get("confidence")
+    if isinstance(confidence, Mapping):
+        verified = confidence.get("verified_checks")
+        total = confidence.get("total_checks")
+        if isinstance(verified, int) and isinstance(total, int):
+            lines.append(f"Risk evidence verified: {verified}/{total} checks")
+
+    reasons = risk_result.get("reasons")
+    if isinstance(reasons, list) and reasons:
+        lines.append("Risk findings:")
+        for reason in reasons[:6]:
+            text = str(reason or "").strip()
+            if text:
+                lines.append(f"• {text}")
+
+    pre_result = pre_trade.get("risk") if isinstance(pre_trade, Mapping) else None
+    pre_result = pre_result if isinstance(pre_result, Mapping) else {}
+    pre_recommendation = str(pre_result.get("recommendation") or "UNAVAILABLE")
+    lines.append(f"Pre-trade result: {pre_recommendation}")
+
+    if not pre_result:
+        for message in _service_messages(pre_trade)[:4]:
+            lines.append(f"• {message}")
+
+    scope = pre_result.get("assessment_scope")
+    scope = scope if isinstance(scope, Mapping) else {}
+    not_included = scope.get("not_yet_included")
+    if isinstance(not_included, list) and not_included:
+        lines.append(
+            "Not yet evaluated: "
+            + ", ".join(str(item).replace("_", " ") for item in not_included)
+            + "."
+        )
+
+    if notional is not None:
+        lines.append(
+            f"The {listener_module.format_usd(notional)} notional is carried as context, "
+            "but CMIS does not yet calculate whether that trade size is safe for execution."
+        )
+
+    lines.append("Analysis only. Execution authorized: NO.")
+    return "\n".join(lines)
 
 
 def _value_or_zero(value):
