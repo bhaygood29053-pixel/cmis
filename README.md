@@ -240,27 +240,43 @@ It does **not**:
 
 Trading/execution should remain a separate, human-approved capability until the intelligence, risk, and service layers have been fully tested.
 
+## Roberta integration
+
+Roberta is the X1 Oracle and Agent Coordinator. Liquidity Scout remains an independently testable specialist service for current X1/XDEX market, tokenomics, historical, and risk intelligence.
+
+The authoritative integration boundary is documented in [`ROBERTA_INTEGRATION_CONTRACT.md`](./ROBERTA_INTEGRATION_CONTRACT.md).
+
+That contract defines:
+
+- ownership and authority boundaries between Roberta and Liquidity Scout;
+- the fresh-data override rule;
+- deterministic data and uncertainty requirements;
+- initial Roberta-callable Liquidity Scout services;
+- response, status, confidence, and source-traceability semantics;
+- failure rules and execution approval boundaries.
+
 ## Repository structure
 
 Key files currently include:
 
 ```text
-liquidity_scout/market/                Reusable deterministic XDEX market core
+ROBERTA_INTEGRATION_CONTRACT.md         Roberta ↔ Liquidity Scout service boundary
+liquidity_scout/market/                 Reusable deterministic XDEX market core
 liquidity_scout/integrations/moltgrid.py  Canonical MoltGrid integration entrypoint
-run_liquidity_scout.sh                 Canonical repository launcher
+run_liquidity_scout.sh                  Canonical repository launcher
 deployment/liquidity-scout.service.example  Example systemd service
-moltgrid_signal_v12_ollama.py          Legacy listener implementation during refactor
-config.py                              Environment-based configuration
-xdex_rankings.py                       Ranking presentation/routing over market core
-historical_metrics.py                  Historical comparison engine
-snapshot_xdex_metrics.py               XDEX snapshot collector
-build_top50_xdex.py                    Top-50 asset export builder
-agi_burn_scan.py                       AGI burn scanner
-x1_burn_scan.py                        Generic X1 token burn scanner
-x1_burn_scan_v2.py                     Extended period/cached burn scanner
-sentinel_diagnostics.sh                Service/project diagnostics
-sentinel_issues.py                     Development issue utility
-development/issues.json                Current development issue backlog
+moltgrid_signal_v12_ollama.py           Legacy listener implementation during refactor
+config.py                               Environment-based configuration
+xdex_rankings.py                        Ranking presentation/routing over market core
+historical_metrics.py                   Historical comparison engine
+snapshot_xdex_metrics.py                XDEX snapshot collector
+build_top50_xdex.py                     Top-50 asset export builder
+agi_burn_scan.py                        AGI burn scanner
+x1_burn_scan.py                         Generic X1 token burn scanner
+x1_burn_scan_v2.py                      Extended period/cached burn scanner
+sentinel_diagnostics.sh                 Service/project diagnostics
+sentinel_issues.py                      Development issue utility
+development/issues.json                 Current development issue backlog
 ```
 
 Runtime databases, generated ranking exports, local backups, virtual environments, caches, logs, and `.env` secrets are excluded through `.gitignore`.
@@ -290,7 +306,7 @@ The project is incrementally moving deterministic intelligence out of `moltgrid_
 2. Finish and harden tokenomics services, including mint/net-issuance tracking where required.
 3. Build a deterministic Liquidity Scout Risk Engine and Scout Score.
 4. Expose structured Liquidity Scout data through an API/service layer.
-5. Connect Roberta as the X1 Oracle/coordinator to Liquidity Scout as a specialist service.
+5. Connect Roberta as the X1 Oracle/coordinator to Liquidity Scout as a specialist service using `ROBERTA_INTEGRATION_CONTRACT.md`.
 6. Add alert automation and threshold monitoring.
 7. Consider controlled trading/execution only after the intelligence and risk layers are proven.
 
