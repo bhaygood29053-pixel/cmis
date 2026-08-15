@@ -68,14 +68,21 @@ def _ranked_row(asset: Mapping[str, Any], metric: str, meta: Mapping[str, Any]) 
     }
 
 
-def _confidence(*, ranked_count: int, incomplete_count: int, total_candidates: int) -> Dict[str, Any]:
+def _confidence(
+    *,
+    ranked_count: int,
+    incomplete_count: int,
+    verified_excluded_count: int,
+    total_candidates: int,
+) -> Dict[str, Any]:
     complete_universe = total_candidates > 0 and incomplete_count == 0
+    verified = ranked_count + verified_excluded_count
     return {
         "complete": complete_universe,
-        "verified_checks": ranked_count,
+        "verified_checks": verified,
         "total_checks": total_candidates,
         "verification_ratio": (
-            round(ranked_count / total_candidates, 6)
+            round(verified / total_candidates, 6)
             if total_candidates > 0
             else 0.0
         ),
@@ -193,6 +200,7 @@ def build_rank_response(
     confidence = _confidence(
         ranked_count=ranked_count,
         incomplete_count=incomplete_count,
+        verified_excluded_count=zero_count,
         total_candidates=total_candidates,
     )
 
