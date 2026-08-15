@@ -1,13 +1,18 @@
-"""CMIS-backed asset lookup and market report presentation for MoltGrid.
+"""CMIS-backed asset lookup, market, and tokenomics presentation for MoltGrid.
 
 This module is intentionally a thin integration layer. MoltGrid supplies the
 already-resolved asset term, CMISGateway performs authoritative collection and
 service composition, and this module renders the standard envelope for a human
-Signal reply. No market values are calculated or invented here.
+Signal reply. No market or tokenomics values are calculated or invented here.
 """
 
 import re
 from collections.abc import Mapping
+
+from liquidity_scout.integrations.moltgrid_tokenomics_cmis import (
+    format_cmis_tokenomics_answer,
+    wants_cmis_tokenomics,
+)
 
 
 _MARKET_CUES = (
@@ -39,15 +44,18 @@ def _text(value):
 
 
 def cmis_asset_service(question):
-    """Choose asset_lookup only for explicit identity-style questions.
+    """Choose the CMIS service for one ordinary resolved asset question.
 
-    Market-oriented wording always selects market_report. Everything else that
-    reaches the legacy deterministic pool-answer route defaults to
-    market_report, except concise lookup/identity forms such as "What is XNT?"
-    and "Find XNT".
+    Tokenomics-specific wording selects ``tokenomics`` before generic market
+    cues such as ``current`` are considered. Market-oriented wording selects
+    ``market_report``. Everything else defaults to market_report except concise
+    lookup/identity forms such as "What is XNT?" and "Find XNT".
     """
     text = _text(question) or ""
     lower = text.lower()
+
+    if wants_cmis_tokenomics(text):
+        return "tokenomics"
 
     if any(cue in lower for cue in _MARKET_CUES):
         return "market_report"
@@ -274,8 +282,17 @@ def _format_market_report(listener_module, envelope):
 
 
 def format_cmis_asset_answer(listener_module, question, asset, *, gateway):
-    """Dispatch and render one asset_lookup or market_report envelope."""
+    """Dispatch and render one ordinary CMIS asset service envelope."""
     request = build_cmis_asset_request(question, asset)
+
+    if request["service"] == "tokenomics":
+        return format_cmis_tokenomics_answer(
+            listener_module,
+            question,
+            asset,
+            gateway=gateway,
+        )
+
     envelope = gateway.dispatch(request)
     if not isinstance(envelope, Mapping):
         return (
