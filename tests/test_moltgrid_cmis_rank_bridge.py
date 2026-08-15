@@ -113,6 +113,10 @@ class MoltGridCMISRankBridgeTests(unittest.TestCase):
                 market_rankings.find_asset_rank,
             )
             self.assertIs(xdex_rankings.ranking_row, market_rankings.ranking_row)
+            self.assertIs(
+                xdex_rankings.ranking_separator,
+                market_rankings.ranking_separator,
+            )
 
     def test_runtime_shim_selects_cmis_rank_adapters(self):
         with patch.object(
@@ -126,6 +130,7 @@ class MoltGridCMISRankBridgeTests(unittest.TestCase):
                 moltgrid_rank_cmis.find_asset_rank,
             )
             self.assertIs(xdex_rankings.ranking_row, moltgrid_rank_cmis.ranking_row)
+            self.assertEqual(xdex_rankings.ranking_separator("liquidity"), "")
 
     def test_global_rank_calls_public_cmis_rank_service(self):
         gateway = FakeGateway()
