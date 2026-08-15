@@ -87,7 +87,9 @@ class MoltGridTokenomicsWiringTests(unittest.TestCase):
         listener = SimpleNamespace(
             SETTINGS=SimpleNamespace(
                 x1_rpc_url="https://rpc.example",
-            )
+            ),
+            wants_asset_analysis=lambda _question: False,
+            format_asset_analysis_answer=lambda *_args: "legacy-analysis",
         )
 
         wired = moltgrid.wire_market_core(listener)
