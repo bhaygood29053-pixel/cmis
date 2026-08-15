@@ -87,10 +87,11 @@ class TokenActivitySignatureWindowTests(unittest.TestCase):
         self.assertEqual(result["history_entries_examined"], 3)
         self.assertTrue(result["selection_complete"])
         self.assertFalse(result["history_exhausted"])
+        self.assertEqual(result["coverage_scope"], "bounded")
         self.assertEqual(result["newest_signature"], "sig1")
         self.assertEqual(result["oldest_signature"], "sig2")
 
-    def test_unbounded_window_requires_history_exhaustion(self):
+    def test_unbounded_window_labels_rpc_history_exhaustion_not_lifetime(self):
         rpc = FakeRPC([
             [signature("sig1")],
         ])
@@ -99,7 +100,18 @@ class TokenActivitySignatureWindowTests(unittest.TestCase):
 
         self.assertTrue(result["selection_complete"])
         self.assertTrue(result["history_exhausted"])
+        self.assertEqual(result["coverage_scope"], "rpc_history_exhausted")
         self.assertEqual(result["signatures"], ["sig1"])
+
+    def test_zero_length_window_has_none_scope(self):
+        rpc = FakeRPC([])
+
+        result = collect_signature_window(rpc, MINT, max_signatures=0)
+
+        self.assertTrue(result["selection_complete"])
+        self.assertFalse(result["history_exhausted"])
+        self.assertEqual(result["coverage_scope"], "none")
+        self.assertEqual(result["history_entries_examined"], 0)
 
     def test_malformed_signature_metadata_fails_closed(self):
         rpc = FakeRPC(
@@ -109,6 +121,7 @@ class TokenActivitySignatureWindowTests(unittest.TestCase):
         result = collect_signature_window(rpc, MINT, max_signatures=1)
 
         self.assertFalse(result["selection_complete"])
+        self.assertEqual(result["coverage_scope"], "incomplete")
         self.assertEqual(result["malformed_history_entries"], 1)
         self.assertEqual(result["signatures"], [])
 
@@ -118,8 +131,49 @@ class TokenActivitySignatureWindowTests(unittest.TestCase):
         result = collect_signature_window(rpc, MINT, max_signatures=5)
 
         self.assertFalse(result["selection_complete"])
+        self.assertEqual(result["coverage_scope"], "incomplete")
         self.assertEqual(result["selection_rpc_errors"], 1)
         self.assertFalse(result["history_exhausted"])
+
+
+class TokenActivityDatabaseMigrationTests(unittest.TestCase):
+    def test_existing_scan_table_gains_coverage_scope_columns(self):
+        db = sqlite3.connect(":memory:")
+        try:
+            db.execute(
+                """
+                CREATE TABLE token_activity_scans (
+                    scan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    mint TEXT NOT NULL,
+                    max_signatures INTEGER,
+                    history_entries_examined INTEGER NOT NULL,
+                    signatures_scanned INTEGER NOT NULL,
+                    transactions_retrieved INTEGER NOT NULL,
+                    rpc_errors INTEGER NOT NULL,
+                    selection_complete INTEGER NOT NULL,
+                    history_exhausted INTEGER NOT NULL,
+                    coverage_verified INTEGER NOT NULL,
+                    activity_verified INTEGER NOT NULL,
+                    newest_signature TEXT,
+                    oldest_signature TEXT
+                )
+                """
+            )
+            db.commit()
+
+            initialize_activity_db(db)
+
+            columns = {
+                row[1]
+                for row in db.execute(
+                    "PRAGMA table_info(token_activity_scans)"
+                ).fetchall()
+            }
+            self.assertIn("coverage_scope", columns)
+            self.assertIn("lifetime_coverage_verified", columns)
+            self.assertIn("lifetime_coverage_reason", columns)
+        finally:
+            db.close()
 
 
 class TokenActivityScannerTests(unittest.TestCase):
@@ -130,7 +184,7 @@ class TokenActivityScannerTests(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
-    def test_verified_scan_persists_mints_burns_and_coverage(self):
+    def test_verified_bounded_scan_never_claims_lifetime_coverage(self):
         rpc = FakeRPC(
             [[signature("sig1"), signature("sig2")]],
             transactions={
@@ -148,10 +202,21 @@ class TokenActivityScannerTests(unittest.TestCase):
         )
 
         self.assertTrue(report["activity_verified"])
+        self.assertEqual(report["coverage_scope"], "bounded")
+        self.assertFalse(report["lifetime_coverage_verified"])
+        self.assertEqual(
+            report["lifetime_coverage_reason"],
+            "bounded_signature_window",
+        )
         self.assertEqual(report["minted_tokens_observed"], "3")
         self.assertEqual(report["burned_tokens_observed"], "1.25")
         self.assertEqual(report["net_issuance_tokens"], "1.75")
         self.assertEqual(len(report["events"]), 2)
+        self.assertEqual(
+            report["coverage"]["coverage_scope"],
+            "bounded",
+        )
+        self.assertFalse(report["coverage"]["lifetime_coverage_verified"])
         self.assertEqual(
             self.db.execute(
                 "SELECT COUNT(*) FROM token_activity_events"
@@ -162,13 +227,53 @@ class TokenActivityScannerTests(unittest.TestCase):
             """
             SELECT signatures_scanned, transactions_retrieved,
                    rpc_errors, coverage_verified, activity_verified,
-                   newest_signature, oldest_signature
+                   newest_signature, oldest_signature, coverage_scope,
+                   lifetime_coverage_verified, lifetime_coverage_reason
             FROM token_activity_scans
             WHERE scan_id = ?
             """,
             (report["scan_id"],),
         ).fetchone()
-        self.assertEqual(scan, (2, 2, 0, 1, 1, "sig1", "sig2"))
+        self.assertEqual(
+            scan,
+            (
+                2,
+                2,
+                0,
+                1,
+                1,
+                "sig1",
+                "sig2",
+                "bounded",
+                0,
+                "bounded_signature_window",
+            ),
+        )
+
+    def test_rpc_history_exhaustion_still_does_not_claim_lifetime(self):
+        rpc = FakeRPC(
+            [[signature("sig1")]],
+            transactions={
+                "sig1": transaction(parsed_ix("mintTo", "1000000")),
+            },
+        )
+
+        report = scan_token_activity(
+            rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=None,
+        )
+
+        self.assertTrue(report["activity_verified"])
+        self.assertEqual(report["coverage_scope"], "rpc_history_exhausted")
+        self.assertFalse(report["lifetime_coverage_verified"])
+        self.assertEqual(
+            report["lifetime_coverage_reason"],
+            "rpc_history_exhaustion_not_independent_lifetime_proof",
+        )
+        self.assertEqual(report["net_issuance_tokens"], "1")
 
     def test_cached_rerun_counts_as_retrieved_without_refetch(self):
         first_rpc = FakeRPC(
@@ -222,6 +327,11 @@ class TokenActivityScannerTests(unittest.TestCase):
         self.assertEqual(report["burned_tokens_observed"], "0")
         self.assertFalse(report["coverage_verified"])
         self.assertFalse(report["activity_verified"])
+        self.assertFalse(report["lifetime_coverage_verified"])
+        self.assertEqual(
+            report["lifetime_coverage_reason"],
+            "selected_window_coverage_unverified",
+        )
         self.assertIsNone(report["net_issuance_tokens"])
         self.assertEqual(report["coverage"]["transactions_retrieved"], 1)
         self.assertEqual(report["coverage"]["transaction_errors"], 1)
