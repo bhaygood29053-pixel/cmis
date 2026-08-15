@@ -21,11 +21,23 @@ from .market_rankings import (
     rank_assets,
 )
 from .market_report import build_market_report
+from .risk import (
+    BLOCK,
+    DEFAULT_RISK_POLICY,
+    PASS,
+    WARN,
+    build_risk_check,
+)
 from .tokenomics import build_tokenomics_report
 
 __all__ = [
+    "BLOCK",
+    "DEFAULT_RISK_POLICY",
     "FIELD_ORDER",
+    "PASS",
+    "WARN",
     "build_market_report",
+    "build_risk_check",
     "build_tokenomics_report",
     "build_verified_market_context",
     "find_asset_rank",
