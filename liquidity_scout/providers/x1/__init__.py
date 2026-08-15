@@ -1,5 +1,13 @@
 """X1 chain provider integrations for CMIS."""
 
+from .activity_scanner import (
+    ACTIVITY_SOURCE,
+    X1ActivityScanner,
+    collect_signature_window,
+    initialize_activity_db,
+    open_activity_db,
+    scan_token_activity,
+)
 from .health import (
     HEALTH_SOURCE,
     HEALTH_URL,
@@ -62,6 +70,7 @@ from .supply import (
 )
 
 __all__ = [
+    "ACTIVITY_SOURCE",
     "CHAIN",
     "CLUSTER_HISTORY_URL",
     "DEFAULT_REFRESH_SECONDS",
@@ -82,6 +91,7 @@ __all__ = [
     "SUPPLY_ASSET",
     "SUPPLY_DEFAULT_NETWORK",
     "SUPPLY_SOURCE",
+    "X1ActivityScanner",
     "X1HealthAPIError",
     "X1HealthProvider",
     "X1NetworkAPIError",
@@ -94,6 +104,7 @@ __all__ = [
     "X1SupplyAPIError",
     "X1SupplyProvider",
     "XDEXCatalog",
+    "collect_signature_window",
     "fetch_all_pools",
     "fetch_cluster_history",
     "fetch_health",
@@ -103,6 +114,8 @@ __all__ = [
     "get_mint_info",
     "get_token_supply",
     "get_x1_network_total_supply",
+    "initialize_activity_db",
+    "open_activity_db",
     "parse_cluster_history",
     "parse_health",
     "parse_mint_account_result",
@@ -110,4 +123,5 @@ __all__ = [
     "parse_supply_text",
     "parse_token_supply_result",
     "rpc_request",
+    "scan_token_activity",
 ]
