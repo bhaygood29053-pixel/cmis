@@ -70,6 +70,8 @@ class MoltGridComparisonBridgeTests(unittest.TestCase):
             format_field_line=object(),
             full_snapshot_lines=object(),
             wants_token_address=object(),
+            wants_asset_analysis=lambda _question: False,
+            format_asset_analysis_answer=lambda *_args: "legacy-analysis",
         )
 
         moltgrid.wire_market_core(listener)
