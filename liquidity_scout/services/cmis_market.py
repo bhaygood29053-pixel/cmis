@@ -174,7 +174,7 @@ def build_market_report_response(
 
     try:
         report = build_market_report(query, matches, catalog)
-    except (TypeError, ValueError, IndexError, KeyError) as exc:
+    except (AttributeError, TypeError, ValueError, IndexError, KeyError) as exc:
         return build_service_envelope(
             "market_report",
             chain,
