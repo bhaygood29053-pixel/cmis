@@ -2,7 +2,7 @@
 
 This integration layer recognizes tokenomics-specific asset questions, dispatches
 them through ``CMISGateway.tokenomics``, and renders only facts present in the
-returned CMIS envelope.  It never launches the standalone burn/mint scanner and
+returned CMIS envelope. It never launches the standalone burn/mint scanner and
 never infers circulating supply, maximum supply, market cap, FDV, or safety.
 """
 
@@ -55,7 +55,7 @@ def wants_cmis_tokenomics(question):
     """Return True only for ordinary tokenomics-specific asset questions.
 
     Market valuation and identity-address questions remain on their dedicated
-    CMIS routes.  Safety/risk wording is also excluded because ``risk_check`` is
+    CMIS routes. Safety/risk wording is also excluded because ``risk_check`` is
     the authoritative CMIS risk service, not tokenomics.
     """
     text = _text(question) or ""
@@ -242,6 +242,41 @@ def _append_activity(lines, data, symbol):
         lines.append("Chain-lifetime activity coverage: UNVERIFIED")
 
 
+def _format_native_tokenomics(envelope, data, symbol, name):
+    lines = [
+        "Liquidity Scout reply:",
+        f"CMIS tokenomics — {symbol}",
+        f"Service status: {str(envelope.get('status') or 'unknown').upper()}",
+    ]
+    if name:
+        lines.append(f"Name: {name}")
+    lines.append("Asset type: Native X1 asset")
+
+    total_supply = data.get("current_total_supply")
+    if data.get("supply_verified") is True and total_supply is not None:
+        lines.append(f"Network total supply: {_token_amount(total_supply, symbol)}")
+    else:
+        lines.append("Network total supply: unavailable from verified X1 network data")
+
+    circulating = data.get("circulating_supply")
+    if data.get("circulating_supply_verified") is True and circulating is not None:
+        lines.append(f"Circulating supply: {_token_amount(circulating, symbol)}")
+    else:
+        lines.append("Circulating supply: unavailable from verified X1 network data")
+
+    maximum = data.get("maximum_supply")
+    if data.get("maximum_supply_verified") is True and maximum is not None:
+        lines.append(f"Maximum supply: {_token_amount(maximum, symbol)}")
+    else:
+        lines.append("Maximum supply: unavailable from independently verified data")
+
+    lines.append(
+        "Native issuance/burn activity: unavailable from verified native-network activity data"
+    )
+    _append_metadata(lines, envelope)
+    return "\n".join(lines)
+
+
 def format_cmis_tokenomics_answer(listener_module, question, asset, *, gateway):
     """Dispatch and render one ordinary tokenomics request through CMIS."""
     if not wants_cmis_tokenomics(question):
@@ -262,6 +297,10 @@ def format_cmis_tokenomics_answer(listener_module, question, asset, *, gateway):
 
     symbol = _text(identity.get("symbol")) or _text(data.get("symbol")) or _text(asset) or "Unknown"
     name = _text(identity.get("name")) or _text(data.get("name"))
+
+    if data.get("scope") == "native_network" or data.get("asset_type") == "native":
+        return _format_native_tokenomics(envelope, data, symbol, name)
+
     mint = _text(identity.get("mint")) or _text(data.get("mint"))
 
     lines = [
