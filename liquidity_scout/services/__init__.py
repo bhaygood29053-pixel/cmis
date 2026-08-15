@@ -39,6 +39,7 @@ from .market_rankings import (
     rank_assets,
 )
 from .market_report import build_market_report
+from .pre_trade import build_pre_trade_check
 from .risk import (
     BLOCK,
     DEFAULT_RISK_POLICY,
@@ -66,6 +67,7 @@ __all__ = [
     "build_historical_comparison",
     "build_market_report",
     "build_market_report_response",
+    "build_pre_trade_check",
     "build_rank_response",
     "build_risk_check",
     "build_risk_check_response",
