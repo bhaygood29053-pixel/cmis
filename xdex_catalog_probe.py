@@ -1,15 +1,12 @@
-"""
-XDEX Catalog Probe
-
-Read-only diagnostic for the X1.Ninja /v1/pools endpoint.
-It NEVER prints your API key.
-"""
+"""Read-only diagnostic over the X1 Provider's X1.Ninja/XDEX catalog."""
 
 import json
-import requests
-from config import SETTINGS
 
-URL = "https://api.x1.ninja/v1/pools"
+from liquidity_scout.providers.x1.market import (
+    MARKET_SOURCE,
+    POOLS_URL,
+    X1Provider,
+)
 
 
 def compact_token(token):
@@ -23,49 +20,20 @@ def compact_token(token):
 
 
 def main():
-    if not SETTINGS.api_key:
-        raise SystemExit("ERROR: X1_NINJA_API_KEY is missing from .env")
+    provider = X1Provider()
+    provider.refresh()
+    catalog = provider.market_catalog()
+    pools = catalog["pools"]
 
-    r = requests.get(
-        URL,
-        params={"limit": 5},
-        headers={"Authorization": f"Bearer {SETTINGS.api_key}"},
-        timeout=20,
+    print("Source:", MARKET_SOURCE)
+    print("Endpoint:", POOLS_URL)
+    print("Observed at:", catalog.get("observed_at"))
+    print("Pools loaded:", len(pools))
+    print("XNT reference price:", catalog.get("xnt_price_usd"))
+    print(
+        "Rate-limit remaining: unavailable through the provider contract "
+        "(raw HTTP headers are intentionally not exposed)"
     )
-
-    print("HTTP status:", r.status_code)
-    print("Rate-limit remaining:", r.headers.get("X-RateLimit-Remaining"))
-    r.raise_for_status()
-
-    body = r.json()
-
-    print("\nTop-level response keys:")
-    if isinstance(body, dict):
-        print(sorted(body.keys()))
-    else:
-        print(type(body).__name__)
-
-    # Print pagination-like metadata without dumping entire records.
-    if isinstance(body, dict):
-        print("\nPossible pagination metadata:")
-        pagination_keys = [
-            "total", "count", "limit", "offset", "page", "pages",
-            "next", "nextCursor", "next_cursor", "cursor",
-            "hasMore", "has_more"
-        ]
-        found = False
-        for key in pagination_keys:
-            if key in body:
-                print(f"{key}: {body.get(key)}")
-                found = True
-        if not found:
-            print("(none of the common pagination keys were present)")
-
-        pools = body.get("pools", [])
-    else:
-        pools = []
-
-    print(f"\nPools returned in this request: {len(pools)}")
 
     for i, pool in enumerate(pools[:5], 1):
         print("\n" + "=" * 72)
