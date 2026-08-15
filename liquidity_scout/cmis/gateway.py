@@ -28,6 +28,7 @@ from liquidity_scout.market.resolver import (
     resolve_asset,
 )
 from liquidity_scout.providers.x1.market import X1Provider
+from liquidity_scout.providers.x1.supply import X1SupplyProvider
 from liquidity_scout.services.cmis_asset_lookup import build_asset_lookup_response
 from liquidity_scout.services.cmis_contract import (
     AMBIGUOUS,
@@ -37,6 +38,7 @@ from liquidity_scout.services.cmis_contract import (
 )
 from liquidity_scout.services.cmis_historical import build_historical_compare_response
 from liquidity_scout.services.cmis_market import build_market_report_response
+from liquidity_scout.services.cmis_native_tokenomics import build_native_tokenomics_response
 from liquidity_scout.services.cmis_pre_trade import build_pre_trade_check_response
 from liquidity_scout.services.cmis_rank import build_rank_response
 from liquidity_scout.services.cmis_risk import build_risk_check_response
@@ -69,9 +71,11 @@ class CMISGateway:
         self,
         *,
         x1_market_provider: Optional[X1Provider] = None,
+        x1_supply_provider: Optional[X1SupplyProvider] = None,
         history_backend: Any = None,
     ):
         self.x1_market_provider = x1_market_provider or X1Provider()
+        self.x1_supply_provider = x1_supply_provider or X1SupplyProvider()
         self.history_backend = history_backend or default_history_backend
 
     @staticmethod
@@ -255,7 +259,43 @@ class CMISGateway:
         identity = lookup.get("asset")
         return (dict(identity) if isinstance(identity, Mapping) else None), None
 
+    def _native_xnt_tokenomics(self) -> Dict[str, Any]:
+        total_record = None
+        circulating_record = None
+        provider_warnings = []
+
+        try:
+            total_record = self.x1_supply_provider.get_total_supply()
+        except Exception as exc:
+            provider_warnings.append({
+                "code": "x1_native_total_supply_provider_unavailable",
+                "message": f"X1 native total-supply collection failed: {exc}",
+            })
+
+        try:
+            circulating_record = self.x1_supply_provider.get_circulating_supply()
+        except Exception as exc:
+            provider_warnings.append({
+                "code": "x1_native_circulating_supply_provider_unavailable",
+                "message": f"X1 native circulating-supply collection failed: {exc}",
+            })
+
+        response = build_native_tokenomics_response(
+            symbol="XNT",
+            name="XNT",
+            chain="x1",
+            total_supply_record=total_record,
+            circulating_supply_record=circulating_record,
+        )
+        response["warnings"].extend(provider_warnings)
+        return response
+
     def _tokenomics(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:
+        supplied_mint = self._text(params.get("mint"))
+        asset_text = self._text(asset)
+        if not supplied_mint and asset_text and asset_text.upper() == "XNT":
+            return self._native_xnt_tokenomics()
+
         identity, failure = self._resolve_tokenomics_identity(asset, params)
         if failure is not None:
             return failure
@@ -264,7 +304,7 @@ class CMISGateway:
                 "tokenomics",
                 "x1",
                 "token_mint_required",
-                "A verified mint is required for tokenomics.",
+                "A verified mint is required for mint-scoped tokenomics.",
             )
         return build_tokenomics_response(
             identity["mint"],
@@ -313,12 +353,16 @@ class CMISGateway:
 
         market_data = market.get("data")
         identity = market.get("asset") if isinstance(market.get("asset"), Mapping) else {}
-        tokenomics = build_tokenomics_response(
-            identity.get("mint"),
-            symbol=identity.get("symbol"),
-            name=identity.get("name"),
-            chain="x1",
-        )
+        asset_text = self._text(asset)
+        if asset_text and asset_text.upper() == "XNT":
+            tokenomics = self._native_xnt_tokenomics()
+        else:
+            tokenomics = build_tokenomics_response(
+                identity.get("mint"),
+                symbol=identity.get("symbol"),
+                name=identity.get("name"),
+                chain="x1",
+            )
         tokenomics_data = (
             tokenomics.get("data")
             if tokenomics.get("status") != ERROR and isinstance(tokenomics.get("data"), Mapping)
