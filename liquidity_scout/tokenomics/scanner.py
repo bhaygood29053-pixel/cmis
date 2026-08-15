@@ -4,6 +4,10 @@ This module is intentionally separate from the live XDEX listener. Callers
 inject an X1 RPC function, while this layer selects a bounded signature window,
 retrieves/caches successful transactions, persists explicit mint/burn events,
 and delegates deterministic arithmetic to ``tokenomics.activity``.
+
+Scanner coverage is always described explicitly. Exhausting the history visible
+to the configured RPC endpoint is not treated as independent proof of complete
+chain-lifetime token history.
 """
 
 import sqlite3
@@ -31,6 +35,24 @@ def _max_signatures(value):
     if parsed < 0:
         raise ValueError("max_signatures must be a non-negative integer or None.")
     return parsed
+
+
+def _ensure_scan_metadata_columns(db):
+    """Add coverage-scope columns to older standalone activity databases."""
+    columns = {
+        row[1]
+        for row in db.execute("PRAGMA table_info(token_activity_scans)").fetchall()
+    }
+    additions = {
+        "coverage_scope": "TEXT NOT NULL DEFAULT 'unknown'",
+        "lifetime_coverage_verified": "INTEGER NOT NULL DEFAULT 0",
+        "lifetime_coverage_reason": "TEXT",
+    }
+    for column, declaration in additions.items():
+        if column not in columns:
+            db.execute(
+                f"ALTER TABLE token_activity_scans ADD COLUMN {column} {declaration}"
+            )
 
 
 def initialize_activity_db(db):
@@ -76,10 +98,14 @@ def initialize_activity_db(db):
             coverage_verified INTEGER NOT NULL,
             activity_verified INTEGER NOT NULL,
             newest_signature TEXT,
-            oldest_signature TEXT
+            oldest_signature TEXT,
+            coverage_scope TEXT NOT NULL DEFAULT 'unknown',
+            lifetime_coverage_verified INTEGER NOT NULL DEFAULT 0,
+            lifetime_coverage_reason TEXT
         )
         """
     )
+    _ensure_scan_metadata_columns(db)
     db.commit()
     return db
 
@@ -93,6 +119,16 @@ def open_activity_db(path):
     return db
 
 
+def _selection_scope(*, selection_complete, history_exhausted, max_signatures):
+    if not selection_complete:
+        return "incomplete"
+    if max_signatures == 0:
+        return "none"
+    if history_exhausted:
+        return "rpc_history_exhausted"
+    return "bounded"
+
+
 def collect_signature_window(rpc, mint, *, max_signatures=None):
     """Select successful signatures for one explicit address-history window.
 
@@ -100,6 +136,10 @@ def collect_signature_window(rpc, mint, *, max_signatures=None):
     successful transactions. Failed transactions are fully accounted for by
     their signature metadata and do not need transaction retrieval because they
     cannot contain completed token supply changes.
+
+    ``coverage_scope`` describes only the selected RPC-visible history window.
+    Even ``rpc_history_exhausted`` is not a claim of complete chain-lifetime
+    coverage because RPC retention/archival completeness is not proven here.
     """
     mint = _text(mint)
     if not mint:
@@ -119,6 +159,7 @@ def collect_signature_window(rpc, mint, *, max_signatures=None):
             "max_signatures": 0,
             "newest_signature": None,
             "oldest_signature": None,
+            "coverage_scope": "none",
         }
 
     selected = []
@@ -195,6 +236,11 @@ def collect_signature_window(rpc, mint, *, max_signatures=None):
         and malformed == 0
         and (history_exhausted or reached_bound)
     )
+    coverage_scope = _selection_scope(
+        selection_complete=selection_complete,
+        history_exhausted=history_exhausted,
+        max_signatures=max_signatures,
+    )
 
     return {
         "signatures": selected,
@@ -206,6 +252,7 @@ def collect_signature_window(rpc, mint, *, max_signatures=None):
         "max_signatures": max_signatures,
         "newest_signature": selected[0] if selected else None,
         "oldest_signature": selected[-1] if selected else None,
+        "coverage_scope": coverage_scope,
     }
 
 
@@ -314,6 +361,19 @@ def _load_window_events(db, mint, signatures):
     ]
 
 
+def _lifetime_coverage_reason(report, coverage):
+    if not report.get("coverage_verified"):
+        return "selected_window_coverage_unverified"
+    scope = coverage.get("coverage_scope")
+    if scope == "bounded":
+        return "bounded_signature_window"
+    if scope == "rpc_history_exhausted":
+        return "rpc_history_exhaustion_not_independent_lifetime_proof"
+    if scope == "none":
+        return "no_signature_history_examined"
+    return "lifetime_history_not_independently_verified"
+
+
 def _record_scan(db, mint, coverage, report):
     cursor = db.execute(
         """
@@ -329,8 +389,11 @@ def _record_scan(db, mint, coverage, report):
             coverage_verified,
             activity_verified,
             newest_signature,
-            oldest_signature
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            oldest_signature,
+            coverage_scope,
+            lifetime_coverage_verified,
+            lifetime_coverage_reason
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             mint,
@@ -345,6 +408,9 @@ def _record_scan(db, mint, coverage, report):
             int(report["activity_verified"]),
             coverage.get("newest_signature"),
             coverage.get("oldest_signature"),
+            coverage.get("coverage_scope"),
+            int(report["lifetime_coverage_verified"]),
+            report.get("lifetime_coverage_reason"),
         ),
     )
     db.commit()
@@ -359,12 +425,17 @@ def scan_token_activity(
     db,
     max_signatures=None,
 ):
-    """Scan one bounded X1 token-activity window and return a verified report.
+    """Scan one X1 token-activity window and return a verified report.
 
     Cached transactions satisfy retrieval coverage for the same selected
     signature window. Transactions that cannot be fetched or cannot prove
     successful execution are left uncached and make coverage incomplete, so
     net issuance is withheld by ``summarize_token_events``.
+
+    Window-level activity may be verified, but this scanner does not claim
+    lifetime coverage. A bounded window remains bounded; exhausting the history
+    visible from the configured RPC is explicitly labeled and still does not
+    prove full chain-lifetime history.
     """
     mint = _text(mint)
     if not mint:
@@ -436,6 +507,7 @@ def scan_token_activity(
         "new_transactions_retrieved": newly_retrieved,
         "newest_signature": selection["newest_signature"],
         "oldest_signature": selection["oldest_signature"],
+        "coverage_scope": selection["coverage_scope"],
     }
 
     events = _load_window_events(db, mint, signatures)
@@ -445,6 +517,14 @@ def scan_token_activity(
         decimals=decimals,
         coverage=coverage,
     )
+    report["coverage_scope"] = coverage["coverage_scope"]
+    report["lifetime_coverage_verified"] = False
+    report["lifetime_coverage_reason"] = _lifetime_coverage_reason(report, coverage)
+    report["coverage"]["coverage_scope"] = coverage["coverage_scope"]
+    report["coverage"]["lifetime_coverage_verified"] = False
+    report["coverage"]["lifetime_coverage_reason"] = report[
+        "lifetime_coverage_reason"
+    ]
     report["events"] = events
     report["scan_id"] = _record_scan(db, mint, coverage, report)
     report["storage"] = "standalone SQLite token activity DB"
