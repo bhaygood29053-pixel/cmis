@@ -57,6 +57,8 @@ class MoltGridHistoricalBridgeTests(unittest.TestCase):
             get_token_total_supply=lambda _mint: None,
             get_token_mint_info=lambda _mint: None,
             format_historical_comparison_answer=legacy_formatter,
+            wants_asset_analysis=lambda _question: False,
+            format_asset_analysis_answer=lambda *_args: "legacy-analysis",
         )
 
         moltgrid.wire_market_core(listener)
