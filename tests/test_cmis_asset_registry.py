@@ -36,6 +36,45 @@ class CMISAssetRegistryTests(unittest.TestCase):
     def test_unknown_wrapped_name_is_not_canonicalized_by_heuristic(self):
         self.assertIsNone(DEFAULT_ASSET_REGISTRY.resolve("x1", "Wrapped FOO"))
         self.assertIsNone(DEFAULT_ASSET_REGISTRY.resolve("x1", "FOO"))
+        self.assertIsNone(
+            DEFAULT_ASSET_REGISTRY.match_representation(
+                "x1",
+                {"symbol": "FOO", "name": "Wrapped FOO", "mint": "MINT_FOO"},
+            )
+        )
+
+    def test_provider_representation_can_be_configured_without_becoming_user_alias(self):
+        registry = AssetRegistry([
+            {
+                "canonical_id": "solana:native:SOL",
+                "chain": "solana",
+                "symbol": "SOL",
+                "name": "SOL",
+                "asset_type": "native",
+                "aliases": ["SOL"],
+                "representations": {
+                    "market": {
+                        "kind": "wrapped_token",
+                        "provider": "example_dex",
+                        "query": "WSOL",
+                        "symbols": ["WSOL"],
+                        "names": ["Wrapped SOL"],
+                    }
+                },
+            }
+        ])
+
+        # An explicit WSOL user query remains representation-scoped unless a
+        # caller deliberately adds WSOL to canonical aliases.
+        self.assertIsNone(registry.resolve("solana", "WSOL"))
+
+        definition = registry.match_representation(
+            "solana",
+            {"symbol": "WSOL", "name": "Wrapped SOL", "mint": "MINT_WSOL"},
+        )
+        self.assertIsNotNone(definition)
+        self.assertEqual(definition["canonical_id"], "solana:native:SOL")
+        self.assertEqual(registry.market_query(definition), "WSOL")
 
     def test_canonicalization_preserves_provider_representation_separately(self):
         definition = DEFAULT_ASSET_REGISTRY.resolve("x1", "XNT")
