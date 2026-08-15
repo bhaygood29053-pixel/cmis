@@ -161,12 +161,18 @@ class CMISCrossServiceContractSignoffTests(unittest.TestCase):
         self.usdc = token("USDC", "MintUSDC", "USD Coin")
         self.xnt = token("XNT", "MintXNT", "Wrapped XNT")
 
-    def _market_response(self, *, second_volume=500.0, liquidity=5000.0):
+    def _market_response(
+        self,
+        *,
+        second_volume=500.0,
+        primary_liquidity=5000.0,
+        secondary_liquidity=1000.0,
+    ):
         primary = pool(
             "P1",
             self.asset,
             self.usdc,
-            liquidity=liquidity,
+            liquidity=primary_liquidity,
             volume24h=100.0,
             txns24h=10,
             holders=1000,
@@ -176,7 +182,7 @@ class CMISCrossServiceContractSignoffTests(unittest.TestCase):
             "P2",
             self.asset,
             self.xnt,
-            liquidity=1000.0,
+            liquidity=secondary_liquidity,
             volume24h=second_volume,
             txns24h=20,
             holders=1000,
@@ -315,16 +321,17 @@ class CMISCrossServiceContractSignoffTests(unittest.TestCase):
         self.assertEqual(risk["status"], PARTIAL)
         self.assertEqual(risk["risk"]["recommendation"], WARN)
         self.assertIn("volume_24h_unverified", risk["risk"]["flags"])
-        self.assertIn("token_activity_unverified", risk["risk"]["flags"])
+        self.assertIn("token_activity_unavailable", risk["risk"]["flags"])
         self.assertLess(
             risk["confidence"]["verified_checks"],
             risk["confidence"]["total_checks"],
         )
 
     def test_verified_block_is_service_ok_across_complete_contract_pipeline(self):
-        market = self._market_response(liquidity=-1000.0)
-        # The secondary LP contributes +1000, producing verified zero aggregate
-        # liquidity without bypassing the normal multi-LP market calculation.
+        market = self._market_response(
+            primary_liquidity=0.0,
+            secondary_liquidity=0.0,
+        )
         self.assertEqual(market["data"]["liquidity_usd"], 0.0)
         self.assertEqual(market["status"], OK)
 
