@@ -33,6 +33,8 @@ def presentation_listener(**overrides):
         "history": SimpleNamespace(parse_historical_comparison=lambda _question: None),
         "wants_volume_rank": lambda _question: False,
         "wants_historical_liquidity": lambda _question: False,
+        "wants_asset_analysis": lambda _question: False,
+        "format_asset_analysis_answer": lambda *_args: "legacy-analysis",
     }
     values.update(overrides)
     return SimpleNamespace(**values)
