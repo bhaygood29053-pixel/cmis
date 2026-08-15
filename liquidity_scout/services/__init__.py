@@ -1,5 +1,15 @@
 """Structured Liquidity Scout service capabilities."""
 
+from .cmis_contract import (
+    AMBIGUOUS,
+    ERROR,
+    OK,
+    PARTIAL,
+    SERVICE_STATUSES,
+    UNAVAILABLE,
+    build_service_envelope,
+)
+from .cmis_risk import build_risk_check_response
 from .historical_compare import (
     build_historical_comparison,
     format_historical_comparison,
@@ -34,14 +44,22 @@ from .risk import (
 from .tokenomics import build_tokenomics_report
 
 __all__ = [
+    "AMBIGUOUS",
     "BLOCK",
     "DEFAULT_RISK_POLICY",
+    "ERROR",
     "FIELD_ORDER",
+    "OK",
+    "PARTIAL",
     "PASS",
+    "SERVICE_STATUSES",
+    "UNAVAILABLE",
     "WARN",
     "build_historical_comparison",
     "build_market_report",
     "build_risk_check",
+    "build_risk_check_response",
+    "build_service_envelope",
     "build_tokenomics_report",
     "build_verified_market_context",
     "find_asset_rank",
