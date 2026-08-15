@@ -51,8 +51,14 @@ def activity_report(**overrides):
             "selection_complete": True,
             "history_exhausted": False,
             "max_signatures": 2,
+            "coverage_scope": "bounded",
+            "lifetime_coverage_verified": False,
+            "lifetime_coverage_reason": "bounded_signature_window",
         },
+        "coverage_scope": "bounded",
         "coverage_verified": True,
+        "lifetime_coverage_verified": False,
+        "lifetime_coverage_reason": "bounded_signature_window",
         "amounts_verified": True,
         "activity_verified": True,
         "net_issuance_raw": "1750000",
@@ -77,12 +83,18 @@ def report_with_activity(activity, *, supply=None):
 
 
 class TokenomicsActivityServiceTests(unittest.TestCase):
-    def test_verified_bounded_activity_exposes_verified_net_issuance(self):
+    def test_verified_bounded_activity_exposes_scope_without_lifetime_claim(self):
         report = report_with_activity(activity_report())
         activity = report["token_activity"]
 
         self.assertTrue(activity["available"])
+        self.assertEqual(activity["coverage_scope"], "bounded")
         self.assertTrue(activity["coverage_verified"])
+        self.assertFalse(activity["lifetime_coverage_verified"])
+        self.assertEqual(
+            activity["lifetime_coverage_reason"],
+            "bounded_signature_window",
+        )
         self.assertTrue(activity["scanner_activity_verified"])
         self.assertTrue(activity["activity_verified"])
         self.assertTrue(activity["net_issuance_verified"])
@@ -95,6 +107,27 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         self.assertEqual(
             report["sources"]["token_activity"],
             "X1 RPC parsed token instructions",
+        )
+
+    def test_service_does_not_upgrade_scanner_lifetime_claim(self):
+        activity = activity_report(
+            coverage_scope="rpc_history_exhausted",
+            lifetime_coverage_verified=True,
+            lifetime_coverage_reason=None,
+        )
+        activity["coverage"] = dict(activity["coverage"])
+        activity["coverage"]["coverage_scope"] = "rpc_history_exhausted"
+        activity["coverage"]["lifetime_coverage_verified"] = True
+
+        report = report_with_activity(activity)["token_activity"]
+
+        self.assertEqual(report["coverage_scope"], "rpc_history_exhausted")
+        self.assertTrue(report["coverage_verified"])
+        self.assertTrue(report["activity_verified"])
+        self.assertFalse(report["lifetime_coverage_verified"])
+        self.assertEqual(
+            report["lifetime_coverage_reason"],
+            "token_activity_lifetime_claim_not_independently_verified",
         )
 
     def test_incomplete_coverage_preserves_observed_totals_but_withholds_net(self):
@@ -133,6 +166,7 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         self.assertFalse(report["available"])
         self.assertFalse(report["activity_verified"])
         self.assertFalse(report["net_issuance_verified"])
+        self.assertFalse(report["lifetime_coverage_verified"])
         self.assertIsNone(report["minted_raw_observed"])
         self.assertIsNone(report["net_issuance_tokens"])
         self.assertEqual(
@@ -189,6 +223,7 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
 
         self.assertEqual(report["unavailable_reasons"], [])
         self.assertFalse(report["token_activity"]["available"])
+        self.assertFalse(report["token_activity"]["lifetime_coverage_verified"])
         self.assertEqual(
             report["token_activity"]["verification_reasons"],
             ["token_activity_not_supplied"],
