@@ -1,30 +1,17 @@
 """
-XDEX Asset Lookup v0.1
+XDEX Asset Lookup v0.1 compatibility utility.
 
-Searches the entire XDEX pool catalog available through X1.Ninja.
-
-Examples:
-    python xdex_asset_lookup.py XNT
-    python xdex_asset_lookup.py ANL
-    python xdex_asset_lookup.py BRAINS
-    python xdex_asset_lookup.py XENCAT
-
-Read-only:
-- no trades
-- no MoltGrid posts
-- no signing
+Market collection is delegated to the X1 Provider. This script only performs
+read-only legacy lookup/presentation over the returned catalog.
 """
 
 import argparse
-import time
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-import requests
-
-from config import SETTINGS
-
-POOLS_URL = "https://api.x1.ninja/v1/pools"
-PAGE_SIZE = 100
+from liquidity_scout.providers.x1.market import (
+    MARKET_SOURCE,
+    fetch_all_pools as provider_fetch_all_pools,
+)
 
 
 def n(value, default=0.0):
@@ -51,60 +38,14 @@ def token_matches(token: Dict[str, Any], query: str) -> bool:
         s(token.get("mint")),
         s(token.get("address")),
     ]
-
-    # Exact symbol/mint match is ideal, but allow partial name matching too.
     return any(q == field.lower() for field in fields if field) or any(
         q in field.lower() for field in fields if field
     )
 
 
 def fetch_all_pools():
-    if not SETTINGS.api_key:
-        raise RuntimeError("X1_NINJA_API_KEY is missing from .env")
-
-    headers = {"Authorization": f"Bearer {SETTINGS.api_key}"}
-
-    pools = []
-    offset = 0
-    total = None
-    xnt_price_usd = None
-
-    while True:
-        r = requests.get(
-            POOLS_URL,
-            params={"limit": PAGE_SIZE, "offset": offset},
-            headers=headers,
-            timeout=20,
-        )
-        r.raise_for_status()
-        body = r.json()
-
-        page = body.get("pools", []) if isinstance(body, dict) else []
-        if not isinstance(page, list):
-            page = []
-
-        if total is None:
-            total = int(body.get("total") or body.get("totalCount") or 0)
-        if xnt_price_usd is None:
-            xnt_price_usd = body.get("xntPriceUsd")
-
-        pools.extend(page)
-
-        if not page:
-            break
-
-        offset += len(page)
-
-        if total and offset >= total:
-            break
-
-        # Safety stop in case pagination metadata is malformed.
-        if offset > 10000:
-            break
-
-        time.sleep(0.05)
-
-    return pools, xnt_price_usd
+    """Compatibility collection wrapper over the X1 market provider."""
+    return provider_fetch_all_pools()
 
 
 def pair_name(pool):
@@ -132,7 +73,6 @@ def find_asset(query: str, pools: List[Dict[str, Any]]):
                 "other": quote if base_match else base,
             })
 
-    # Prefer stronger pools: liquidity first, then 24h volume.
     results.sort(
         key=lambda item: (
             n(item["pool"].get("liquidity")),
@@ -140,7 +80,6 @@ def find_asset(query: str, pools: List[Dict[str, Any]]):
         ),
         reverse=True,
     )
-
     return results
 
 
@@ -183,20 +122,18 @@ def main():
 
     pools, xnt_price_usd = fetch_all_pools()
 
+    print(f"Source: {MARKET_SOURCE}")
     print(f"XDEX pools loaded: {len(pools)}")
     if xnt_price_usd is not None:
         print(f"XNT reference price: ${n(xnt_price_usd):,.8f}")
     print()
 
     query = args.asset.strip()
-
-    # XNT has an authoritative top-level USD reference price in this endpoint.
     if query.lower() in {"xnt", "wrapped xnt"} and xnt_price_usd is not None:
         print(f"XNT USD price: ${n(xnt_price_usd):,.8f}")
         print()
 
     matches = find_asset(query, pools)
-
     if not matches:
         print(f"No XDEX asset/pool match found for: {query}")
         print("Try the exact token symbol, token name, mint address, or pool address.")
