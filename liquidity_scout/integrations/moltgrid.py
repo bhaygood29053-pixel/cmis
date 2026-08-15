@@ -15,6 +15,10 @@ from importlib import import_module
 from collections.abc import Mapping
 
 from liquidity_scout.cmis import CMISGateway
+from liquidity_scout.integrations.moltgrid_asset_cmis import (
+    cmis_asset_service,
+    format_cmis_asset_answer,
+)
 from liquidity_scout.market import (
     AmbiguousAssetError,
     XDEXCatalog as CoreXDEXCatalog,
@@ -647,6 +651,27 @@ def _mint_info_adapter(listener_module):
     return adapter
 
 
+def _ordinary_asset_question(listener_module, question):
+    history = getattr(listener_module, "history", None)
+    parse_history = getattr(history, "parse_historical_comparison", None)
+    if callable(parse_history) and parse_history(question):
+        return False
+
+    wants_asset_rank = getattr(listener_module, "wants_asset_rank", None)
+    if callable(wants_asset_rank) and wants_asset_rank(question):
+        return False
+
+    wants_historical_liquidity = getattr(
+        listener_module,
+        "wants_historical_liquidity",
+        None,
+    )
+    if callable(wants_historical_liquidity) and wants_historical_liquidity(question):
+        return False
+
+    return True
+
+
 def wire_market_core(listener_module):
     """Replace legacy globals with reusable market, tokenomics, and CMIS routes."""
     legacy_wants_asset_analysis = getattr(
@@ -659,8 +684,15 @@ def wire_market_core(listener_module):
         "_cmis_legacy_format_asset_analysis_answer",
         listener_module.format_asset_analysis_answer,
     )
+    legacy_format_pool_answer = getattr(
+        listener_module,
+        "_cmis_legacy_format_pool_answer",
+        getattr(listener_module, "format_pool_answer", None),
+    )
     listener_module._cmis_legacy_wants_asset_analysis = legacy_wants_asset_analysis
     listener_module._cmis_legacy_format_asset_analysis_answer = legacy_format_asset_analysis_answer
+    if callable(legacy_format_pool_answer):
+        listener_module._cmis_legacy_format_pool_answer = legacy_format_pool_answer
 
     def routed_wants_asset_analysis(question):
         return wants_cmis_pre_trade(question) or legacy_wants_asset_analysis(question)
@@ -674,6 +706,18 @@ def wire_market_core(listener_module):
                 term,
             )
         return legacy_format_asset_analysis_answer(question, term, matches, catalog)
+
+    def routed_format_pool_answer(question, term, matches, catalog):
+        if not _ordinary_asset_question(listener_module, question):
+            return legacy_format_pool_answer(question, term, matches, catalog)
+        service = cmis_asset_service(question)
+        print(f"CMIS Gateway: {service.upper()} | asset: {term}")
+        return format_cmis_asset_answer(
+            listener_module,
+            question,
+            term,
+            gateway=_gateway_instance(),
+        )
 
     listener_module.XDEXCatalog = MoltGridXDEXCatalog
     listener_module.resolve_asset = resolve_asset
@@ -694,6 +738,8 @@ def wire_market_core(listener_module):
     listener_module.get_token_mint_info = _mint_info_adapter(listener_module)
     listener_module.wants_asset_analysis = routed_wants_asset_analysis
     listener_module.format_asset_analysis_answer = routed_format_asset_analysis_answer
+    if callable(legacy_format_pool_answer):
+        listener_module.format_pool_answer = routed_format_pool_answer
     return listener_module
 
 
