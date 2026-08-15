@@ -1,34 +1,28 @@
 import argparse
 import os
-import sqlite3
-import time
 from decimal import Decimal, ROUND_HALF_UP
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import requests
 from dotenv import load_dotenv
 
 from liquidity_scout.market import XDEXCatalog, resolve_asset
+from liquidity_scout.providers.x1.activity_scanner import (
+    X1ActivityScanner,
+    collect_signature_window,
+    open_activity_db,
+)
+from liquidity_scout.providers.x1.rpc import DEFAULT_X1_RPC_URL, X1RPCProvider
 from liquidity_scout.tokenomics import get_mint_info as core_get_mint_info
+from liquidity_scout.tokenomics.activity import extract_token_events
 
 load_dotenv()
 
-RPC = os.getenv(
-    "X1_RPC_URL",
-    "https://rpc.mainnet.x1.xyz"
-).strip()
-
+RPC = os.getenv("X1_RPC_URL", DEFAULT_X1_RPC_URL).strip()
 DB_FILE = "x1_burn_scan.db"
 
 BASE58 = set(
     "123456789ABCDEFGHJKLMNPQRSTUVWXYZ"
     "abcdefghijkmnopqrstuvwxyz"
 )
-
-
-# ============================================================
-# RPC
-# ============================================================
 
 
 def round_token_amount(value):
@@ -41,51 +35,22 @@ def round_token_amount(value):
     )
 
 
+def _rpc_provider(*, retries=5):
+    """Build the X1 RPC provider used by this legacy compatibility CLI."""
+    return X1RPCProvider(
+        rpc_url=RPC,
+        retries=retries,
+        timeout=30,
+    )
+
+
 def rpc(method, params, retries=5):
-    """RPC transport reserved for burn-history and transaction scanning."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": method,
-        "params": params,
-    }
+    """Compatibility RPC helper delegated to the X1 provider transport."""
+    return _rpc_provider(retries=retries).request(method, params)
 
-    for attempt in range(retries):
-        try:
-            r = requests.post(
-                RPC,
-                json=payload,
-                timeout=30,
-            )
-
-            # Retry rate limits / temporary server errors.
-            if r.status_code == 429 or r.status_code >= 500:
-                time.sleep(0.75 * (2 ** attempt))
-                continue
-
-            r.raise_for_status()
-
-            data = r.json()
-
-            if "error" in data:
-                raise RuntimeError(data["error"])
-
-            return data.get("result")
-
-        except Exception:
-            if attempt == retries - 1:
-                raise
-
-            time.sleep(0.75 * (2 ** attempt))
-
-
-# ============================================================
-# TOKEN RESOLUTION
-# ============================================================
 
 def looks_like_mint(value):
     value = value.strip()
-
     return (
         32 <= len(value) <= 50
         and all(ch in BASE58 for ch in value)
@@ -93,21 +58,8 @@ def looks_like_mint(value):
 
 
 def resolve_token(value, catalog=None):
-    """
-    Accept either:
-      AGI
-      XENCAT
-      <mint address>
-
-    Symbol/name resolution uses the shared XDEX market core. A caller may
-    provide an already-loaded catalog for tests or batch workflows.
-
-    Returns:
-      symbol, mint
-    """
-
+    """Resolve an XDEX symbol/name or direct X1 mint without guessing identity."""
     value = str(value or "").strip()
-
     if not value:
         raise ValueError("Token identifier is required.")
 
@@ -118,35 +70,20 @@ def resolve_token(value, catalog=None):
         catalog = XDEXCatalog()
         catalog.refresh()
 
-    term, matches = resolve_asset(
-        value,
-        catalog.pools,
-    )
-
+    term, matches = resolve_asset(value, catalog.pools)
     if not matches:
         raise RuntimeError(
             f"Token '{value}' was not found in the XDEX catalog."
         )
 
     _pool, side, asset, _quality = matches[0]
-
     if side == "pool" or not isinstance(asset, dict):
         raise RuntimeError(
             f"Could not determine X1 mint address for '{value}'."
         )
 
-    mint = str(
-        asset.get("mint")
-        or asset.get("address")
-        or ""
-    ).strip()
-
-    symbol = str(
-        asset.get("symbol")
-        or term
-        or value
-    ).strip().upper()
-
+    mint = str(asset.get("mint") or asset.get("address") or "").strip()
+    symbol = str(asset.get("symbol") or term or value).strip().upper()
     if not mint:
         raise RuntimeError(
             f"Could not determine X1 mint address for {symbol}."
@@ -155,12 +92,8 @@ def resolve_token(value, catalog=None):
     return symbol, mint
 
 
-# ============================================================
-# TOKEN INFORMATION
-# ============================================================
-
 def get_token_info(mint):
-    """Return burn-scanner compatibility fields from shared tokenomics core."""
+    """Return burn-scanner compatibility fields from provider-backed tokenomics."""
     record = core_get_mint_info(
         mint,
         rpc_url=RPC,
@@ -169,15 +102,10 @@ def get_token_info(mint):
     )
 
     if not isinstance(record, dict):
-        raise RuntimeError(
-            "Mint account could not be parsed."
-        )
+        raise RuntimeError("Mint account could not be parsed.")
 
     decimals = record.get("decimals")
     raw_supply = record.get("raw_supply")
-
-    # Burn conversion cannot be verified without mint decimals. Fail closed
-    # rather than silently treating missing decimals as zero.
     if decimals is None or raw_supply is None:
         raise RuntimeError(
             "Mint account supply/decimals could not be verified."
@@ -185,7 +113,6 @@ def get_token_info(mint):
 
     return {
         "decimals": decimals,
-        # Preserve the scanner's historical raw-integer supply field.
         "supply": raw_supply,
         "mint_authority": record.get("mint_authority"),
         "freeze_authority": record.get("freeze_authority"),
@@ -198,154 +125,42 @@ def get_token_info(mint):
     }
 
 
-# ============================================================
-# SIGNATURE HISTORY
-# ============================================================
-
 def get_signatures(mint, max_signatures=None):
-    results = []
-    before = None
+    """Compatibility view over the provider's bounded signature selection."""
+    provider = _rpc_provider()
+    selection = collect_signature_window(
+        provider.request,
+        mint,
+        max_signatures=max_signatures,
+    )
+    return [
+        {"signature": signature, "err": None}
+        for signature in selection["signatures"]
+    ]
 
-    while True:
-        limit = 1000
-
-        if max_signatures is not None:
-            remaining = max_signatures - len(results)
-
-            if remaining <= 0:
-                break
-
-            limit = min(limit, remaining)
-
-        options = {"limit": limit}
-
-        if before:
-            options["before"] = before
-
-        batch = rpc(
-            "getSignaturesForAddress",
-            [mint, options],
-        ) or []
-
-        if not batch:
-            break
-
-        # Failed transactions cannot contain completed burns.
-        successful = [
-            item for item in batch
-            if item.get("err") is None
-        ]
-
-        results.extend(successful)
-
-        print(
-            f"Successful signatures collected: "
-            f"{len(results):,}",
-            flush=True,
-        )
-
-        if len(batch) < limit:
-            break
-
-        before = batch[-1]["signature"]
-
-    return results
-
-
-# ============================================================
-# BURN EXTRACTION
-# ============================================================
 
 def extract_burns(tx, mint):
+    """Compatibility burn-only view over the shared deterministic event parser."""
     burns = []
-
-    if not tx:
-        return burns
-
-    meta = tx.get("meta") or {}
-
-    # Never count a failed transaction.
-    if meta.get("err") is not None:
-        return burns
-
-    block_time = tx.get("blockTime")
-
-    def inspect(ix, location):
-        if not isinstance(ix, dict):
-            return
-
-        parsed = ix.get("parsed")
-
-        if not isinstance(parsed, dict):
-            return
-
-        ix_type = str(
-            parsed.get("type") or ""
-        ).lower()
-
-        if ix_type not in (
-            "burn",
-            "burnchecked",
-        ):
-            return
-
-        info = parsed.get("info") or {}
-
-        # Only count burns for the requested mint.
-        if str(info.get("mint") or "") != mint:
-            return
-
-        token_amount = info.get("tokenAmount") or {}
-
-        raw_amount = (
-            token_amount.get("amount")
-            or info.get("amount")
+    for event in extract_token_events(tx, mint):
+        if event.get("kind") != "burn":
+            continue
+        burns.append(
+            {
+                "location": event.get("location"),
+                "type": event.get("instruction_type"),
+                "raw_amount": event.get("raw_amount"),
+                "authority": event.get("authority") or "",
+                "account": event.get("account") or "",
+                "block_time": event.get("block_time"),
+            }
         )
-
-        if raw_amount is None:
-            return
-
-        burns.append({
-            "location": location,
-            "type": ix_type,
-            "raw_amount": str(raw_amount),
-            "authority": str(
-                info.get("authority") or ""
-            ),
-            "account": str(
-                info.get("account") or ""
-            ),
-            "block_time": block_time,
-        })
-
-    message = (
-        tx.get("transaction", {})
-        .get("message", {})
-    )
-
-    # Top-level token instructions.
-    for i, ix in enumerate(
-        message.get("instructions") or []
-    ):
-        inspect(ix, f"top:{i}")
-
-    # Inner CPI token instructions.
-    for group_i, group in enumerate(
-        meta.get("innerInstructions") or []
-    ):
-        for ix_i, ix in enumerate(
-            group.get("instructions") or []
-        ):
-            inspect(
-                ix,
-                f"inner:{group_i}:{ix_i}",
-            )
-
     return burns
 
 
 def fetch_transaction(signature, mint):
-    tx = rpc(
+    """Compatibility transaction fetch delegated to the X1 RPC provider."""
+    tx = _rpc_provider().request(
         "getTransaction",
         [
             signature,
@@ -355,132 +170,14 @@ def fetch_transaction(signature, mint):
             },
         ],
     )
-
     return signature, extract_burns(tx, mint)
 
 
-# ============================================================
-# DATABASE / CACHE
-# ============================================================
-
-def open_db():
-    db = sqlite3.connect(DB_FILE)
-
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS processed (
-            mint TEXT NOT NULL,
-            signature TEXT NOT NULL,
-            PRIMARY KEY (mint, signature)
-        )
-    """)
-
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS burns (
-            mint TEXT NOT NULL,
-            burn_key TEXT NOT NULL,
-            signature TEXT NOT NULL,
-            instruction_type TEXT NOT NULL,
-            raw_amount TEXT NOT NULL,
-            authority TEXT,
-            account TEXT,
-            block_time INTEGER,
-            PRIMARY KEY (mint, burn_key)
-        )
-    """)
-
-    db.commit()
-
-    return db
-
-
-def save_result(
-    db,
-    mint,
-    signature,
-    burns,
-):
-    for burn in burns:
-        burn_key = (
-            f"{signature}:{burn['location']}"
-        )
-
-        db.execute(
-            """
-            INSERT OR IGNORE INTO burns (
-                mint,
-                burn_key,
-                signature,
-                instruction_type,
-                raw_amount,
-                authority,
-                account,
-                block_time
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                mint,
-                burn_key,
-                signature,
-                burn["type"],
-                burn["raw_amount"],
-                burn["authority"],
-                burn["account"],
-                burn["block_time"],
-            ),
-        )
-
-    db.execute(
-        """
-        INSERT OR IGNORE INTO processed (
-            mint,
-            signature
-        )
-        VALUES (?, ?)
-        """,
-        (
-            mint,
-            signature,
-        ),
-    )
-
-
-# ============================================================
-# SUMMARY
-# ============================================================
-
-def print_summary(
-    db,
-    symbol,
-    mint,
-    decimals,
-):
-    rows = db.execute(
-        """
-        SELECT raw_amount
-        FROM burns
-        WHERE mint = ?
-        """,
-        (mint,),
-    ).fetchall()
-
-    total_raw = sum(
-        (Decimal(row[0]) for row in rows),
-        Decimal(0),
-    )
-
-    divisor = Decimal(10) ** decimals
-
-    total = total_raw / divisor
-
-    processed = db.execute(
-        """
-        SELECT COUNT(*)
-        FROM processed
-        WHERE mint = ?
-        """,
-        (mint,),
-    ).fetchone()[0]
+def print_summary(report, symbol, mint, decimals):
+    """Print the legacy burn-focused summary from the provider scan report."""
+    burned = report.get("burned_tokens_observed")
+    burn_events = report.get("burn_events_observed", 0)
+    scanned = (report.get("coverage") or {}).get("signatures_scanned", 0)
 
     print()
     print("============================================")
@@ -489,16 +186,18 @@ def print_summary(
     print(f"Token:             {symbol}")
     print(f"Mint:              {mint}")
     print(f"Decimals:          {decimals}")
-    print(f"Txs processed:     {processed:,}")
-    print(f"Burn instructions: {len(rows):,}")
-    print(f"Burned tokens:     {total:,.9f} {symbol}")
-    print(f"Rounded burned:    {round_token_amount(total):,} {symbol}")
+    print(f"Txs in window:     {scanned:,}")
+    print(f"Burn instructions: {burn_events:,}")
+    if burned is None:
+        print("Burned tokens:     unavailable")
+    else:
+        amount = Decimal(str(burned))
+        print(f"Burned tokens:     {amount:,.9f} {symbol}")
+        print(f"Rounded burned:    {round_token_amount(amount):,} {symbol}")
+    print(f"Coverage scope:    {report.get('coverage_scope')}")
+    print("Lifetime coverage: UNVERIFIED")
     print("============================================")
 
-
-# ============================================================
-# SCANNER
-# ============================================================
 
 def scan(
     symbol,
@@ -506,188 +205,42 @@ def scan(
     decimals,
     workers,
     max_signatures,
+    *,
+    db_file=DB_FILE,
 ):
-    signatures = get_signatures(
-        mint,
-        max_signatures=max_signatures,
-    )
+    """Run the provider-owned X1 activity scanner through the legacy CLI seam."""
+    # ``workers`` remains accepted for CLI compatibility. The deterministic
+    # provider scanner controls retrieval order itself and does not currently
+    # expose concurrent transaction fetching.
+    _ = max(1, int(workers))
 
-    db = open_db()
-
-    already_done = {
-        row[0]
-        for row in db.execute(
-            """
-            SELECT signature
-            FROM processed
-            WHERE mint = ?
-            """,
-            (mint,),
+    provider = _rpc_provider()
+    scanner = X1ActivityScanner(provider.request)
+    db = open_activity_db(db_file)
+    try:
+        report = scanner.scan(
+            mint=mint,
+            decimals=decimals,
+            db=db,
+            max_signatures=max_signatures,
         )
-    }
-
-    pending = [
-        item["signature"]
-        for item in signatures
-        if item["signature"] not in already_done
-    ]
-
-    print()
-    print(f"Token:              {symbol}")
-    print(f"Mint:               {mint}")
-    print(f"Successful history: {len(signatures):,}")
-    print(f"Already cached:     {len(already_done):,}")
-    print(f"Remaining:          {len(pending):,}")
-    print(f"Workers:            {workers}")
-    print()
-
-    if not pending:
-        print("No new transactions need scanning.")
-        print_summary(
-            db,
-            symbol,
-            mint,
-            decimals,
-        )
+    finally:
         db.close()
-        return
 
-    completed = 0
-    errors = 0
-
-    # Work in batches so we do not create tens of thousands
-    # of futures in memory at once.
-    batch_size = 500
-
-    for start in range(
-        0,
-        len(pending),
-        batch_size,
-    ):
-        batch = pending[
-            start:start + batch_size
-        ]
-
-        with ThreadPoolExecutor(
-            max_workers=workers
-        ) as executor:
-
-            futures = {
-                executor.submit(
-                    fetch_transaction,
-                    signature,
-                    mint,
-                ): signature
-                for signature in batch
-            }
-
-            for future in as_completed(futures):
-                signature = futures[future]
-
-                try:
-                    sig, burns = future.result()
-
-                    save_result(
-                        db,
-                        mint,
-                        sig,
-                        burns,
-                    )
-
-                    completed += 1
-
-                except Exception as exc:
-                    errors += 1
-
-                    print(
-                        f"RPC error "
-                        f"{signature[:12]}...: "
-                        f"{exc}",
-                        flush=True,
-                    )
-
-                if completed % 50 == 0:
-                    db.commit()
-
-                if completed % 100 == 0:
-                    print(
-                        f"Processed this run: "
-                        f"{completed:,}/"
-                        f"{len(pending):,} "
-                        f"| RPC errors: "
-                        f"{errors:,}",
-                        flush=True,
-                    )
-
-        db.commit()
-
-    print_summary(
-        db,
-        symbol,
-        mint,
-        decimals,
-    )
-
-    if errors:
-        print()
-        print(
-            f"{errors:,} RPC requests were not "
-            "successfully retrieved."
-        )
-        print(
-            "Run the same command again; "
-            "cached transactions will be skipped "
-            "and missing ones retried."
-        )
-
-    db.close()
+    print_summary(report, symbol, mint, decimals)
+    return report
 
 
-# ============================================================
-# MAIN
-# ============================================================
-
-def main():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Scan verified standard token burns "
-            "for any token on X1."
-        )
-    )
-
-    parser.add_argument(
-        "token",
-        help=(
-            "XDEX symbol such as AGI/XENCAT "
-            "or an X1 mint address"
-        ),
-    )
-
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=6,
-        help="Concurrent RPC workers (default: 6)",
-    )
-
-    parser.add_argument(
-        "--max-signatures",
-        type=int,
-        default=None,
-        help=(
-            "Only inspect this many recent "
-            "signatures; useful for testing"
-        ),
-    )
-
-    args = parser.parse_args()
-
-    symbol, mint = resolve_token(
-        args.token
-    )
-
+def run_token_scan(
+    token,
+    *,
+    workers=6,
+    max_signatures=None,
+    db_file=DB_FILE,
+):
+    """Resolve a token, verify mint facts, and run the X1 provider scanner."""
+    symbol, mint = resolve_token(token)
     token_info = get_token_info(mint)
-
     decimals = token_info["decimals"]
 
     print()
@@ -698,13 +251,8 @@ def main():
     print(f"Mint:             {mint}")
     print(f"Decimals:         {decimals}")
 
-    mint_authority = token_info[
-        "mint_authority"
-    ]
-    mint_authority_verified = token_info[
-        "mint_authority_verified"
-    ]
-
+    mint_authority = token_info["mint_authority"]
+    mint_authority_verified = token_info["mint_authority_verified"]
     if not mint_authority_verified:
         mint_authority_text = "UNAVAILABLE"
     elif mint_authority is None:
@@ -712,18 +260,47 @@ def main():
     else:
         mint_authority_text = str(mint_authority)
 
-    print(
-        "Mint authority:   "
-        + mint_authority_text
-    )
-
+    print("Mint authority:   " + mint_authority_text)
     print("============================================")
     print()
 
-    scan(
+    return scan(
         symbol=symbol,
         mint=mint,
         decimals=decimals,
+        workers=workers,
+        max_signatures=max_signatures,
+        db_file=db_file,
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Scan verified standard token burns for any token on X1."
+    )
+    parser.add_argument(
+        "token",
+        help="XDEX symbol such as AGI/XENCAT or an X1 mint address",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=6,
+        help=(
+            "Compatibility option retained from the legacy scanner; "
+            "provider retrieval is deterministic"
+        ),
+    )
+    parser.add_argument(
+        "--max-signatures",
+        type=int,
+        default=None,
+        help="Only inspect this many recent signature-history entries",
+    )
+    args = parser.parse_args()
+
+    run_token_scan(
+        args.token,
         workers=max(1, args.workers),
         max_signatures=args.max_signatures,
     )
