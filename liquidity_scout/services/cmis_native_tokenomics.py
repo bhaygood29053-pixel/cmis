@@ -54,6 +54,12 @@ def build_native_tokenomics_response(
     Current total and circulating supply are accepted only from independently
     verified provider records. Maximum supply and native issuance history remain
     unavailable unless separately verified by a future provider/service.
+
+    Mint/freeze authority states are explicitly ``not_applicable`` for a native
+    chain asset. Their verification flags are true because CMIS has verified the
+    applicability state itself; no wrapped-token authority is being substituted.
+    This lets shared deterministic risk logic distinguish "not applicable" from
+    "unknown/unverified" without inventing a native mint account.
     """
     symbol_text = _text(symbol)
     name_text = _text(name) or symbol_text
@@ -138,10 +144,10 @@ def build_native_tokenomics_response(
             "decimals": None,
             "rpc_decimals_consistent": None,
             "mint_authority": None,
-            "mint_authority_verified": False,
+            "mint_authority_verified": True,
             "mint_authority_state": "not_applicable",
             "freeze_authority": None,
-            "freeze_authority_verified": False,
+            "freeze_authority_verified": True,
             "freeze_authority_state": "not_applicable",
             "future_minting_possible": None,
             "token_activity": {
