@@ -11,6 +11,7 @@ from .cmis_contract import (
 )
 from .cmis_market import build_market_report_response
 from .cmis_risk import build_risk_check_response
+from .cmis_tokenomics import build_tokenomics_response
 from .historical_compare import (
     build_historical_comparison,
     format_historical_comparison,
@@ -63,6 +64,7 @@ __all__ = [
     "build_risk_check_response",
     "build_service_envelope",
     "build_tokenomics_report",
+    "build_tokenomics_response",
     "build_verified_market_context",
     "find_asset_rank",
     "format_field_line",
