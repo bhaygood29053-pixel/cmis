@@ -689,13 +689,28 @@ def wire_market_core(listener_module):
         "_cmis_legacy_format_pool_answer",
         getattr(listener_module, "format_pool_answer", None),
     )
+    legacy_looks_like_general_question = getattr(
+        listener_module,
+        "_cmis_legacy_looks_like_general_question",
+        getattr(listener_module, "looks_like_general_question", None),
+    )
     listener_module._cmis_legacy_wants_asset_analysis = legacy_wants_asset_analysis
     listener_module._cmis_legacy_format_asset_analysis_answer = legacy_format_asset_analysis_answer
     if callable(legacy_format_pool_answer):
         listener_module._cmis_legacy_format_pool_answer = legacy_format_pool_answer
+    if callable(legacy_looks_like_general_question):
+        listener_module._cmis_legacy_looks_like_general_question = legacy_looks_like_general_question
 
     def routed_wants_asset_analysis(question):
         return wants_cmis_pre_trade(question) or legacy_wants_asset_analysis(question)
+
+    def routed_looks_like_general_question(question):
+        wants_global_rank = getattr(listener_module, "wants_global_xdex_ranking", None)
+        if callable(wants_global_rank) and wants_global_rank(question):
+            return True
+        if callable(legacy_looks_like_general_question):
+            return bool(legacy_looks_like_general_question(question))
+        return False
 
     def routed_format_asset_analysis_answer(question, term, matches, catalog):
         if wants_cmis_pre_trade(question):
@@ -738,6 +753,8 @@ def wire_market_core(listener_module):
     listener_module.get_token_mint_info = _mint_info_adapter(listener_module)
     listener_module.wants_asset_analysis = routed_wants_asset_analysis
     listener_module.format_asset_analysis_answer = routed_format_asset_analysis_answer
+    if callable(legacy_looks_like_general_question):
+        listener_module.looks_like_general_question = routed_looks_like_general_question
     if callable(legacy_format_pool_answer):
         listener_module.format_pool_answer = routed_format_pool_answer
     return listener_module
