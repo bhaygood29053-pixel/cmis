@@ -37,8 +37,8 @@ Roberta remains responsible for broader reasoning, user policy, specialist coord
 - historical market comparisons
 - tokenomics verification
 - burn and mint intelligence
-- Scout Risk Engine results
-- pre-trade market-risk analysis
+- Scout Risk Engine results when implemented
+- pre-trade market-risk analysis when implemented
 
 Liquidity Scout is a **specialist service**.
 
@@ -60,13 +60,14 @@ This applies to values including:
 - volume
 - transaction activity
 - holders
-- circulating or total supply
+- total supply
+- circulating supply only when independently verified
 - rankings
 - pool information
 - burn totals
 - mint activity
 - authority status
-- Scout risk metrics
+- Scout risk metrics when available
 
 Conversation history, model memory, or previous market reports must not override newer verified Liquidity Scout observations.
 
@@ -112,9 +113,19 @@ Where appropriate, responses should distinguish:
 
 ---
 
-## 5. Initial Roberta-Callable Services
+## 5. Target Roberta-Callable Services and Implementation Status
+
+This section defines the intended Roberta-facing service surface. It does **not** imply that every listed capability is already exposed through the final Roberta/API contract.
+
+Implementation status should be interpreted as follows:
+
+- **implemented core** — reusable deterministic Liquidity Scout logic exists and is independently testable;
+- **wrapper planned** — core capability exists, but the final Roberta-facing service envelope is not yet complete;
+- **planned** — capability belongs to a future roadmap phase and must not be treated as live.
 
 ### `asset_lookup`
+
+**Status:** implemented core; Roberta-facing structured wrapper planned.
 
 Resolves an asset from:
 
@@ -133,6 +144,8 @@ Expected result:
 
 ### `market_report`
 
+**Status:** implemented core; common Roberta response-envelope wrapper planned.
+
 Returns current verified market information when available.
 
 Possible fields include:
@@ -145,13 +158,15 @@ Possible fields include:
 - transaction activity
 - holders
 - price changes
-- volume changes
-- liquidity changes
+- volume changes when supported by verified data
+- liquidity changes when supported by verified historical data
 - rankings
 - source timestamps
-- confidence
+- confidence/completeness
 
 ### `rank`
+
+**Status:** implemented core; Roberta-facing response envelope planned.
 
 Supported ranking dimensions may include:
 
@@ -166,6 +181,8 @@ Supported ranking dimensions may include:
 Ranking methodology should be deterministic and reproducible.
 
 ### `historical_compare`
+
+**Status:** implemented core; Roberta-facing response envelope planned.
 
 Input:
 
@@ -189,22 +206,27 @@ Historical storage must remain separate from the live market listener.
 
 ### `tokenomics`
 
+**Status:** implemented core; activity coverage remains bounded by verified scanner coverage and the final Roberta-facing response envelope is planned.
+
 Returns verified token information when supported.
 
 Possible fields include:
 
-- supply
+- current total supply
+- circulating supply only when independently verified
 - mint authority
 - freeze authority
 - mint activity
 - burn activity
-- net issuance
+- net issuance only when scan coverage and verification requirements are satisfied
 - verification source
 - confidence
 
 Burn and mint scanning must remain separate from ordinary XDEX market polling.
 
 ### `risk_check`
+
+**Status:** planned for the Scout Risk Engine phase.
 
 Returns the Liquidity Scout risk assessment.
 
@@ -226,6 +248,8 @@ Recommendation states should support:
 Risk results must remain explainable.
 
 ### `pre_trade_check`
+
+**Status:** planned after the required market, tokenomics, and Scout Risk Engine layers are implemented and tested.
 
 Input:
 
@@ -250,11 +274,11 @@ A successful pre-trade check does not itself authorize execution.
 
 ---
 
-## 6. Response Contract
+## 6. Target Response Contract
 
-Roberta-facing responses should be structured and machine-readable.
+Roberta-facing responses should ultimately be structured and machine-readable.
 
-A common response envelope should support:
+The following common response envelope is a **target interface for the Roberta Interface phase**. It is not a claim that every current reusable service already exposes this exact API shape.
 
 ```json
 {
@@ -281,11 +305,13 @@ Exact schemas may evolve independently for each service, but responses should pr
 - warnings
 - explicit errors
 
+Until the common envelope is implemented, existing reusable service return structures remain internal implementation contracts and must not be represented to Roberta as finalized public APIs.
+
 ---
 
 ## 7. Status Semantics
 
-Recommended service-level statuses:
+Recommended service-level statuses for the target Roberta-facing interface:
 
 ### `ok`
 
@@ -323,6 +349,7 @@ Confidence may reflect factors such as:
 - LP coverage
 - RPC verification
 - historical-data coverage
+- scanner coverage
 - calculation completeness
 
 Roberta may use confidence information as part of broader reasoning but must not reinterpret an unverified value as verified.
@@ -356,9 +383,11 @@ It must not:
 - substitute remembered prices for unavailable live prices
 - invent missing LPs
 - invent supply
+- infer circulating supply from total supply without independent verification
 - invent holder counts
 - invent rankings
 - invent burn or mint totals
+- claim verified net issuance without verified scanner coverage
 - report stale values as current without disclosure
 - convert source failure into false certainty
 
@@ -368,15 +397,17 @@ When deterministic verification fails, the response should clearly expose the fa
 
 ## 11. Roberta Consumption Rules
 
-When Roberta invokes Liquidity Scout:
+When Roberta invokes an implemented Liquidity Scout service:
 
 1. Roberta supplies the required query or asset context.
 2. Liquidity Scout resolves the asset when necessary.
 3. Liquidity Scout obtains or calculates the requested specialist facts.
-4. Liquidity Scout returns structured results.
+4. Liquidity Scout returns structured results using the currently implemented service contract.
 5. Roberta consumes the returned facts as specialist evidence.
 6. Roberta performs any higher-level reasoning or specialist coordination required.
 7. Roberta produces the final user-facing synthesis.
+
+Roberta must not invoke a service marked **planned** as though it were already implemented.
 
 For freshness-sensitive market information, Roberta should not substitute remembered values for verified Liquidity Scout values.
 
@@ -434,6 +465,8 @@ Liquidity Scout should be developed one layer at a time:
 7. Controlled Execution Intelligence
 
 Integration work should not bypass unfinished lower-level verification layers.
+
+Service status in this contract should be updated as each roadmap phase becomes implemented and tested.
 
 ---
 
