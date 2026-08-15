@@ -22,6 +22,18 @@ from .rpc import (
     parse_token_supply_result,
     rpc_request,
 )
+from .supply import (
+    ASSET as SUPPLY_ASSET,
+    DEFAULT_NETWORK as SUPPLY_DEFAULT_NETWORK,
+    SUPPLY_API_BASE_URL,
+    SUPPLY_SOURCE,
+    X1SupplyAPIError,
+    X1SupplyProvider,
+    fetch_supply,
+    get_circulating_supply,
+    get_total_supply as get_x1_network_total_supply,
+    parse_supply_text,
+)
 
 __all__ = [
     "CHAIN",
@@ -32,14 +44,24 @@ __all__ = [
     "PAGE_SIZE",
     "POOLS_URL",
     "RPC_SOURCE",
+    "SUPPLY_API_BASE_URL",
+    "SUPPLY_ASSET",
+    "SUPPLY_DEFAULT_NETWORK",
+    "SUPPLY_SOURCE",
     "X1Provider",
     "X1RPCError",
     "X1RPCProvider",
+    "X1SupplyAPIError",
+    "X1SupplyProvider",
     "XDEXCatalog",
     "fetch_all_pools",
+    "fetch_supply",
+    "get_circulating_supply",
     "get_mint_info",
     "get_token_supply",
+    "get_x1_network_total_supply",
     "parse_mint_account_result",
+    "parse_supply_text",
     "parse_token_supply_result",
     "rpc_request",
 ]
