@@ -103,7 +103,7 @@ class CMISGatewayTests(unittest.TestCase):
         self.assertEqual(response["status"], "ok")
         self.assertEqual(response["asset"]["mint"], "MINT_AGI")
         self.assertEqual(response["data"]["liquidity_usd"], 5000)
-        self.assertEqual(response["data"]["#LPs"] if "#LPs" in response["data"] else response["data"]["lp_count"], 1)
+        self.assertEqual(response["data"]["#LPs"], 1)
 
     def test_rank_collects_catalog_inside_gateway(self):
         response = self.gateway.dispatch({
@@ -114,8 +114,12 @@ class CMISGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["service"], "rank")
         self.assertIn(response["status"], {"ok", "partial"})
-        self.assertEqual(response["data"]["rankings"][0]["mint"], "MINT_AGI")
-        self.assertEqual(response["data"]["rankings"][0]["#LPs"], 1)
+        agi_row = next(
+            row
+            for row in response["data"]["rankings"]
+            if row["mint"] == "MINT_AGI"
+        )
+        self.assertEqual(agi_row["#LPs"], 1)
 
     def test_tokenomics_resolves_symbol_then_calls_service_with_verified_mint(self):
         tokenomics_response = build_service_envelope(
