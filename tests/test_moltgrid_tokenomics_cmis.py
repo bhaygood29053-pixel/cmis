@@ -118,7 +118,7 @@ class MoltGridCMISTokenomicsTests(unittest.TestCase):
             "What is XNT market cap?": "market_report",
             "What is XNT FDV?": "market_report",
             "What is XNT current supply valuation?": "market_report",
-            "Is XNT safe?": "market_report",
+            "Is XNT safe?": "risk_check",
             "What is XNT mint address?": "asset_lookup",
         }
         for question, service in exclusions.items():
