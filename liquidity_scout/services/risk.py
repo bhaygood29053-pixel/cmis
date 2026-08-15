@@ -1,12 +1,13 @@
 """Deterministic risk assessment over already-verified service facts.
 
 This module deliberately performs no network, RPC, DEX, database, or LLM work.
-Callers supply structured market/tokenomics reports that were produced by other
-Liquidity Scout / CMIS layers. The risk core evaluates only facts that those
-reports mark as verified and preserves uncertainty when data is missing.
+Callers supply structured market, tokenomics, and historical facts produced by
+other Liquidity Scout / CMIS layers. The risk core evaluates only facts marked
+as verified, recomputes derived historical movement itself, and preserves
+uncertainty when data is missing.
 
-The first risk milestone intentionally does not invent a numeric Scout score.
-A score remains unavailable until a calibrated, tested scoring policy exists.
+The risk engine intentionally does not invent a numeric Scout score. A score
+remains unavailable until a calibrated, tested scoring policy exists.
 """
 
 from typing import Any, Dict, Mapping, Optional
@@ -18,16 +19,19 @@ BLOCK = "BLOCK"
 _STATUS_ORDER = {PASS: 0, WARN: 1, BLOCK: 2}
 
 DEFAULT_RISK_POLICY = {
-    # Monetary/activity thresholds are intentionally unset by default. A caller
-    # may supply explicit values, making the resulting decision reproducible
-    # without embedding arbitrary market-size assumptions in the core.
+    # Monetary/activity/historical thresholds are intentionally unset by
+    # default. A caller may supply explicit values, making the resulting
+    # decision reproducible without embedding arbitrary market assumptions.
     "minimum_liquidity_usd": None,
     "minimum_volume_24h_usd": None,
     "minimum_transactions_24h": None,
+    "historical_price_warn_abs_change_pct": None,
+    "historical_price_block_abs_change_pct": None,
     "block_on_zero_liquidity": True,
     "warn_on_zero_activity": True,
     "warn_on_active_mint_authority": True,
     "warn_on_active_freeze_authority": True,
+    "warn_on_missing_history": True,
 }
 
 
@@ -73,14 +77,29 @@ def _normalize_policy(policy: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
         "minimum_liquidity_usd",
         "minimum_volume_24h_usd",
         "minimum_transactions_24h",
+        "historical_price_warn_abs_change_pct",
+        "historical_price_block_abs_change_pct",
     ):
         result[key] = _nonnegative_policy_number(key, result.get(key))
+
+    warn_threshold = result["historical_price_warn_abs_change_pct"]
+    block_threshold = result["historical_price_block_abs_change_pct"]
+    if (
+        warn_threshold is not None
+        and block_threshold is not None
+        and block_threshold < warn_threshold
+    ):
+        raise ValueError(
+            "historical_price_block_abs_change_pct must be greater than or "
+            "equal to historical_price_warn_abs_change_pct"
+        )
 
     for key in (
         "block_on_zero_liquidity",
         "warn_on_zero_activity",
         "warn_on_active_mint_authority",
         "warn_on_active_freeze_authority",
+        "warn_on_missing_history",
     ):
         if not isinstance(result.get(key), bool):
             raise ValueError(f"{key} must be a boolean")
@@ -324,9 +343,141 @@ def _assess_tokenomics(
     )
 
 
+def _historical_price_facts(
+    historical_report: Optional[Mapping[str, Any]],
+):
+    if not isinstance(historical_report, Mapping):
+        return None, None, None, False
+
+    metric = (_text(historical_report.get("metric")) or "").lower()
+    current = _number(historical_report.get("current_value"))
+    historical = _number(historical_report.get("historical_value"))
+    verified = (
+        metric == "price"
+        and historical_report.get("current_verified") is True
+        and historical_report.get("historical_verified") is True
+        and current is not None
+        and current >= 0
+        and historical is not None
+        and historical > 0
+    )
+    return current, historical, metric or None, verified
+
+
+def _assess_history(
+    historical_report: Optional[Mapping[str, Any]],
+    policy: Mapping[str, Any],
+) -> Dict[str, Any]:
+    current, historical, metric, verified = _historical_price_facts(
+        historical_report
+    )
+    evidence = {
+        "metric": metric,
+        "period": (
+            _text(historical_report.get("period"))
+            if isinstance(historical_report, Mapping)
+            else None
+        ),
+        "current_value": current,
+        "historical_value": historical,
+        "change_pct": None,
+        "absolute_change_pct": None,
+        "warn_absolute_change_pct": policy[
+            "historical_price_warn_abs_change_pct"
+        ],
+        "block_absolute_change_pct": policy[
+            "historical_price_block_abs_change_pct"
+        ],
+        "current_observed_at": (
+            historical_report.get("current_observed_at")
+            if isinstance(historical_report, Mapping)
+            else None
+        ),
+        "historical_observed_at": (
+            historical_report.get("historical_observed_at")
+            if isinstance(historical_report, Mapping)
+            else None
+        ),
+        "source": (
+            historical_report.get("source")
+            if isinstance(historical_report, Mapping)
+            else None
+        ),
+    }
+
+    if not isinstance(historical_report, Mapping):
+        if not policy["warn_on_missing_history"]:
+            return _component(PASS, available=False, evidence=evidence)
+        return _component(
+            WARN,
+            available=False,
+            flags=["historical_price_unavailable"],
+            reasons=[
+                "Verified historical price comparison was not supplied to the risk core."
+            ],
+            evidence=evidence,
+        )
+
+    if metric != "price":
+        return _component(
+            WARN,
+            available=True,
+            flags=["historical_metric_unsupported"],
+            reasons=[
+                "Historical risk currently supports verified price comparisons only."
+            ],
+            evidence=evidence,
+        )
+
+    if not verified:
+        return _component(
+            WARN,
+            available=current is not None or historical is not None,
+            flags=["historical_price_unverified"],
+            reasons=[
+                "Historical price movement cannot be verified from the supplied comparison."
+            ],
+            evidence=evidence,
+        )
+
+    change_pct = ((current - historical) / historical) * 100.0
+    absolute_change_pct = abs(change_pct)
+    evidence["change_pct"] = change_pct
+    evidence["absolute_change_pct"] = absolute_change_pct
+
+    block_threshold = policy["historical_price_block_abs_change_pct"]
+    if block_threshold is not None and absolute_change_pct >= block_threshold:
+        return _component(
+            BLOCK,
+            available=True,
+            flags=["historical_price_move_exceeds_block_threshold"],
+            reasons=[
+                "Verified historical price movement meets or exceeds the explicit "
+                "risk-policy block threshold."
+            ],
+            evidence=evidence,
+        )
+
+    warn_threshold = policy["historical_price_warn_abs_change_pct"]
+    if warn_threshold is not None and absolute_change_pct >= warn_threshold:
+        return _component(
+            WARN,
+            available=True,
+            flags=["historical_price_move_exceeds_warn_threshold"],
+            reasons=[
+                "Verified historical price movement meets or exceeds the explicit "
+                "risk-policy warning threshold."
+            ],
+            evidence=evidence,
+        )
+
+    return _component(PASS, available=True, evidence=evidence)
+
+
 def _confidence(
     market_report: Mapping[str, Any],
     tokenomics_report: Optional[Mapping[str, Any]],
+    historical_report: Optional[Mapping[str, Any]],
 ) -> Dict[str, Any]:
     _, liquidity_verified = _verified_market_metric(
         market_report, "liquidity_usd", "liquidity"
@@ -340,6 +491,7 @@ def _confidence(
 
     tokenomics = tokenomics_report if isinstance(tokenomics_report, Mapping) else {}
     activity = tokenomics.get("token_activity")
+    _, _, _, historical_price_verified = _historical_price_facts(historical_report)
     checks = {
         "liquidity_verified": liquidity_verified,
         "volume_24h_verified": volume_verified,
@@ -352,6 +504,7 @@ def _confidence(
             and activity.get("available") is True
             and activity.get("activity_verified") is True
         ),
+        "historical_price_verified": historical_price_verified,
     }
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
@@ -375,21 +528,23 @@ def _confidence(
 def build_risk_check(
     market_report: Mapping[str, Any],
     tokenomics_report: Optional[Mapping[str, Any]] = None,
+    historical_report: Optional[Mapping[str, Any]] = None,
     *,
     chain: str = "x1",
     policy: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Evaluate deterministic current-fact risk without collecting data.
+    """Evaluate deterministic risk without collecting data.
 
-    ``market_report`` and ``tokenomics_report`` are expected to come from the
-    existing deterministic service layers. Missing or incomplete verification
-    produces WARN rather than being silently converted to PASS. A verified
-    asset-wide liquidity value of zero may produce BLOCK according to policy.
+    ``market_report``, ``tokenomics_report``, and ``historical_report`` are
+    expected to come from deterministic service layers. Missing or incomplete
+    verification produces WARN rather than being silently converted to PASS.
+    A verified asset-wide liquidity value of zero may produce BLOCK according
+    to policy.
 
-    PASS/WARN/BLOCK applies only to the currently implemented assessment scope:
-    liquidity, 24h activity, tokenomics authorities, token activity, and source
-    completeness. Holder-distribution, historical-volatility, and trade-impact
-    risk remain explicit future layers rather than guessed values.
+    Historical risk currently means verified point-to-point price movement. It
+    is not statistical volatility. The core recomputes percentage change from
+    verified current/historical values and applies only explicit caller-supplied
+    warning/block thresholds.
     """
     if not isinstance(market_report, Mapping):
         raise ValueError("market_report must be a mapping")
@@ -402,6 +557,7 @@ def build_risk_check(
         "liquidity": _assess_liquidity(market_report, normalized_policy),
         "activity": _assess_activity(market_report, normalized_policy),
         "tokenomics": _assess_tokenomics(tokenomics_report, normalized_policy),
+        "history": _assess_history(historical_report, normalized_policy),
     }
     recommendation = _merge_status(
         *(component["status"] for component in components.values())
@@ -409,7 +565,7 @@ def build_risk_check(
 
     flags = []
     reasons = []
-    for name in ("liquidity", "activity", "tokenomics"):
+    for name in ("liquidity", "activity", "tokenomics", "history"):
         component = components[name]
         flags.extend(component["flags"])
         reasons.extend(component["reasons"])
@@ -422,7 +578,11 @@ def build_risk_check(
         },
         "recommendation": recommendation,
         "components": components,
-        "confidence": _confidence(market_report, tokenomics_report),
+        "confidence": _confidence(
+            market_report,
+            tokenomics_report,
+            historical_report,
+        ),
         "flags": flags,
         "reasons": reasons,
         # Deliberately unavailable until a calibrated scoring model is defined.
@@ -436,11 +596,12 @@ def build_risk_check(
                 "activity_24h",
                 "tokenomics_authorities",
                 "bounded_token_activity",
+                "historical_price_movement",
                 "source_completeness",
             ],
             "not_yet_included": [
                 "holder_distribution",
-                "historical_volatility",
+                "statistical_volatility",
                 "trade_impact",
             ],
         },
