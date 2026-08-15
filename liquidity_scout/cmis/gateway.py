@@ -201,18 +201,27 @@ class CMISGateway:
 
     def _market_report(self, asset: Any) -> Dict[str, Any]:
         if not self._text(asset):
-            return build_market_report_response(asset, None, self.x1_market_provider, chain="x1")
+            return build_market_report_response(
+                asset,
+                None,
+                self.x1_market_provider,
+                chain="x1",
+            )
         catalog, failure = self._collect_x1_catalog("market_report")
         if failure is not None:
             return failure
         term, matches = self._resolved_matches(asset, catalog["pools"])
-        return build_market_report_response(
+        response = build_market_report_response(
             term,
             matches,
             self.x1_market_provider,
             chain="x1",
             observed_at=catalog.get("observed_at"),
         )
+        data = response.get("data")
+        if isinstance(data, dict) and "lp_count" in data:
+            data["#LPs"] = data.get("lp_count")
+        return response
 
     def _rank(self, params: Mapping[str, Any]) -> Dict[str, Any]:
         catalog, failure = self._collect_x1_catalog("rank")
@@ -441,7 +450,6 @@ class CMISGateway:
         if service == "pre_trade_check":
             return self._pre_trade_check(asset, params)
 
-        # The service allow-list above makes this unreachable; keep fail-closed.
         return self._gateway_error(
             service,
             chain,
