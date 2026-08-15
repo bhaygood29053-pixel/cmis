@@ -1,5 +1,6 @@
 """Structured Liquidity Scout service capabilities."""
 
+from .cmis_asset_lookup import build_asset_lookup_response
 from .cmis_contract import (
     AMBIGUOUS,
     ERROR,
@@ -58,6 +59,7 @@ __all__ = [
     "SERVICE_STATUSES",
     "UNAVAILABLE",
     "WARN",
+    "build_asset_lookup_response",
     "build_historical_compare_response",
     "build_historical_comparison",
     "build_market_report",
