@@ -11,6 +11,16 @@ STOPWORDS = {
     "BUY", "SELL", "HOLD", "SIGNAL", "PLEASE", "WHATS", "WHAT'S",
 }
 
+# Conversational/advisory words are ignored only when they appear as normal
+# prose. Uppercase forms remain eligible so a user can still explicitly request
+# an XDEX symbol such as SMART by writing the symbol exactly.
+PROSE_STOPWORDS = {
+    "WOULD", "SHOULD", "COULD", "CAN", "IT", "BE", "SMART", "WORTH",
+    "THINK", "GOOD", "BAD", "IDEA", "TO", "I", "YOU", "YOUR", "MY",
+    "WE", "OUR", "INVEST", "INVESTING", "PURCHASE", "PURCHASING",
+    "DOLLAR", "DOLLARS", "USD",
+}
+
 
 class AmbiguousAssetError(ValueError):
     """Raised when an exact human-facing identifier maps to multiple mints."""
@@ -63,6 +73,27 @@ def normalize_text(text) -> str:
     return re.sub(r"[^A-Za-z0-9.]+", " ", _s(text)).strip()
 
 
+def _is_numeric_term(word: str) -> bool:
+    return bool(re.fullmatch(r"\d+(?:\.\d+)?", _s(word)))
+
+
+def _is_candidate_word(word: str) -> bool:
+    text = _s(word)
+    if len(text) < 2 or _is_numeric_term(text):
+        return False
+
+    upper = text.upper()
+    if upper in STOPWORDS:
+        return False
+
+    # Ordinary prose such as "Would" and "smart" must not beat an explicit
+    # ticker later in the sentence. Exact uppercase symbols remain eligible.
+    if upper in PROSE_STOPWORDS and text != upper:
+        return False
+
+    return True
+
+
 def candidate_terms(question) -> List[str]:
     clean = normalize_text(question)
     words = [word for word in clean.split() if word]
@@ -70,14 +101,19 @@ def candidate_terms(question) -> List[str]:
 
     for size in (3, 2):
         for index in range(len(words) - size + 1):
-            phrase = " ".join(words[index:index + size])
-            if phrase.upper() not in STOPWORDS:
-                candidates.append(phrase)
+            parts = words[index:index + size]
+            phrase = " ".join(parts)
+            if phrase.upper() in STOPWORDS:
+                continue
+            # Skip phrases made entirely from grammar/advice words or numeric
+            # trade context. A phrase containing a real candidate term remains
+            # eligible for exact multi-word token-name matching.
+            if not any(_is_candidate_word(part) for part in parts):
+                continue
+            candidates.append(phrase)
 
     for word in words:
-        if word.upper() in STOPWORDS:
-            continue
-        if len(word) >= 2:
+        if _is_candidate_word(word):
             candidates.append(word)
 
     seen = set()
