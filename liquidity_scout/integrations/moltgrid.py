@@ -648,7 +648,33 @@ def _mint_info_adapter(listener_module):
 
 
 def wire_market_core(listener_module):
-    """Replace legacy globals with reusable market and tokenomics implementations."""
+    """Replace legacy globals with reusable market, tokenomics, and CMIS routes."""
+    legacy_wants_asset_analysis = getattr(
+        listener_module,
+        "_cmis_legacy_wants_asset_analysis",
+        listener_module.wants_asset_analysis,
+    )
+    legacy_format_asset_analysis_answer = getattr(
+        listener_module,
+        "_cmis_legacy_format_asset_analysis_answer",
+        listener_module.format_asset_analysis_answer,
+    )
+    listener_module._cmis_legacy_wants_asset_analysis = legacy_wants_asset_analysis
+    listener_module._cmis_legacy_format_asset_analysis_answer = legacy_format_asset_analysis_answer
+
+    def routed_wants_asset_analysis(question):
+        return wants_cmis_pre_trade(question) or legacy_wants_asset_analysis(question)
+
+    def routed_format_asset_analysis_answer(question, term, matches, catalog):
+        if wants_cmis_pre_trade(question):
+            print(f"CMIS Gateway: PRE-TRADE | asset: {term}")
+            return format_cmis_pre_trade_answer(
+                listener_module,
+                question,
+                term,
+            )
+        return legacy_format_asset_analysis_answer(question, term, matches, catalog)
+
     listener_module.XDEXCatalog = MoltGridXDEXCatalog
     listener_module.resolve_asset = resolve_asset
     listener_module.resolve_multiple_assets = resolve_multiple_assets
@@ -666,6 +692,8 @@ def wire_market_core(listener_module):
     listener_module.wants_token_address = core_wants_token_address
     listener_module.get_token_total_supply = _total_supply_adapter(listener_module)
     listener_module.get_token_mint_info = _mint_info_adapter(listener_module)
+    listener_module.wants_asset_analysis = routed_wants_asset_analysis
+    listener_module.format_asset_analysis_answer = routed_format_asset_analysis_answer
     return listener_module
 
 
