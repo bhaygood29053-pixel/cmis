@@ -40,6 +40,12 @@ def _source(record: Any, role: str):
     return result
 
 
+def _source_name(record: Any):
+    if not isinstance(record, Mapping):
+        return None
+    return _text(record.get("source"))
+
+
 def build_native_tokenomics_response(
     *,
     symbol: Any,
@@ -158,6 +164,15 @@ def build_native_tokenomics_response(
                 "net_issuance_verified": False,
                 "net_issuance_tokens": None,
                 "verification_reasons": ["native_issuance_activity_unavailable"],
+            },
+            # Preserve source names inside the data payload because the shared
+            # deterministic risk wrapper receives tokenomics data rather than
+            # the whole tokenomics envelope.
+            "sources": {
+                "network_total_supply": _source_name(total_supply_record),
+                "network_circulating_supply": _source_name(
+                    circulating_supply_record
+                ),
             },
         },
         risk=None,
