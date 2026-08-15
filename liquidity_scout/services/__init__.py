@@ -9,6 +9,7 @@ from .cmis_contract import (
     UNAVAILABLE,
     build_service_envelope,
 )
+from .cmis_market import build_market_report_response
 from .cmis_risk import build_risk_check_response
 from .historical_compare import (
     build_historical_comparison,
@@ -57,6 +58,7 @@ __all__ = [
     "WARN",
     "build_historical_comparison",
     "build_market_report",
+    "build_market_report_response",
     "build_risk_check",
     "build_risk_check_response",
     "build_service_envelope",
