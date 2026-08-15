@@ -45,21 +45,46 @@ def tokenomics_report(**overrides):
     return value
 
 
+def historical_report(**overrides):
+    value = {
+        "metric": "price",
+        "period": "24h",
+        "current_value": 105.0,
+        "historical_value": 100.0,
+        "current_verified": True,
+        "historical_verified": True,
+        "current_observed_at": 2000,
+        "historical_observed_at": 1000,
+        "source": "historical_db",
+    }
+    value.update(overrides)
+    return value
+
+
 class RiskCheckCoreTests(unittest.TestCase):
     def test_verified_low_risk_facts_pass_without_inventing_score(self):
-        result = build_risk_check(market_report(), tokenomics_report())
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(),
+        )
 
         self.assertEqual(result["recommendation"], PASS)
         self.assertEqual(result["chain"], "x1")
         self.assertEqual(result["asset"], {"symbol": "REF", "mint": MINT})
         self.assertEqual(result["flags"], [])
         self.assertEqual(result["confidence"]["level"], "high")
-        self.assertEqual(result["confidence"]["verified_checks"], 7)
+        self.assertEqual(result["confidence"]["verified_checks"], 8)
+        self.assertEqual(result["confidence"]["total_checks"], 8)
         self.assertIsNone(result["score"])
         self.assertFalse(result["score_verified"])
         self.assertEqual(result["score_reason"], "risk_score_not_calibrated")
         self.assertIn(
-            "historical_volatility",
+            "historical_price_movement",
+            result["assessment_scope"]["included"],
+        )
+        self.assertIn(
+            "statistical_volatility",
             result["assessment_scope"]["not_yet_included"],
         )
 
@@ -68,7 +93,11 @@ class RiskCheckCoreTests(unittest.TestCase):
             mint_authority_state="active",
         )
 
-        result = build_risk_check(market_report(), tokenomics)
+        result = build_risk_check(
+            market_report(),
+            tokenomics,
+            historical_report(),
+        )
 
         self.assertEqual(result["recommendation"], WARN)
         self.assertEqual(result["components"]["tokenomics"]["status"], WARN)
@@ -83,7 +112,11 @@ class RiskCheckCoreTests(unittest.TestCase):
             freeze_authority_state="active",
         )
 
-        result = build_risk_check(market_report(), tokenomics)
+        result = build_risk_check(
+            market_report(),
+            tokenomics,
+            historical_report(),
+        )
 
         self.assertEqual(result["recommendation"], WARN)
         self.assertIn("freeze_authority_active", result["flags"])
@@ -91,7 +124,11 @@ class RiskCheckCoreTests(unittest.TestCase):
     def test_verified_zero_asset_wide_liquidity_blocks(self):
         market = market_report(liquidity_usd=0)
 
-        result = build_risk_check(market, tokenomics_report())
+        result = build_risk_check(
+            market,
+            tokenomics_report(),
+            historical_report(),
+        )
 
         self.assertEqual(result["recommendation"], BLOCK)
         self.assertEqual(result["components"]["liquidity"]["status"], BLOCK)
@@ -104,6 +141,7 @@ class RiskCheckCoreTests(unittest.TestCase):
         result = build_risk_check(
             market,
             tokenomics_report(),
+            historical_report(),
             policy={"minimum_liquidity_usd": 1000},
         )
 
@@ -116,6 +154,7 @@ class RiskCheckCoreTests(unittest.TestCase):
         result = build_risk_check(
             market_report(),
             tokenomics_report(),
+            historical_report(),
             policy={
                 "minimum_liquidity_usd": 200000,
                 "minimum_volume_24h_usd": 100000,
@@ -129,14 +168,17 @@ class RiskCheckCoreTests(unittest.TestCase):
         self.assertIn("transactions_24h_below_policy_minimum", result["flags"])
 
     def test_missing_tokenomics_warns_and_reduces_confidence(self):
-        result = build_risk_check(market_report())
+        result = build_risk_check(
+            market_report(),
+            historical_report=historical_report(),
+        )
 
         self.assertEqual(result["recommendation"], WARN)
         self.assertEqual(result["components"]["tokenomics"]["status"], WARN)
         self.assertFalse(result["components"]["tokenomics"]["available"])
         self.assertIn("tokenomics_unavailable", result["flags"])
-        self.assertEqual(result["confidence"]["level"], "low")
-        self.assertEqual(result["confidence"]["verified_checks"], 3)
+        self.assertEqual(result["confidence"]["level"], "medium")
+        self.assertEqual(result["confidence"]["verified_checks"], 4)
 
     def test_unverified_token_activity_warns_without_using_lifetime_claim(self):
         tokenomics = tokenomics_report(
@@ -149,7 +191,11 @@ class RiskCheckCoreTests(unittest.TestCase):
             }
         )
 
-        result = build_risk_check(market_report(), tokenomics)
+        result = build_risk_check(
+            market_report(),
+            tokenomics,
+            historical_report(),
+        )
         evidence = result["components"]["tokenomics"]["evidence"]
 
         self.assertEqual(result["recommendation"], WARN)
@@ -164,17 +210,146 @@ class RiskCheckCoreTests(unittest.TestCase):
         result = build_risk_check(
             market_report(),
             tokenomics_report(),
+            historical_report(),
             chain="Solana",
         )
 
         self.assertEqual(result["chain"], "solana")
         self.assertEqual(result["recommendation"], PASS)
 
+    def test_missing_history_warns_and_reduces_confidence(self):
+        result = build_risk_check(market_report(), tokenomics_report())
+
+        self.assertEqual(result["recommendation"], WARN)
+        self.assertIn("historical_price_unavailable", result["flags"])
+        self.assertFalse(result["components"]["history"]["available"])
+        self.assertEqual(result["confidence"]["level"], "medium")
+        self.assertEqual(result["confidence"]["verified_checks"], 7)
+        self.assertFalse(
+            result["confidence"]["checks"]["historical_price_verified"]
+        )
+
+    def test_large_verified_move_does_not_warn_without_explicit_threshold(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(current_value=190.0, historical_value=100.0),
+        )
+
+        self.assertEqual(result["recommendation"], PASS)
+        history = result["components"]["history"]
+        self.assertEqual(history["status"], PASS)
+        self.assertEqual(history["evidence"]["change_pct"], 90.0)
+        self.assertEqual(history["evidence"]["absolute_change_pct"], 90.0)
+
+    def test_explicit_historical_warning_threshold_warns(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(current_value=125.0, historical_value=100.0),
+            policy={"historical_price_warn_abs_change_pct": 20},
+        )
+
+        self.assertEqual(result["recommendation"], WARN)
+        self.assertEqual(result["components"]["history"]["status"], WARN)
+        self.assertIn(
+            "historical_price_move_exceeds_warn_threshold",
+            result["flags"],
+        )
+
+    def test_explicit_historical_block_threshold_blocks(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(current_value=40.0, historical_value=100.0),
+            policy={
+                "historical_price_warn_abs_change_pct": 20,
+                "historical_price_block_abs_change_pct": 50,
+            },
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertEqual(result["components"]["history"]["status"], BLOCK)
+        self.assertIn(
+            "historical_price_move_exceeds_block_threshold",
+            result["flags"],
+        )
+        self.assertEqual(
+            result["components"]["history"]["evidence"]["change_pct"],
+            -60.0,
+        )
+
+    def test_history_change_is_recomputed_not_trusted_from_caller(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(
+                current_value=80.0,
+                historical_value=100.0,
+                change_pct=1.0,
+            ),
+            policy={"historical_price_warn_abs_change_pct": 15},
+        )
+
+        history = result["components"]["history"]
+        self.assertEqual(history["evidence"]["change_pct"], -20.0)
+        self.assertEqual(history["evidence"]["absolute_change_pct"], 20.0)
+        self.assertEqual(history["status"], WARN)
+
+    def test_unverified_history_warns_fail_closed(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(historical_verified=False),
+        )
+
+        self.assertEqual(result["recommendation"], WARN)
+        self.assertIn("historical_price_unverified", result["flags"])
+        self.assertFalse(
+            result["confidence"]["checks"]["historical_price_verified"]
+        )
+
+    def test_zero_historical_price_cannot_produce_verified_change(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(historical_value=0),
+        )
+
+        self.assertEqual(result["components"]["history"]["status"], WARN)
+        self.assertIn("historical_price_unverified", result["flags"])
+        self.assertIsNone(
+            result["components"]["history"]["evidence"]["change_pct"]
+        )
+
+    def test_unsupported_historical_metric_warns(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(metric="liquidity"),
+        )
+
+        self.assertEqual(result["components"]["history"]["status"], WARN)
+        self.assertIn("historical_metric_unsupported", result["flags"])
+
+    def test_missing_history_warning_can_be_explicitly_disabled(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            policy={"warn_on_missing_history": False},
+        )
+
+        self.assertEqual(result["recommendation"], PASS)
+        self.assertEqual(result["components"]["history"]["status"], PASS)
+        self.assertFalse(result["components"]["history"]["available"])
+        self.assertEqual(result["confidence"]["level"], "medium")
+
     def test_invalid_policy_fails_closed(self):
         with self.assertRaises(ValueError):
             build_risk_check(
                 market_report(),
                 tokenomics_report(),
+                historical_report(),
                 policy={"minimum_liquidity_usd": -1},
             )
 
@@ -182,6 +357,7 @@ class RiskCheckCoreTests(unittest.TestCase):
             build_risk_check(
                 market_report(),
                 tokenomics_report(),
+                historical_report(),
                 policy={"made_up_threshold": 1},
             )
 
@@ -189,7 +365,19 @@ class RiskCheckCoreTests(unittest.TestCase):
             build_risk_check(
                 market_report(),
                 tokenomics_report(),
+                historical_report(),
                 policy={"block_on_zero_liquidity": "yes"},
+            )
+
+        with self.assertRaises(ValueError):
+            build_risk_check(
+                market_report(),
+                tokenomics_report(),
+                historical_report(),
+                policy={
+                    "historical_price_warn_abs_change_pct": 50,
+                    "historical_price_block_abs_change_pct": 20,
+                },
             )
 
 
