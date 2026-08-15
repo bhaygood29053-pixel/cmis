@@ -176,8 +176,11 @@ def build_tokenomics_report(
     Lookup functions are injectable so callers can test deterministically and
     integrations can choose their transport boundary. RPC failures are
     preserved as unavailable facts rather than converted to zero or revoked.
-    ``activity_report`` must come from a separate scanner boundary; this service
-    never initiates token-history scanning.
+    When both RPC sources expose token decimals, a disagreement fails closed:
+    raw supply remains observable, but scaled supply and token-activity values
+    are not certified until the conflict is resolved. ``activity_report`` must
+    come from a separate scanner boundary; this service never initiates token-
+    history scanning.
     """
     mint = _text(mint)
     if not mint:
@@ -202,12 +205,35 @@ def build_tokenomics_report(
     if not isinstance(mint_record, dict):
         mint_record = {}
 
-    supply_verified = bool(supply_record.get("supply_verified"))
+    source_supply_verified = bool(supply_record.get("supply_verified"))
+    supply_decimals = (
+        _nonnegative_int(supply_record.get("decimals"))
+        if source_supply_verified
+        else None
+    )
+    mint_decimals = _nonnegative_int(mint_record.get("decimals"))
+
+    rpc_decimals_consistent = None
+    if supply_decimals is not None and mint_decimals is not None:
+        rpc_decimals_consistent = supply_decimals == mint_decimals
+        if not rpc_decimals_consistent:
+            unavailable_reasons.append("rpc_decimals_mismatch")
+
+    # getTokenSupply remains the primary current-supply source, but an explicit
+    # disagreement with the mint account means the scaled value is not safe to
+    # certify. Preserve raw supply for diagnostics while withholding scaled
+    # supply and verified decimals.
+    supply_verified = (
+        source_supply_verified
+        and rpc_decimals_consistent is not False
+    )
     current_total_supply = (
         supply_record.get("total_supply") if supply_verified else None
     )
-    raw_supply = supply_record.get("raw_supply") if supply_verified else None
-    decimals = supply_record.get("decimals") if supply_verified else None
+    raw_supply = (
+        supply_record.get("raw_supply") if source_supply_verified else None
+    )
+    decimals = supply_decimals if supply_verified else None
 
     mint_authority_verified = bool(
         mint_record.get("mint_authority_verified")
@@ -262,6 +288,11 @@ def build_tokenomics_report(
         "raw_supply": raw_supply,
         "decimals": decimals,
         "supply_verified": supply_verified,
+        "rpc_decimals_consistent": rpc_decimals_consistent,
+        "rpc_decimal_sources": {
+            "token_supply": supply_decimals,
+            "mint_account": mint_decimals,
+        },
         "mint_authority": mint_authority,
         "mint_authority_verified": mint_authority_verified,
         "mint_authority_state": mint_authority_state,
