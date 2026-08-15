@@ -145,6 +145,7 @@ class MoltGridCMISRankBridgeTests(unittest.TestCase):
         self.assertIn("CMIS / X1.NINJA / XDEX TOP 2", answer)
         self.assertIn("Service status: PARTIAL", answer)
         self.assertIn("#LPs", answer)
+        self.assertNotIn("-----+", answer)
         self.assertIn("XNT", answer)
         self.assertIn("Confidence checks: 2/3 verified", answer)
         self.assertIn("Source: X1.Ninja/XDEX (rank) @ 123.0", answer)
