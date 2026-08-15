@@ -507,13 +507,16 @@ def format_historical_comparison_answer(
     matches,
     catalog,
 ):
-    """Format historical comparison through verified reusable service policy."""
-    snapshot = compact_asset_snapshot(listener_module, term, matches, catalog)
-    return core_format_historical_comparison(
+    """Route recognized historical comparisons through the public CMIS gateway."""
+    from liquidity_scout.integrations.moltgrid_historical_cmis import (
+        format_cmis_historical_answer,
+    )
+
+    return format_cmis_historical_answer(
+        listener_module,
         question,
-        snapshot,
-        history_backend=listener_module.history,
-        get_total_supply=listener_module.get_token_total_supply,
+        term,
+        gateway=_gateway_instance(),
     )
 
 
