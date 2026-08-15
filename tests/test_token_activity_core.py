@@ -185,8 +185,8 @@ class TokenActivitySummaryTests(unittest.TestCase):
             report["coverage_unverified_reason"],
         )
 
-    def test_zero_and_negative_net_are_distinct_from_unavailable(self):
-        zero_report = summarize_token_events(
+    def test_zero_length_window_is_unverified_not_verified_zero(self):
+        report = summarize_token_events(
             [],
             mint=MINT,
             decimals=6,
@@ -196,9 +196,34 @@ class TokenActivitySummaryTests(unittest.TestCase):
                 max_signatures=0,
             ),
         )
-        self.assertTrue(zero_report["activity_verified"])
-        self.assertEqual(zero_report["net_issuance_tokens"], "0")
 
+        self.assertFalse(report["coverage_verified"])
+        self.assertFalse(report["activity_verified"])
+        self.assertIsNone(report["net_issuance_raw"])
+        self.assertIsNone(report["net_issuance_tokens"])
+        self.assertIn(
+            "no signature-history window",
+            report["coverage_unverified_reason"],
+        )
+
+    def test_verified_examined_window_with_no_events_reports_zero_net(self):
+        report = summarize_token_events(
+            [],
+            mint=MINT,
+            decimals=6,
+            coverage=coverage(
+                signatures_scanned=1,
+                transactions_retrieved=1,
+                max_signatures=1,
+            ),
+        )
+
+        self.assertTrue(report["coverage_verified"])
+        self.assertTrue(report["activity_verified"])
+        self.assertEqual(report["net_issuance_raw"], "0")
+        self.assertEqual(report["net_issuance_tokens"], "0")
+
+    def test_negative_net_is_distinct_from_unavailable(self):
         negative_report = summarize_token_events(
             [
                 {"kind": "mint", "raw_amount": "1000000"},
