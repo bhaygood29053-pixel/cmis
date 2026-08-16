@@ -27,9 +27,13 @@ from .gateway import (
     KNOWN_CHAINS,
     SUPPORTED_CHAINS,
     SUPPORTED_SERVICES,
-    CMISGateway,
 )
+from .risk_evidence_gateway import EvidenceAwareCMISGateway
 
+
+# The HTTP runtime uses evidence-aware risk composition while preserving the
+# stable CMISGateway request/response contract.
+CMISGateway = EvidenceAwareCMISGateway
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
