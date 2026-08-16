@@ -5,6 +5,8 @@ from liquidity_scout.providers.x1 import (
     XDEX_SOURCE,
     XDEXAPIError,
     XDEXReadOnlyProvider,
+)
+from liquidity_scout.providers.x1.xdex import (
     fetch_price_history,
     fetch_swap_quote,
     fetch_token_price,
