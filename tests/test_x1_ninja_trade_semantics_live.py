@@ -1,6 +1,7 @@
 import math
 import os
 import unittest
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 from liquidity_scout.providers.x1.market import fetch_all_pools
@@ -9,6 +10,7 @@ from liquidity_scout.providers.x1.rpc import rpc_request
 
 
 RUN_LIVE = os.getenv("RUN_X1_NINJA_LIVE_TESTS") == "1"
+SWAP_TYPE_CANDIDATES = frozenset({"buy", "sell"})
 
 
 def _text(value):
@@ -83,13 +85,20 @@ class X1NinjaTradeSemanticLiveTests(unittest.TestCase):
         iso_timestamps = 0
         integer_slots = 0
         nonempty_tx_hashes = 0
-        native_price_checks = 0
-        native_price_matches = 0
-        usd_value_checks = 0
-        usd_value_matches = 0
-        observed_types = set()
+        observed_types = Counter()
+        arithmetic = defaultdict(
+            lambda: {
+                "native_checks": 0,
+                "native_matches": 0,
+                "usd_checks": 0,
+                "usd_matches": 0,
+            }
+        )
 
         for row in trades:
+            row_type = str(row.get("type")) if row.get("type") is not None else "<missing>"
+            observed_types[row_type] += 1
+
             if row.get("poolAddress") == address:
                 pool_matches += 1
 
@@ -103,9 +112,6 @@ class X1NinjaTradeSemanticLiveTests(unittest.TestCase):
             if _text(row.get("txHash")):
                 nonempty_tx_hashes += 1
 
-            if row.get("type") is not None:
-                observed_types.add(str(row.get("type")))
-
             amount_native = _number(row.get("amountNative"))
             amount_token = _number(row.get("amountToken"))
             price_native = _number(row.get("priceNative"))
@@ -114,9 +120,9 @@ class X1NinjaTradeSemanticLiveTests(unittest.TestCase):
                 and amount_token not in (None, 0.0)
                 and price_native is not None
             ):
-                native_price_checks += 1
+                arithmetic[row_type]["native_checks"] += 1
                 if _close(amount_native / amount_token, price_native):
-                    native_price_matches += 1
+                    arithmetic[row_type]["native_matches"] += 1
 
             amount_usd = _number(row.get("amountUsd"))
             price_usd = _number(row.get("priceUsd"))
@@ -125,9 +131,9 @@ class X1NinjaTradeSemanticLiveTests(unittest.TestCase):
                 and amount_usd is not None
                 and price_usd is not None
             ):
-                usd_value_checks += 1
+                arithmetic[row_type]["usd_checks"] += 1
                 if _close(amount_token * price_usd, amount_usd):
-                    usd_value_matches += 1
+                    arithmetic[row_type]["usd_matches"] += 1
 
         last_updated = body.get("lastUpdated")
         last_updated_iso = None
@@ -143,19 +149,21 @@ class X1NinjaTradeSemanticLiveTests(unittest.TestCase):
         print("X1.Ninja live trade semantic-candidate probe")
         print(f"Pool address: {address}")
         print(f"Returned rows: {len(trades)}")
-        print(f"Observed type values: {sorted(observed_types)}")
+        print(f"Observed type counts: {dict(sorted(observed_types.items()))}")
         print(f"poolAddress matches requested pool: {pool_matches}/{len(trades)}")
         print(f"ISO-8601 timezone-aware timestamps: {iso_timestamps}/{len(trades)}")
         print(f"Non-negative integer slots: {integer_slots}/{len(trades)}")
         print(f"Non-empty txHash values: {nonempty_tx_hashes}/{len(trades)}")
-        print(
-            "priceNative == amountNative / amountToken: "
-            f"{native_price_matches}/{native_price_checks}"
-        )
-        print(
-            "amountUsd == amountToken * priceUsd: "
-            f"{usd_value_matches}/{usd_value_checks}"
-        )
+        for row_type in sorted(arithmetic):
+            stats = arithmetic[row_type]
+            print(
+                f"{row_type} priceNative relation: "
+                f"{stats['native_matches']}/{stats['native_checks']}"
+            )
+            print(
+                f"{row_type} amountUsd relation: "
+                f"{stats['usd_matches']}/{stats['usd_checks']}"
+            )
         print(
             f"lastUpdated raw: {last_updated!r}; "
             f"milliseconds-as-UTC candidate: {last_updated_iso}"
@@ -165,10 +173,32 @@ class X1NinjaTradeSemanticLiveTests(unittest.TestCase):
         self.assertEqual(iso_timestamps, len(trades))
         self.assertEqual(integer_slots, len(trades))
         self.assertEqual(nonempty_tx_hashes, len(trades))
-        self.assertGreater(native_price_checks, 0)
-        self.assertEqual(native_price_matches, native_price_checks)
-        self.assertGreater(usd_value_checks, 0)
-        self.assertEqual(usd_value_matches, usd_value_checks)
+
+        # The live provider vocabulary includes both swap-looking labels and LP
+        # events.  Only buy/sell rows are candidates for swap arithmetic here;
+        # LP-event financial semantics stay explicitly unverified.
+        swap_rows_checked = 0
+        for row_type in SWAP_TYPE_CANDIDATES:
+            stats = arithmetic[row_type]
+            if observed_types[row_type] == 0:
+                continue
+            self.assertGreater(stats["native_checks"], 0, row_type)
+            self.assertEqual(
+                stats["native_matches"],
+                stats["native_checks"],
+                f"{row_type} native-price relationship",
+            )
+            self.assertGreater(stats["usd_checks"], 0, row_type)
+            self.assertEqual(
+                stats["usd_matches"],
+                stats["usd_checks"],
+                f"{row_type} USD-value relationship",
+            )
+            swap_rows_checked += observed_types[row_type]
+        self.assertGreater(swap_rows_checked, 0)
+
+        non_swap_types = sorted(set(observed_types) - SWAP_TYPE_CANDIDATES)
+        print(f"Non-swap provider types left semantically gated: {non_swap_types}")
 
         candidate = next(
             (
@@ -177,10 +207,12 @@ class X1NinjaTradeSemanticLiveTests(unittest.TestCase):
                 if _text(row.get("txHash"))
                 and isinstance(row.get("slot"), int)
                 and _parse_iso_utc(row.get("timestamp")) is not None
-                and row.get("type") in {"buy", "sell"}
+                and row.get("type") in SWAP_TYPE_CANDIDATES
             ),
-            trades[0],
+            None,
         )
+        self.assertIsNotNone(candidate, "no buy/sell row available for RPC identity cross-check")
+
         tx_hash = _text(candidate.get("txHash"))
         provider_slot = candidate.get("slot")
         provider_time = _parse_iso_utc(candidate.get("timestamp"))
