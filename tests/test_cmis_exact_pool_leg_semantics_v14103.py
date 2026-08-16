@@ -1,6 +1,9 @@
 import unittest
 
-from liquidity_scout.providers.x1.exact_pool_leg_semantics_v14102 import (
+from liquidity_scout.providers.x1 import (
+    prove_exact_pool_leg_semantics as public_prover,
+)
+from liquidity_scout.providers.x1.exact_pool_leg_semantics_v14103 import (
     prove_exact_pool_leg_semantics,
 )
 
@@ -8,6 +11,7 @@ from liquidity_scout.providers.x1.exact_pool_leg_semantics_v14102 import (
 POOL = "PoolA"
 MINT = "AssetMint"
 END = 100000.0
+START = END - 86400
 
 
 class Provider:
@@ -80,68 +84,40 @@ def inactive_coupling_report():
     }
 
 
-class ExactPoolLegSemanticsV14102Tests(unittest.TestCase):
-    def test_v14102_module_remains_directly_importable(self):
+class ExactPoolLegSemanticsV14103Tests(unittest.TestCase):
+    def test_public_export_routes_to_v14103(self):
         self.assertEqual(
-            prove_exact_pool_leg_semantics.__module__,
-            "liquidity_scout.providers.x1.exact_pool_leg_semantics_v14102",
+            public_prover.__module__,
+            "liquidity_scout.providers.x1.exact_pool_leg_semantics_v14103",
         )
 
-    def test_inactive_pool_gets_first_class_no_activity_diagnosis(self):
+    def test_boundary_scan_rows_outside_literal_window_do_not_count_as_activity(self):
         coupling = Provider(inactive_coupling_report())
         diagnostic_scanner = Provider(
             {
                 "range_proven": True,
                 "integrity_verified": True,
-                "entries": [],
-            }
-        )
-
-        result = prove_exact_pool_leg_semantics(
-            pool_address=POOL,
-            asset_mint=MINT,
-            end_epoch=END,
-            coupling_provider=coupling,
-            diagnostic_scanner=diagnostic_scanner,
-        )
-
-        self.assertEqual(result["version"], "1.4.10.2")
-        self.assertEqual(result["status"], "canonical_vault_mapping_unproven")
-        self.assertEqual(
-            result["proof_diagnosis"]["proof_outcome"],
-            "INSUFFICIENT_EVIDENCE",
-        )
-        self.assertEqual(
-            result["proof_diagnosis"]["blocking_code"],
-            "NO_POOL_ACTIVITY_IN_PROOF_WINDOW",
-        )
-        self.assertEqual(
-            result["proof_diagnosis"]["blocking_stage"],
-            "vault_pair_discovery",
-        )
-        self.assertEqual(
-            result["summary"]["blocking_code"],
-            "NO_POOL_ACTIVITY_IN_PROOF_WINDOW",
-        )
-        self.assertFalse(result["summary"]["canonical_vault_mapping_promoted"])
-        self.assertFalse(result["summary"]["exact_pool_leg_semantics_promoted"])
-        self.assertFalse(result["summary"]["transaction_execution_enabled"])
-        self.assertFalse(result["transaction_execution_enabled"])
-        self.assertEqual(len(diagnostic_scanner.calls), 1)
-
-    def test_activity_without_candidates_gets_distinct_diagnosis(self):
-        coupling = Provider(inactive_coupling_report())
-        diagnostic_scanner = Provider(
-            {
-                "range_proven": True,
-                "integrity_verified": True,
+                "signature_count": 3,
+                "scan_interval_signature_count": 0,
                 "entries": [
                     {
-                        "signature": "sig-1",
-                        "slot": 1,
-                        "block_time": END - 10,
+                        "signature": "older-1",
+                        "slot": 3,
+                        "block_time": START - 1,
                         "err": None,
-                    }
+                    },
+                    {
+                        "signature": "older-2",
+                        "slot": 2,
+                        "block_time": START - 2,
+                        "err": None,
+                    },
+                    {
+                        "signature": "older-3",
+                        "slot": 1,
+                        "block_time": START - 3,
+                        "err": None,
+                    },
                 ],
             }
         )
@@ -153,16 +129,65 @@ class ExactPoolLegSemanticsV14102Tests(unittest.TestCase):
             coupling_provider=coupling,
             diagnostic_scanner=diagnostic_scanner,
         )
+
+        self.assertEqual(result["version"], "1.4.10.3")
+        self.assertEqual(
+            result["proof_diagnosis"]["blocking_code"],
+            "NO_POOL_ACTIVITY_IN_PROOF_WINDOW",
+        )
+        evidence = result["proof_diagnosis"]["evidence"]
+        self.assertEqual(evidence["diagnostic_24h_transaction_signature_count"], 0)
+        self.assertEqual(evidence["diagnostic_24h_scanned_signature_count"], 3)
+        self.assertEqual(evidence["diagnostic_24h_literal_window_signature_count"], 0)
+        self.assertEqual(
+            evidence["diagnostic_24h_provider_scan_interval_signature_count"],
+            0,
+        )
+        self.assertFalse(result["summary"]["canonical_vault_mapping_promoted"])
+        self.assertFalse(result["summary"]["exact_pool_leg_semantics_promoted"])
+        self.assertFalse(result["transaction_execution_enabled"])
+
+    def test_literal_window_activity_still_reports_no_vault_candidates(self):
+        coupling = Provider(inactive_coupling_report())
+        diagnostic_scanner = Provider(
+            {
+                "range_proven": True,
+                "integrity_verified": True,
+                "signature_count": 2,
+                "scan_interval_signature_count": 1,
+                "entries": [
+                    {
+                        "signature": "inside",
+                        "slot": 2,
+                        "block_time": END - 10,
+                        "err": None,
+                    },
+                    {
+                        "signature": "boundary-proof-row",
+                        "slot": 1,
+                        "block_time": START - 1,
+                        "err": None,
+                    },
+                ],
+            }
+        )
+
+        result = prove_exact_pool_leg_semantics(
+            pool_address=POOL,
+            asset_mint=MINT,
+            end_epoch=END,
+            coupling_provider=coupling,
+            diagnostic_scanner=diagnostic_scanner,
+        )
+
         self.assertEqual(
             result["proof_diagnosis"]["blocking_code"],
             "NO_VAULT_PAIR_CANDIDATES",
         )
-        self.assertEqual(
-            result["proof_diagnosis"]["evidence"][
-                "diagnostic_24h_transaction_signature_count"
-            ],
-            1,
-        )
+        evidence = result["proof_diagnosis"]["evidence"]
+        self.assertEqual(evidence["diagnostic_24h_transaction_signature_count"], 1)
+        self.assertEqual(evidence["diagnostic_24h_scanned_signature_count"], 2)
+        self.assertEqual(evidence["diagnostic_24h_literal_window_signature_count"], 1)
 
 
 if __name__ == "__main__":
