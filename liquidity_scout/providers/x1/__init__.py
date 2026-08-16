@@ -37,6 +37,13 @@ from .network_history import (
     fetch_cluster_history,
     parse_cluster_history,
 )
+from .ninja_history import (
+    TRADE_HISTORY_PATH as X1_NINJA_TRADE_HISTORY_PATH,
+    X1_NINJA_API_BASE_URL,
+    X1_NINJA_SOURCE,
+    X1NinjaAPIError,
+    fetch_pool_trades_raw as fetch_x1_ninja_pool_trades_raw,
+)
 from .rpc import (
     DEFAULT_X1_RPC_URL,
     RPC_SOURCE,
@@ -101,11 +108,15 @@ __all__ = [
     "X1NetworkHistoryAPIError",
     "X1NetworkHistoryProvider",
     "X1NetworkProvider",
+    "X1NinjaAPIError",
     "X1Provider",
     "X1RPCError",
     "X1RPCProvider",
     "X1SupplyAPIError",
     "X1SupplyProvider",
+    "X1_NINJA_API_BASE_URL",
+    "X1_NINJA_SOURCE",
+    "X1_NINJA_TRADE_HISTORY_PATH",
     "XDEXCatalog",
     "XDEXAPIError",
     "XDEXReadOnlyProvider",
@@ -120,6 +131,7 @@ __all__ = [
     "fetch_health",
     "fetch_network_snapshot",
     "fetch_supply",
+    "fetch_x1_ninja_pool_trades_raw",
     "fetch_xdex_price_history",
     "fetch_xdex_swap_quote",
     "fetch_xdex_token_price",
