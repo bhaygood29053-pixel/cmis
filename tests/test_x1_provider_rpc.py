@@ -6,8 +6,10 @@ from liquidity_scout.providers.x1 import (
     X1RPCError,
     X1RPCProvider,
     get_mint_info as provider_get_mint_info,
+    get_token_account_info as provider_get_token_account_info,
     get_token_supply as provider_get_token_supply,
     parse_mint_account_result as provider_parse_mint_account_result,
+    parse_token_account_result as provider_parse_token_account_result,
     parse_token_supply_result as provider_parse_token_supply_result,
     rpc_request as provider_rpc_request,
 )
@@ -145,6 +147,96 @@ class X1RPCProviderTests(unittest.TestCase):
         self.assertTrue(result["supply_verified"])
         self.assertEqual(result["source"], "X1 RPC getAccountInfo(jsonParsed)")
 
+    def test_token_account_parser_separates_program_owner_and_authority(self):
+        parsed = provider_parse_token_account_result(
+            {
+                "value": {
+                    "owner": "TokenProgram111",
+                    "data": {
+                        "parsed": {
+                            "type": "account",
+                            "info": {
+                                "mint": "MintA",
+                                "owner": "VaultAuthorityA",
+                                "tokenAmount": {
+                                    "amount": "1250000",
+                                    "decimals": 6,
+                                    "uiAmountString": "1.25",
+                                },
+                            },
+                        }
+                    },
+                }
+            },
+            account="TokenAccountA",
+        )
+
+        self.assertTrue(parsed["account_exists"])
+        self.assertTrue(parsed["identity_verified"])
+        self.assertEqual(parsed["account"], "TokenAccountA")
+        self.assertEqual(parsed["program_owner"], "TokenProgram111")
+        self.assertEqual(parsed["token_authority"], "VaultAuthorityA")
+        self.assertEqual(parsed["mint"], "MintA")
+        self.assertEqual(parsed["raw_amount"], "1250000")
+        self.assertEqual(parsed["decimals"], 6)
+
+    def test_token_account_parser_preserves_missing_account(self):
+        parsed = provider_parse_token_account_result(
+            {"value": None},
+            account="MissingAccount",
+        )
+
+        self.assertFalse(parsed["account_exists"])
+        self.assertFalse(parsed["identity_verified"])
+        self.assertEqual(parsed["account"], "MissingAccount")
+        self.assertIsNone(parsed["mint"])
+        self.assertIsNone(parsed["token_authority"])
+
+    def test_provider_get_token_account_info_uses_json_parsed_rpc(self):
+        calls = []
+
+        def post(_url, json, timeout):
+            calls.append((json, timeout))
+            return FakeResponse({
+                "result": {
+                    "value": {
+                        "owner": "TokenProgram111",
+                        "data": {
+                            "parsed": {
+                                "type": "account",
+                                "info": {
+                                    "mint": "MintA",
+                                    "owner": "VaultAuthorityA",
+                                    "tokenAmount": {
+                                        "amount": "9",
+                                        "decimals": 0,
+                                        "uiAmountString": "9",
+                                    },
+                                },
+                            }
+                        },
+                    }
+                }
+            })
+
+        provider = X1RPCProvider(
+            rpc_url="https://rpc.example",
+            retries=1,
+            post=post,
+            sleep=lambda _seconds: None,
+        )
+
+        result = provider.get_token_account_info("TokenAccountA")
+
+        self.assertEqual(calls[0][0]["method"], "getAccountInfo")
+        self.assertEqual(
+            calls[0][0]["params"],
+            ["TokenAccountA", {"encoding": "jsonParsed"}],
+        )
+        self.assertTrue(result["identity_verified"])
+        self.assertEqual(result["mint"], "MintA")
+        self.assertEqual(result["token_authority"], "VaultAuthorityA")
+
     def test_provider_preserves_unverified_missing_decimals(self):
         parsed = provider_parse_token_supply_result({
             "value": {
@@ -164,6 +256,9 @@ class X1RPCProviderTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             X1RPCProvider(retries=0)
+
+        with self.assertRaises(ValueError):
+            provider_get_token_account_info("   ")
 
     def test_provider_propagates_final_rpc_failure(self):
         def post(_url, json, timeout):
