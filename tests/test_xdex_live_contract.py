@@ -1,4 +1,5 @@
 import os
+import time
 import unittest
 
 from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
@@ -8,6 +9,10 @@ RUN_LIVE = os.getenv("RUN_XDEX_LIVE_TESTS") == "1"
 AGI_MINT = os.getenv(
     "XDEX_LIVE_TOKEN",
     "7SXmUpcBGSAwW5LmtzQVF9jHswZ7xzmdKqWa4nDgL3ER",
+)
+HISTORY_QUOTE_TOKEN = os.getenv(
+    "XDEX_LIVE_HISTORY_TO_TOKEN",
+    "So11111111111111111111111111111111111111112",
 )
 QUOTE_TOKEN_IN = os.getenv(
     "XDEX_LIVE_QUOTE_TOKEN_IN",
@@ -34,7 +39,14 @@ class XDEXLiveContractTests(unittest.TestCase):
         self.assertTrue(data)
 
     def test_live_history_exposes_candidate_timestamp_and_price_fields(self):
-        points = self.provider.price_history(AGI_MINT, days=7)
+        time_to = int(time.time())
+        time_from = time_to - (7 * 24 * 60 * 60)
+        points = self.provider.price_history(
+            AGI_MINT,
+            HISTORY_QUOTE_TOKEN,
+            time_from=time_from,
+            time_to=time_to,
+        )
 
         self.assertIsInstance(points, list)
         self.assertTrue(

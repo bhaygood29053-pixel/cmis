@@ -3,9 +3,8 @@
 Status: **provider transport implemented; live contract promotion gated**
 
 This document records the XDEX API surface being verified for direct use by
-the X1 Provider beneath CMIS. It deliberately separates user-supplied API
-catalog information, observed endpoint behavior, candidate request contracts,
-and fields that are safe to promote into CMIS.
+the X1 Provider beneath CMIS. It separates user-supplied API notes, live
+observations, request contracts, and fields that are safe to promote into CMIS.
 
 ## Ownership
 
@@ -19,8 +18,8 @@ Roberta
 
 Roberta and X1 Scout must not call XDEX HTTP endpoints directly.
 
-The direct XDEX provider added in this milestone is read-only. It does not
-prepare, sign, or broadcast transactions.
+The direct XDEX provider in this milestone is read-only. It does not prepare,
+sign, or broadcast transactions.
 
 ## Base URL
 
@@ -28,134 +27,88 @@ prepare, sign, or broadcast transactions.
 https://api.xdex.xyz
 ```
 
-Use HTTPS. The user-supplied quote notes included an `http://` example, but
-the supplied base URL and the public X1 client implementations use HTTPS.
+Use HTTPS.
 
-## Network naming
+## Live-observed network contract
 
-The user-supplied endpoint catalog shows values such as:
-
-```text
-mainnet | testnet | devnet
-```
-
-However, direct probing of some chart endpoints with `network=mainnet` was
-not sufficient, and public X1 clients use:
+The user-supplied catalog described generic values such as
+`mainnet | testnet | devnet`. Live XDEX responses on 2026-08-16 showed that
+the quote endpoint rejects `network=mainnet` and explicitly requires one of:
 
 ```text
-X1 Mainnet
-X1 Testnet
-Solana Mainnet
 Solana Devnet
+Solana Mainnet
+X1 Testnet
+X1 Mainnet
 ```
 
-The X1 direct provider therefore uses `X1 Mainnet` as the current **candidate
-runtime contract**. This remains subject to the opt-in live contract probe.
+The X1 provider therefore uses:
+
+```text
+network=X1 Mainnet
+```
+
+This is live-observed request-contract evidence, not a market fact.
 
 ## Current token price
 
-Candidate request:
+A live request using `address=<mint>` failed with:
+
+```text
+Network and token_address are required
+```
+
+The provider now uses:
 
 ```text
 GET /api/token-price/price
   ?network=X1%20Mainnet
-  &address=<TOKEN_MINT>
+  &token_address=<TOKEN_MINT>
 ```
 
-The transport requires a top-level JSON object with:
-
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
-
-The provider preserves all `data` values as returned. It does not convert
-missing fields to zero.
-
-Public X1 clients currently reference candidate fields including:
-
-- `price`
-- `price_usd`
-- `price_change_24h`
-- `volume_24h`
-- `market_cap`
-- `liquidity`
-
-These names are not automatically treated as independently verified CMIS
-facts by the direct transport.
+The transport still preserves returned values without interpreting units.
+A successful live response is required before any response fields are promoted.
 
 ## Price history
 
-The user-supplied catalog includes:
+A live request using `token=<mint>&days=7` failed with:
 
 ```text
-GET /api/xendex/chart/history?network=mainnet
+Missing required parameters: from_token, to_token, time_from, time_to, network
 ```
 
-A request with only `network=mainnet` returned HTTP 400 during this milestone,
-which shows that additional parameters are required.
-
-Public X1 clients use this candidate request shape:
+The provider now uses the live-observed parameter names:
 
 ```text
 GET /api/xendex/chart/history
   ?network=X1%20Mainnet
-  &token=<TOKEN_MINT>
-  &days=<POSITIVE_INTEGER>
+  &from_token=<TOKEN_MINT>
+  &to_token=<QUOTE_TOKEN_MINT>
+  &time_from=<INTEGER>
+  &time_to=<INTEGER>
 ```
 
-Candidate response:
+The next live probe uses AGI -> XNT market representation and Unix epoch
+seconds for a seven-day window. **The time unit remains provisional** until
+XDEX accepts the request and returned point semantics are inspected.
 
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "timestamp": "...",
-      "price": "...",
-      "volume": "..."
-    }
-  ]
-}
-```
+XDEX history must not feed CMIS `historical_compare` or `risk_check` until the
+live probe verifies:
 
-Some clients tolerate `time` instead of `timestamp`.
+- timestamp field and unit;
+- price field and quote unit;
+- pair direction;
+- sampling interval;
+- requested-range coverage;
+- stale/interpolated/aggregated behavior.
 
-### CMIS integration gate
-
-XDEX history must **not** be promoted into CMIS `historical_compare` or
-`risk_check` until the live probe verifies:
-
-- whether `timestamp`/`time` is UTC, epoch seconds, epoch milliseconds, or an
-  ISO string;
-- whether `price` is USD or another quote unit;
-- whether points are token-wide or pool-specific;
-- sampling interval and requested `days` semantics;
-- whether historical coverage is complete enough for a requested comparison;
-- whether the endpoint can return stale, interpolated, or aggregated points.
-
-Until then, CMIS's existing local historical observations remain authoritative
-for verified historical comparisons.
-
-## Chart price endpoint
-
-The user-supplied catalog includes:
-
-```text
-GET /api/xendex/chart/price?network=mainnet
-```
-
-A direct probe of that exact form returned HTTP 404 during this milestone.
-No code is wired to this endpoint.
-
-The implemented current-price transport uses `/api/token-price/price`, which
-has a concrete address parameter in public X1 client code.
+Until then, CMIS's existing verified local historical observations remain
+authoritative.
 
 ## Swap quote
 
-Candidate request:
+A live request with `network=mainnet` failed and explicitly identified
+`X1 Mainnet` as a valid network value. The provider uses:
 
 ```text
 GET /api/xendex/swap/quote
@@ -166,73 +119,51 @@ GET /api/xendex/swap/quote
   &is_exact_amount_in=true
 ```
 
-`is_exact_amount_in` is treated as required because both the user-supplied
-detailed quote contract and public X1 wallet code send it.
+The request is read-only. Response fields must not feed `pre_trade_check`
+policy until live verification confirms amount units, rate semantics,
+`priceImpactPct` semantics, route identity, freshness/expiry, and fees.
 
-Public wallet code currently consumes candidate response fields:
+## HTTP error evidence
 
-- `data.outputAmount`
-- `data.rate`
-- optional `data.priceImpactPct`
-
-The provider preserves those values without changing units.
-
-### CMIS integration gate
-
-Quote data must **not** yet feed `pre_trade_check` policy. The live probe must
-first verify:
-
-- input/output token unit conventions;
-- whether amounts are UI units or raw integer units;
-- exact meaning of `rate`;
-- whether `priceImpactPct` is a fraction (`0.01 == 1%`) or percentage points;
-- route/pool identity and whether it is included;
-- quote freshness/expiry;
-- fee fields and whether output is pre/post fee;
-- behavior for insufficient liquidity and unsupported pairs.
+Provider transport includes a bounded XDEX response body in HTTP errors. This
+is intentional contract-discovery support so a 4xx response identifies the
+actual missing/invalid parameter instead of being reduced to a generic status.
 
 ## Swap prepare is out of scope
-
-The endpoint:
 
 ```text
 POST /api/xendex/swap/prepare
 ```
 
-is intentionally not part of this provider milestone.
-
-Transaction preparation belongs to the future Execution Agent / transaction
-preparation boundary. Signing, broadcasting, value movement, or wallet
+is intentionally excluded. Transaction preparation belongs to the future
+Execution Agent boundary. Signing, broadcasting, value movement, and wallet
 permission changes require human approval.
 
 ## Opt-in live verification
 
-The live probe is intentionally excluded from ordinary deterministic CI.
-
-Run:
-
 ```bash
 RUN_XDEX_LIVE_TESTS=1 \
-python -m unittest tests.test_xdex_live_contract -v
+python -m unittest discover -s tests -p "test_xdex_live_contract.py" -v
 ```
 
 Defaults:
 
-- history/current-price token: AGI mint
+- current-price/history base token: AGI
   `7SXmUpcBGSAwW5LmtzQVF9jHswZ7xzmdKqWa4nDgL3ER`
-- quote input: XNT market representation
+- history quote token / quote input: XNT market representation
   `So11111111111111111111111111111111111111112`
 - quote output: XNM
   `AvNDf423kEmWNP6AZHFV7DkNG4YRgt6qbdyyryjaa4PQ`
 
-These can be overridden with:
+Overrides:
 
 ```text
 XDEX_LIVE_TOKEN
+XDEX_LIVE_HISTORY_TO_TOKEN
 XDEX_LIVE_QUOTE_TOKEN_IN
 XDEX_LIVE_QUOTE_TOKEN_OUT
 ```
 
 A passing live probe verifies only the fields asserted by the test. It does
-not authorize CMIS promotion of undocumented units or semantics without an
-explicit deterministic adapter and tests.
+not authorize CMIS promotion of undocumented units or semantics without a
+deterministic adapter and tests.
