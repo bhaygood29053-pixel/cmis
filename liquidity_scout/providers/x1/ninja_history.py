@@ -1,13 +1,15 @@
 """Read-only X1.Ninja history transport beneath the X1 Provider.
 
-This module intentionally promotes only the transport facts documented by the
-public X1.Ninja Developer API: Bearer authentication, the pool-trade-history
-path, JSON responses, and rate-limit headers. The public documentation does not
-publish the trade-row field schema, so CMIS must not infer side, amounts, USD
-value, LP-event semantics, transaction identity, or finality from this adapter.
+This module promotes only provider facts that have been either publicly
+documented or live-observed and regression-tested. The public X1.Ninja
+Developer API documents Bearer authentication, the pool-trade-history path,
+JSON responses, and rate-limit headers. A read-only live probe on 2026-08-16
+verified the response container/row shape below.
 
-A later opt-in live contract probe may promote individual fields only after the
-observed response contract is recorded and deterministic tests are added.
+The live observation does *not* establish financial semantics for ``type``,
+amount/price units, USD derivation, LP-event meaning, transaction finality, or
+pagination/range behavior. Those gates remain closed and the record remains
+``cmis_promotable=False`` until separately verified.
 """
 
 from __future__ import annotations
@@ -31,14 +33,32 @@ _REQUIRED_SUCCESS_RATE_LIMIT_HEADERS = (
     "X-RateLimit-Remaining",
     "X-RateLimit-Reset",
 )
-_OPTIONAL_RATE_LIMIT_HEADERS = (
-    "X-RateLimit-Window",
-    "X-API-Service",
-)
+
+# Live-observed read-only contract, 2026-08-16.  These names are provider
+# structure only; their financial/chain semantics are deliberately not inferred.
+OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS = frozenset({
+    "lastUpdated",
+    "total",
+    "trades",
+})
+OBSERVED_TRADE_ROW_KEYS = frozenset({
+    "amountNative",
+    "amountToken",
+    "amountUsd",
+    "id",
+    "maker",
+    "poolAddress",
+    "priceNative",
+    "priceUsd",
+    "slot",
+    "timestamp",
+    "txHash",
+    "type",
+})
 
 
 class X1NinjaAPIError(RuntimeError):
-    """Raised when X1.Ninja transport or the documented response contract fails."""
+    """Raised when X1.Ninja transport or a promoted response contract fails."""
 
 
 def _nonempty_text(name: str, value: Any) -> str:
@@ -121,20 +141,58 @@ def _http_error(response: Any, exc: Exception) -> X1NinjaAPIError:
     return X1NinjaAPIError(" | ".join(parts) + f": {exc}{detail}")
 
 
-def _response_shape(body: Any) -> str:
-    if isinstance(body, Mapping):
-        return "object"
-    if isinstance(body, list):
-        return "array"
-    if body is None:
-        return "null"
-    if isinstance(body, bool):
-        return "boolean"
-    if isinstance(body, (int, float)):
-        return "number"
-    if isinstance(body, str):
-        return "string"
-    return type(body).__name__
+def _validate_observed_trade_history_shape(body: Any) -> dict[str, Any]:
+    """Validate only the live-observed provider container/row structure.
+
+    This function intentionally does not coerce or interpret provider values.
+    Empty ``trades`` is valid structural output; a non-empty list must contain
+    JSON objects with the live-observed field names.
+    """
+
+    if not isinstance(body, Mapping):
+        raise X1NinjaAPIError(
+            "X1.Ninja trade-history response must be a JSON object under the "
+            "live-observed contract."
+        )
+
+    missing_top = sorted(OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS - set(body.keys()))
+    if missing_top:
+        raise X1NinjaAPIError(
+            "X1.Ninja trade-history response is missing live-observed top-level "
+            f"field(s): {', '.join(missing_top)}"
+        )
+
+    trades = body.get("trades")
+    if not isinstance(trades, list):
+        raise X1NinjaAPIError(
+            "X1.Ninja trade-history 'trades' field must be a JSON array."
+        )
+
+    observed_row_keys = set()
+    for index, row in enumerate(trades):
+        if not isinstance(row, Mapping):
+            raise X1NinjaAPIError(
+                f"X1.Ninja trade-history row {index} must be a JSON object."
+            )
+        row_keys = set(row.keys())
+        missing_row = sorted(OBSERVED_TRADE_ROW_KEYS - row_keys)
+        if missing_row:
+            raise X1NinjaAPIError(
+                f"X1.Ninja trade-history row {index} is missing live-observed "
+                f"field(s): {', '.join(missing_row)}"
+            )
+        observed_row_keys.update(str(key) for key in row.keys())
+
+    return {
+        "response_contract_verified": True,
+        "trade_row_shape_verified": True,
+        "top_level_keys": sorted(str(key) for key in body.keys()),
+        "trade_row_keys": sorted(observed_row_keys or OBSERVED_TRADE_ROW_KEYS),
+        "returned_trade_count": len(trades),
+        # Preserve these provider values without assigning meaning/units.
+        "provider_total_raw": body.get("total"),
+        "provider_last_updated_raw": body.get("lastUpdated"),
+    }
 
 
 def fetch_pool_trades_raw(
@@ -147,9 +205,9 @@ def fetch_pool_trades_raw(
 ) -> dict[str, Any]:
     """Fetch raw X1.Ninja trade history for one verified pool address.
 
-    No trade fields are interpreted. The returned record preserves the raw JSON,
-    documented rate-limit metadata, source, endpoint, and observation time while
-    explicitly marking semantic promotion gates as unverified.
+    The response structure is now live-observed and validated. Trade values are
+    still returned raw; no side, amount, USD, LP-event, signature/finality, or
+    pagination semantics are promoted by this transport.
     """
 
     address = _nonempty_text("pool_address", pool_address)
@@ -175,6 +233,7 @@ def fetch_pool_trades_raw(
             f"X1.Ninja trade-history response was not valid JSON: {exc}{detail}"
         ) from exc
 
+    contract = _validate_observed_trade_history_shape(body)
     rate_limit = _rate_limit_record(response)
     observed_at = observed_at_fn()
 
@@ -184,11 +243,12 @@ def fetch_pool_trades_raw(
         "endpoint": TRADE_HISTORY_PATH.format(address=address),
         "pool_address": address,
         "observed_at": observed_at,
-        "response_shape": _response_shape(body),
+        "response_shape": "object",
         "raw_response": body,
         "rate_limit": rate_limit,
+        "contract": contract,
         "semantics": {
-            "trade_rows_verified": False,
+            "trade_rows_verified": True,
             "side_classification_verified": False,
             "token_amount_units_verified": False,
             "usd_value_source_verified": False,
@@ -203,6 +263,8 @@ def fetch_pool_trades_raw(
 
 __all__ = [
     "CHAIN",
+    "OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS",
+    "OBSERVED_TRADE_ROW_KEYS",
     "TRADE_HISTORY_PATH",
     "X1_NINJA_API_BASE_URL",
     "X1_NINJA_SOURCE",
