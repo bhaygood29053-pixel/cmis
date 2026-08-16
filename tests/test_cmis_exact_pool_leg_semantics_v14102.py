@@ -1,8 +1,5 @@
 import unittest
 
-from liquidity_scout.providers.x1 import (
-    prove_exact_pool_leg_semantics as public_prover,
-)
 from liquidity_scout.providers.x1.exact_pool_leg_semantics_v14102 import (
     prove_exact_pool_leg_semantics,
 )
@@ -84,9 +81,9 @@ def inactive_coupling_report():
 
 
 class ExactPoolLegSemanticsV14102Tests(unittest.TestCase):
-    def test_public_export_routes_to_v14102(self):
+    def test_v14102_module_remains_directly_importable(self):
         self.assertEqual(
-            public_prover.__module__,
+            prove_exact_pool_leg_semantics.__module__,
             "liquidity_scout.providers.x1.exact_pool_leg_semantics_v14102",
         )
 
