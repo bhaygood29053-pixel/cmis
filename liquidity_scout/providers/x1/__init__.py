@@ -1,5 +1,6 @@
 """X1 chain provider integrations for CMIS."""
 
+from .canonical_pool_vault_coupling import prove_canonical_pool_vault_coupling
 from .health import (
     HEALTH_SOURCE,
     HEALTH_URL,
@@ -161,5 +162,6 @@ __all__ = [
     "parse_supply_text",
     "parse_token_account_result",
     "parse_token_supply_result",
+    "prove_canonical_pool_vault_coupling",
     "rpc_request",
 ]
