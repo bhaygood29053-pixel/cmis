@@ -22,7 +22,9 @@ CHAIN = "x1"
 XDEX_SOURCE = "XDEX public API"
 XDEX_API_BASE_URL = "https://api.xdex.xyz"
 XDEX_NETWORK_X1_MAINNET = "X1 Mainnet"
+XDEX_POOL_NETWORK_MAINNET = "mainnet"
 
+POOL_LIST_URL = f"{XDEX_API_BASE_URL}/api/xendex/pool/list"
 TOKEN_PRICE_URL = f"{XDEX_API_BASE_URL}/api/token-price/price"
 PRICE_HISTORY_URL = f"{XDEX_API_BASE_URL}/api/xendex/chart/history"
 SWAP_QUOTE_URL = f"{XDEX_API_BASE_URL}/api/xendex/swap/quote"
@@ -125,6 +127,40 @@ def _get_json(
         detail = _bounded_response_text(response)
         raise XDEXAPIError(f"XDEX request failed for {url}: {exc}{detail}") from exc
     return body
+
+
+def fetch_pool_list(
+    *,
+    network: str = XDEX_POOL_NETWORK_MAINNET,
+    session=requests,
+    timeout: int = 15,
+) -> list[dict[str, Any]]:
+    """Fetch XDEX's public pool list without requiring X1.Ninja credentials.
+
+    The pool-list route uses the generic `mainnet` network value from the
+    user-supplied XDEX API contract. This is intentionally separate from the
+    `X1 Mainnet` label live-verified for price/history/quote routes.
+    """
+
+    network_name = _nonempty_text("network", network)
+    body = _get_json(
+        POOL_LIST_URL,
+        params={"network": network_name},
+        session=session,
+        timeout=timeout,
+    )
+    data = _parse_success_data(
+        body,
+        expected_type=list,
+        operation="pool list",
+    )
+
+    pools: list[dict[str, Any]] = []
+    for index, pool in enumerate(data):
+        if not isinstance(pool, Mapping):
+            raise XDEXAPIError(f"pool list item {index} must be a JSON object.")
+        pools.append(dict(pool))
+    return pools
 
 
 def fetch_token_price(
@@ -263,12 +299,21 @@ class XDEXReadOnlyProvider:
         self,
         *,
         network: str = XDEX_NETWORK_X1_MAINNET,
+        pool_network: str = XDEX_POOL_NETWORK_MAINNET,
         session=requests,
         timeout: int = 15,
     ):
         self.network = _nonempty_text("network", network)
+        self.pool_network = _nonempty_text("pool_network", pool_network)
         self.session = session
         self.timeout = _positive_int("timeout", timeout)
+
+    def pool_list(self) -> list[dict[str, Any]]:
+        return fetch_pool_list(
+            network=self.pool_network,
+            session=self.session,
+            timeout=self.timeout,
+        )
 
     def token_price(self, token_address: str) -> dict[str, Any]:
         return fetch_token_price(
@@ -317,14 +362,17 @@ class XDEXReadOnlyProvider:
 
 __all__ = [
     "CHAIN",
+    "POOL_LIST_URL",
     "PRICE_HISTORY_URL",
     "SWAP_QUOTE_URL",
     "TOKEN_PRICE_URL",
     "XDEX_API_BASE_URL",
     "XDEX_NETWORK_X1_MAINNET",
+    "XDEX_POOL_NETWORK_MAINNET",
     "XDEX_SOURCE",
     "XDEXAPIError",
     "XDEXReadOnlyProvider",
+    "fetch_pool_list",
     "fetch_price_history",
     "fetch_swap_quote",
     "fetch_token_price",
