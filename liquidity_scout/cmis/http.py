@@ -23,17 +23,14 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
 
-from .gateway import (
-    KNOWN_CHAINS,
-    SUPPORTED_CHAINS,
-    SUPPORTED_SERVICES,
-)
-from .risk_evidence_gateway import EvidenceAwareCMISGateway
+from .gateway import KNOWN_CHAINS, SUPPORTED_CHAINS
+from .trade_gateway import SUPPORTED_SERVICES, TradeAwareCMISGateway
 
 
-# The HTTP runtime uses evidence-aware risk composition while preserving the
-# stable CMISGateway request/response contract.
-CMISGateway = EvidenceAwareCMISGateway
+# The HTTP runtime uses the trade-aware gateway. TradeAwareCMISGateway extends
+# EvidenceAwareCMISGateway, preserving the existing market/risk behavior while
+# adding deterministic trade_verification.
+CMISGateway = TradeAwareCMISGateway
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
