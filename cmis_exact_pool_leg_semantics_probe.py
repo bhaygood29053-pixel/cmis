@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only CMIS v1.4.10 exact pool-leg semantics probe."""
+"""Read-only CMIS v1.4.10.1 exact pool-leg semantics probe."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import argparse
 import json
 import time
 
-from liquidity_scout.providers.x1.exact_pool_leg_semantics import (
+from liquidity_scout.providers.x1.exact_pool_leg_semantics_v14101 import (
     prove_exact_pool_leg_semantics,
 )
 
@@ -15,9 +15,10 @@ from liquidity_scout.providers.x1.exact_pool_leg_semantics import (
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Prove exact BUY/SELL semantics from the canonical pool vaults by "
-            "checking reserve delta signs and direction-specific recognized AMM "
-            "instruction fingerprints across nested 1h/6h/24h windows."
+            "Prove exact BUY/SELL semantics from canonical pool vaults after "
+            "deterministically classifying recognized AMM operations as swaps, "
+            "liquidity additions/removals, or UNKNOWN across nested 1h/6h/24h "
+            "windows. UNKNOWN operations remain fail-closed."
         )
     )
     parser.add_argument("pool_address")
