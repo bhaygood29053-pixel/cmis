@@ -9,6 +9,15 @@
       "status": "OPEN",
       "created_at": "2026-08-12T14:28:29.613281+00:00",
       "updated_at": "2026-08-12T14:28:29.613303+00:00"
+    },
+    {
+      "id": "SENT-0002",
+      "area": "future_service",
+      "issue": "Explore a Roberta/CMIS cross-chain historical scam-pattern intelligence service that compares current token, wallet, liquidity, authority, and trading behavior against older blockchain events to identify potential rug-pull, insider-exit, wash-trading, pump-and-dump, liquidity-manipulation, and related scam-risk patterns. CMIS should supply verified evidence; Roberta should produce probabilistic risk interpretation and explanations rather than definitive scam accusations.",
+      "severity": "normal",
+      "status": "OPEN",
+      "created_at": "2026-08-16T13:52:00+00:00",
+      "updated_at": "2026-08-16T13:52:00+00:00"
     }
   ]
 }
