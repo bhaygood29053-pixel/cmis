@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import time
 from typing import Any
 
 from liquidity_scout.cmis.risk_evidence_gateway import EvidenceAwareCMISGateway
 from liquidity_scout.market.resolver import find_matches_for_term, pair_name, pool_address
 from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
 from liquidity_scout.providers.x1.rpc import DEFAULT_X1_RPC_URL
+from liquidity_scout.services.cmis_activity_window import (
+    apply_activity_window,
+    parse_activity_window_seconds,
+)
 from liquidity_scout.services.cmis_trade_verification import (
     SERVICE as TRADE_VERIFICATION_SERVICE,
     build_x1_trade_verification_response,
@@ -42,6 +47,7 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
         x1_trade_rpc_url: str = DEFAULT_X1_RPC_URL,
         x1_trade_verifier=None,
         x1_trade_history_fetcher=None,
+        x1_activity_now_fn=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -52,6 +58,7 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
         self.x1_trade_history_fetcher = (
             x1_trade_history_fetcher or fetch_pool_trades_raw
         )
+        self.x1_activity_now_fn = x1_activity_now_fn or time.time
 
     @staticmethod
     def _bounded_positive_int(name, value, *, default, maximum):
@@ -84,6 +91,19 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 "An asset symbol, name, mint, or pool identifier is required.",
             )
 
+        window_raw = params.get("window")
+        window_seconds = None
+        if window_raw is not None:
+            try:
+                window_seconds = parse_activity_window_seconds(window_raw)
+            except ValueError as exc:
+                return self._gateway_error(
+                    VERIFIED_ASSET_ACTIVITY_SERVICE,
+                    "x1",
+                    "invalid_activity_window",
+                    str(exc),
+                )
+
         try:
             max_pools = self._bounded_positive_int(
                 "max_pools", params.get("max_pools"), default=5, maximum=10
@@ -91,8 +111,8 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
             per_pool_limit = self._bounded_positive_int(
                 "per_pool_limit",
                 params.get("per_pool_limit"),
-                default=5,
-                maximum=20,
+                default=50 if window_seconds is not None else 5,
+                maximum=50,
             )
         except ValueError as exc:
             return self._gateway_error(
@@ -116,12 +136,22 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
         )
         resolved_mint = self._text(resolved_asset.get("mint"))
         if not resolved_mint:
-            return build_verified_asset_activity_response(
+            response = build_verified_asset_activity_response(
                 market_envelope=market,
                 pool_records=[],
                 matched_pool_count=0,
                 selected_pool_count=0,
             )
+            if window_seconds is not None:
+                response = apply_activity_window(
+                    response,
+                    window_seconds=window_seconds,
+                    window_end_epoch=float(
+                        getattr(self, "x1_activity_now_fn", time.time)()
+                    ),
+                    pool_records=[],
+                )
+            return response
 
         catalog, failure = self._collect_x1_catalog(
             VERIFIED_ASSET_ACTIVITY_SERVICE
@@ -157,6 +187,8 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 "provider_event_count": 0,
                 "processed_event_count": 0,
                 "verifications": [],
+                "history_semantics": {},
+                "provider_total_raw": None,
             }
             try:
                 history = self.x1_trade_history_fetcher(address)
@@ -178,6 +210,16 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 record["source"] = history.get("source")
                 record["observed_at"] = history.get("observed_at")
 
+                semantics = history.get("semantics")
+                if isinstance(semantics, Mapping):
+                    record["history_semantics"] = dict(semantics)
+
+                contract = history.get("contract")
+                if isinstance(contract, Mapping):
+                    record["provider_total_raw"] = contract.get(
+                        "provider_total_raw"
+                    )
+
                 for row in selected_rows:
                     record["verifications"].append(
                         self._trade_verification({"event": row})
@@ -192,12 +234,23 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 }
             pool_records.append(record)
 
-        return build_verified_asset_activity_response(
+        response = build_verified_asset_activity_response(
             market_envelope=market,
             pool_records=pool_records,
             matched_pool_count=len(unique_pools),
             selected_pool_count=len(selected_pools),
         )
+
+        if window_seconds is not None:
+            now_fn = getattr(self, "x1_activity_now_fn", None) or time.time
+            response = apply_activity_window(
+                response,
+                window_seconds=window_seconds,
+                window_end_epoch=float(now_fn()),
+                pool_records=pool_records,
+            )
+
+        return response
 
     def dispatch(self, request: Any):
         if isinstance(request, Mapping):
