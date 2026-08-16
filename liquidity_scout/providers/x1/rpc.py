@@ -197,6 +197,84 @@ def parse_mint_account_result(result):
     }
 
 
+def parse_token_account_result(result, *, account=None):
+    """Parse jsonParsed SPL-style token-account identity evidence.
+
+    The top-level account owner is the token program. The parsed ``info.owner``
+    field is the token-account authority used by CMIS vault-family checks.
+    Missing or malformed identity fields remain explicitly unverified.
+    """
+    if not isinstance(result, dict) or "value" not in result:
+        return None
+
+    source = "X1 RPC getAccountInfo(jsonParsed token account)"
+    account_text = _text(account) or None
+    value = result.get("value")
+
+    if value is None:
+        return {
+            "account": account_text,
+            "account_exists": False,
+            "program_owner": None,
+            "parsed_type": None,
+            "mint": None,
+            "token_authority": None,
+            "raw_amount": None,
+            "decimals": None,
+            "ui_amount_string": None,
+            "identity_verified": False,
+            "source": source,
+        }
+
+    if not isinstance(value, dict):
+        return None
+
+    data = value.get("data")
+    if not isinstance(data, dict):
+        return None
+
+    parsed = data.get("parsed")
+    if not isinstance(parsed, dict):
+        return None
+
+    info = parsed.get("info")
+    if not isinstance(info, dict):
+        return None
+
+    token_amount = info.get("tokenAmount")
+    if not isinstance(token_amount, dict):
+        token_amount = {}
+
+    mint = _text(info.get("mint")) or None
+    token_authority = _text(info.get("owner")) or None
+    raw_amount = _text(token_amount.get("amount")) or None
+    decimals = _decimals(token_amount.get("decimals"))
+    ui_amount_string = _text(token_amount.get("uiAmountString")) or None
+    program_owner = _text(value.get("owner")) or None
+    parsed_type = _text(parsed.get("type")) or None
+
+    identity_verified = bool(
+        mint
+        and token_authority
+        and raw_amount is not None
+        and decimals is not None
+    )
+
+    return {
+        "account": account_text,
+        "account_exists": True,
+        "program_owner": program_owner,
+        "parsed_type": parsed_type,
+        "mint": mint,
+        "token_authority": token_authority,
+        "raw_amount": raw_amount,
+        "decimals": decimals,
+        "ui_amount_string": ui_amount_string,
+        "identity_verified": identity_verified,
+        "source": source,
+    }
+
+
 def get_token_supply(
     mint,
     *,
@@ -252,6 +330,36 @@ def get_mint_info(
     )
 
     return parse_mint_account_result(result)
+
+
+def get_token_account_info(
+    account,
+    *,
+    rpc_url=DEFAULT_X1_RPC_URL,
+    retries=4,
+    timeout=15,
+    post=requests.post,
+    sleep=time.sleep,
+):
+    """Return direct RPC identity evidence for one X1 token account."""
+    account = _text(account)
+    if not account:
+        raise ValueError("Token account is required.")
+
+    result = rpc_request(
+        "getAccountInfo",
+        [
+            account,
+            {"encoding": "jsonParsed"},
+        ],
+        rpc_url=rpc_url,
+        retries=retries,
+        timeout=timeout,
+        post=post,
+        sleep=sleep,
+    )
+
+    return parse_token_account_result(result, account=account)
 
 
 class X1RPCProvider:
@@ -311,6 +419,16 @@ class X1RPCProvider:
             sleep=self.sleep,
         )
 
+    def get_token_account_info(self, account):
+        return get_token_account_info(
+            account,
+            rpc_url=self.rpc_url,
+            retries=self.retries,
+            timeout=self.timeout,
+            post=self.post,
+            sleep=self.sleep,
+        )
+
 
 __all__ = [
     "CHAIN",
@@ -319,8 +437,10 @@ __all__ = [
     "X1RPCError",
     "X1RPCProvider",
     "get_mint_info",
+    "get_token_account_info",
     "get_token_supply",
     "parse_mint_account_result",
+    "parse_token_account_result",
     "parse_token_supply_result",
     "rpc_request",
 ]
