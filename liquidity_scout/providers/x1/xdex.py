@@ -22,7 +22,11 @@ import requests
 CHAIN = "x1"
 XDEX_SOURCE = "XDEX public API"
 XDEX_API_BASE_URL = "https://api.xdex.xyz"
-XDEX_NETWORK_X1_MAINNET = "X1 Mainnet"
+# XDEX's supplied API catalog documents mainnet/testnet/devnet as endpoint
+# network values. Public clients using display names such as "X1 Mainnet" are
+# not treated as transport-authoritative after live XDEX returned HTTP 400 for
+# that form across price, history, and quote endpoints.
+XDEX_NETWORK_X1_MAINNET = "mainnet"
 
 TOKEN_PRICE_URL = f"{XDEX_API_BASE_URL}/api/token-price/price"
 PRICE_HISTORY_URL = f"{XDEX_API_BASE_URL}/api/xendex/chart/history"
@@ -72,6 +76,19 @@ def _error_message(body: Mapping[str, Any]) -> str:
     return text or "XDEX reported an unsuccessful response."
 
 
+def _http_error_detail(exc: Exception) -> str:
+    """Expose bounded provider error text when requests attaches a response."""
+
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
+    text = str(getattr(response, "text", "") or "").strip()
+    if not text:
+        return ""
+    compact = " ".join(text.split())
+    return f" | response: {compact[:1000]}"
+
+
 def _parse_success_data(
     body: Any,
     *,
@@ -105,7 +122,8 @@ def _get_json(
     except Exception as exc:
         if isinstance(exc, XDEXAPIError):
             raise
-        raise XDEXAPIError(f"XDEX request failed for {url}: {exc}") from exc
+        detail = _http_error_detail(exc)
+        raise XDEXAPIError(f"XDEX request failed for {url}: {exc}{detail}") from exc
     return body
 
 
