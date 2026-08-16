@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only CMIS v1.4.10.1 exact pool-leg semantics probe."""
+"""Read-only CMIS v1.4.10.2 exact pool-leg semantics + diagnosis probe."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import argparse
 import json
 import time
 
-from liquidity_scout.providers.x1.exact_pool_leg_semantics_v14101 import (
+from liquidity_scout.providers.x1.exact_pool_leg_semantics_v14102 import (
     prove_exact_pool_leg_semantics,
 )
 
@@ -18,7 +18,9 @@ def main():
             "Prove exact BUY/SELL semantics from canonical pool vaults after "
             "deterministically classifying recognized AMM operations as swaps, "
             "liquidity additions/removals, or UNKNOWN across nested 1h/6h/24h "
-            "windows. UNKNOWN operations remain fail-closed."
+            "windows. UNKNOWN operations remain fail-closed. When proof is not "
+            "available, return a deterministic proof_diagnosis explaining the "
+            "blocking stage and evidence class."
         )
     )
     parser.add_argument("pool_address")
