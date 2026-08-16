@@ -37,7 +37,7 @@ A public webpage, release note, UI, or advertised endpoint is evidence for inves
 | X1-DEX-01 | Pool catalog / liquidity / volume | VERIFIED | X1.Ninja/XDEX catalog path is used by CMIS; direct XDEX public pool transport also exists as an independent provider-native path. | Maintain asset-wide aggregation, pool deduplication, timestamps, and source traceability. |
 | X1-DEX-02 | Pool detail / reserves | PARTIAL | X1.Ninja documents pool detail including reserves. | Cross-check reserve values against direct X1 RPC/on-chain evidence and define exact units/freshness before high-confidence promotion. |
 | X1-DEX-03 | Holder data | PARTIAL | X1.Ninja exposes holder information, but CMIS already preserves uncertainty when holder sources disagree or coverage is incomplete. | Cross-check holder semantics and coverage against independent/on-chain evidence where possible. |
-| X1-HIST-01 | X1.Ninja trade history | PARTIAL | Public Developer API documents `/v1/trades/{address}` including buys, sells, and LP events. | Add deterministic contract tests for pagination/range, side classification, token amounts/decimals, USD-value source, LP-event semantics, signature, finality, and stale behavior. |
+| X1-HIST-01 | X1.Ninja trade history | PARTIAL | `/v1/trades/{address}` transport is implemented. A read-only live probe on 2026-08-16 verified a top-level object with `lastUpdated`, `total`, and `trades`; returned trade rows exposed `amountNative`, `amountToken`, `amountUsd`, `id`, `maker`, `poolAddress`, `priceNative`, `priceUsd`, `slot`, `timestamp`, `txHash`, and `type`. Deterministic structural validation now fails closed on malformed responses. | Verify `type` meaning, token/native amount units and decimals, USD-value/price derivation, LP-event semantics, transaction identity/finality, pagination/range coverage, duplicates, ordering, and stale behavior before CMIS promotion. |
 | X1-HIST-02 | X1.Ninja OHLCV | PARTIAL | Public Developer API documents `/v1/ohlcv/{address}` with 1m, 5m, 15m, 1h, 4h, and 1D timeframes. | Verify timestamp unit, pair direction, quote unit, interval semantics, requested-range coverage, gaps, stale/interpolated behavior, and provenance before CMIS history promotion. |
 | X1-HIST-03 | Direct XDEX chart/history | BLOCKED | Read-only transport and request-shape discovery exist in `docs/XDEX_READ_ONLY_PROVIDER.md`, but exact live pair/response semantics remain gated. | Verify timestamp, price/quote units, pair direction, interval, range coverage, and exact current pool identity before use by `historical_compare` or risk. |
 | X1-QUOTE-01 | Direct XDEX read-only quote | BLOCKED | Quote transport exists, but live token-supply and native-XNT handling have produced unresolved provider errors. | Verify an exact current non-XNT pair; then validate amounts, rate, route identity, fees, expiry/freshness, and `priceImpactPct` semantics before any pre-trade promotion. |
@@ -93,14 +93,22 @@ Verify:
 
 ### Trade-history checks
 
-Verify:
+Verified structure as of 2026-08-16:
 
-- buy/sell side definition;
-- token amount units and decimals;
-- USD-value source;
+- response object contains `lastUpdated`, `total`, and `trades`;
+- `trades` is an array;
+- observed trade rows contain `amountNative`, `amountToken`, `amountUsd`, `id`, `maker`, `poolAddress`, `priceNative`, `priceUsd`, `slot`, `timestamp`, `txHash`, and `type`.
+
+Still verify before semantic promotion:
+
+- buy/sell/LP-event definition of `type`;
+- token/native amount units and decimals;
+- USD-value and USD-price source;
 - LP-event semantics;
-- transaction signature/identifier;
+- transaction signature/identifier meaning;
 - commitment/finality;
+- `lastUpdated` and `timestamp` units/semantics;
+- `total` meaning;
 - pagination/range coverage;
 - duplicates and ordering.
 
@@ -139,7 +147,7 @@ Bridge Intelligence is an X1-provider capability and remains separate from ordin
 ## Immediate work order
 
 1. **Register created** — this document is the baseline.
-2. Add deterministic contract tests for X1.Ninja `/v1/trades/{address}`.
+2. **X1.Ninja trade-history transport + response structure verified** — semantic promotion remains open.
 3. Add deterministic contract tests for X1.Ninja `/v1/ohlcv/{address}`.
 4. Cross-check X1.Ninja pool reserves/holders against direct X1 RPC evidence.
 5. Probe current X1.Ninja SSE access without assuming the documented Pro tier is live.
