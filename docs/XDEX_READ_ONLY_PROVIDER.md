@@ -21,6 +21,52 @@ Roberta and X1 Scout must not call XDEX HTTP endpoints directly.
 The direct XDEX provider in this milestone is read-only. It does not prepare,
 sign, or broadcast transactions.
 
+## X1 network liveness vs economic availability
+
+X1 mainnet validator/RPC operation and practical DeFi/economic availability are
+separate concepts.
+
+The project rule supplied by the user is that normal practical access to the
+X1 economy depends on bridging USDC from Solana across the X1 bridge and then
+using the X1-side liquidity path. Therefore CMIS must not equate an operational
+RPC/validator network with available XDEX liquidity, routability, or a usable
+native-XNT market.
+
+Bridge availability, bridge capacity, XDEX liquidity, pool existence, and quote
+availability are freshness-sensitive provider facts and must be verified when
+needed. They must not be inferred from the fact that X1 mainnet RPC is online.
+
+## Native XNT identity rule
+
+Project policy supplied by the user:
+
+```text
+Canonical asset: XNT
+Asset type: native X1 currency
+Native/provider identifier: So11111111111111111111111111111111111111112
+```
+
+The user has explicitly instructed that Roberta/CMIS must use **native XNT** and
+must not model or substitute WXNT as a separate asset for this workflow, even
+though the same identifier may be associated with XNT/WXNT in external tooling.
+
+The canonical CMIS identity therefore remains native XNT. A provider must not
+silently convert XNT into a wrapped-token identity merely to satisfy a token
+program or DEX endpoint.
+
+A live XDEX quote using the supplied native-XNT identifier reached the XDEX
+backend but failed with:
+
+```text
+failed to get token supply: Invalid param: could not find account
+```
+
+This is evidence about the current XDEX quote path, not evidence that the
+canonical XNT identity is wrong. The XDEX adapter must treat native-token
+handling as a provider-specific concern. Until XDEX native-XNT quote behavior
+is verified, native XNT must not be forced through token-mint semantics and no
+alternate wrapped-XNT address may be invented.
+
 ## Base URL
 
 ```text
@@ -66,8 +112,8 @@ GET /api/token-price/price
   &token_address=<TOKEN_MINT>
 ```
 
-The transport still preserves returned values without interpreting units.
-A successful live response is required before any response fields are promoted.
+A live AGI request using this shape succeeded. Returned field units remain
+unpromoted until explicitly verified.
 
 ## Price history
 
@@ -88,9 +134,14 @@ GET /api/xendex/chart/history
   &time_to=<INTEGER>
 ```
 
-The next live probe uses AGI -> XNT market representation and Unix epoch
-seconds for a seven-day window. **The time unit remains provisional** until
-XDEX accepts the request and returned point semantics are inspected.
+A subsequent request reached the endpoint but returned top-level
+`success:false`. The provider now preserves bounded unsuccessful response
+bodies so the next probe can reveal the reason.
+
+Because native-XNT semantics are still unresolved in XDEX's token-oriented
+paths, the default contract-discovery pair uses two concrete X1 token mints:
+AGI -> XNM. Unix epoch seconds remain provisional until XDEX accepts the
+request and returned point semantics are inspected.
 
 XDEX history must not feed CMIS `historical_compare` or `risk_check` until the
 live probe verifies:
@@ -119,15 +170,20 @@ GET /api/xendex/swap/quote
   &is_exact_amount_in=true
 ```
 
-The request is read-only. Response fields must not feed `pre_trade_check`
-policy until live verification confirms amount units, rate semantics,
-`priceImpactPct` semantics, route identity, freshness/expiry, and fees.
+The request is read-only. A live quote using the supplied native-XNT identifier
+failed in XDEX token-supply lookup, so native-XNT quote support remains
+unverified. Contract discovery therefore uses AGI -> XNM by default.
 
-## HTTP error evidence
+Response fields must not feed `pre_trade_check` policy until live verification
+confirms amount units, rate semantics, `priceImpactPct` semantics, route
+identity, freshness/expiry, and fees.
 
-Provider transport includes a bounded XDEX response body in HTTP errors. This
-is intentional contract-discovery support so a 4xx response identifies the
-actual missing/invalid parameter instead of being reduced to a generic status.
+## HTTP/error evidence
+
+Provider transport includes bounded XDEX response details for HTTP errors and
+top-level `success:false` responses. This is intentional contract-discovery
+support so an unsuccessful request identifies the actual missing/invalid
+provider assumption instead of being reduced to a generic status.
 
 ## Swap prepare is out of scope
 
@@ -150,10 +206,10 @@ Defaults:
 
 - current-price/history base token: AGI
   `7SXmUpcBGSAwW5LmtzQVF9jHswZ7xzmdKqWa4nDgL3ER`
-- history quote token / quote input: XNT market representation
-  `So11111111111111111111111111111111111111112`
-- quote output: XNM
+- history quote token / quote output: XNM
   `AvNDf423kEmWNP6AZHFV7DkNG4YRgt6qbdyyryjaa4PQ`
+- quote input: AGI
+  `7SXmUpcBGSAwW5LmtzQVF9jHswZ7xzmdKqWa4nDgL3ER`
 
 Overrides:
 
