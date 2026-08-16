@@ -3,6 +3,7 @@ import unittest
 from liquidity_scout.providers.x1.history_range import (
     compare_provider_rows_to_chain,
     scan_address_history_range,
+    summarize_entries_for_window,
 )
 
 
@@ -190,6 +191,73 @@ class HistoryRangeTests(unittest.TestCase):
         )
         self.assertTrue(result["overlapping_identity_verified"])
         self.assertFalse(result["provider_range_contract_verified"])
+
+
+    def test_scan_result_labels_proof_interval_not_requested_window(self):
+        rpc = FakeRPC({
+            None: [
+                entry("s3", 30, 130),
+                entry("s2", 20, 120),
+                entry("s1", 10, 90),
+            ],
+        })
+        result = scan_address_history_range(
+            "pool",
+            start_epoch=100,
+            end_epoch=140,
+            rpc=rpc,
+            page_size=10,
+            max_signatures=100,
+        )
+        self.assertEqual(result["scan_start_epoch"], 100.0)
+        self.assertEqual(result["scan_end_epoch"], 140.0)
+        self.assertEqual(result["scan_interval_signature_count"], 2)
+        self.assertNotIn("window_signature_count", result)
+        self.assertNotIn("requested_start_epoch", result)
+
+    def test_literal_requested_window_is_separate_from_longer_proof_scan(self):
+        chain_entries = [
+            {
+                "signature": "new",
+                "slot": 40,
+                "block_time": 200.0,
+                "err": None,
+            },
+            {
+                "signature": "inside_ok",
+                "slot": 30,
+                "block_time": 170.0,
+                "err": None,
+            },
+            {
+                "signature": "inside_failed",
+                "slot": 20,
+                "block_time": 160.0,
+                "err": {"InstructionError": [0, "x"]},
+            },
+            {
+                "signature": "old",
+                "slot": 10,
+                "block_time": 100.0,
+                "err": None,
+            },
+        ]
+        result = summarize_entries_for_window(
+            chain_entries,
+            start_epoch=150,
+            end_epoch=180,
+        )
+        self.assertEqual(result["signature_count"], 2)
+        self.assertEqual(result["successful_signature_count"], 1)
+        self.assertEqual(result["failed_signature_count"], 1)
+        self.assertEqual(
+            result["oldest_signature_time_utc"],
+            "1970-01-01T00:02:40+00:00",
+        )
+        self.assertEqual(
+            result["newest_signature_time_utc"],
+            "1970-01-01T00:02:50+00:00",
+        )
 
 
 if __name__ == "__main__":

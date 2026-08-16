@@ -1,4 +1,4 @@
-"""Read-only X1 history-range proof primitives for CMIS v1.3.
+"""Read-only X1 history-range proof primitives for CMIS v1.3.1.
 
 This module does not promote provider pagination/range semantics. It proves only
 what the X1 RPC itself can establish for an address history scan:
@@ -304,7 +304,7 @@ def scan_address_history_range(
     newest = entries[0] if entries else None
     oldest = entries[-1] if entries else None
 
-    window_entries = [
+    scan_interval_entries = [
         entry
         for entry in entries
         if (
@@ -317,10 +317,10 @@ def scan_address_history_range(
         "chain": CHAIN,
         "source": SOURCE,
         "address": address,
-        "requested_start_epoch": start_epoch,
-        "requested_start_utc": _iso(start_epoch),
-        "requested_end_epoch": end_epoch,
-        "requested_end_utc": _iso(end_epoch),
+        "scan_start_epoch": start_epoch,
+        "scan_start_utc": _iso(start_epoch),
+        "scan_end_epoch": end_epoch,
+        "scan_end_utc": _iso(end_epoch),
         "page_size": page_size,
         "max_signatures": max_signatures,
         "pages_fetched": pages,
@@ -331,7 +331,7 @@ def scan_address_history_range(
         "failed_signature_count": sum(
             1 for entry in entries if entry["err"] is not None
         ),
-        "window_signature_count": len(window_entries),
+        "scan_interval_signature_count": len(scan_interval_entries),
         "rpc_errors": rpc_errors,
         "malformed_entries": malformed_entries,
         "duplicate_signatures": duplicate_signatures,
@@ -345,7 +345,7 @@ def scan_address_history_range(
         "integrity_verified": integrity_verified,
         "range_proven": range_proven,
         "coverage_scope": (
-            "window_boundary_reached"
+            "scan_boundary_reached"
             if range_proven and start_boundary_reached
             else (
                 "rpc_history_exhausted"
@@ -374,6 +374,68 @@ def scan_address_history_range(
         # Returned for deterministic comparison by callers. CLI probes should
         # summarize/remove this field before printing large JSON.
         "entries": entries,
+    }
+
+
+def summarize_entries_for_window(
+    entries: Sequence[Mapping[str, Any]],
+    *,
+    start_epoch: float,
+    end_epoch: float,
+) -> dict[str, Any]:
+    # Summarize literal requested-window membership from scanned RPC entries.
+    # This function deliberately does not decide whether the scan range is proven.
+    # It only classifies already-scanned X1 RPC signature entries whose chain
+    # block times fall inside the exact requested [start, end] interval.
+
+    start_epoch = _epoch(start_epoch)
+    end_epoch = _epoch(end_epoch)
+    if start_epoch is None or end_epoch is None:
+        raise ValueError("start_epoch and end_epoch must be non-negative times")
+    if start_epoch > end_epoch:
+        raise ValueError("start_epoch must be <= end_epoch")
+
+    valid = []
+    without_block_time = 0
+
+    for raw in entries:
+        if not isinstance(raw, Mapping):
+            continue
+
+        block_time = raw.get("block_time")
+        if block_time is None:
+            without_block_time += 1
+            continue
+        if isinstance(block_time, bool) or not isinstance(
+            block_time, (int, float)
+        ):
+            without_block_time += 1
+            continue
+
+        block_time = float(block_time)
+        if start_epoch <= block_time <= end_epoch:
+            valid.append(raw)
+
+    times = [float(item["block_time"]) for item in valid]
+    newest = max(times) if times else None
+    oldest = min(times) if times else None
+
+    return {
+        "start_epoch": start_epoch,
+        "start_utc": _iso(start_epoch),
+        "end_epoch": end_epoch,
+        "end_utc": _iso(end_epoch),
+        "membership_basis": "X1_RPC_BLOCK_TIME",
+        "signature_count": len(valid),
+        "successful_signature_count": sum(
+            1 for item in valid if item.get("err") is None
+        ),
+        "failed_signature_count": sum(
+            1 for item in valid if item.get("err") is not None
+        ),
+        "scanned_entries_without_block_time": without_block_time,
+        "oldest_signature_time_utc": _iso(oldest),
+        "newest_signature_time_utc": _iso(newest),
     }
 
 
@@ -507,4 +569,5 @@ __all__ = [
     "SOURCE",
     "compare_provider_rows_to_chain",
     "scan_address_history_range",
+    "summarize_entries_for_window",
 ]

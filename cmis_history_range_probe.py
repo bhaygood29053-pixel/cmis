@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only CMIS v1.3 history-range proof probe."""
+"""Read-only CMIS v1.3.1 history-range proof probe."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from liquidity_scout.market.resolver import (
 from liquidity_scout.providers.x1.history_range import (
     compare_provider_rows_to_chain,
     scan_address_history_range,
+    summarize_entries_for_window,
 )
 from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
 from liquidity_scout.services.cmis_activity_window import (
@@ -41,6 +42,12 @@ def _parse_provider_epoch(value):
     if parsed.tzinfo is None:
         return None
     return parsed.astimezone(timezone.utc).timestamp()
+
+
+def _iso_epoch(value):
+    return datetime.fromtimestamp(
+        float(value), tz=timezone.utc
+    ).isoformat()
 
 
 def _resolve_asset_pools(gateway, asset, max_pools):
@@ -155,6 +162,11 @@ def main():
         )
 
         entries = chain.pop("entries", [])
+        requested_window_chain = summarize_entries_for_window(
+            entries,
+            start_epoch=requested_start,
+            end_epoch=end_epoch,
+        )
         comparison = compare_provider_rows_to_chain(
             rows, entries
         )
@@ -182,7 +194,8 @@ def main():
                     is True
                 ),
             },
-            "chain_range": chain,
+            "requested_window_chain": requested_window_chain,
+            "proof_scan": chain,
             "provider_chain_comparison": comparison,
             "chain_signature_sample": {
                 "first": [
@@ -197,7 +210,7 @@ def main():
         })
 
     all_chain_ranges = bool(reports) and all(
-        item["chain_range"]["range_proven"]
+        item["proof_scan"]["range_proven"]
         for item in reports
     )
     all_ordering_observed = bool(reports) and all(
@@ -215,7 +228,7 @@ def main():
 
     result = {
         "service": "history_range_probe",
-        "version": "1.3",
+        "version": "1.3.1",
         "chain": "x1",
         "asset": dict(resolved),
         "status": (
@@ -223,17 +236,24 @@ def main():
             if all_chain_ranges
             else "partial"
         ),
-        "window": {
+        "requested_window": {
             "label": args.window,
             "duration_seconds": seconds,
+            "start_epoch": requested_start,
+            "start_utc": _iso_epoch(requested_start),
             "end_epoch": end_epoch,
-            "requested_start_epoch": requested_start,
+            "end_utc": _iso_epoch(end_epoch),
+            "membership_basis": "X1_RPC_BLOCK_TIME",
         },
         "market_snapshot_status": market.get("status"),
         "matched_pool_count": matched_pool_count,
         "selected_pool_count": len(pools),
         "pools": reports,
         "summary": {
+            "all_selected_pool_proof_ranges_proven": (
+                all_chain_ranges
+            ),
+            # Backward-compatible alias for the v1.3 probe summary.
             "all_selected_pool_chain_ranges_proven": (
                 all_chain_ranges
             ),
@@ -246,9 +266,11 @@ def main():
             "provider_range_contract_verified": False,
             "cmis_window_completion_promoted": False,
             "interpretation": (
-                "This probe can prove the X1 RPC address-history scan "
-                "reached the requested boundary. It does not yet prove "
-                "that the provider trade index is exhaustive, so CMIS "
+                "requested_window reports the literal user-requested "
+                "time interval. proof_scan may extend farther backward so "
+                "provider sample rows can be linked to X1 RPC without "
+                "assuming provider ordering. A proven proof_scan still does "
+                "not establish provider index exhaustiveness, so CMIS "
                 "window completeness remains gated."
             ),
         },
