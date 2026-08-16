@@ -18,6 +18,15 @@
       "status": "OPEN",
       "created_at": "2026-08-16T13:52:00+00:00",
       "updated_at": "2026-08-16T13:52:00+00:00"
+    },
+    {
+      "id": "SENT-0003",
+      "area": "future_tool",
+      "issue": "Add a Roberta macro and market-regime intelligence tool to assist her crypto predictions. The tool should consume trusted historical and current market data such as interest-rate trends, Treasury yields and yield-curve changes, inflation, unemployment, monetary liquidity, central-bank balance-sheet trends, credit conditions, dollar strength, equity-market behavior, stablecoin supply and flows, and verified crypto/on-chain activity. CMIS should normalize, timestamp, verify, and preserve the underlying facts; Roberta should use those facts to identify market regimes, compare current conditions with historical periods, estimate risk-on/risk-off transitions, and produce probabilistic crypto outlooks with evidence and confidence rather than deterministic price predictions.",
+      "severity": "normal",
+      "status": "OPEN",
+      "created_at": "2026-08-16T13:56:00+00:00",
+      "updated_at": "2026-08-16T13:56:00+00:00"
     }
   ]
 }
