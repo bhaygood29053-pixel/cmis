@@ -14,12 +14,17 @@ from liquidity_scout.providers.x1.xdex import (
 
 
 class FakeResponse:
-    def __init__(self, body, *, error=None):
+    def __init__(self, body, *, error=None, text=""):
         self.body = body
         self.error = error
+        self.text = text
 
     def raise_for_status(self):
         if self.error is not None:
+            try:
+                self.error.response = self
+            except Exception:
+                pass
             raise self.error
 
     def json(self):
@@ -43,16 +48,16 @@ class FakeSession:
 
 
 class XDEXReadOnlyProviderTests(unittest.TestCase):
-    def test_provider_identifies_chain_source_and_x1_network_name(self):
+    def test_provider_identifies_chain_source_and_documented_mainnet_name(self):
         provider = XDEXReadOnlyProvider(session=FakeSession([]))
 
         self.assertEqual(provider.chain, "x1")
         self.assertEqual(provider.source, "XDEX public API")
         self.assertEqual(XDEX_SOURCE, "XDEX public API")
-        self.assertEqual(provider.network, "X1 Mainnet")
-        self.assertEqual(XDEX_NETWORK_X1_MAINNET, "X1 Mainnet")
+        self.assertEqual(provider.network, "mainnet")
+        self.assertEqual(XDEX_NETWORK_X1_MAINNET, "mainnet")
 
-    def test_token_price_uses_address_and_x1_mainnet_without_coercing_values(self):
+    def test_token_price_uses_address_and_documented_mainnet_without_coercing_values(self):
         session = FakeSession(
             [
                 FakeResponse(
@@ -73,7 +78,7 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         self.assertEqual(
             session.calls[0]["params"],
             {
-                "network": "X1 Mainnet",
+                "network": "mainnet",
                 "address": "AGI_MINT",
             },
         )
@@ -93,7 +98,7 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         self.assertEqual(
             session.calls[0]["params"],
             {
-                "network": "X1 Mainnet",
+                "network": "mainnet",
                 "token": "AGI_MINT",
                 "days": 7,
             },
@@ -153,7 +158,7 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         self.assertEqual(
             session.calls[0]["params"],
             {
-                "network": "X1 Mainnet",
+                "network": "mainnet",
                 "token_in": "XNT_MINT",
                 "token_out": "XNM_MINT",
                 "token_in_amount": "1.2500",
@@ -227,6 +232,23 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(XDEXAPIError, "network down"):
+            fetch_token_price("AGI_MINT", session=session)
+
+    def test_http_failure_preserves_bounded_provider_response_text(self):
+        session = FakeSession(
+            [
+                FakeResponse(
+                    None,
+                    error=RuntimeError("400 Bad Request"),
+                    text='{"error":"invalid network"}',
+                )
+            ]
+        )
+
+        with self.assertRaisesRegex(
+            XDEXAPIError,
+            'response: \\{"error":"invalid network"\\}',
+        ):
             fetch_token_price("AGI_MINT", session=session)
 
     def test_provider_methods_delegate_to_read_only_transports(self):
