@@ -112,8 +112,10 @@ GET /api/token-price/price
   &token_address=<TOKEN_MINT>
 ```
 
-A live AGI request using this shape succeeded. Returned field units remain
-unpromoted until explicitly verified.
+A live AGI request using this shape succeeded. This verifies the request shape
+for that endpoint only. It does **not** prove that the same identifier is a
+currently deployed/routable X1 token account for swap or chart endpoints.
+Returned field units remain unpromoted until explicitly verified.
 
 ## Price history
 
@@ -134,14 +136,23 @@ GET /api/xendex/chart/history
   &time_to=<INTEGER>
 ```
 
-A subsequent request reached the endpoint but returned top-level
-`success:false`. The provider now preserves bounded unsuccessful response
-bodies so the next probe can reveal the reason.
+A subsequent AGI -> XNM request reached the endpoint and returned:
 
-Because native-XNT semantics are still unresolved in XDEX's token-oriented
-paths, the default contract-discovery pair uses two concrete X1 token mints:
-AGI -> XNM. Unix epoch seconds remain provisional until XDEX accepts the
-request and returned point semantics are inspected.
+```text
+Pool not found for the given token pair
+```
+
+That is useful negative evidence: token identifiers accepted by the token-price
+endpoint must not be assumed to form a current X1 pool.
+
+The live probe now loads the existing provider-owned X1.Ninja/XDEX pool catalog,
+selects an **exact current pool**, excludes any side identified as XNT/WXNT, and
+uses that pool's two token addresses for history verification. This avoids
+hard-coded pair guesses and keeps native-XNT adapter behavior out of endpoint
+contract discovery.
+
+Unix epoch seconds remain provisional until XDEX accepts an exact catalog pair
+and returned point semantics are inspected.
 
 XDEX history must not feed CMIS `historical_compare` or `risk_check` until the
 live probe verifies:
@@ -172,11 +183,40 @@ GET /api/xendex/swap/quote
 
 The request is read-only. A live quote using the supplied native-XNT identifier
 failed in XDEX token-supply lookup, so native-XNT quote support remains
-unverified. Contract discovery therefore uses AGI -> XNM by default.
+unverified.
 
-Response fields must not feed `pre_trade_check` policy until live verification
-confirms amount units, rate semantics, `priceImpactPct` semantics, route
-identity, freshness/expiry, and fees.
+A later AGI -> XNM quote also failed in XDEX token-supply lookup for the AGI
+identifier even though AGI token-price lookup succeeded. Therefore quote
+verification must use token addresses taken from an exact current X1 pool, not
+assets chosen only because token-price lookup recognizes them.
+
+The live probe now uses the same catalog-selected non-XNT pool pair for quote
+verification. Response fields must not feed `pre_trade_check` policy until live
+verification confirms amount units, rate semantics, `priceImpactPct` semantics,
+route identity, freshness/expiry, and fees.
+
+## Live-pair discovery rule
+
+The opt-in probe uses the existing `X1Provider` / X1.Ninja catalog as the source
+of current pool membership. Pool rows use the established provider shape:
+
+```text
+address
+baseToken.mint / baseToken.address
+quoteToken.mint / quoteToken.address
+```
+
+The probe:
+
+1. refreshes the current X1 pool catalog;
+2. finds the first exact pool whose two sides have usable addresses;
+3. excludes XNT/WXNT/`Wrapped XNT` sides per project policy;
+4. prints the selected pool and symbols;
+5. uses that exact pair for token-price, history, and quote checks.
+
+If no current pool has two non-XNT token sides, the live XDEX tests skip with an
+explicit reason instead of fabricating a pair or substituting WXNT. The catalog
+requires the same `X1_NINJA_API_KEY` used by the existing X1 market provider.
 
 ## HTTP/error evidence
 
@@ -202,23 +242,9 @@ RUN_XDEX_LIVE_TESTS=1 \
 python -m unittest discover -s tests -p "test_xdex_live_contract.py" -v
 ```
 
-Defaults:
-
-- current-price/history base token: AGI
-  `7SXmUpcBGSAwW5LmtzQVF9jHswZ7xzmdKqWa4nDgL3ER`
-- history quote token / quote output: XNM
-  `AvNDf423kEmWNP6AZHFV7DkNG4YRgt6qbdyyryjaa4PQ`
-- quote input: AGI
-  `7SXmUpcBGSAwW5LmtzQVF9jHswZ7xzmdKqWa4nDgL3ER`
-
-Overrides:
-
-```text
-XDEX_LIVE_TOKEN
-XDEX_LIVE_HISTORY_TO_TOKEN
-XDEX_LIVE_QUOTE_TOKEN_IN
-XDEX_LIVE_QUOTE_TOKEN_OUT
-```
+The live probe no longer hard-codes AGI/XNM/XNT as a presumed tradable pair.
+It discovers an exact current non-XNT pool pair from the provider-owned X1 pool
+catalog and prints the selected pair before making the read-only XDEX calls.
 
 A passing live probe verifies only the fields asserted by the test. It does
 not authorize CMIS promotion of undocumented units or semantics without a
