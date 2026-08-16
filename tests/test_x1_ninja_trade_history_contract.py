@@ -1,6 +1,8 @@
 import unittest
 
 from liquidity_scout.providers.x1.ninja_history import (
+    OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS,
+    OBSERVED_TRADE_ROW_KEYS,
     TRADE_HISTORY_PATH,
     X1_NINJA_API_BASE_URL,
     X1NinjaAPIError,
@@ -56,6 +58,33 @@ def success_headers(**extra):
     return headers
 
 
+def observed_trade(**overrides):
+    row = {
+        "amountNative": "1",
+        "amountToken": "2",
+        "amountUsd": "3",
+        "id": "trade-1",
+        "maker": "maker-1",
+        "poolAddress": "POOL1",
+        "priceNative": "4",
+        "priceUsd": "5",
+        "slot": 123,
+        "timestamp": 456,
+        "txHash": "tx-1",
+        "type": "provider-type",
+    }
+    row.update(overrides)
+    return row
+
+
+def observed_body(*trades):
+    return {
+        "lastUpdated": 456,
+        "total": len(trades),
+        "trades": list(trades),
+    }
+
+
 class X1NinjaTradeHistoryContractTests(unittest.TestCase):
     def test_requires_pool_address(self):
         with self.assertRaises(ValueError):
@@ -67,13 +96,8 @@ class X1NinjaTradeHistoryContractTests(unittest.TestCase):
             fetch_pool_trades_raw("POOL1", api_key="", session=session)
         self.assertEqual(session.calls, [])
 
-    def test_uses_documented_path_bearer_auth_and_preserves_raw_object(self):
-        body = {
-            "trades": [
-                {"unknown_provider_field": "preserve-me"},
-            ],
-            "provider_meta": {"anything": True},
-        }
+    def test_uses_documented_path_and_validates_live_observed_shape(self):
+        body = observed_body(observed_trade(unknown_provider_field="preserve-me"))
         session = FakeSession(
             FakeResponse(
                 body=body,
@@ -112,32 +136,81 @@ class X1NinjaTradeHistoryContractTests(unittest.TestCase):
         self.assertEqual(result["rate_limit"]["reset"], "1786819999")
         self.assertEqual(result["rate_limit"]["window"], "60")
         self.assertEqual(result["rate_limit"]["service"], "public-api")
-        self.assertFalse(result["cmis_promotable"])
-        self.assertTrue(all(value is False for value in result["semantics"].values()))
 
-    def test_preserves_raw_array_without_inventing_trade_schema(self):
-        body = [
-            {"opaque": 1},
-            {"opaque": 2},
-        ]
+        contract = result["contract"]
+        self.assertTrue(contract["response_contract_verified"])
+        self.assertTrue(contract["trade_row_shape_verified"])
+        self.assertEqual(contract["returned_trade_count"], 1)
+        self.assertEqual(contract["provider_total_raw"], 1)
+        self.assertEqual(contract["provider_last_updated_raw"], 456)
+        self.assertTrue(OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS.issubset(contract["top_level_keys"]))
+        self.assertTrue(OBSERVED_TRADE_ROW_KEYS.issubset(contract["trade_row_keys"]))
+
+        self.assertTrue(result["semantics"]["trade_rows_verified"])
+        for key, value in result["semantics"].items():
+            if key != "trade_rows_verified":
+                self.assertFalse(value, key)
+        self.assertFalse(result["cmis_promotable"])
+
+    def test_empty_trade_list_is_valid_structure_without_fabricating_rows(self):
         result = fetch_pool_trades_raw(
             "POOL2",
             api_key="secret",
-            session=FakeSession(FakeResponse(body=body, headers=success_headers())),
+            session=FakeSession(
+                FakeResponse(body=observed_body(), headers=success_headers())
+            ),
             observed_at_fn=lambda: 1.0,
         )
 
-        self.assertEqual(result["response_shape"], "array")
-        self.assertEqual(result["raw_response"], body)
-        self.assertNotIn("trades", result)
+        self.assertEqual(result["raw_response"]["trades"], [])
+        self.assertEqual(result["contract"]["returned_trade_count"], 0)
+        self.assertTrue(result["contract"]["trade_row_shape_verified"])
+        self.assertFalse(result["cmis_promotable"])
+
+    def test_fails_closed_when_live_observed_top_level_field_is_missing(self):
+        body = observed_body(observed_trade())
+        del body["lastUpdated"]
+
+        with self.assertRaisesRegex(X1NinjaAPIError, "lastUpdated"):
+            fetch_pool_trades_raw(
+                "POOL3",
+                api_key="secret",
+                session=FakeSession(FakeResponse(body=body, headers=success_headers())),
+            )
+
+    def test_fails_closed_when_trades_is_not_array(self):
+        body = observed_body()
+        body["trades"] = {"not": "a list"}
+
+        with self.assertRaisesRegex(X1NinjaAPIError, "must be a JSON array"):
+            fetch_pool_trades_raw(
+                "POOL4",
+                api_key="secret",
+                session=FakeSession(FakeResponse(body=body, headers=success_headers())),
+            )
+
+    def test_fails_closed_when_trade_row_is_missing_live_observed_field(self):
+        row = observed_trade()
+        del row["txHash"]
+
+        with self.assertRaisesRegex(X1NinjaAPIError, "txHash"):
+            fetch_pool_trades_raw(
+                "POOL5",
+                api_key="secret",
+                session=FakeSession(
+                    FakeResponse(body=observed_body(row), headers=success_headers())
+                ),
+            )
 
     def test_success_fails_closed_when_documented_rate_limit_header_missing(self):
         headers = success_headers()
         del headers["X-RateLimit-Reset"]
-        session = FakeSession(FakeResponse(body={"anything": []}, headers=headers))
+        session = FakeSession(
+            FakeResponse(body=observed_body(), headers=headers)
+        )
 
         with self.assertRaisesRegex(X1NinjaAPIError, "X-RateLimit-Reset"):
-            fetch_pool_trades_raw("POOL3", api_key="secret", session=session)
+            fetch_pool_trades_raw("POOL6", api_key="secret", session=session)
 
     def test_invalid_json_fails_closed_and_preserves_bounded_response_context(self):
         session = FakeSession(
@@ -149,7 +222,7 @@ class X1NinjaTradeHistoryContractTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(X1NinjaAPIError, "not valid JSON") as raised:
-            fetch_pool_trades_raw("POOL4", api_key="secret", session=session)
+            fetch_pool_trades_raw("POOL7", api_key="secret", session=session)
         self.assertIn("not-json", str(raised.exception))
 
     def test_documented_http_failure_preserves_status_and_retry_after(self):
@@ -163,7 +236,7 @@ class X1NinjaTradeHistoryContractTests(unittest.TestCase):
         )
 
         with self.assertRaises(X1NinjaAPIError) as raised:
-            fetch_pool_trades_raw("POOL5", api_key="secret", session=session)
+            fetch_pool_trades_raw("POOL8", api_key="secret", session=session)
 
         message = str(raised.exception)
         self.assertIn("HTTP 503", message)
