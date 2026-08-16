@@ -118,7 +118,6 @@ __all__ = [
     "X1HealthProvider",
     "X1NetworkAPIError",
     "X1NetworkHistoryAPIError",
-    "X1NetworkHistoryAPIError",
     "X1NetworkHistoryProvider",
     "X1NetworkProvider",
     "X1NinjaAPIError",
