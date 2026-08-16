@@ -277,58 +277,6 @@ class EvidenceAwareCMISGateway(CMISGateway):
             )
         return response
 
-    def _pre_trade_check(self, asset: Any, params: Mapping[str, Any]):
-        """Preserve the base pre-trade contract while forwarding evidence controls."""
-
-        # The base implementation already calls ``self._risk_check``. Reuse it,
-        # but it only forwards a narrow risk-parameter allowlist, so copy the
-        # request and temporarily fold the activity bound into that path.
-        trade = params.get("trade")
-        if not isinstance(trade, Mapping):
-            return super()._pre_trade_check(asset, params)
-
-        # Reimplement only the tiny parameter-forwarding seam; all transaction
-        # analysis and execution-denial behavior remains in the existing service.
-        definition = self._canonical_definition(asset)
-        risk_params = {
-            key: params[key]
-            for key in ("policy", "historical_question", "activity_max_signatures")
-            if key in params
-        }
-        risk = self._risk_check(asset, risk_params)
-
-        normalized_trade = dict(trade)
-        if "chain" not in normalized_trade:
-            normalized_trade["chain"] = "x1"
-        if not isinstance(normalized_trade.get("asset"), Mapping):
-            raw_risk = risk.get("risk") if isinstance(risk, Mapping) else None
-            raw_risk_asset = raw_risk.get("asset") if isinstance(raw_risk, Mapping) else None
-            if isinstance(raw_risk_asset, Mapping):
-                normalized_trade["asset"] = dict(raw_risk_asset)
-            else:
-                risk_asset = risk.get("asset") if isinstance(risk, Mapping) else None
-                if isinstance(risk_asset, Mapping):
-                    normalized_trade["asset"] = dict(risk_asset)
-
-        from liquidity_scout.services.cmis_pre_trade import build_pre_trade_check_response
-
-        response = build_pre_trade_check_response(
-            risk,
-            normalized_trade,
-            chain="x1",
-            observed_at=risk.get("observed_at"),
-        )
-        if isinstance(definition, Mapping):
-            raw_risk = risk.get("risk") if isinstance(risk, Mapping) else None
-            provider_asset = raw_risk.get("asset") if isinstance(raw_risk, Mapping) else None
-            response = self._canonicalize(
-                response,
-                definition,
-                provider_asset=provider_asset,
-                role="market",
-            )
-        return response
-
 
 __all__ = [
     "DEFAULT_RISK_ACTIVITY_MAX_SIGNATURES",
