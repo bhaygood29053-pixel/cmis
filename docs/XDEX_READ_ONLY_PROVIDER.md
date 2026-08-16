@@ -67,6 +67,25 @@ handling as a provider-specific concern. Until XDEX native-XNT quote behavior
 is verified, native XNT must not be forced through token-mint semantics and no
 alternate wrapped-XNT address may be invented.
 
+## Provider-side asset identity rule
+
+For non-native X1 token assets, the provider-side identity used for live XDEX
+verification is the exact public address supplied by the current pool catalog.
+The effective key is therefore:
+
+```text
+chain + public address
+```
+
+Symbol and name are metadata only. They must not substitute for a verified
+address, and they must not cause two different public addresses to be merged.
+If a pool token row exposes both `address` and `mint`, the live XDEX probe
+prefers the explicit `address` field and uses `mint` only as a compatibility
+fallback when `address` is absent.
+
+This rule does not turn native XNT into a token-program mint. XNT keeps the
+separate native identity rule above.
+
 ## Base URL
 
 ```text
@@ -147,7 +166,7 @@ endpoint must not be assumed to form a current X1 pool.
 
 The live probe now loads the existing provider-owned X1.Ninja/XDEX pool catalog,
 selects an **exact current pool**, excludes any side identified as XNT/WXNT, and
-uses that pool's two token addresses for history verification. This avoids
+uses that pool's two public token addresses for history verification. This avoids
 hard-coded pair guesses and keeps native-XNT adapter behavior out of endpoint
 contract discovery.
 
@@ -209,10 +228,11 @@ quoteToken.mint / quoteToken.address
 The probe:
 
 1. refreshes the current X1 pool catalog;
-2. finds the first exact pool whose two sides have usable addresses;
+2. finds the first exact pool whose two sides have usable public addresses;
 3. excludes XNT/WXNT/`Wrapped XNT` sides per project policy;
-4. prints the selected pool and symbols;
-5. uses that exact pair for token-price, history, and quote checks.
+4. prefers `baseToken.address` / `quoteToken.address` over compatibility `mint` fields;
+5. prints the selected pool and symbols;
+6. uses that exact address pair for token-price, history, and quote checks.
 
 If no current pool has two non-XNT token sides, the live XDEX tests skip with an
 explicit reason instead of fabricating a pair or substituting WXNT. The catalog
@@ -244,7 +264,8 @@ python -m unittest discover -s tests -p "test_xdex_live_contract.py" -v
 
 The live probe no longer hard-codes AGI/XNM/XNT as a presumed tradable pair.
 It discovers an exact current non-XNT pool pair from the provider-owned X1 pool
-catalog and prints the selected pair before making the read-only XDEX calls.
+catalog and prints the selected public-address pair before making the read-only
+XDEX calls.
 
 A passing live probe verifies only the fields asserted by the test. It does
 not authorize CMIS promotion of undocumented units or semantics without a
