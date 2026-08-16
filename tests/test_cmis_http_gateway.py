@@ -95,8 +95,9 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["request_path"], "/v1/cmis")
-        self.assertEqual(len(response["supported_services"]), 8)
+        self.assertEqual(len(response["supported_services"]), 9)
         self.assertIn("trade_verification", response["supported_services"])
+        self.assertIn("verified_asset_activity", response["supported_services"])
         self.assertEqual(response["supported_chains"], ["x1"])
         self.assertIn("solana", response["known_chains"])
 
