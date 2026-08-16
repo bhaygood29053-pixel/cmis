@@ -1,7 +1,7 @@
 """X1 chain provider integrations for CMIS."""
 
 from .canonical_pool_vault_coupling import prove_canonical_pool_vault_coupling
-from .exact_pool_leg_semantics_v14102 import prove_exact_pool_leg_semantics
+from .exact_pool_leg_semantics_v14103 import prove_exact_pool_leg_semantics
 from .health import (
     HEALTH_SOURCE,
     HEALTH_URL,
@@ -117,6 +117,7 @@ __all__ = [
     "X1HealthAPIError",
     "X1HealthProvider",
     "X1NetworkAPIError",
+    "X1NetworkHistoryAPIError",
     "X1NetworkHistoryAPIError",
     "X1NetworkHistoryProvider",
     "X1NetworkProvider",
