@@ -50,8 +50,10 @@ from .rpc import (
     X1RPCError,
     X1RPCProvider,
     get_mint_info,
+    get_token_account_info,
     get_token_supply,
     parse_mint_account_result,
+    parse_token_account_result,
     parse_token_supply_result,
     rpc_request,
 )
@@ -148,6 +150,7 @@ __all__ = [
     "get_circulating_supply",
     "get_mint_info",
     "get_network_supply_rpc",
+    "get_token_account_info",
     "get_token_supply",
     "get_x1_network_total_supply",
     "parse_cluster_history",
@@ -156,6 +159,7 @@ __all__ = [
     "parse_network_snapshot",
     "parse_network_supply_result",
     "parse_supply_text",
+    "parse_token_account_result",
     "parse_token_supply_result",
     "rpc_request",
 ]
