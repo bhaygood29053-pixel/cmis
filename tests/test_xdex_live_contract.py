@@ -16,9 +16,10 @@ def _text(value):
 
 
 def _token_address(token):
+    """Return the pool token's public address, preferring explicit address over mint."""
     if not isinstance(token, Mapping):
         return None
-    return _text(token.get("mint") or token.get("address"))
+    return _text(token.get("address") or token.get("mint"))
 
 
 def _is_native_xnt_side(token):
@@ -88,6 +89,28 @@ class XDEXLivePairSelectionTests(unittest.TestCase):
                 "quote_symbol": "AGI",
             },
         )
+
+    def test_prefers_explicit_public_address_over_mint_metadata(self):
+        pools = [
+            {
+                "address": "P_ADDRESS_FIRST",
+                "baseToken": {
+                    "symbol": "AAA",
+                    "address": "AAA_PUBLIC_ADDRESS",
+                    "mint": "AAA_MINT_METADATA",
+                },
+                "quoteToken": {
+                    "symbol": "BBB",
+                    "address": "BBB_PUBLIC_ADDRESS",
+                    "mint": "BBB_MINT_METADATA",
+                },
+            }
+        ]
+
+        pair = select_non_native_live_pool_pair(pools)
+
+        self.assertEqual(pair["base_address"], "AAA_PUBLIC_ADDRESS")
+        self.assertEqual(pair["quote_address"], "BBB_PUBLIC_ADDRESS")
 
     def test_returns_none_when_only_xnt_pairs_exist(self):
         pools = [
