@@ -3,7 +3,7 @@ import time
 import unittest
 from collections.abc import Mapping
 
-from liquidity_scout.providers.x1 import X1Provider, XDEXReadOnlyProvider
+from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
 
 
 RUN_LIVE = os.getenv("RUN_XDEX_LIVE_TESTS") == "1"
@@ -131,19 +131,20 @@ class XDEXLivePairSelectionTests(unittest.TestCase):
 class XDEXLiveContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        market_provider = X1Provider()
+        discovery_provider = XDEXReadOnlyProvider(timeout=20)
         try:
-            market_provider.refresh()
+            pools = discovery_provider.pool_list()
         except Exception as exc:
             raise unittest.SkipTest(
-                f"Cannot load the live X1 pool catalog for XDEX contract probing: {exc}"
+                f"Cannot load the public XDEX pool list for contract probing: {exc}"
             ) from exc
 
-        cls.live_pair = select_non_native_live_pool_pair(market_provider.pools)
+        cls.live_pair = select_non_native_live_pool_pair(pools)
         if cls.live_pair is None:
             raise unittest.SkipTest(
-                "No current X1 catalog pool has two non-XNT token sides; "
-                "native-XNT adapter behavior remains a separate verification task."
+                "The public XDEX pool list currently exposes no usable non-XNT "
+                "pool pair; native-XNT adapter behavior remains a separate "
+                "verification task."
             )
 
         print(
