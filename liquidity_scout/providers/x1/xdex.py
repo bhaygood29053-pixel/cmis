@@ -1,13 +1,12 @@
 """Read-only XDEX public API transport for the X1 provider layer.
 
-This module intentionally owns transport and minimal response-shape validation
-only. CMIS remains responsible for deterministic interpretation, historical
-comparison, risk, and pre-trade policy.
+This module owns transport and minimal response-shape validation only. CMIS
+remains responsible for deterministic interpretation, historical comparison,
+risk, and pre-trade policy.
 
-The request shapes in this module are candidate contracts discovered from the
-user-supplied XDEX endpoint catalog plus public X1 client implementations.
-They must pass the opt-in live contract probe before CMIS may promote their
-fields into verified historical/risk/pre-trade evidence.
+Request shapes are promoted here only when supported by user-supplied API
+documentation or live XDEX error/response evidence. Field units and semantics
+remain gated until the opt-in live contract probe verifies them.
 """
 
 from __future__ import annotations
@@ -22,11 +21,7 @@ import requests
 CHAIN = "x1"
 XDEX_SOURCE = "XDEX public API"
 XDEX_API_BASE_URL = "https://api.xdex.xyz"
-# XDEX's supplied API catalog documents mainnet/testnet/devnet as endpoint
-# network values. Public clients using display names such as "X1 Mainnet" are
-# not treated as transport-authoritative after live XDEX returned HTTP 400 for
-# that form across price, history, and quote endpoints.
-XDEX_NETWORK_X1_MAINNET = "mainnet"
+XDEX_NETWORK_X1_MAINNET = "X1 Mainnet"
 
 TOKEN_PRICE_URL = f"{XDEX_API_BASE_URL}/api/token-price/price"
 PRICE_HISTORY_URL = f"{XDEX_API_BASE_URL}/api/xendex/chart/history"
@@ -76,19 +71,6 @@ def _error_message(body: Mapping[str, Any]) -> str:
     return text or "XDEX reported an unsuccessful response."
 
 
-def _http_error_detail(exc: Exception) -> str:
-    """Expose bounded provider error text when requests attaches a response."""
-
-    response = getattr(exc, "response", None)
-    if response is None:
-        return ""
-    text = str(getattr(response, "text", "") or "").strip()
-    if not text:
-        return ""
-    compact = " ".join(text.split())
-    return f" | response: {compact[:1000]}"
-
-
 def _parse_success_data(
     body: Any,
     *,
@@ -108,6 +90,15 @@ def _parse_success_data(
     return data
 
 
+def _bounded_response_text(response: Any, *, limit: int = 500) -> str:
+    text = str(getattr(response, "text", "") or "").strip()
+    if not text:
+        return ""
+    if len(text) > limit:
+        text = f"{text[:limit]}..."
+    return f" | response: {text}"
+
+
 def _get_json(
     url: str,
     *,
@@ -115,6 +106,7 @@ def _get_json(
     session=requests,
     timeout: int = 15,
 ):
+    response = None
     try:
         response = session.get(url, params=dict(params), timeout=timeout)
         response.raise_for_status()
@@ -122,7 +114,7 @@ def _get_json(
     except Exception as exc:
         if isinstance(exc, XDEXAPIError):
             raise
-        detail = _http_error_detail(exc)
+        detail = _bounded_response_text(response)
         raise XDEXAPIError(f"XDEX request failed for {url}: {exc}{detail}") from exc
     return body
 
@@ -140,7 +132,7 @@ def fetch_token_price(
     network_name = _nonempty_text("network", network)
     body = _get_json(
         TOKEN_PRICE_URL,
-        params={"network": network_name, "address": token},
+        params={"network": network_name, "token_address": token},
         session=session,
         timeout=timeout,
     )
@@ -153,29 +145,41 @@ def fetch_token_price(
 
 
 def fetch_price_history(
-    token_address: str,
+    from_token: str,
+    to_token: str,
     *,
-    days: int = 7,
+    time_from: Any,
+    time_to: Any,
     network: str = XDEX_NETWORK_X1_MAINNET,
     session=requests,
     timeout: int = 15,
 ) -> list[dict[str, Any]]:
-    """Fetch raw XDEX chart history points.
+    """Fetch raw pair price-history points for an explicit time window.
 
-    No point field is promoted as a verified timestamp/price contract here.
-    Each row must at least be a mapping so later verification can inspect it
-    without silently accepting malformed scalar/list content.
+    XDEX live error evidence confirms the required parameter names. The time
+    unit is intentionally not interpreted here; the opt-in live probe currently
+    tests Unix seconds and must verify the returned contract before CMIS use.
     """
 
-    token = _nonempty_text("token_address", token_address)
+    from_token_text = _nonempty_text("from_token", from_token)
+    to_token_text = _nonempty_text("to_token", to_token)
+    if from_token_text == to_token_text:
+        raise ValueError("from_token and to_token must be different.")
+
+    start = _positive_int("time_from", time_from)
+    end = _positive_int("time_to", time_to)
+    if end <= start:
+        raise ValueError("time_to must be greater than time_from.")
+
     network_name = _nonempty_text("network", network)
-    day_count = _positive_int("days", days)
     body = _get_json(
         PRICE_HISTORY_URL,
         params={
             "network": network_name,
-            "token": token,
-            "days": day_count,
+            "from_token": from_token_text,
+            "to_token": to_token_text,
+            "time_from": start,
+            "time_to": end,
         },
         session=session,
         timeout=timeout,
@@ -268,13 +272,17 @@ class XDEXReadOnlyProvider:
 
     def price_history(
         self,
-        token_address: str,
+        from_token: str,
+        to_token: str,
         *,
-        days: int = 7,
+        time_from: Any,
+        time_to: Any,
     ) -> list[dict[str, Any]]:
         return fetch_price_history(
-            token_address,
-            days=days,
+            from_token,
+            to_token,
+            time_from=time_from,
+            time_to=time_to,
             network=self.network,
             session=self.session,
             timeout=self.timeout,

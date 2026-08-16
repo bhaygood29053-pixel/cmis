@@ -48,16 +48,16 @@ class FakeSession:
 
 
 class XDEXReadOnlyProviderTests(unittest.TestCase):
-    def test_provider_identifies_chain_source_and_documented_mainnet_name(self):
+    def test_provider_identifies_chain_source_and_live_verified_x1_network_name(self):
         provider = XDEXReadOnlyProvider(session=FakeSession([]))
 
         self.assertEqual(provider.chain, "x1")
         self.assertEqual(provider.source, "XDEX public API")
         self.assertEqual(XDEX_SOURCE, "XDEX public API")
-        self.assertEqual(provider.network, "mainnet")
-        self.assertEqual(XDEX_NETWORK_X1_MAINNET, "mainnet")
+        self.assertEqual(provider.network, "X1 Mainnet")
+        self.assertEqual(XDEX_NETWORK_X1_MAINNET, "X1 Mainnet")
 
-    def test_token_price_uses_address_and_documented_mainnet_without_coercing_values(self):
+    def test_token_price_uses_live_observed_token_address_parameter(self):
         session = FakeSession(
             [
                 FakeResponse(
@@ -78,33 +78,64 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         self.assertEqual(
             session.calls[0]["params"],
             {
-                "network": "mainnet",
-                "address": "AGI_MINT",
+                "network": "X1 Mainnet",
+                "token_address": "AGI_MINT",
             },
         )
         self.assertEqual(result["price"], "0.00006188")
         self.assertIsNone(result["price_change_24h"])
         self.assertEqual(result["liquidity"], "3366.60")
 
-    def test_price_history_uses_token_days_and_preserves_raw_points(self):
+    def test_price_history_uses_live_observed_pair_and_time_range_parameters(self):
         points = [
             {"timestamp": "2026-08-15T00:00:00Z", "price": "1.25", "volume": None},
             {"time": 1786830000, "price": 1.5},
         ]
         session = FakeSession([FakeResponse({"success": True, "data": points})])
 
-        result = fetch_price_history("AGI_MINT", days=7, session=session)
+        result = fetch_price_history(
+            "AGI_MINT",
+            "XNT_MINT",
+            time_from=100,
+            time_to=200,
+            session=session,
+        )
 
         self.assertEqual(
             session.calls[0]["params"],
             {
-                "network": "mainnet",
-                "token": "AGI_MINT",
-                "days": 7,
+                "network": "X1 Mainnet",
+                "from_token": "AGI_MINT",
+                "to_token": "XNT_MINT",
+                "time_from": 100,
+                "time_to": 200,
             },
         )
         self.assertEqual(result, points)
         self.assertIsNot(result, points)
+
+    def test_price_history_rejects_invalid_window_before_transport(self):
+        session = FakeSession([])
+
+        with self.assertRaisesRegex(ValueError, "must be different"):
+            fetch_price_history(
+                "SAME",
+                "SAME",
+                time_from=100,
+                time_to=200,
+                session=session,
+            )
+
+        with self.assertRaisesRegex(ValueError, "time_to must be greater"):
+            fetch_price_history(
+                "A",
+                "B",
+                time_from=200,
+                time_to=100,
+                session=session,
+            )
+
+        self.assertEqual(session.calls, [])
 
     def test_price_history_rejects_non_mapping_point(self):
         session = FakeSession(
@@ -115,7 +146,13 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
             XDEXAPIError,
             "price history point 1 must be a JSON object",
         ):
-            fetch_price_history("AGI_MINT", session=session)
+            fetch_price_history(
+                "AGI_MINT",
+                "XNT_MINT",
+                time_from=100,
+                time_to=200,
+                session=session,
+            )
 
     def test_unsuccessful_provider_response_is_explicit_error(self):
         session = FakeSession(
@@ -132,7 +169,7 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(XDEXAPIError, "token not found"):
             fetch_token_price("UNKNOWN", session=session)
 
-    def test_swap_quote_uses_verified_candidate_request_shape(self):
+    def test_swap_quote_uses_live_verified_x1_mainnet_request_shape(self):
         session = FakeSession(
             [
                 FakeResponse(
@@ -158,7 +195,7 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         self.assertEqual(
             session.calls[0]["params"],
             {
-                "network": "mainnet",
+                "network": "X1 Mainnet",
                 "token_in": "XNT_MINT",
                 "token_out": "XNM_MINT",
                 "token_in_amount": "1.2500",
@@ -218,7 +255,13 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
             [FakeResponse({"success": True, "data": {}})]
         )
         with self.assertRaisesRegex(XDEXAPIError, "price history response data"):
-            fetch_price_history("AGI_MINT", session=list_expected)
+            fetch_price_history(
+                "AGI_MINT",
+                "XNT_MINT",
+                time_from=100,
+                time_to=200,
+                session=list_expected,
+            )
 
         quote_expected = FakeSession(
             [FakeResponse({"success": True, "data": []})]
@@ -272,7 +315,15 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         provider = XDEXReadOnlyProvider(session=session, timeout=9)
 
         self.assertEqual(provider.token_price("T")["price"], 1)
-        self.assertEqual(provider.price_history("T", days=3)[0]["price"], 1)
+        self.assertEqual(
+            provider.price_history(
+                "T",
+                "U",
+                time_from=100,
+                time_to=200,
+            )[0]["price"],
+            1,
+        )
         self.assertEqual(provider.swap_quote("T", "U", 1)["outputAmount"], 2)
         self.assertTrue(all(call["timeout"] == 9 for call in session.calls))
 
