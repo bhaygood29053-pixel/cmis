@@ -336,11 +336,26 @@ def diagnose_exact_pool_leg_semantics(
             "diagnostic_24h_integrity_verified": scan.get("integrity_verified") is True,
             "diagnostic_24h_transaction_signature_count": signature_count,
         }
-        if (
+
+        if not (
             scan.get("range_proven") is True
             and scan.get("integrity_verified") is True
-            and signature_count == 0
         ):
+            return _result(
+                outcome=INSUFFICIENT_EVIDENCE,
+                stage="proof_diagnosis_history_scan",
+                code="DIAGNOSTIC_HISTORY_RANGE_UNPROVEN",
+                reason=(
+                    "CMIS identified missing vault-pair evidence, but the additional "
+                    "24h activity range could not itself be fully proven. The system "
+                    "therefore cannot distinguish inactivity from missing topology "
+                    "evidence and remains fail-closed."
+                ),
+                evidence=evidence,
+                retryable=True,
+            )
+
+        if signature_count == 0:
             return _result(
                 outcome=INSUFFICIENT_EVIDENCE,
                 stage="vault_pair_discovery",
