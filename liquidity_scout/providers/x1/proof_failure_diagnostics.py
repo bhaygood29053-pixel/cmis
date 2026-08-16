@@ -213,12 +213,25 @@ def diagnose_exact_pool_leg_semantics(
         if isinstance(raw, Mapping)
     ]
 
+    # v1.4.10 records an explanatory canonical_pool_vault_coupling error when a
+    # mapping prerequisite is merely unproven. That is expected fail-closed
+    # evidence, not a transport failure. Preserve it for later diagnosis.
+    expected_mapping_prerequisite_error = bool(
+        status == "canonical_vault_mapping_unproven"
+        and errors
+        and all(
+            _text(raw.get("stage")) == "canonical_pool_vault_coupling"
+            for raw in errors
+        )
+        and not coupling_errors
+    )
+
     if status in {
         "canonical_vault_mapping_unavailable",
         "history_scan_unavailable",
         "transaction_evidence_incomplete",
-    } or errors or coupling_errors:
-        first = (errors + coupling_errors)[0] if (errors or coupling_errors) else {}
+    } or coupling_errors or (errors and not expected_mapping_prerequisite_error):
+        first = (coupling_errors + errors)[0] if (coupling_errors or errors) else {}
         return _result(
             outcome=DATA_OR_TRANSPORT_ERROR,
             stage=_text(first.get("stage")) or status,
