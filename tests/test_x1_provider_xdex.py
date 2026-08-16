@@ -169,6 +169,28 @@ class XDEXReadOnlyProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(XDEXAPIError, "token not found"):
             fetch_token_price("UNKNOWN", session=session)
 
+    def test_unsuccessful_provider_response_preserves_body_when_message_missing(self):
+        session = FakeSession(
+            [
+                FakeResponse(
+                    {
+                        "success": False,
+                        "data": [],
+                        "status": "unavailable",
+                    }
+                )
+            ]
+        )
+
+        with self.assertRaisesRegex(XDEXAPIError, "status.*unavailable"):
+            fetch_price_history(
+                "AGI_MINT",
+                "XNM_MINT",
+                time_from=100,
+                time_to=200,
+                session=session,
+            )
+
     def test_swap_quote_uses_live_verified_x1_mainnet_request_shape(self):
         session = FakeSession(
             [
