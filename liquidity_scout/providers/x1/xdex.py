@@ -68,7 +68,15 @@ def _error_message(body: Mapping[str, Any]) -> str:
     if isinstance(raw, Mapping):
         raw = raw.get("message") or raw.get("code")
     text = str(raw or body.get("message") or "").strip()
-    return text or "XDEX reported an unsuccessful response."
+    if text:
+        return text
+
+    detail = repr(dict(body)).strip()
+    if len(detail) > 500:
+        detail = f"{detail[:500]}..."
+    if detail:
+        return f"XDEX reported an unsuccessful response: {detail}"
+    return "XDEX reported an unsuccessful response."
 
 
 def _parse_success_data(
