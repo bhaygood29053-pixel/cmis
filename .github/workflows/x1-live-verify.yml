@@ -29,7 +29,7 @@ on:
         default: false
         type: boolean
       run_history_range_probe:
-        description: Run sanitized XENCAT provider-RPC history-range evidence probe
+        description: Run sanitized canonical-XENCAT provider-RPC history-range evidence probe
         required: true
         default: false
         type: boolean
@@ -160,12 +160,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Run XENCAT history-range evidence probe
+      - name: Run canonical XENCAT history-range evidence probe
         if: ${{ inputs.run_history_range_probe }}
         shell: bash
         run: |
           set -euo pipefail
-          python cmis_history_range_probe.py XENCAT --window 1h --max-pools 1 --max-signatures-per-pool 5000 --page-size 1000 --output x1-history-range-evidence.json
+          # XENCAT is not globally unique in the live catalog. Use the canonical
+          # mint so CMIS keeps its fail-closed ambiguity contract while this
+          # verification job remains deterministic.
+          python cmis_history_range_probe.py DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb --window 1h --max-pools 1 --max-signatures-per-pool 5000 --page-size 1000 --output x1-history-range-evidence.json
 
       - name: Upload X1 history-range evidence
         if: ${{ inputs.run_history_range_probe }}
