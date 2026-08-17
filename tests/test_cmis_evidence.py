@@ -155,7 +155,7 @@ class CMISEvidenceTests(unittest.TestCase):
         self.assertEqual(quality["independent_source_count"], 1)
         self.assertIn("SINGLE_SOURCE_ONLY", quality["reasons"])
 
-    def test_conflict_prevents_high_quality(self):
+    def test_conflict_forces_low_quality(self):
         primary = self._observation(normalized_value="1000")
         verifier = self._observation(
             source="X1 RPC",
@@ -169,7 +169,7 @@ class CMISEvidenceTests(unittest.TestCase):
             verification=verification,
         )
 
-        self.assertEqual(quality["quality"], "MEDIUM")
+        self.assertEqual(quality["quality"], "LOW")
         self.assertFalse(quality["independent_agreement_verified"])
         self.assertIn("INDEPENDENT_SOURCE_CONFLICT", quality["reasons"])
 
