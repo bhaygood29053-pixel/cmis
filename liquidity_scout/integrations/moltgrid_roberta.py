@@ -1,20 +1,20 @@
-"""MoltGrid launcher with opt-in Roberta conversational routes.
+"""MoltGrid launcher with Roberta-first conversational routing.
 
 The existing ``liquidity_scout.integrations.moltgrid`` module remains the
-transport/source of truth for Signal/MoltGrid behavior. This wrapper preserves
-the existing router and deterministic market routes while handing selected
-conversation routes to Roberta.
+Signal/MoltGrid transport and admission boundary. Roberta can be enabled in two
+modes:
 
-Routes:
-- explicit pre-trade questions -> Roberta -> X1 Scout -> CMIS
-- general conversational questions -> Roberta
-- agent identity questions -> Roberta
-- deterministic market-data/ranking routes -> existing Liquidity Scout router
+- selected-route compatibility mode: pre-trade and/or conversation handoffs;
+- all-questions mode: every admitted Signal question goes to Roberta first.
 
-Run with::
+In all-questions mode, Liquidity Scout's existing router remains available only
+as a per-message fallback when the Roberta bridge is unavailable. That fallback
+preserves deterministic XDEX/CMIS behavior without allowing two visible replies
+for one incoming Signal message.
 
-    ROBERTA_MOLTGRID_PRETRADE_ENABLED=1 \
-    ROBERTA_MOLTGRID_CONVERSATION_ENABLED=1 \
+Recommended mode::
+
+    ROBERTA_MOLTGRID_ALL_QUESTIONS_ENABLED=1 \
     python -m liquidity_scout.integrations.moltgrid_roberta
 """
 
@@ -24,6 +24,7 @@ from liquidity_scout.integrations import moltgrid as base_moltgrid
 from liquidity_scout.integrations.roberta_bridge import (
     RobertaBridgeError,
     ask_roberta,
+    roberta_all_questions_enabled,
     roberta_conversation_enabled,
     roberta_pretrade_enabled,
 )
@@ -39,11 +40,196 @@ def _conversation_fallback(label, fallback_text):
     )
 
 
+def _legacy_route_answer(
+    listener_module,
+    catalog,
+    question,
+    pre_term=None,
+    pre_matches=None,
+):
+    """Run the existing per-message router without re-entering Roberta.
+
+    This mirrors the legacy listener's route ordering so all-questions mode can
+    fail over one message at a time while keeping ``process_cycle`` duplicate
+    protection under the Roberta-first wrapper.
+    """
+    if listener_module.wants_global_xdex_ranking(question):
+        metric = listener_module.xdex_ranking_metric(question)
+        print(
+            "Fallback route: GLOBAL XDEX RANKING | "
+            f"metric: {metric}"
+        )
+        return listener_module.format_global_xdex_ranking_answer(
+            question,
+            catalog,
+        )
+
+    if listener_module.looks_like_agent_identity_question(question):
+        print("Fallback route: AGENT IDENTITY / HXMP QUESTION")
+        return listener_module.format_hxmp_identity_answer(question)
+
+    if listener_module.explicitly_requests_multiple_assets(question):
+        multi = listener_module.resolve_multiple_assets(
+            question,
+            catalog.pools,
+        )
+    else:
+        multi = []
+
+    if len(multi) >= 2:
+        names = ", ".join(term for term, _ in multi)
+        print(f"Fallback route: MULTI-ASSET DATA | detected: {names}")
+        return listener_module.format_multi_asset_answer(
+            question,
+            multi,
+            catalog,
+        )
+
+    if pre_matches:
+        term, matches = pre_term, pre_matches
+    elif multi:
+        term, matches = multi[0]
+    else:
+        term, matches = listener_module.resolve_asset(
+            question,
+            catalog.pools,
+        )
+
+    if matches:
+        if listener_module.wants_asset_analysis(question):
+            print(f"Fallback route: ASSET ANALYSIS | asset: {term}")
+            return listener_module.format_asset_analysis_answer(
+                question,
+                term,
+                matches,
+                catalog,
+            )
+
+        fields = listener_module.requested_asset_fields(question)
+        if fields:
+            print(
+                "Fallback route: SPECIFIC ASSET DATA | "
+                f"asset: {term} | fields: {', '.join(fields)}"
+            )
+        else:
+            print(f"Fallback route: FULL ASSET REPORT | asset: {term}")
+        return listener_module.format_pool_answer(
+            question,
+            term,
+            matches,
+            catalog,
+        )
+
+    print("Fallback route: GENERAL CRYPTO/X1/DEFI QUESTION")
+    return listener_module.format_general_answer(question)
+
+
+def wire_roberta_all_questions(listener_module):
+    """Make Roberta the first responder for every admitted Signal question."""
+    if getattr(listener_module, "_roberta_all_questions_wired", False):
+        return listener_module
+
+    existing_process_cycle = getattr(
+        listener_module,
+        "_roberta_all_questions_fallback_process_cycle",
+        listener_module.process_cycle,
+    )
+    listener_module._roberta_all_questions_fallback_process_cycle = (
+        existing_process_cycle
+    )
+    listener_module._roberta_all_questions_wired = True
+
+    def routed_process_cycle(catalog, implicit_mode_started_at):
+        if not roberta_all_questions_enabled():
+            return existing_process_cycle(catalog, implicit_mode_started_at)
+
+        catalog.refresh_if_needed()
+
+        posts = listener_module.fetch_signal_posts()
+        thread_reply_mode_started_at = (
+            listener_module.ensure_thread_reply_mode_start()
+        )
+        pending = listener_module.find_unanswered_messages(
+            posts,
+            catalog,
+            implicit_mode_started_at,
+            thread_reply_mode_started_at,
+        )
+
+        if not pending:
+            return
+
+        answered = listener_module.load_answered()
+
+        for post, message_type, pre_term, pre_matches in pending[:5]:
+            post_id = str(post["id"])
+            question = listener_module.s(post.get("content"))
+            sender = post.get("name") or post.get("wallet")
+
+            if message_type.startswith("standalone"):
+                reply_target_id = post_id
+            else:
+                reply_target_id = str(post.get("replyTo"))
+
+            print()
+            print("=" * 72)
+            print(f"New {message_type} message from: {sender}")
+            print(f"Message: {question}")
+            print("Route: ROBERTA FIRST | all admitted questions")
+
+            try:
+                answer = ask_roberta(question)
+            except RobertaBridgeError as exc:
+                print(
+                    "Roberta Bridge unavailable: "
+                    f"{type(exc).__name__}"
+                )
+                fallback = _legacy_route_answer(
+                    listener_module,
+                    catalog,
+                    question,
+                    pre_term,
+                    pre_matches,
+                )
+                answer = _conversation_fallback(
+                    "router",
+                    fallback,
+                )
+
+            result = listener_module.post_visible_reply(
+                reply_target_id,
+                answer,
+            )
+            created = (
+                result.get("post", {})
+                if isinstance(result, dict)
+                else {}
+            )
+            returned_reply_to = str(created.get("replyTo") or "")
+
+            if returned_reply_to == reply_target_id:
+                answered.add(post_id)
+                listener_module.save_answered(answered)
+                print(
+                    "Answered successfully on Signal. Post ID: "
+                    f"{created.get('id')}"
+                )
+            else:
+                print("WARNING: reply linkage was not confirmed.")
+                print("Stopping this cycle to avoid duplicate replies.")
+                break
+
+    listener_module.process_cycle = routed_process_cycle
+    return listener_module
+
+
 def wire_roberta_pretrade(listener_module):
-    """Preserve the MoltGrid router while adding selected Roberta handoffs.
+    """Preserve selected-route compatibility handoffs.
 
     The public function name is retained for compatibility with the first
-    bridge release, but it now wires pre-trade plus general/identity routes.
+    bridge release. It wires explicit pre-trade plus general/identity routes.
+    All-questions mode is wired separately so its fallback cannot recursively
+    re-enter these selected Roberta wrappers.
     """
     existing_asset_formatter = getattr(
         listener_module,
@@ -134,8 +320,11 @@ def wire_roberta_pretrade(listener_module):
 
 
 def load_listener():
-    """Load the existing MoltGrid listener, then add the Roberta handoffs."""
-    return wire_roberta_pretrade(base_moltgrid.load_listener())
+    """Load MoltGrid and apply the configured Roberta ownership mode."""
+    listener = base_moltgrid.load_listener()
+    if roberta_all_questions_enabled():
+        return wire_roberta_all_questions(listener)
+    return wire_roberta_pretrade(listener)
 
 
 def main():
@@ -147,4 +336,9 @@ if __name__ == "__main__":
     main()
 
 
-__all__ = ["load_listener", "main", "wire_roberta_pretrade"]
+__all__ = [
+    "load_listener",
+    "main",
+    "wire_roberta_all_questions",
+    "wire_roberta_pretrade",
+]
