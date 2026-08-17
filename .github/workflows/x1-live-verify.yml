@@ -77,10 +77,20 @@ jobs:
         if: ${{ inputs.run_reserve_scope_probe }}
         env:
           RUN_X1_RESERVE_SCOPE_LIVE: "1"
+          X1_RESERVE_SCOPE_OUTPUT: x1-reserve-scope-evidence.json
         shell: bash
         run: |
           set -euo pipefail
           python -m unittest tests.test_x1_reserve_scope_live -v
+
+      - name: Upload X1 reserve scope evidence
+        if: ${{ inputs.run_reserve_scope_probe }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-reserve-scope-evidence-${{ github.run_id }}
+          path: x1-reserve-scope-evidence.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run X1.Ninja OHLCV live contract probe
         if: ${{ inputs.run_ohlcv }}
@@ -112,4 +122,5 @@ jobs:
         run: |
           echo "Read-only provider verification only."
           echo "Reserve scope probes measure evidence timing/slots but do not declare freshness or CMIS promotion."
+          echo "Uploaded reserve-scope artifacts are sanitized and exclude credentials/raw HTTP payloads."
           echo "No transaction preparation, signing, broadcasting, or autonomous execution is performed."
