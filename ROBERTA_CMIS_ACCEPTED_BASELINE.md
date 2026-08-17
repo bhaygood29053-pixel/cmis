@@ -60,14 +60,40 @@ CMIS has a fail-closed structural gate that can bind explicit provider field pat
 
 The manifest is an asserted proof input, not self-authenticating truth. The gate does not establish freshness or cross-source value agreement and does not make the result CMIS-promotable by itself.
 
+### X1 reserve evidence adapter
+
+CMIS has a fail-closed adapter that can convert an already-verified X1.Ninja semantic binding plus a matching X1 RPC token-account balance into two same-identity CMIS evidence observations.
+
+The adapter accepts only an explicitly declared `token_base_units` or explicitly declared `token_units` provider contract. It canonicalizes supported values to deterministic `TOKEN_UNITS`, requires the RPC account and decimals to match the already-bound vault identity, preserves provider field path and RPC slot provenance, and rejects unsupported or over-precision values.
+
+Freshness remains caller-controlled and defaults false. The adapter never marks its own output CMIS-promotable; the generic reserve verifier still owns same-fact agreement/conflict evaluation.
+
+## Verified XENCAT/XNT live observation
+
+A read-only proof path has established one concrete X1.Ninja reserve-semantic example for pool `6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry`:
+
+- XENCAT mint: `DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb`
+- XENCAT vault: `9ojBC34QUrubQASb1ktqkNn3kdFiUnqaBnLLgSeWbRm7`
+- XNT mint: `So11111111111111111111111111111111111111112`
+- XNT vault: `7khUrkZN7Y6VgoSR8pASMFjHcKwqdh2cd6NRctXyjSZC`
+- shared token-account authority: `9Dpjw2pB5kXJr6ZTHiqzEMfJPic3om9jgNacnwpLCoaU`
+
+Saved on-chain transaction evidence identified the same recurring vault pair with opposite token movement. Direct X1 RPC independently confirmed the expected mints, decimals, shared authority, and live token-account balances. Those RPC token-unit balances exactly matched the X1.Ninja live `pool.pooledBase` and `pool.pooledQuote` values observed in workflow run `32027108070`:
+
+- XENCAT: `1146902.928865` token units, 6 decimals
+- XNT: `49.575383312` token units, 9 decimals
+
+This is a proof for that exact pool and observation path. It must not be generalized into a rule that every X1.Ninja pool uses identical field semantics without its own verified identity/unit evidence.
+
 ## Not yet Roberta-consumable as production capability
 
 Roberta must currently treat the following as unavailable unless and until a supported Roberta-facing wrapper and all required verification gates are accepted:
 
 - `verification_evidence` as a callable Roberta service
-- X1 reserve values derived from X1.Ninja pool-detail fields
-- a provider/RPC reserve comparison produced from unproven provider units
-- draft reserve evidence adapters, including work that depends on proving whether provider values are token units, token base units, or another documented unit
+- a general Roberta-callable X1 reserve verification service
+- provider/RPC reserve comparisons where provider units, vault identity, decimals, or freshness requirements are unproven
+- automatic generalization of the verified XENCAT/XNT `pooledBase` / `pooledQuote` semantics to other pools
+- direct use of the accepted reserve evidence adapter as if it were a production service or a promotion decision
 - any CMIS capability that exists only in an open or stacked PR
 
 In particular, an accepted low-level CMIS primitive is **not** equivalent to a production Roberta service.
@@ -85,6 +111,7 @@ When a future supported service returns CMIS verification output, Roberta may:
 Roberta must not:
 
 - infer missing provider semantics or units
+- generalize a pool-specific semantic proof to another pool without CMIS evidence
 - convert `CONFLICT` into agreement
 - convert `INSUFFICIENT_EVIDENCE` into a definitive fact
 - recalculate deterministic CMIS comparisons to obtain a preferred answer
