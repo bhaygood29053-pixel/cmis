@@ -16,6 +16,7 @@ import os
 from typing import Any
 
 from liquidity_scout.cmis.evidence_ledger import VerificationEvidenceLedger
+from liquidity_scout.cmis.pre_trade_policy_gateway import PreTradePolicyMixin
 from liquidity_scout.cmis.solana_gateway import SolanaAssetLookupMixin
 from liquidity_scout.cmis.solana_historical_gateway import SolanaHistoricalCompareMixin
 from liquidity_scout.cmis.solana_market_gateway import SolanaMarketReportMixin
@@ -47,6 +48,7 @@ SUPPORTED_SERVICES = (
 
 
 class RuntimeCMISGateway(
+    PreTradePolicyMixin,
     SolanaHistoricalCompareMixin,
     SolanaRiskCheckMixin,
     SolanaMarketReportMixin,
