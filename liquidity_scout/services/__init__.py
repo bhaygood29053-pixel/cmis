@@ -18,6 +18,7 @@ from .cmis_rank import SUPPORTED_RANK_METRICS, build_rank_response
 from .cmis_risk import build_risk_check_response
 from .cmis_tokenomics import build_tokenomics_response
 from .cmis_verification_evidence import build_verification_evidence_response
+from .cmis_verification_evidence_lookup import lookup_verification_evidence
 from .historical_compare import (
     build_historical_comparison,
     format_historical_comparison,
@@ -88,6 +89,7 @@ __all__ = [
     "format_top",
     "full_snapshot_lines",
     "liquidity_depth_label",
+    "lookup_verification_evidence",
     "price_movement_label",
     "rank_assets",
     "requested_asset_fields",
