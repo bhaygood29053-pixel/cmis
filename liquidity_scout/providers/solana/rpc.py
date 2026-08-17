@@ -29,9 +29,11 @@ class SolanaRPCNotFound(SolanaRPCError):
 
 
 def _text(value: object, *, field: str) -> str:
-    text = str(value or "").strip()
+    if not isinstance(value, str):
+        raise SolanaRPCError(f"{field} must be a non-empty string")
+    text = value.strip()
     if not text:
-        raise SolanaRPCError(f"{field} is missing or empty")
+        raise SolanaRPCError(f"{field} must be a non-empty string")
     return text
 
 
@@ -57,10 +59,11 @@ def _u8(value: object, *, field: str) -> int:
 
 
 def _raw_amount(value: object, *, field: str) -> str:
-    text = _text(value, field=field)
-    if not text.isdigit():
+    if not isinstance(value, str) or not value:
         raise SolanaRPCError(f"{field} must be an unsigned integer string")
-    return text.lstrip("0") or "0"
+    if not value.isdigit():
+        raise SolanaRPCError(f"{field} must be an unsigned integer string")
+    return value.lstrip("0") or "0"
 
 
 def _context_slot(result: Mapping[str, Any]) -> int:
