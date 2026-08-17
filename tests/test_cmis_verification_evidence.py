@@ -41,10 +41,7 @@ def observation(
     )
 
 
-def verified_result(
-    primary=None,
-    verifier=None,
-):
+def verified_result(primary=None, verifier=None):
     return verify_x1_pool_reserve(
         primary or observation("X1.Ninja"),
         verifier or observation("X1 RPC", slot=101),
@@ -109,7 +106,7 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertEqual(response["warnings"], [])
         self.assertEqual(response["errors"], [])
 
-    def test_agreement_without_freshness_is_partial_and_not_strengthened(self):
+    def test_agreement_without_freshness_is_partial_but_not_a_promoted_fact(self):
         result = verified_result(
             observation("X1.Ninja", freshness=False),
             observation("X1 RPC", freshness=False, slot=101),
@@ -121,11 +118,18 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertEqual(response["status"], "partial")
         self.assertEqual(response["data"]["verification"]["status"], "AGREEMENT")
         self.assertFalse(response["data"]["cmis_promotable"])
-        self.assertEqual(response["confidence"]["quality"], "LOW")
-        self.assertIn(
-            "FRESHNESS_UNVERIFIED",
-            response["confidence"]["reasons"],
+        self.assertIsNone(response["data"]["fact"]["normalized_value"])
+        self.assertIsNone(response["data"]["fact"]["unit"])
+        self.assertEqual(
+            response["data"]["observations"]["primary"]["normalized_value"],
+            "42",
         )
+        self.assertEqual(
+            response["data"]["observations"]["verifier"]["normalized_value"],
+            "42",
+        )
+        self.assertEqual(response["confidence"]["quality"], "LOW")
+        self.assertIn("FRESHNESS_UNVERIFIED", response["confidence"]["reasons"])
         self.assertEqual(response["warnings"][0]["code"], "agreement_not_promotable")
 
     def test_conflict_is_partial_and_never_exposes_one_value_as_verified_fact(self):
@@ -167,8 +171,7 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         )
 
     def test_wrapper_drops_unapproved_nested_payloads_and_secret_shaped_extras(self):
-        result = verified_result()
-        result = copy.deepcopy(result)
+        result = copy.deepcopy(verified_result())
         primary = result["verification"]["primary"]
         primary["api_key"] = "secret"
         primary["raw_response"] = {"authorization": "Bearer secret"}
@@ -187,16 +190,14 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertNotIn("secret", str(response))
 
     def test_wrapper_rejects_chain_or_fact_identity_mismatch(self):
-        result = verified_result()
-        result = copy.deepcopy(result)
+        result = copy.deepcopy(verified_result())
         result["verification"]["verifier"]["chain"] = "solana"
 
         response = build_verification_evidence_response(result, chain="x1")
         self.assertEqual(response["status"], "error")
         self.assertEqual(response["errors"][0]["code"], "verification_chain_mismatch")
 
-        result = verified_result()
-        result = copy.deepcopy(result)
+        result = copy.deepcopy(verified_result())
         result["verification"]["verifier"]["subject_id"] = "other-subject"
         response = build_verification_evidence_response(result)
         self.assertEqual(response["status"], "error")
@@ -206,8 +207,7 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         )
 
     def test_wrapper_rejects_inconsistent_status_and_promotion_claims(self):
-        result = verified_result()
-        result = copy.deepcopy(result)
+        result = copy.deepcopy(verified_result())
         result["verification"]["status"] = "CONFLICT"
         result["verification"]["agreement"] = True
 
@@ -225,20 +225,52 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertEqual(response["status"], "error")
         self.assertEqual(response["errors"][0]["code"], "promotion_state_inconsistent")
 
+    def test_wrapper_rejects_invalid_or_inconsistent_quality_contract(self):
+        result = copy.deepcopy(verified_result())
+        result["data_quality"]["quality"] = "VERY_HIGH"
+        response = build_verification_evidence_response(result)
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(response["errors"][0]["code"], "data_quality_invalid")
+
+        result = copy.deepcopy(verified_result())
+        result["data_quality"]["independent_agreement_verified"] = False
+        response = build_verification_evidence_response(result)
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(
+            response["errors"][0]["code"],
+            "data_quality_agreement_inconsistent",
+        )
+
+        result = copy.deepcopy(verified_result())
+        result["data_quality"]["freshness_verified"] = False
+        response = build_verification_evidence_response(result)
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(response["errors"][0]["code"], "promotion_quality_inconsistent")
+
+        result = copy.deepcopy(verified_result())
+        result["data_quality"]["independent_source_count"] = 1
+        response = build_verification_evidence_response(result)
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(response["errors"][0]["code"], "promotion_quality_inconsistent")
+
+    def test_promotable_agreement_requires_equal_normalized_value_and_unit(self):
+        result = copy.deepcopy(verified_result())
+        result["verification"]["primary_value"] = {"nested": "not-a-scalar"}
+        response = build_verification_evidence_response(result)
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(response["errors"][0]["code"], "promoted_fact_value_invalid")
+
     def test_wrapper_rejects_missing_fact_specific_verifier_contract(self):
         response = build_verification_evidence_response({})
         self.assertEqual(response["status"], "error")
         self.assertEqual(response["errors"][0]["code"], "verification_result_missing")
 
-        result = verified_result()
-        result = copy.deepcopy(result)
+        result = copy.deepcopy(verified_result())
         del result["data_quality"]
         response = build_verification_evidence_response(result)
         self.assertEqual(response["errors"][0]["code"], "data_quality_missing")
 
     def test_wrapper_is_internal_service_builder_not_gateway_evidence_selector(self):
-        # Runtime selection/storage belongs in a future eligible gateway/data-store
-        # integration. This wrapper accepts a verifier result; it does not fetch one.
         response = build_verification_evidence_response(verified_result())
         self.assertNotIn("request", response["data"])
         self.assertNotIn("provider_query", response["data"])
