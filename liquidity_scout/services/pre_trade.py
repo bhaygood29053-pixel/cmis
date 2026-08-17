@@ -5,13 +5,13 @@ transaction work. It consumes an already-computed deterministic ``risk_check``
 result plus proposed trade context and applies fail-closed identity, chain,
 trade-size/liquidity, and explicit evidence-freshness gates.
 
-The result is analysis only. ``PASS`` never authorizes execution. Slippage,
-price impact, fees, and route quality remain unavailable until separately
-verified calculation/quote evidence exists; this core never manufactures them.
+Unsupported execution estimates are represented through a machine-readable
+capability contract. The core never fills those fields with guessed values.
 """
 
 from typing import Any, Dict, Mapping, Optional
 
+from .pre_trade_capabilities import build_execution_capability_report
 from .pre_trade_freshness import assess_risk_freshness
 from .pre_trade_liquidity import (
     DEFAULT_PRE_TRADE_POLICY,
@@ -36,7 +36,7 @@ def _number(value: Any) -> Optional[float]:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    if number != number:  # NaN
+    if number != number:
         return None
     if number in (float("inf"), float("-inf")):
         return None
@@ -49,13 +49,7 @@ def _merge_status(*statuses: str) -> str:
     return max(statuses, key=lambda status: _STATUS_ORDER[status])
 
 
-def _component(
-    status: str,
-    *,
-    flags=None,
-    reasons=None,
-    evidence=None,
-) -> Dict[str, Any]:
+def _component(status: str, *, flags=None, reasons=None, evidence=None) -> Dict[str, Any]:
     return {
         "status": status,
         "flags": list(flags or []),
@@ -84,17 +78,14 @@ def _normalize_trade(trade: Mapping[str, Any]) -> Dict[str, Any]:
     side = (_text(trade.get("side")) or "").lower()
     if side not in _ALLOWED_SIDES:
         raise ValueError("trade side must be 'buy' or 'sell'")
-
     asset = trade.get("asset")
     if not isinstance(asset, Mapping):
         raise ValueError("trade asset must be a mapping")
-
     notional = None
     if "notional_usd" in trade and trade.get("notional_usd") is not None:
         notional = _number(trade.get("notional_usd"))
         if notional is None or notional <= 0:
             raise ValueError("trade notional_usd must be a positive finite number when supplied")
-
     return {
         "side": side,
         "chain": (_text(trade.get("chain")) or "").lower() or None,
@@ -106,35 +97,26 @@ def _normalize_trade(trade: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _assess_identity(
-    risk_result: Mapping[str, Any],
-    trade: Mapping[str, Any],
-    target_chain: str,
-) -> Dict[str, Any]:
+def _assess_identity(risk_result: Mapping[str, Any], trade: Mapping[str, Any], target_chain: str) -> Dict[str, Any]:
     flags = []
     reasons = []
-
     risk_chain = (_text(risk_result.get("chain")) or "").lower() or None
     trade_chain = trade.get("chain")
     risk_asset = risk_result.get("asset")
     risk_asset = risk_asset if isinstance(risk_asset, Mapping) else {}
     trade_asset = trade.get("asset")
     trade_asset = trade_asset if isinstance(trade_asset, Mapping) else {}
-
     risk_mint = _text(risk_asset.get("mint") or risk_asset.get("address"))
     trade_mint = _text(trade_asset.get("mint") or trade_asset.get("address"))
-
     if not risk_chain:
         flags.append("risk_chain_unverified")
         reasons.append("The supplied risk result does not identify a verified target chain.")
     elif risk_chain != target_chain:
         flags.append("risk_chain_mismatch")
         reasons.append("The supplied risk result was produced for a different chain.")
-
     if trade_chain and trade_chain != target_chain:
         flags.append("trade_chain_mismatch")
         reasons.append("The proposed trade context identifies a different chain.")
-
     if not trade_mint:
         flags.append("trade_asset_mint_unverified")
         reasons.append("The proposed trade asset does not contain a mint/address identity.")
@@ -144,7 +126,6 @@ def _assess_identity(
     if trade_mint and risk_mint and trade_mint != risk_mint:
         flags.append("trade_asset_mismatch")
         reasons.append("The proposed trade asset does not match the asset assessed by risk_check.")
-
     evidence = {
         "target_chain": target_chain,
         "risk_chain": risk_chain,
@@ -153,39 +134,28 @@ def _assess_identity(
         "trade_mint": trade_mint,
         "mint_match": bool(trade_mint and risk_mint and trade_mint == risk_mint),
     }
-
-    return _component(
-        BLOCK if flags else PASS,
-        flags=flags,
-        reasons=reasons,
-        evidence=evidence,
-    )
+    return _component(BLOCK if flags else PASS, flags=flags, reasons=reasons, evidence=evidence)
 
 
 def _assess_risk_gate(risk_result: Mapping[str, Any]) -> Dict[str, Any]:
     recommendation = _text(risk_result.get("recommendation"))
     if recommendation not in _STATUS_ORDER:
         raise ValueError("risk_result recommendation must be PASS, WARN, or BLOCK")
-
     confidence_complete = _risk_confidence_complete(risk_result)
     flags = []
     reasons = []
-
     if recommendation == BLOCK:
         flags.append("risk_check_block")
         reasons.append("The deterministic risk_check outcome is BLOCK.")
     elif recommendation == WARN:
         flags.append("risk_check_warn")
         reasons.append("The deterministic risk_check outcome is WARN.")
-
     if not confidence_complete:
         flags.append("risk_evidence_incomplete")
         reasons.append("The supplied risk_check result does not have complete verification coverage.")
-
     status = recommendation
     if not confidence_complete:
         status = _merge_status(status, WARN)
-
     return _component(
         status,
         flags=flags,
@@ -193,39 +163,20 @@ def _assess_risk_gate(risk_result: Mapping[str, Any]) -> Dict[str, Any]:
         evidence={
             "risk_recommendation": recommendation,
             "risk_confidence_complete": confidence_complete,
-            "risk_confidence": (
-                dict(risk_result.get("confidence"))
-                if isinstance(risk_result.get("confidence"), Mapping)
-                else {}
-            ),
+            "risk_confidence": dict(risk_result.get("confidence")) if isinstance(risk_result.get("confidence"), Mapping) else {},
         },
     )
 
 
-def _confidence(
-    identity_component: Mapping[str, Any],
-    risk_component: Mapping[str, Any],
-    size_component: Mapping[str, Any],
-    freshness_component: Mapping[str, Any],
-) -> Dict[str, Any]:
-    identity_evidence = identity_component.get("evidence")
-    identity_evidence = identity_evidence if isinstance(identity_evidence, Mapping) else {}
-    risk_evidence = risk_component.get("evidence")
-    risk_evidence = risk_evidence if isinstance(risk_evidence, Mapping) else {}
-    size_evidence = size_component.get("evidence")
-    size_evidence = size_evidence if isinstance(size_evidence, Mapping) else {}
-    freshness_evidence = freshness_component.get("evidence")
-    freshness_evidence = (
-        freshness_evidence if isinstance(freshness_evidence, Mapping) else {}
-    )
+def _confidence(identity_component, risk_component, size_component, freshness_component, capability_component) -> Dict[str, Any]:
+    identity_evidence = identity_component.get("evidence") if isinstance(identity_component.get("evidence"), Mapping) else {}
+    risk_evidence = risk_component.get("evidence") if isinstance(risk_component.get("evidence"), Mapping) else {}
+    size_evidence = size_component.get("evidence") if isinstance(size_component.get("evidence"), Mapping) else {}
+    freshness_evidence = freshness_component.get("evidence") if isinstance(freshness_component.get("evidence"), Mapping) else {}
+    capability_evidence = capability_component.get("evidence") if isinstance(capability_component.get("evidence"), Mapping) else {}
     freshness_required = freshness_evidence.get("freshness_policy_active") is True
-
     checks = {
-        "chain_consistent": identity_component.get("status") != BLOCK
-        or not any(
-            flag in {"risk_chain_unverified", "risk_chain_mismatch", "trade_chain_mismatch"}
-            for flag in identity_component.get("flags", [])
-        ),
+        "chain_consistent": identity_component.get("status") != BLOCK or not any(flag in {"risk_chain_unverified", "risk_chain_mismatch", "trade_chain_mismatch"} for flag in identity_component.get("flags", [])),
         "trade_asset_mint_verified": bool(identity_evidence.get("trade_mint")),
         "risk_asset_mint_verified": bool(identity_evidence.get("risk_mint")),
         "asset_identity_matches": identity_evidence.get("mint_match") is True,
@@ -233,17 +184,10 @@ def _confidence(
         "trade_notional_verified": size_evidence.get("notional_usd") is not None,
         "liquidity_verified_for_trade": size_evidence.get("liquidity_verified") is True,
         "trade_size_assessment_complete": size_evidence.get("size_assessment_complete") is True,
-        "risk_timestamp_verified_for_freshness": (
-            not freshness_required
-            or freshness_evidence.get("risk_observed_at_epoch") is not None
-        ),
-        "evaluation_timestamp_verified_for_freshness": (
-            not freshness_required
-            or freshness_evidence.get("evaluated_at_epoch") is not None
-        ),
-        "risk_freshness_assessment_complete": (
-            freshness_evidence.get("freshness_assessment_complete") is True
-        ),
+        "risk_timestamp_verified_for_freshness": not freshness_required or freshness_evidence.get("risk_observed_at_epoch") is not None,
+        "evaluation_timestamp_verified_for_freshness": not freshness_required or freshness_evidence.get("evaluated_at_epoch") is not None,
+        "risk_freshness_assessment_complete": freshness_evidence.get("freshness_assessment_complete") is True,
+        "required_execution_capabilities_available": capability_evidence.get("all_required_capabilities_available") is True,
     }
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
@@ -265,57 +209,36 @@ def build_pre_trade_check(
     risk_observed_at: Any = None,
     evaluated_at: Any = None,
 ) -> Dict[str, Any]:
-    """Evaluate deterministic pre-trade gates without authorizing execution.
-
-    The core propagates ``risk_check`` severity, blocks chain/mint mismatches,
-    evaluates USD notional against verified asset-wide liquidity, and applies
-    optional explicit evidence-age thresholds. No size or freshness threshold
-    is invented by CMIS.
-    """
     if not isinstance(risk_result, Mapping):
         raise ValueError("risk_result must be a mapping")
     if not isinstance(trade, Mapping):
         raise ValueError("trade must be a mapping")
-
     chain_name = (_text(chain) or "").lower()
     if not chain_name:
         raise ValueError("chain is required")
-
     normalized_trade = _normalize_trade(trade)
     identity = _assess_identity(risk_result, normalized_trade, chain_name)
     risk_gate = _assess_risk_gate(risk_result)
-    trade_size_liquidity = assess_trade_size_liquidity(
-        risk_result,
-        normalized_trade,
-        policy=policy,
-    )
-    freshness = assess_risk_freshness(
-        risk_observed_at=risk_observed_at,
-        evaluated_at=evaluated_at,
-        policy=policy,
-    )
+    trade_size_liquidity = assess_trade_size_liquidity(risk_result, normalized_trade, policy=policy)
+    normalized_policy = dict(trade_size_liquidity.get("policy") or DEFAULT_PRE_TRADE_POLICY)
+    freshness = assess_risk_freshness(risk_observed_at=risk_observed_at, evaluated_at=evaluated_at, policy=normalized_policy)
+    execution_capabilities = build_execution_capability_report(normalized_policy.get("required_capabilities"))
     components = {
         "identity": identity,
         "risk_gate": risk_gate,
         "trade_size_liquidity": trade_size_liquidity,
         "freshness": freshness,
+        "execution_capabilities": execution_capabilities,
     }
-    recommendation = _merge_status(
-        identity["status"],
-        risk_gate["status"],
-        trade_size_liquidity["status"],
-        freshness["status"],
-    )
-
+    recommendation = _merge_status(identity["status"], risk_gate["status"], trade_size_liquidity["status"], freshness["status"], execution_capabilities["status"])
     flags = []
     reasons = []
-    for name in ("identity", "risk_gate", "trade_size_liquidity", "freshness"):
+    for name in ("identity", "risk_gate", "trade_size_liquidity", "freshness", "execution_capabilities"):
         flags.extend(components[name]["flags"])
         reasons.extend(components[name]["reasons"])
-
     risk_asset = risk_result.get("asset")
     risk_asset = risk_asset if isinstance(risk_asset, Mapping) else {}
-
+    capability_evidence = execution_capabilities["evidence"]
     return {
         "chain": chain_name,
         "asset": {
@@ -325,15 +248,11 @@ def build_pre_trade_check(
         "trade": normalized_trade,
         "recommendation": recommendation,
         "components": components,
-        "confidence": _confidence(
-            identity,
-            risk_gate,
-            trade_size_liquidity,
-            freshness,
-        ),
+        "execution_capabilities": capability_evidence.get("capabilities") or {},
+        "confidence": _confidence(identity, risk_gate, trade_size_liquidity, freshness, execution_capabilities),
         "flags": flags,
         "reasons": reasons,
-        "policy": dict(trade_size_liquidity.get("policy") or DEFAULT_PRE_TRADE_POLICY),
+        "policy": normalized_policy,
         "risk_observed_at": risk_observed_at,
         "evaluated_at": evaluated_at,
         "analysis_only": True,
@@ -349,6 +268,7 @@ def build_pre_trade_check(
                 "explicit_trade_size_policy_thresholds",
                 "deterministic_policy_notional_thresholds",
                 "explicit_risk_evidence_freshness_policy",
+                "execution_estimate_capability_availability",
             ],
             "not_yet_included": [
                 "slippage",
