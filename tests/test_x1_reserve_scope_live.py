@@ -11,6 +11,7 @@ from liquidity_scout.providers.x1.reserve_scope_measurements import (
 
 
 RUN_LIVE = os.getenv("RUN_X1_RESERVE_SCOPE_LIVE") == "1"
+OUTPUT_PATH = os.getenv("X1_RESERVE_SCOPE_OUTPUT")
 
 POOL = "6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry"
 ASSET_MINT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
@@ -49,9 +50,26 @@ class X1ReserveScopeLiveTests(unittest.TestCase):
         scope = measure_x1_reserve_scope(bundle)
 
         diagnostic = {
+            "evidence_type": "x1_reserve_scope_probe",
+            "evidence_version": "1.0",
+            "chain": "x1",
             "pool_address": bundle["pool_address"],
+            "expected_identity": {
+                "shared_authority": SHARED_AUTHORITY,
+                "asset": {
+                    "mint": ASSET_MINT,
+                    "vault": ASSET_VAULT,
+                    "decimals": 6,
+                },
+                "counter": {
+                    "mint": COUNTER_MINT,
+                    "vault": COUNTER_VAULT,
+                    "decimals": 9,
+                },
+            },
             "collection": bundle["collection"],
             "provider": {
+                "source": bundle["provider"]["source"],
                 "observed_at": bundle["provider"]["observed_at"],
                 "last_synced_at": bundle["provider"]["last_synced_at"],
                 "last_updated": bundle["provider"]["last_updated"],
@@ -89,12 +107,23 @@ class X1ReserveScopeLiveTests(unittest.TestCase):
             "scope_metrics": scope["metrics"],
             "scope_warnings": scope["warnings"],
             "scope_errors": scope["errors"],
+            "reserve_field_semantics_verified": bundle[
+                "reserve_field_semantics_verified"
+            ],
+            "value_agreement_verified": bundle["value_agreement_verified"],
             "freshness_verified": scope["freshness_verified"],
             "observation_scope_verified": scope["observation_scope_verified"],
             "cmis_promotable": scope["cmis_promotable"],
         }
+        rendered = json.dumps(diagnostic, indent=2, sort_keys=True, default=str)
         print("X1 XENCAT/XNT bounded reserve scope probe")
-        print(json.dumps(diagnostic, indent=2, sort_keys=True, default=str))
+        print(rendered)
+
+        if OUTPUT_PATH:
+            with open(OUTPUT_PATH, "w", encoding="utf-8") as handle:
+                handle.write(rendered)
+                handle.write("\n")
+            print(f"Sanitized reserve scope evidence written to: {OUTPUT_PATH}")
 
         self.assertEqual(bundle["service"], "x1_reserve_live_evidence")
         self.assertEqual(bundle["pool_address"], POOL)
