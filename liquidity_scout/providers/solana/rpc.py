@@ -19,6 +19,20 @@ SOURCE = "solana_rpc"
 DEFAULT_RPC_URL = "https://api.mainnet-beta.solana.com"
 DEFAULT_COMMITMENT = "confirmed"
 
+# Canonical Solana token-program identities. These are checked together with
+# the RPC jsonParsed program label before ``program_identity_verified`` may be
+# true; an arbitrary account owner can never masquerade as a token mint.
+SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+_PROGRAM_LABEL_BY_OWNER = {
+    SPL_TOKEN_PROGRAM_ID: "spl-token",
+    TOKEN_2022_PROGRAM_ID: "spl-token-2022",
+}
+_PROGRAM_KIND_BY_OWNER = {
+    SPL_TOKEN_PROGRAM_ID: "legacy_spl_token",
+    TOKEN_2022_PROGRAM_ID: "token_2022",
+}
+
 
 class SolanaRPCError(RuntimeError):
     """Raised when a read-only Solana RPC contract cannot be verified."""
@@ -88,6 +102,15 @@ def _extension_names(info: Mapping[str, Any]) -> list[str]:
     return names
 
 
+def _verified_program_identity(owner_program_id: str, parsed_program: str) -> str:
+    expected_label = _PROGRAM_LABEL_BY_OWNER.get(owner_program_id)
+    if expected_label is None:
+        raise SolanaRPCError("mint account owner is not a supported Solana token program")
+    if parsed_program != expected_label:
+        raise SolanaRPCError("mint owner program and jsonParsed program label do not match")
+    return _PROGRAM_KIND_BY_OWNER[owner_program_id]
+
+
 class SolanaRPCProvider:
     """Small, read-only Solana RPC facade with fail-closed response parsing."""
 
@@ -122,6 +145,8 @@ class SolanaRPCProvider:
             "method": method,
             "params": params,
         }
+
+        transport_error_type: str | None = None
         try:
             response = self._post(
                 self._rpc_url,
@@ -134,11 +159,17 @@ class SolanaRPCProvider:
         except SolanaRPCError:
             raise
         except Exception as exc:
-            # Never include the configured URL in the error: keyed RPC URLs may
-            # contain credentials in path/query components.
+            # Capture only the exception class while inside the handler. The new
+            # public exception is raised after the handler exits, so it carries
+            # neither a chained cause nor a suppressed-but-inspectable transport
+            # exception that could contain a credential-bearing RPC URL.
+            transport_error_type = type(exc).__name__
+            body = None
+
+        if transport_error_type is not None:
             raise SolanaRPCError(
-                f"{method} transport failed ({type(exc).__name__})"
-            ) from exc
+                f"{method} transport failed ({transport_error_type})"
+            ) from None
 
         if not isinstance(body, Mapping):
             raise SolanaRPCError(f"{method} returned a non-object JSON-RPC response")
@@ -183,7 +214,7 @@ class SolanaRPCProvider:
         }
 
     def get_mint_account(self, mint: str) -> dict[str, Any]:
-        """Return parsed mint program/authority state from ``getAccountInfo``."""
+        """Return verified parsed mint program/authority state from ``getAccountInfo``."""
 
         mint = _text(mint, field="mint")
         result = self._request(
@@ -208,6 +239,8 @@ class SolanaRPCProvider:
         if not isinstance(data, Mapping):
             raise SolanaRPCError("parsed mint account data must be an object")
         parsed_program = _text(data.get("program"), field="parsed token program")
+        program_kind = _verified_program_identity(owner_program_id, parsed_program)
+
         parsed = data.get("parsed")
         if not isinstance(parsed, Mapping) or parsed.get("type") != "mint":
             raise SolanaRPCError("getAccountInfo did not return parsed mint data")
@@ -223,9 +256,12 @@ class SolanaRPCProvider:
             raise SolanaRPCError("mintAuthority must be a string or null")
         if freeze_authority is not None and not isinstance(freeze_authority, str):
             raise SolanaRPCError("freezeAuthority must be a string or null")
+
         initialized = info.get("isInitialized")
-        if initialized is not None and not isinstance(initialized, bool):
-            raise SolanaRPCError("isInitialized must be a boolean or null")
+        if not isinstance(initialized, bool):
+            raise SolanaRPCError("isInitialized must be present and boolean")
+        if initialized is not True:
+            raise SolanaRPCError("mint account is not initialized")
 
         return {
             "chain": CHAIN,
@@ -235,6 +271,7 @@ class SolanaRPCProvider:
             "context_slot": slot,
             "owner_program_id": owner_program_id,
             "parsed_program": parsed_program,
+            "program_kind": program_kind,
             "program_identity_verified": True,
             "amount_raw": supply,
             "decimals": decimals,
@@ -301,6 +338,8 @@ __all__ = [
     "CHAIN",
     "DEFAULT_RPC_URL",
     "SOURCE",
+    "SPL_TOKEN_PROGRAM_ID",
+    "TOKEN_2022_PROGRAM_ID",
     "SolanaRPCError",
     "SolanaRPCNotFound",
     "SolanaRPCProvider",
