@@ -1,11 +1,17 @@
 """Solana provider namespace beneath CMIS.
 
-The live Solana provider is intentionally not configured yet. This placeholder
-makes that state explicit without exposing fake market data or falling back to
-X1 provider implementations.
+The live Solana market/indexer/DEX provider path remains intentionally disabled.
+The read-only RPC adapter is available for deterministic contract testing and
+future canonical-chain observations without promoting broader Solana services.
 """
 
 from dataclasses import dataclass
+
+from liquidity_scout.providers.solana.rpc import (
+    SolanaRPCError,
+    SolanaRPCNotFound,
+    SolanaRPCProvider,
+)
 
 CHAIN = "solana"
 
@@ -27,5 +33,8 @@ UNCONFIGURED_SOLANA_PROVIDER = SolanaProviderPlaceholder()
 __all__ = [
     "CHAIN",
     "SolanaProviderPlaceholder",
+    "SolanaRPCError",
+    "SolanaRPCNotFound",
+    "SolanaRPCProvider",
     "UNCONFIGURED_SOLANA_PROVIDER",
 ]
