@@ -14,6 +14,9 @@ from liquidity_scout.services.cmis_activity_window import (
     apply_activity_window,
     parse_activity_window_seconds,
 )
+from liquidity_scout.services.cmis_chain_window_dex import (
+    enumerate_chain_window_dex_activity,
+)
 from liquidity_scout.services.cmis_trade_verification import (
     SERVICE as TRADE_VERIFICATION_SERVICE,
     build_x1_trade_verification_response,
@@ -48,6 +51,7 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
         x1_trade_verifier=None,
         x1_trade_history_fetcher=None,
         x1_activity_now_fn=None,
+        x1_chain_window_enumerator=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -59,6 +63,9 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
             x1_trade_history_fetcher or fetch_pool_trades_raw
         )
         self.x1_activity_now_fn = x1_activity_now_fn or time.time
+        self.x1_chain_window_enumerator = (
+            x1_chain_window_enumerator or enumerate_chain_window_dex_activity
+        )
 
     @staticmethod
     def _bounded_positive_int(name, value, *, default, maximum):
@@ -75,12 +82,62 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
             raise ValueError(f"{name} must be a positive integer <= {maximum}")
         return parsed
 
+    @staticmethod
+    def _bool_param(name, value, *, default=False):
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        raise ValueError(f"{name} must be a boolean")
+
     def _trade_verification(self, params: Mapping[str, Any]):
         event = params.get("event")
         kwargs = {"rpc_url": self.x1_trade_rpc_url}
         if self.x1_trade_verifier is not None:
             kwargs["verifier"] = self.x1_trade_verifier
         return build_x1_trade_verification_response(event, **kwargs)
+
+    @staticmethod
+    def _attach_chain_window_activity(response, activity):
+        """Attach chain-first selected-pool evidence without promoting asset completeness."""
+        if not isinstance(response, dict) or not isinstance(activity, Mapping):
+            return response
+
+        data = response.get("data")
+        if not isinstance(data, dict):
+            data = {}
+            response["data"] = data
+        data["chain_window_dex_activity"] = dict(activity)
+
+        summary = activity.get("summary")
+        summary = summary if isinstance(summary, Mapping) else {}
+
+        confidence = response.get("confidence")
+        if not isinstance(confidence, dict):
+            confidence = {}
+            response["confidence"] = confidence
+        confidence["selected_pool_chain_window_complete"] = (
+            summary.get("selected_pool_chain_window_complete") is True
+        )
+        confidence["chain_window_asset_window_complete"] = (
+            summary.get("asset_window_complete") is True
+        )
+        confidence["chain_window_asset_completion_promoted"] = (
+            summary.get("asset_window_completion_promoted") is True
+        )
+
+        transaction_count = summary.get("unique_window_transaction_count")
+        if isinstance(transaction_count, int) and transaction_count >= 0:
+            confidence["chain_window_unique_transaction_count"] = transaction_count
+            confidence["selected_pool_chain_window_empty"] = (
+                confidence["selected_pool_chain_window_complete"]
+                and transaction_count == 0
+            )
+
+        # Deliberately do not alter status/window_coverage_complete. The chain-first
+        # service proves selected pool address ranges, not globally exhaustive pool
+        # discovery for the asset.
+        return response
 
     def _verified_asset_activity(self, asset, params: Mapping[str, Any]):
         if not self._text(asset):
@@ -105,6 +162,26 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 )
 
         try:
+            chain_window_requested = self._bool_param(
+                "chain_window", params.get("chain_window"), default=False
+            )
+        except ValueError as exc:
+            return self._gateway_error(
+                VERIFIED_ASSET_ACTIVITY_SERVICE,
+                "x1",
+                "invalid_activity_bound",
+                str(exc),
+            )
+
+        if chain_window_requested and window_seconds is None:
+            return self._gateway_error(
+                VERIFIED_ASSET_ACTIVITY_SERVICE,
+                "x1",
+                "chain_window_requires_window",
+                "chain_window=true requires one supported window: 1h, 6h, or 24h.",
+            )
+
+        try:
             max_pools = self._bounded_positive_int(
                 "max_pools", params.get("max_pools"), default=5, maximum=10
             )
@@ -114,6 +191,18 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 default=50 if window_seconds is not None else 5,
                 maximum=50,
             )
+            chain_page_size = self._bounded_positive_int(
+                "chain_page_size",
+                params.get("chain_page_size"),
+                default=1000,
+                maximum=1000,
+            )
+            chain_max_signatures_per_pool = self._bounded_positive_int(
+                "chain_max_signatures_per_pool",
+                params.get("chain_max_signatures_per_pool"),
+                default=1000,
+                maximum=5000,
+            )
         except ValueError as exc:
             return self._gateway_error(
                 VERIFIED_ASSET_ACTIVITY_SERVICE,
@@ -121,6 +210,11 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 "invalid_activity_bound",
                 str(exc),
             )
+
+        window_end_epoch = None
+        if window_seconds is not None:
+            now_fn = getattr(self, "x1_activity_now_fn", None) or time.time
+            window_end_epoch = float(now_fn())
 
         # Reuse the existing market path so activity attribution starts from
         # one canonical resolved asset identity.
@@ -146,9 +240,7 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
                 response = apply_activity_window(
                     response,
                     window_seconds=window_seconds,
-                    window_end_epoch=float(
-                        getattr(self, "x1_activity_now_fn", time.time)()
-                    ),
+                    window_end_epoch=window_end_epoch,
                     pool_records=[],
                 )
             return response
@@ -242,13 +334,58 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
         )
 
         if window_seconds is not None:
-            now_fn = getattr(self, "x1_activity_now_fn", None) or time.time
             response = apply_activity_window(
                 response,
                 window_seconds=window_seconds,
-                window_end_epoch=float(now_fn()),
+                window_end_epoch=window_end_epoch,
                 pool_records=pool_records,
             )
+
+        if chain_window_requested:
+            enumerator = (
+                getattr(self, "x1_chain_window_enumerator", None)
+                or enumerate_chain_window_dex_activity
+            )
+            pool_descriptors = [
+                {
+                    "pool_address": pool_address(pool),
+                    "pair": pair_name(pool),
+                }
+                for pool in selected_pools
+                if pool_address(pool)
+            ]
+            try:
+                activity = enumerator(
+                    asset_mint=resolved_mint,
+                    pools=pool_descriptors,
+                    start_epoch=window_end_epoch - window_seconds,
+                    end_epoch=window_end_epoch,
+                    rpc_url=self.x1_trade_rpc_url,
+                    page_size=chain_page_size,
+                    max_signatures_per_pool=chain_max_signatures_per_pool,
+                )
+                response = self._attach_chain_window_activity(response, activity)
+            except Exception as exc:
+                confidence = response.get("confidence")
+                if not isinstance(confidence, dict):
+                    confidence = {}
+                    response["confidence"] = confidence
+                confidence["selected_pool_chain_window_complete"] = False
+                confidence["chain_window_asset_window_complete"] = False
+                confidence["chain_window_asset_completion_promoted"] = False
+
+                warnings = response.get("warnings")
+                warnings = list(warnings) if isinstance(warnings, list) else []
+                warnings.append({
+                    "code": "chain_window_enumeration_unavailable",
+                    "message": (
+                        "Direct X1 chain-window enumeration could not be completed; "
+                        f"provider-backed activity remains available. {type(exc).__name__}: {exc}"
+                    ),
+                })
+                response["warnings"] = warnings
+                if response.get("status") == "ok":
+                    response["status"] = "partial"
 
         return response
 
