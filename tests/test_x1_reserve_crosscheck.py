@@ -8,6 +8,7 @@ from liquidity_scout.cmis.evidence import (
 )
 from liquidity_scout.providers.x1.ninja_reserve_semantics import PROOF_STATUS
 from liquidity_scout.providers.x1.reserve_crosscheck import (
+    OBSERVED_AT_MISSING,
     RPC_BALANCE_MISSING,
     SEMANTIC_PROOF_REJECTED,
     run_x1_reserve_crosscheck,
@@ -169,6 +170,31 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
                 verification["data_quality"]["reasons"],
             )
 
+    def test_claimed_observation_scope_without_observed_at_fails_closed(self):
+        result = run_x1_reserve_crosscheck(
+            pool_detail(),
+            vault_identity(),
+            semantic_manifest(),
+            rpc_balances(),
+            observed_at=None,
+            observation_scope_verified=True,
+        )
+
+        self.assertEqual(result["overall_verification"], AGREEMENT)
+        self.assertFalse(result["observation_scope_verified"])
+        self.assertFalse(result["cmis_promotable"])
+        self.assertIn("observation_scope_unverified", result["warnings"])
+        self.assertIn(
+            f"observation_scope:{OBSERVED_AT_MISSING}",
+            result["errors"],
+        )
+        for role in ("asset", "counter"):
+            self.assertFalse(
+                result["roles"][role]["verification"]["data_quality"][
+                    "freshness_verified"
+                ]
+            )
+
     def test_one_conflicting_leg_makes_overall_result_conflict(self):
         balances = rpc_balances()
         balances["asset"]["amount"] = "42500001"
@@ -327,7 +353,7 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
             live_identity,
             live_manifest,
             live_rpc,
-            observed_at="2026-08-17T12:00:00Z",
+            observed_at=None,
             observation_scope_verified=False,
         )
 
