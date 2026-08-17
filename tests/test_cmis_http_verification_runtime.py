@@ -141,7 +141,7 @@ class CMISHTTPVerificationRuntimeTests(unittest.TestCase):
         self.assertEqual(body["data"]["fact"]["subject_id"], SUBJECT)
         self.assertEqual(body["data"]["fact"]["normalized_value"], "42")
         self.assertEqual(
-            body["data"]["retrieval"]["evidence_id"],
+            body["data"]["evidence_ref"]["evidence_id"],
             stored["evidence_id"],
         )
         self.assertEqual(market.refresh_calls, 0)
