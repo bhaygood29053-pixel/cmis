@@ -13,6 +13,7 @@ promotion claim to this wrapper.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from liquidity_scout.cmis.evidence import (
@@ -26,23 +27,26 @@ from .cmis_contract import ERROR, OK, PARTIAL, build_service_envelope
 
 
 _SERVICE = "verification_evidence"
-_OBSERVATION_FIELDS = (
+_TEXT_OBSERVATION_FIELDS = (
     "chain",
     "fact_type",
     "subject_id",
     "source",
     "source_role",
-    "observed_at",
-    "block_slot",
     "raw_identifier",
-    "raw_value",
-    "normalized_value",
     "unit",
     "calculation_version",
+)
+_SCALAR_OBSERVATION_FIELDS = (
+    "observed_at",
+    "block_slot",
+    "raw_value",
+    "normalized_value",
+)
+_BOOLEAN_OBSERVATION_FIELDS = (
     "identity_verified",
     "semantics_verified",
     "freshness_verified",
-    "warnings",
 )
 _QUALITY_FIELDS = (
     "quality",
@@ -51,7 +55,6 @@ _QUALITY_FIELDS = (
     "semantics_verified",
     "freshness_verified",
     "independent_agreement_verified",
-    "reasons",
 )
 
 
@@ -62,16 +65,50 @@ def _text(value: Any) -> Optional[str]:
     return text or None
 
 
+def _safe_scalar(value: Any) -> Any:
+    """Expose primitive evidence values only; never nested transport payloads."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Decimal):
+        return str(value)
+    return None
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if not isinstance(item, (Mapping, list, tuple, set))]
+
+
 def _safe_observation(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping):
         return None
-    return {field: value.get(field) for field in _OBSERVATION_FIELDS}
+    record: Dict[str, Any] = {
+        field: _text(value.get(field)) for field in _TEXT_OBSERVATION_FIELDS
+    }
+    record.update(
+        {
+            field: _safe_scalar(value.get(field))
+            for field in _SCALAR_OBSERVATION_FIELDS
+        }
+    )
+    record.update(
+        {
+            field: value.get(field) is True
+            for field in _BOOLEAN_OBSERVATION_FIELDS
+        }
+    )
+    record["warnings"] = _string_list(value.get("warnings"))
+    return record
 
 
 def _safe_quality(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping):
         return None
-    return {field: value.get(field) for field in _QUALITY_FIELDS}
+    record = {field: value.get(field) for field in _QUALITY_FIELDS}
+    record["quality"] = _text(record.get("quality"))
+    record["reasons"] = _string_list(value.get("reasons"))
+    return record
 
 
 def _source(observation: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
@@ -263,8 +300,8 @@ def build_verification_evidence_response(
     normalized_fact = None
     normalized_unit = None
     if verification_status == AGREEMENT:
-        primary_value = verification.get("primary_value")
-        verifier_value = verification.get("verifier_value")
+        primary_value = _safe_scalar(verification.get("primary_value"))
+        verifier_value = _safe_scalar(verification.get("verifier_value"))
         unit = _text(verification.get("normalized_unit"))
         if primary_value is not None and primary_value == verifier_value and unit is not None:
             normalized_fact = primary_value
@@ -279,7 +316,7 @@ def build_verification_evidence_response(
         },
         "verification": {
             "status": verification_status,
-            "code": verification.get("code"),
+            "code": _text(verification.get("code")),
             "agreement": agreement,
         },
         "data_quality": quality,
