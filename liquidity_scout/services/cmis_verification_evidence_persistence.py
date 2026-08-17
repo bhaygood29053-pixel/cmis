@@ -12,6 +12,7 @@ from collections.abc import Mapping
 import math
 from typing import Any
 
+from liquidity_scout.cmis.evidence_ledger import sanitize_verification_envelope
 from liquidity_scout.services.cmis_verification_evidence import (
     build_verification_evidence_response,
 )
@@ -46,8 +47,9 @@ def persist_verification_evidence(
     """Sanitize one accepted verifier result and persist the resulting envelope.
 
     A verifier result that cannot satisfy the accepted ``verification_evidence``
-    wrapper is never sent to the ledger. Ledger failures are returned as an
-    explicit persistence failure without exposing exception/provider text.
+    wrapper is never sent to the ledger. The returned envelope is the same strict
+    canonical sanitized shape that the ledger persists. Ledger failures are
+    returned explicitly without exposing exception/provider text.
     """
     envelope = build_verification_evidence_response(
         verifier_result,
@@ -65,26 +67,38 @@ def persist_verification_evidence(
             ),
         )
 
+    try:
+        safe_envelope = sanitize_verification_envelope(envelope)
+    except Exception:
+        return _failure(
+            envelope=envelope,
+            code="verification_evidence_not_storable",
+            message=(
+                "The verification_evidence envelope did not satisfy the accepted "
+                "storage sanitizer contract."
+            ),
+        )
+
     store = getattr(ledger, "store", None)
     if not callable(store):
         return _failure(
-            envelope=envelope,
+            envelope=safe_envelope,
             code="verification_evidence_ledger_not_configured",
             message="A verification-evidence ledger with store() is required.",
         )
 
     try:
-        receipt = store(envelope, recorded_at=recorded_at)
+        receipt = store(safe_envelope, recorded_at=recorded_at)
     except Exception:
         return _failure(
-            envelope=envelope,
+            envelope=safe_envelope,
             code="verification_evidence_persistence_failed",
             message="The verification-evidence ledger rejected or failed to store the envelope.",
         )
 
     if not isinstance(receipt, Mapping):
         return _failure(
-            envelope=envelope,
+            envelope=safe_envelope,
             code="verification_evidence_persistence_receipt_invalid",
             message="The verification-evidence ledger returned an invalid storage receipt.",
         )
@@ -101,14 +115,14 @@ def persist_verification_evidence(
         or not math.isfinite(float(receipt_recorded_at))
     ):
         return _failure(
-            envelope=envelope,
+            envelope=safe_envelope,
             code="verification_evidence_persistence_receipt_invalid",
             message="The verification-evidence ledger returned an invalid storage receipt.",
         )
 
     return {
         "stored": True,
-        "envelope": envelope,
+        "envelope": safe_envelope,
         "storage": {
             "evidence_id": evidence_id,
             "inserted": inserted,
