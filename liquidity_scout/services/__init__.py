@@ -43,7 +43,7 @@ from .market_rankings import (
     rank_assets,
 )
 from .market_report import build_market_report
-from .pre_trade import build_pre_trade_check
+from .pre_trade import DEFAULT_PRE_TRADE_POLICY, build_pre_trade_check
 from .risk import (
     BLOCK,
     DEFAULT_RISK_POLICY,
@@ -56,6 +56,7 @@ from .tokenomics import build_tokenomics_report
 __all__ = [
     "AMBIGUOUS",
     "BLOCK",
+    "DEFAULT_PRE_TRADE_POLICY",
     "DEFAULT_RISK_POLICY",
     "ERROR",
     "FIELD_ORDER",
