@@ -3,8 +3,11 @@
 This adapter does not fetch data or discover semantics. It accepts the output of
 ``validate_reserve_semantic_proof`` plus a raw X1 RPC token-account balance and
 constructs same-identity CMIS evidence only when the provider contract explicitly
-states that the reserve field is integer token base units with decimals matching
-the RPC token account.
+declares a supported unit contract with decimals matching the RPC token account.
+
+Supported provider unit contracts are explicit integer ``token_base_units`` and
+explicit decimal ``token_units``. Neither contract is inferred from field names,
+value shape, ordering, or token decimals.
 
 Freshness is deliberately caller-controlled and defaults closed. A provider
 observation and an RPC slot are not assumed contemporaneous merely because they
@@ -22,6 +25,8 @@ from liquidity_scout.cmis.evidence import build_evidence_observation
 
 VERSION = "1.0"
 BASE_UNITS = "token_base_units"
+TOKEN_UNITS = "token_units"
+SUPPORTED_UNITS = {BASE_UNITS, TOKEN_UNITS}
 
 
 def _text(value: Any) -> str | None:
@@ -31,23 +36,56 @@ def _text(value: Any) -> str | None:
     return text or None
 
 
-def _base_units_to_token_units(value: Any, decimals: Any) -> str | None:
-    if isinstance(value, bool) or isinstance(decimals, bool):
-        return None
-    text = _text(value)
-    if text is None or not text.isdigit():
+def _places(decimals: Any) -> int | None:
+    if isinstance(decimals, bool):
         return None
     try:
         places = int(decimals)
     except (TypeError, ValueError):
         return None
-    if places < 0:
+    return places if places >= 0 else None
+
+
+def _canonical_decimal(value: Decimal) -> str:
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _base_units_to_token_units(value: Any, decimals: Any) -> str | None:
+    if isinstance(value, bool):
+        return None
+    text = _text(value)
+    places = _places(decimals)
+    if text is None or not text.isdigit() or places is None:
         return None
     try:
         normalized = Decimal(text) / (Decimal(10) ** places)
     except (InvalidOperation, ValueError):
         return None
-    return format(normalized, "f")
+    return _canonical_decimal(normalized)
+
+
+def _token_units_to_canonical(value: Any, decimals: Any) -> str | None:
+    if value is None or isinstance(value, bool):
+        return None
+    text = _text(value)
+    places = _places(decimals)
+    if text is None or places is None:
+        return None
+    try:
+        parsed = Decimal(text)
+    except (InvalidOperation, ValueError):
+        return None
+    if not parsed.is_finite() or parsed < 0:
+        return None
+
+    scale = Decimal(10) ** places
+    scaled = parsed * scale
+    if scaled != scaled.to_integral_value():
+        return None
+    return _canonical_decimal(parsed)
 
 
 def build_x1_reserve_evidence_pair(
@@ -61,8 +99,8 @@ def build_x1_reserve_evidence_pair(
     """Build provider/RPC evidence for one reserve role, failing closed.
 
     ``role`` must be ``asset`` or ``counter``. The semantic proof must already
-    bind the provider field to the same vault/mint queried through RPC. Only the
-    explicit ``token_base_units`` unit contract is normalized here.
+    bind the provider field to the same vault/mint queried through RPC and must
+    explicitly declare either ``token_base_units`` or ``token_units``.
     """
     if not isinstance(semantic_proof, Mapping) or not isinstance(rpc_balance, Mapping):
         raise TypeError("reserve evidence inputs must be mappings")
@@ -93,8 +131,8 @@ def build_x1_reserve_evidence_pair(
 
     if not pool or not mint or not vault or not field_path:
         reasons.append("identity_incomplete")
-    if unit != BASE_UNITS:
-        reasons.append("provider_unit_not_token_base_units")
+    if unit not in SUPPORTED_UNITS:
+        reasons.append("provider_unit_unsupported")
     if _text(rpc_balance.get("account")) != vault:
         reasons.append("rpc_vault_mismatch")
     if rpc_balance.get("method") != "getTokenAccountBalance":
@@ -102,10 +140,20 @@ def build_x1_reserve_evidence_pair(
     if rpc_balance.get("decimals") != decimals:
         reasons.append("decimal_mismatch")
 
-    provider_normalized = _base_units_to_token_units(provider_raw, decimals)
-    rpc_normalized = _base_units_to_token_units(rpc_balance.get("amount"), rpc_balance.get("decimals"))
-    if provider_normalized is None:
-        reasons.append("provider_base_units_invalid")
+    if unit == BASE_UNITS:
+        provider_normalized = _base_units_to_token_units(provider_raw, decimals)
+        if provider_normalized is None:
+            reasons.append("provider_base_units_invalid")
+    elif unit == TOKEN_UNITS:
+        provider_normalized = _token_units_to_canonical(provider_raw, decimals)
+        if provider_normalized is None:
+            reasons.append("provider_token_units_invalid")
+    else:
+        provider_normalized = None
+
+    rpc_normalized = _base_units_to_token_units(
+        rpc_balance.get("amount"), rpc_balance.get("decimals")
+    )
     if rpc_normalized is None:
         reasons.append("rpc_base_units_invalid")
 
@@ -165,4 +213,9 @@ def build_x1_reserve_evidence_pair(
     }
 
 
-__all__ = ["BASE_UNITS", "VERSION", "build_x1_reserve_evidence_pair"]
+__all__ = [
+    "BASE_UNITS",
+    "TOKEN_UNITS",
+    "VERSION",
+    "build_x1_reserve_evidence_pair",
+]
