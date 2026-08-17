@@ -34,7 +34,9 @@ VERIFICATION_STATUSES = frozenset({
 
 
 def _text(value: Any) -> Optional[str]:
-    text = str(value or "").strip()
+    if value is None:
+        return None
+    text = str(value).strip()
     return text or None
 
 
@@ -231,7 +233,9 @@ def build_data_quality_assessment(
     )
     agreement_verified = verification_status == AGREEMENT
 
-    if (
+    if verification_status == CONFLICT:
+        quality = "LOW"
+    elif (
         len(independent_sources) >= 2
         and identity_verified
         and semantics_verified
