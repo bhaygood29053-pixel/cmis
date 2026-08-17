@@ -320,10 +320,27 @@ class CMISVerificationEvidenceLookupTests(unittest.TestCase):
             "verification_evidence_record_chain_mismatch",
         )
 
-    def test_content_address_mismatch_detects_tampering(self):
+    def test_invariant_breaking_tampering_is_rejected_before_hash_check(self):
         stored = record()
         original_id = stored["evidence_id"]
         stored["envelope"]["data"]["fact"]["normalized_value"] = "99"
+
+        response = lookup_verification_evidence(
+            FakeLedger(record=stored),
+            chain="x1",
+            evidence_id=original_id,
+        )
+
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(
+            response["errors"][0]["code"],
+            "verification_evidence_record_invalid",
+        )
+
+    def test_content_address_mismatch_detects_valid_content_tampering(self):
+        stored = record()
+        original_id = stored["evidence_id"]
+        stored["envelope"]["asset"]["symbol"] = "ALT"
 
         response = lookup_verification_evidence(
             FakeLedger(record=stored),
