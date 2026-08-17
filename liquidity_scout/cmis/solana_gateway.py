@@ -147,7 +147,11 @@ class SolanaAssetLookupMixin:
             )
 
         program_kind = record.get("program_kind")
-        program_contract = _PROGRAM_CONTRACTS.get(program_kind)
+        program_contract = (
+            _PROGRAM_CONTRACTS.get(program_kind)
+            if isinstance(program_kind, str)
+            else None
+        )
         if program_contract is None:
             return self._solana_contract_error(
                 "solana_mint_program_contract_invalid",
