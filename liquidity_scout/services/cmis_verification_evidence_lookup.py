@@ -3,8 +3,8 @@
 This adapter is gateway-ready but does not alter ``CMISGateway`` itself. It
 accepts either one content-addressed evidence ID or one exact fact identity
 (``fact_type`` + ``subject_id``), reads from an injected verification-evidence
-ledger, and returns the stored standard CMIS envelope without recalculating or
-strengthening the fact.
+ledger, and returns only a revalidated sanitized CMIS envelope without
+recalculating or strengthening the fact.
 
 Free-form asset names, raw verifier results, provider responses, and arbitrary
 queries are intentionally unsupported selectors.
@@ -14,7 +14,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import copy
+import math
 from typing import Any, Optional
+
+from liquidity_scout.cmis.evidence_ledger import (
+    evidence_id_for,
+    sanitize_verification_envelope,
+)
 
 from .cmis_contract import ERROR, UNAVAILABLE, build_service_envelope
 
@@ -62,9 +68,10 @@ def lookup_verification_evidence(
     - ``evidence_id``; or
     - ``fact_type`` + ``subject_id`` for the latest exact fact record.
 
-    The returned evidence body is the sanitized envelope stored by CMIS. A
-    retrieval reference is appended under ``data.evidence_ref`` only; no fact,
-    verification, quality, source, or promotion field is recomputed.
+    The returned evidence body is revalidated through the same sanitizer used at
+    the persistence boundary. Its content-addressed ID is recomputed before
+    release. No fact, verification, quality, source, or promotion field is
+    recalculated or strengthened.
     """
     chain_name = (_text(chain) or "unknown").lower()
     if ledger is None:
@@ -137,14 +144,33 @@ def lookup_verification_evidence(
             "verification_evidence_record_invalid",
             "The verification-evidence ledger record is incomplete.",
         )
+    if (
+        isinstance(stored_at, bool)
+        or not isinstance(stored_at, (int, float))
+        or not math.isfinite(float(stored_at))
+    ):
+        return _error(
+            chain_name,
+            "verification_evidence_record_timestamp_invalid",
+            "The verification-evidence ledger record has an invalid recorded_at timestamp.",
+        )
 
-    if envelope.get("service") != SERVICE:
+    try:
+        safe_envelope = sanitize_verification_envelope(envelope)
+    except (TypeError, ValueError):
+        return _error(
+            chain_name,
+            "verification_evidence_record_invalid",
+            "The persisted verification-evidence envelope failed CMIS storage validation.",
+        )
+
+    if safe_envelope.get("service") != SERVICE:
         return _error(
             chain_name,
             "verification_evidence_record_service_mismatch",
             "The persisted record is not a verification_evidence envelope.",
         )
-    stored_chain = _text(envelope.get("chain"))
+    stored_chain = _text(safe_envelope.get("chain"))
     if stored_chain is None or stored_chain.lower() != chain_name:
         return _error(
             chain_name,
@@ -152,6 +178,13 @@ def lookup_verification_evidence(
             "The persisted evidence does not belong to the requested chain.",
         )
 
+    computed_id = evidence_id_for(safe_envelope)
+    if computed_id != stored_id:
+        return _error(
+            chain_name,
+            "verification_evidence_content_id_mismatch",
+            "The persisted evidence ID does not match the sanitized evidence content.",
+        )
     if evidence_key is not None and stored_id != evidence_key:
         return _error(
             chain_name,
@@ -159,7 +192,7 @@ def lookup_verification_evidence(
             "The ledger record identity does not match the requested evidence ID.",
         )
 
-    data = envelope.get("data")
+    data = safe_envelope.get("data")
     if not isinstance(data, Mapping):
         return _error(
             chain_name,
@@ -177,12 +210,12 @@ def lookup_verification_evidence(
                 "The ledger returned evidence for a different fact identity.",
             )
 
-    response = copy.deepcopy(dict(envelope))
+    response = copy.deepcopy(safe_envelope)
     response_data = response.get("data")
     response_data = dict(response_data) if isinstance(response_data, Mapping) else {}
     response_data["evidence_ref"] = {
         "evidence_id": stored_id,
-        "recorded_at": stored_at,
+        "recorded_at": float(stored_at),
     }
     response["data"] = response_data
     return response
