@@ -28,6 +28,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_history_range_probe:
+        description: Run sanitized XENCAT provider-RPC history-range evidence probe
+        required: true
+        default: false
+        type: boolean
       run_ohlcv:
         description: Run read-only X1.Ninja OHLCV live contract verification
         required: true
@@ -67,7 +72,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Verify required X1.Ninja secret is available
-        if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_holder_observational_probe || inputs.run_sse_access_probe || inputs.run_ohlcv || inputs.run_trade_history }}
+        if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_holder_observational_probe || inputs.run_sse_access_probe || inputs.run_history_range_probe || inputs.run_ohlcv || inputs.run_trade_history }}
         shell: bash
         run: |
           if [ -z "${X1_NINJA_API_KEY:-}" ]; then
@@ -155,6 +160,22 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Run XENCAT history-range evidence probe
+        if: ${{ inputs.run_history_range_probe }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python cmis_history_range_probe.py XENCAT --window 1h --max-pools 1 --max-signatures-per-pool 5000 --page-size 1000 --output x1-history-range-evidence.json
+
+      - name: Upload X1 history-range evidence
+        if: ${{ inputs.run_history_range_probe }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-history-range-evidence-${{ github.run_id }}
+          path: x1-history-range-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run X1.Ninja OHLCV live contract probe
         if: ${{ inputs.run_ohlcv }}
         env:
@@ -188,5 +209,6 @@ jobs:
           echo "Reserve scope probes measure evidence timing/slots but do not declare freshness or CMIS promotion."
           echo "Token-account enumeration probes expose candidate counts/set digests but do not declare total coverage or holder semantics."
           echo "Holder observational probes compare sanitized numeric candidates only; they do not authenticate holder semantics, totality, or beneficial ownership."
+          echo "History-range artifacts omit raw signatures/provider payloads and do not prove provider index exhaustiveness or archival completeness."
           echo "Uploaded live artifacts are sanitized and exclude credentials/raw HTTP or RPC payloads."
           echo "No transaction preparation, signing, broadcasting, or autonomous execution is performed."
