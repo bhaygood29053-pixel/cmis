@@ -2,6 +2,8 @@ import unittest
 
 from liquidity_scout.providers.registry import build_default_chain_provider_registry
 from liquidity_scout.providers.solana.rpc import (
+    SPL_TOKEN_PROGRAM_ID,
+    TOKEN_2022_PROGRAM_ID,
     SolanaRPCError,
     SolanaRPCNotFound,
     SolanaRPCProvider,
@@ -35,6 +37,37 @@ def _post_with(body):
 
     post.calls = calls
     return post
+
+
+def _mint_body(
+    *,
+    owner=SPL_TOKEN_PROGRAM_ID,
+    program="spl-token",
+    initialized=True,
+    include_initialized=True,
+):
+    info = {
+        "supply": "9000000",
+        "decimals": 6,
+        "mintAuthority": "Authority111",
+        "freezeAuthority": None,
+    }
+    if include_initialized:
+        info["isInitialized"] = initialized
+    return {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "context": {"slot": 456},
+            "value": {
+                "owner": owner,
+                "data": {
+                    "program": program,
+                    "parsed": {"type": "mint", "info": info},
+                },
+            },
+        },
+    }
 
 
 class SolanaRPCProviderTests(unittest.TestCase):
@@ -74,39 +107,18 @@ class SolanaRPCProviderTests(unittest.TestCase):
         self.assertEqual(post.calls[0]["json"]["method"], "getTokenSupply")
         self.assertEqual(post.calls[0]["json"]["params"][0], "Mint111")
 
-    def test_parsed_mint_account_preserves_program_and_authorities(self):
-        post = _post_with(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "result": {
-                    "context": {"slot": 456},
-                    "value": {
-                        "owner": "TokenProgram111",
-                        "data": {
-                            "program": "spl-token",
-                            "parsed": {
-                                "type": "mint",
-                                "info": {
-                                    "supply": "9000000",
-                                    "decimals": 6,
-                                    "mintAuthority": "Authority111",
-                                    "freezeAuthority": None,
-                                    "isInitialized": True,
-                                },
-                            },
-                        },
-                    },
-                },
-            }
+    def test_legacy_mint_account_requires_canonical_program_identity(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(_mint_body()),
         )
-        provider = SolanaRPCProvider("https://rpc.example.invalid", post=post)
 
         result = provider.get_mint_account("Mint111")
 
         self.assertEqual(result["context_slot"], 456)
-        self.assertEqual(result["owner_program_id"], "TokenProgram111")
+        self.assertEqual(result["owner_program_id"], SPL_TOKEN_PROGRAM_ID)
         self.assertEqual(result["parsed_program"], "spl-token")
+        self.assertEqual(result["program_kind"], "legacy_spl_token")
         self.assertTrue(result["program_identity_verified"])
         self.assertEqual(result["amount_raw"], "9000000")
         self.assertEqual(result["decimals"], 6)
@@ -116,45 +128,71 @@ class SolanaRPCProviderTests(unittest.TestCase):
         self.assertEqual(result["extension_names"], [])
         self.assertTrue(result["mint_state_verified"])
 
-    def test_token_2022_parsed_label_and_extension_names_are_preserved_not_reinterpreted(self):
-        post = _post_with(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "result": {
-                    "context": {"slot": 789},
-                    "value": {
-                        "owner": "Token2022Program111",
-                        "data": {
-                            "program": "spl-token-2022",
-                            "parsed": {
-                                "type": "mint",
-                                "info": {
-                                    "supply": "1",
-                                    "decimals": 0,
-                                    "mintAuthority": None,
-                                    "freezeAuthority": None,
-                                    "isInitialized": True,
-                                    "extensions": [
-                                        {"extension": "transferFeeConfig", "state": {}},
-                                        {"type": "metadataPointer", "state": {}},
-                                    ],
-                                },
-                            },
-                        },
-                    },
-                },
-            }
+    def test_token_2022_canonical_owner_label_and_extensions_are_preserved(self):
+        body = _mint_body(
+            owner=TOKEN_2022_PROGRAM_ID,
+            program="spl-token-2022",
         )
-        provider = SolanaRPCProvider("https://rpc.example.invalid", post=post)
+        body["result"]["value"]["data"]["parsed"]["info"]["supply"] = "1"
+        body["result"]["value"]["data"]["parsed"]["info"]["decimals"] = 0
+        body["result"]["value"]["data"]["parsed"]["info"]["mintAuthority"] = None
+        body["result"]["value"]["data"]["parsed"]["info"]["extensions"] = [
+            {"extension": "transferFeeConfig", "state": {}},
+            {"type": "metadataPointer", "state": {}},
+        ]
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(body),
+        )
 
         result = provider.get_mint_account("Mint2022")
 
+        self.assertEqual(result["owner_program_id"], TOKEN_2022_PROGRAM_ID)
         self.assertEqual(result["parsed_program"], "spl-token-2022")
+        self.assertEqual(result["program_kind"], "token_2022")
+        self.assertTrue(result["program_identity_verified"])
         self.assertEqual(
             result["extension_names"],
             ["transferFeeConfig", "metadataPointer"],
         )
+
+    def test_arbitrary_account_owner_cannot_be_verified_as_token_mint(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(_mint_body(owner="SystemProgramOrOtherOwner")),
+        )
+
+        with self.assertRaisesRegex(SolanaRPCError, "not a supported Solana token program"):
+            provider.get_mint_account("Mint111")
+
+    def test_canonical_owner_with_wrong_parsed_program_label_fails_closed(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(
+                _mint_body(owner=SPL_TOKEN_PROGRAM_ID, program="spl-token-2022")
+            ),
+        )
+
+        with self.assertRaisesRegex(SolanaRPCError, "do not match"):
+            provider.get_mint_account("Mint111")
+
+    def test_missing_initialized_field_cannot_produce_verified_mint_state(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(_mint_body(include_initialized=False)),
+        )
+
+        with self.assertRaisesRegex(SolanaRPCError, "isInitialized must be present"):
+            provider.get_mint_account("Mint111")
+
+    def test_uninitialized_mint_fails_closed(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(_mint_body(initialized=False)),
+        )
+
+        with self.assertRaisesRegex(SolanaRPCError, "mint account is not initialized"):
+            provider.get_mint_account("Mint111")
 
     def test_missing_mint_account_fails_with_explicit_not_found(self):
         provider = SolanaRPCProvider(
@@ -231,7 +269,7 @@ class SolanaRPCProviderTests(unittest.TestCase):
         self.assertNotIn("super-secret", message)
         self.assertNotIn(secret_url, message)
 
-    def test_transport_error_does_not_echo_keyed_rpc_url(self):
+    def test_transport_error_has_no_chained_secret_bearing_exception(self):
         secret_url = "https://rpc.example.invalid/?api-key=super-secret"
 
         def failing_post(*args, **kwargs):
@@ -246,6 +284,9 @@ class SolanaRPCProviderTests(unittest.TestCase):
         self.assertIn("RuntimeError", message)
         self.assertNotIn("super-secret", message)
         self.assertNotIn(secret_url, message)
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+        self.assertTrue(caught.exception.__suppress_context__)
 
     def test_registry_can_expose_only_rpc_component_without_enabling_market(self):
         rpc = SolanaRPCProvider(
