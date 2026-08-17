@@ -35,6 +35,7 @@ ROLES = ("asset", "counter")
 SEMANTIC_PROOF_REJECTED = "SEMANTIC_PROOF_REJECTED"
 RPC_BALANCE_MISSING = "RPC_BALANCE_MISSING"
 EVIDENCE_NOT_READY = "EVIDENCE_NOT_READY"
+OBSERVED_AT_MISSING = "OBSERVED_AT_MISSING"
 
 
 def _insufficient(code: str) -> dict[str, Any]:
@@ -86,7 +87,9 @@ def run_x1_reserve_crosscheck(
     ``rpc_balances`` must map ``asset`` and ``counter`` to already-collected
     ``getTokenAccountBalance`` observations. ``observation_scope_verified`` is
     caller-supplied proof state; this function never derives freshness from wall
-    clock proximity, provider timestamps, or RPC slots.
+    clock proximity, provider timestamps, or RPC slots. A verified observation
+    scope also requires an explicit ``observed_at`` value so the proof remains
+    auditable.
     """
     for name, value in (
         ("pool_detail", pool_detail),
@@ -97,11 +100,14 @@ def run_x1_reserve_crosscheck(
         if not isinstance(value, Mapping):
             raise TypeError(f"{name} must be a mapping")
 
-    scope_verified = bool(observation_scope_verified)
+    scope_requested = bool(observation_scope_verified)
+    scope_verified = scope_requested and observed_at is not None
     warnings: list[str] = []
     errors: list[str] = []
     if not scope_verified:
         warnings.append("observation_scope_unverified")
+    if scope_requested and observed_at is None:
+        errors.append(f"observation_scope:{OBSERVED_AT_MISSING}")
 
     semantic_proof = validate_reserve_semantic_proof(
         pool_detail,
@@ -190,6 +196,7 @@ def run_x1_reserve_crosscheck(
 
 __all__ = [
     "EVIDENCE_NOT_READY",
+    "OBSERVED_AT_MISSING",
     "RPC_BALANCE_MISSING",
     "ROLES",
     "SEMANTIC_PROOF_REJECTED",
