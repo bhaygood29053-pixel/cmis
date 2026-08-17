@@ -246,6 +246,11 @@ def evaluate_vault_pair_family_attribution(
                         "stable_directional_pair_candidate"
                     ) is True
                 ),
+                "stable_structural_directional_pair_candidate": (
+                    candidate.get(
+                        "stable_structural_directional_pair_candidate"
+                    ) is True
+                ),
                 "qualifying_family_evidence": qualifying_family_evidence,
                 "buy": buy,
                 "sell": sell,
@@ -265,6 +270,11 @@ def evaluate_vault_pair_family_attribution(
                     "opposite_direction_ratio": opposite_ratio,
                     "stable_directional_pair_candidate": (
                         observation["stable_directional_pair_candidate"]
+                    ),
+                    "stable_structural_directional_pair_candidate": (
+                        observation[
+                            "stable_structural_directional_pair_candidate"
+                        ]
                     ),
                     "qualifying_family_evidence": (
                         qualifying_family_evidence

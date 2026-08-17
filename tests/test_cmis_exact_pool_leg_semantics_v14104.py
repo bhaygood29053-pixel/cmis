@@ -218,6 +218,46 @@ class ExactPoolLegSemanticsV14104Tests(unittest.TestCase):
             "REQUIRED_WINDOW_DIRECTIONAL_PAIR_UNSTABLE",
         )
 
+    def test_scope_only_full_fingerprint_instability_does_not_block_structural_coupling(self):
+        report = apex_like_report(
+            failures={"1h": "unstable"}
+        )
+
+        rows = report["coupling"]["families"][0]["window_coupling"]
+
+        for row in rows:
+            if row["window"] == "1h":
+                row[
+                    "stable_structural_directional_pair_candidate"
+                ] = False
+            elif row["window"] == "6h":
+                row["stable_directional_pair_candidate"] = False
+                row[
+                    "stable_structural_directional_pair_candidate"
+                ] = True
+                row["pool_instruction_coupled"] = True
+            elif row["window"] == "24h":
+                row[
+                    "stable_structural_directional_pair_candidate"
+                ] = True
+
+        result = refine_per_window_coupling_diagnosis(report)
+
+        self.assertEqual(
+            result["blocking_code"],
+            "REQUIRED_WINDOW_DIRECTIONAL_PAIR_UNSTABLE",
+        )
+        self.assertEqual(
+            result["evidence"]["blocking_windows"],
+            ["1h"],
+        )
+
+        failures = result["evidence"]["window_failures"]
+        self.assertEqual(
+            [item["window"] for item in failures],
+            ["1h"],
+        )
+
     def test_opposite_flow_failure_has_distinct_code(self):
         result = refine_per_window_coupling_diagnosis(
             apex_like_report(failures={"1h": "flow"})

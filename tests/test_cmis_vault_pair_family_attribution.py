@@ -42,6 +42,7 @@ def candidate(
     buy=None,
     sell=None,
     stable=True,
+    structural_stable=None,
 ):
     return {
         "asset_account": f"{name}-asset",
@@ -63,6 +64,11 @@ def candidate(
         "buy_fingerprint": buy or direction(0, None, False),
         "sell_fingerprint": sell or direction(0, None, False),
         "stable_directional_pair_candidate": stable,
+        "stable_structural_directional_pair_candidate": (
+            stable
+            if structural_stable is None
+            else structural_stable
+        ),
     }
 
 
@@ -192,6 +198,38 @@ class VaultPairFamilyAttributionTests(unittest.TestCase):
         self.assertFalse(
             result["summary"][
                 "leading_change_explained_by_recurrent_families"
+            ]
+        )
+
+    def test_structural_pair_stability_is_forwarded_per_window(self):
+        reports = [
+            report([
+                candidate(
+                    "A",
+                    sell=SELL_OUTER,
+                    stable=False,
+                    structural_stable=True,
+                )
+            ]),
+            report([candidate("A", sell=SELL_OUTER)]),
+            report([candidate("A", sell=SELL_OUTER)]),
+        ]
+
+        result, _ = run(reports)
+
+        one_hour = next(
+            row
+            for row in result["windows"]
+            if row["label"] == "1h"
+        )
+        candidate_row = one_hour["candidates"][0]
+
+        self.assertFalse(
+            candidate_row["stable_directional_pair_candidate"]
+        )
+        self.assertTrue(
+            candidate_row[
+                "stable_structural_directional_pair_candidate"
             ]
         )
 

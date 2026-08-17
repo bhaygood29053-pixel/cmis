@@ -275,6 +275,45 @@ class CanonicalPoolVaultCouplingTests(unittest.TestCase):
             result["families"][0]["rejection_reasons"],
         )
 
+    def test_scope_only_full_fingerprint_instability_uses_structural_stability(self):
+        report = qualification_report(
+            ["A"],
+            stable={("A", "6h"): False},
+        )
+
+        six_hour_window = next(
+            row
+            for row in report["family_attribution"]["windows"]
+            if row["label"] == "6h"
+        )
+        six_hour_candidate = six_hour_window["candidates"][0]
+        six_hour_candidate[
+            "stable_structural_directional_pair_candidate"
+        ] = True
+
+        result, _ = run(report)
+
+        self.assertEqual(
+            result["status"],
+            "canonical_pool_vault_coupling_proven",
+        )
+
+        six_hour = next(
+            row
+            for row in result["families"][0]["window_coupling"]
+            if row["window"] == "6h"
+        )
+
+        self.assertFalse(
+            six_hour["stable_directional_pair_candidate"]
+        )
+        self.assertTrue(
+            six_hour["stable_structural_directional_pair_candidate"]
+        )
+        self.assertTrue(
+            six_hour["pool_instruction_coupled"]
+        )
+
     def test_unqualified_opposite_flow_in_any_window_rejects_family(self):
         result, _ = run(
             qualification_report(
