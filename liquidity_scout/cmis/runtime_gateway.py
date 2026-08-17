@@ -2,8 +2,8 @@
 
 The HTTP runtime needs the accepted risk/trade extensions, persisted
 ``verification_evidence`` lookup, and narrowly eligible Solana identity,
-tokenomics, and market-evidence layers on one cooperative gateway class. These
-layers compose without duplicating their dispatch logic.
+tokenomics, market-evidence, and risk layers on one cooperative gateway class.
+These layers compose without duplicating their dispatch logic.
 
 Verification evidence persistence is an internal runtime dependency. Callers
 can select evidence only by the public service contract; they cannot choose a
@@ -18,6 +18,7 @@ from typing import Any
 from liquidity_scout.cmis.evidence_ledger import VerificationEvidenceLedger
 from liquidity_scout.cmis.solana_gateway import SolanaAssetLookupMixin
 from liquidity_scout.cmis.solana_market_gateway import SolanaMarketReportMixin
+from liquidity_scout.cmis.solana_risk_gateway import SolanaRiskCheckMixin
 from liquidity_scout.cmis.solana_tokenomics_gateway import SolanaTokenomicsMixin
 from liquidity_scout.cmis.trade_gateway import (
     SUPPORTED_SERVICES as TRADE_SUPPORTED_SERVICES,
@@ -45,6 +46,7 @@ SUPPORTED_SERVICES = (
 
 
 class RuntimeCMISGateway(
+    SolanaRiskCheckMixin,
     SolanaMarketReportMixin,
     SolanaTokenomicsMixin,
     SolanaAssetLookupMixin,
