@@ -213,9 +213,9 @@ def build_data_quality_assessment(
     records = [item for item in observations if isinstance(item, Mapping)]
 
     independent_sources = {
-        (_text(item.get("source")), _text(item.get("source_role")))
+        _text(item.get("source"))
         for item in records
-        if _text(item.get("source")) and _text(item.get("source_role"))
+        if _text(item.get("source"))
     }
 
     identity_verified = bool(records) and all(
