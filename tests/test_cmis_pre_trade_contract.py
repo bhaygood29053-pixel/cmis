@@ -17,17 +17,25 @@ from liquidity_scout.services import (
 MINT = "ReferenceMint"
 
 
-def raw_risk(*, recommendation=PASS, chain="x1", mint=MINT, verified=8, total=8):
+def raw_risk(*, recommendation=PASS, chain="x1", mint=MINT, verified=8, total=8, liquidity=100000.0, liquidity_verified=True):
     return {
         "chain": chain,
         "asset": {"symbol": "REF", "mint": mint},
         "recommendation": recommendation,
+        "components": {
+            "liquidity": {
+                "status": PASS if liquidity_verified else WARN,
+                "flags": [] if liquidity_verified else ["liquidity_unverified"],
+                "reasons": [],
+                "evidence": {"liquidity_usd": liquidity},
+            },
+        },
         "confidence": {
             "level": "high" if verified == total else "medium",
             "verified_checks": verified,
             "total_checks": total,
             "verification_ratio": verified / total if total else 0.0,
-            "checks": {},
+            "checks": {"liquidity_verified": liquidity_verified},
         },
         "flags": [],
         "reasons": [],
@@ -117,6 +125,10 @@ class CMISPreTradeContractTests(unittest.TestCase):
         self.assertFalse(response["data"]["execution_authorized"])
         self.assertEqual(response["data"]["trade"]["notional_usd"], 1000.0)
         self.assertEqual(
+            response["risk"]["components"]["trade_size_liquidity"]["evidence"]["notional_to_liquidity_ratio"],
+            0.01,
+        )
+        self.assertEqual(
             response["sources"],
             [{"source": "pre_trade_engine", "role": "pre_trade_check"}],
         )
@@ -144,7 +156,6 @@ class CMISPreTradeContractTests(unittest.TestCase):
         self.assertEqual(response["risk"]["recommendation"], BLOCK)
         self.assertIn("trade_asset_mismatch", response["risk"]["flags"])
         self.assertFalse(response["confidence"]["complete"])
-        # A false match predicate is a verified blocking fact, not missing data.
         self.assertNotEqual(response["status"], PARTIAL)
 
     def test_incomplete_risk_evidence_is_partial_and_warns(self):
@@ -168,6 +179,53 @@ class CMISPreTradeContractTests(unittest.TestCase):
         self.assertEqual(response["status"], PARTIAL)
         self.assertEqual(response["risk"]["recommendation"], BLOCK)
         self.assertIn("trade_asset_mint_unverified", response["risk"]["flags"])
+
+    def test_missing_trade_notional_is_partial_warn(self):
+        response = build_pre_trade_check_response(
+            raw_risk(),
+            trade(notional_usd=None),
+        )
+
+        self.assertEqual(response["status"], PARTIAL)
+        self.assertEqual(response["risk"]["recommendation"], WARN)
+        self.assertIn("trade_notional_unverified", response["risk"]["flags"])
+
+    def test_sized_trade_with_unverified_liquidity_is_partial_block(self):
+        response = build_pre_trade_check_response(
+            raw_risk(liquidity_verified=False),
+            trade(notional_usd=1000),
+        )
+
+        self.assertEqual(response["status"], PARTIAL)
+        self.assertEqual(response["risk"]["recommendation"], BLOCK)
+        self.assertIn("sized_trade_liquidity_unverified", response["risk"]["flags"])
+
+    def test_verified_size_policy_block_is_service_ok(self):
+        response = build_pre_trade_check_response(
+            raw_risk(liquidity=100000),
+            trade(notional_usd=10000),
+            policy={
+                "warn_notional_to_liquidity_ratio": 0.05,
+                "block_notional_to_liquidity_ratio": 0.10,
+            },
+        )
+
+        self.assertEqual(response["status"], OK)
+        self.assertEqual(response["risk"]["recommendation"], BLOCK)
+        self.assertIn("trade_size_exceeds_liquidity_block_ratio", response["risk"]["flags"])
+        evidence = response["risk"]["components"]["trade_size_liquidity"]["evidence"]
+        self.assertEqual(evidence["hard_block_notional_usd_threshold"], 10000.0)
+        self.assertIsNone(evidence["price_impact_estimate_pct"])
+
+    def test_invalid_pretrade_policy_is_service_error(self):
+        response = build_pre_trade_check_response(
+            raw_risk(),
+            trade(),
+            policy={"unsupported": 1},
+        )
+
+        self.assertEqual(response["status"], ERROR)
+        self.assertEqual(response["errors"][0]["code"], "pre_trade_check_validation_error")
 
     def test_missing_risk_input_is_unavailable(self):
         response = build_pre_trade_check_response(None, trade())
@@ -216,6 +274,10 @@ class CMISPreTradeContractTests(unittest.TestCase):
         self.assertEqual(response["risk"]["recommendation"], PASS)
         self.assertEqual(response["data"]["trade"]["side"], "sell")
         self.assertEqual(response["data"]["trade"]["notional_usd"], 2500.0)
+        self.assertEqual(
+            response["risk"]["components"]["trade_size_liquidity"]["evidence"]["notional_to_liquidity_ratio"],
+            0.025,
+        )
         self.assertEqual(response["observed_at"], 2000)
         self.assertIn(
             {
