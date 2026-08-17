@@ -19,6 +19,7 @@ ProviderResolutionStatus = Literal["selected", "unavailable", "unknown_chain"]
 
 KNOWN_CHAINS = ("x1", "solana")
 KNOWN_COMPONENTS = (
+    "rpc",
     "market",
     "supply",
     "indexer",
@@ -134,13 +135,13 @@ def build_default_chain_provider_registry(
     *,
     x1_market_provider: object | None = None,
     x1_supply_provider: object | None = None,
+    solana_rpc_provider: object | None = None,
 ) -> ChainProviderRegistry:
-    """Return the current CMIS provider registry without enabling Solana.
+    """Return the current provider registry with Solana opt-in by component.
 
-    X1 uses its existing provider classes. Solana is a known chain but remains
-    explicitly unavailable until verified components are injected in a later
-    slice. Instantiating the X1 facades here preserves current gateway defaults;
-    the constructors do not make network calls.
+    X1 uses its existing provider classes. Solana is a known chain and remains
+    unavailable by default. A verified/read-only Solana RPC adapter may be
+    injected explicitly without enabling market/indexer/DEX/security components.
     """
 
     registry = ChainProviderRegistry()
@@ -158,6 +159,12 @@ def build_default_chain_provider_registry(
         "solana",
         reason=UNCONFIGURED_SOLANA_PROVIDER.reason,
     )
+    if solana_rpc_provider is not None:
+        registry.register(
+            chain="solana",
+            component="rpc",
+            provider=solana_rpc_provider,
+        )
     return registry
 
 
