@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import hashlib
 import json
+import math
 import sqlite3
 import time
 from typing import Any, Optional
@@ -43,8 +44,10 @@ def _text(value: Any) -> Optional[str]:
 
 
 def _safe_scalar(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, (str, int, bool)):
         return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
     return None
 
 
@@ -105,10 +108,7 @@ def _safe_observation(value: Any) -> dict[str, Any]:
         "semantics_verified",
         "freshness_verified",
     )
-    record = {
-        field: _safe_scalar(value.get(field))
-        for field in fields
-    }
+    record = {field: _safe_scalar(value.get(field)) for field in fields}
     record["warnings"] = _safe_string_list(value.get("warnings"))
     return record
 
@@ -188,6 +188,10 @@ def sanitize_verification_envelope(envelope: Mapping[str, Any]) -> dict[str, Any
     if _text(safe_quality.get("quality")) is None:
         raise ValueError("verification evidence data quality is required")
 
+    agreement = verification.get("agreement")
+    if agreement is not None and not isinstance(agreement, bool):
+        raise ValueError("verification evidence agreement state is invalid")
+
     safe_fact = {
         "fact_type": fact_type,
         "subject_id": subject_id,
@@ -197,9 +201,7 @@ def sanitize_verification_envelope(envelope: Mapping[str, Any]) -> dict[str, Any
     safe_verification = {
         "status": verification_status,
         "code": _text(verification.get("code")),
-        "agreement": verification.get("agreement")
-        if verification.get("agreement") in {True, False, None}
-        else None,
+        "agreement": agreement,
     }
 
     return {
@@ -211,10 +213,7 @@ def sanitize_verification_envelope(envelope: Mapping[str, Any]) -> dict[str, Any
             "fact": safe_fact,
             "verification": safe_verification,
             "data_quality": safe_quality,
-            "observations": {
-                "primary": primary,
-                "verifier": verifier,
-            },
+            "observations": {"primary": primary, "verifier": verifier},
             "cmis_promotable": promotable,
         },
         "risk": None,
@@ -292,6 +291,8 @@ class VerificationEvidenceLedger:
         if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)):
             raise ValueError("recorded_at must be a numeric timestamp")
         timestamp = float(timestamp)
+        if not math.isfinite(timestamp):
+            raise ValueError("recorded_at must be finite")
 
         data = safe["data"]
         fact = data["fact"]
@@ -349,11 +350,10 @@ class VerificationEvidenceLedger:
             ).fetchone()
         if row is None:
             return None
-        envelope = json.loads(row["envelope_json"])
         return {
             "evidence_id": row["evidence_id"],
             "recorded_at": row["recorded_at"],
-            "envelope": envelope,
+            "envelope": json.loads(row["envelope_json"]),
         }
 
     def find(
