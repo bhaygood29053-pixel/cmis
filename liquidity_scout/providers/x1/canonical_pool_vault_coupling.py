@@ -139,6 +139,14 @@ def _window_coupling_evidence(
     range_proven = window.get("range_proven") is True
     integrity_verified = window.get("integrity_verified") is True
     stable_pair = candidate.get("stable_directional_pair_candidate") is True
+    raw_structural_stable = candidate.get(
+        "stable_structural_directional_pair_candidate"
+    )
+    structural_stable_pair = (
+        stable_pair
+        if raw_structural_stable is None
+        else raw_structural_stable is True
+    )
     qualifying_flow = candidate.get("qualifying_family_evidence") is True
     present = bool(candidate)
 
@@ -147,7 +155,7 @@ def _window_coupling_evidence(
         and range_proven
         and integrity_verified
         and full_coverage
-        and stable_pair
+        and structural_stable_pair
         and qualifying_flow
     )
 
@@ -165,6 +173,9 @@ def _window_coupling_evidence(
         ),
         "full_pool_instruction_coverage": full_coverage,
         "stable_directional_pair_candidate": stable_pair,
+        "stable_structural_directional_pair_candidate": (
+            structural_stable_pair
+        ),
         "qualifying_family_evidence": qualifying_flow,
         "is_leading_candidate": candidate.get("is_leading_candidate") is True,
         "pool_instruction_coupled": coupled,
@@ -421,7 +432,9 @@ def prove_canonical_pool_vault_coupling(
                     rejection_reasons.append(f"{label}_history_unproven")
                 elif not evidence["full_pool_instruction_coverage"]:
                     rejection_reasons.append(f"{label}_pool_instruction_coverage_incomplete")
-                elif not evidence["stable_directional_pair_candidate"]:
+                elif not evidence[
+                    "stable_structural_directional_pair_candidate"
+                ]:
                     rejection_reasons.append(f"{label}_directional_pair_unstable")
                 elif not evidence["qualifying_family_evidence"]:
                     rejection_reasons.append(f"{label}_opposite_flow_unqualified")

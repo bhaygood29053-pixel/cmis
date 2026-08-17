@@ -1,6 +1,7 @@
 import unittest
 
 from liquidity_scout.providers.x1.directional_vault_fingerprints import (
+    _direction_summary,
     correlate_directional_vault_pairs,
 )
 from liquidity_scout.providers.x1.transaction_semantics import (
@@ -218,6 +219,60 @@ class DirectionalVaultFingerprintTests(unittest.TestCase):
         self.assertFalse(
             pair["stable_directional_pair_candidate"]
         )
+
+    def test_scope_only_variant_is_structurally_stable(self):
+        records = {}
+
+        for index in range(8):
+            records[f"s{index}"] = {
+                "direction": "SELL",
+                "fingerprints": {
+                    (
+                        XDEX_MAINNET_OBSERVED_PROGRAM_ID,
+                        "outer",
+                        3,
+                        6,
+                        7,
+                    )
+                },
+            }
+
+        records["s8"] = {
+            "direction": "SELL",
+            "fingerprints": {
+                (
+                    XDEX_MAINNET_OBSERVED_PROGRAM_ID,
+                    "inner",
+                    3,
+                    6,
+                    7,
+                )
+            },
+        }
+
+        summary = _direction_summary(
+            "SELL",
+            records,
+            min_direction_occurrences=2,
+            min_fingerprint_ratio=0.95,
+        )
+
+        self.assertEqual(summary["transaction_count"], 9)
+        self.assertEqual(
+            summary["dominant_instruction_fingerprint_count"],
+            8,
+        )
+        self.assertFalse(summary["fingerprint_stable"])
+
+        self.assertEqual(
+            summary["dominant_structural_instruction_fingerprint_count"],
+            9,
+        )
+        self.assertEqual(
+            summary["dominant_structural_instruction_fingerprint_ratio"],
+            1.0,
+        )
+        self.assertTrue(summary["structural_fingerprint_stable"])
 
     def test_single_observed_direction_can_be_stable_with_sample(self):
         txs = {
