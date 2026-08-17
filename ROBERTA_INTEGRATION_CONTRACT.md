@@ -231,7 +231,7 @@ Burn and mint scanning must remain separate from ordinary XDEX market polling.
 
 ### `verification_evidence`
 
-**Status:** draft core in the current CMIS trust-layer development stack; Roberta-facing wrapper not yet available.
+**Status:** implemented core on the accepted CMIS trust baseline; Roberta-facing wrapper planned and not yet available.
 
 Target purpose:
 
@@ -252,7 +252,7 @@ Target result may include:
 - explainable data-quality level and reasons
 - CMIS-promotion state
 
-Until the underlying trust-layer stack is accepted into the integration baseline, Roberta must treat this service as unavailable rather than simulating it.
+The underlying CMIS trust primitives are accepted core and are documented in `ROBERTA_CMIS_ACCEPTED_BASELINE.md`. Until a supported Roberta-facing wrapper is implemented and tested, Roberta must still treat `verification_evidence` as unavailable for production invocation rather than simulating it. Acceptance of low-level CMIS core does not by itself make this service callable.
 
 ### `risk_check`
 
