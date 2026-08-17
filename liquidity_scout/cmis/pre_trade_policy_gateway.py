@@ -1,18 +1,20 @@
-"""Narrow CMIS runtime wiring for explicit pre-trade size policy.
+"""Narrow CMIS runtime wiring for explicit pre-trade policy.
 
 The stable gateway already composes ``risk_check`` before ``pre_trade_check``.
 This mixin changes only the pre-trade composition point so callers can supply a
 separate ``params.pre_trade_policy`` mapping. ``params.policy`` remains the risk
-policy and is never reinterpreted as a trade-size policy.
+policy and is never reinterpreted as a trade-size or freshness policy.
 
-No raw market report, liquidity value, quote, route, or execution object may be
-injected through this boundary. The deterministic pre-trade core consumes only
-the verified evidence already present in the CMIS risk result.
+No raw market report, liquidity value, quote, route, current-time override, or
+execution object may be injected through this boundary. The deterministic
+pre-trade core consumes only CMIS-produced risk evidence and an internal
+runtime evaluation clock.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+import time
 from typing import Any, Dict
 
 from liquidity_scout.services.cmis_pre_trade import build_pre_trade_check_response
@@ -61,11 +63,15 @@ class PreTradePolicyMixin:
                 if isinstance(risk_asset, Mapping):
                     normalized_trade["asset"] = dict(risk_asset)
 
+        now_fn = getattr(self, "pre_trade_now_fn", None) or time.time
+        evaluated_at = float(now_fn())
+
         response = build_pre_trade_check_response(
             risk,
             normalized_trade,
             chain="x1",
             policy=pre_trade_policy,
+            evaluated_at=evaluated_at,
             observed_at=risk.get("observed_at") if isinstance(risk, Mapping) else None,
         )
         if isinstance(definition, Mapping):

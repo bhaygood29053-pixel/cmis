@@ -1,10 +1,8 @@
 """Deterministic trade-size-to-liquidity analysis for CMIS pre-trade checks.
 
-This module is transport-free. It consumes the already-verified liquidity
-component produced by ``risk_check`` plus normalized proposed-trade context.
-It never estimates AMM slippage, price impact, routes, fees, or execution
-outcomes. Numeric warning/block behavior exists only when an explicit caller
-policy supplies the corresponding ratios.
+This module also owns the shared explicit pre-trade policy schema. The policy
+contains no calibrated defaults for market-size or freshness thresholds; callers
+must provide those values explicitly when they want numeric gates applied.
 """
 
 from __future__ import annotations
@@ -15,17 +13,16 @@ from typing import Any, Dict, Optional
 from .risk import BLOCK, PASS, WARN
 
 
-VERSION = "1.0"
+VERSION = "1.1"
 DEFAULT_PRE_TRADE_POLICY = {
-    # Ratios are fractions of verified asset-wide liquidity. They are unset by
-    # default so CMIS never invents an acceptable market-impact threshold.
     "warn_notional_to_liquidity_ratio": None,
     "block_notional_to_liquidity_ratio": None,
-    # Missing trade size means the size-sensitive portion is incomplete.
     "warn_on_missing_notional": True,
-    # A sized trade cannot be evaluated safely when asset-wide liquidity is not
-    # verified. This is a pre-trade analysis gate, not execution authorization.
     "block_on_unverified_liquidity_for_sized_trade": True,
+    # Evidence-age thresholds are seconds and intentionally unset by default.
+    "warn_risk_age_seconds": None,
+    "block_risk_age_seconds": None,
+    "block_on_unverified_timestamp_when_age_policy_set": True,
 }
 
 
@@ -41,7 +38,7 @@ def _number(value: Any) -> Optional[float]:
     return number
 
 
-def _positive_policy_ratio(name: str, value: Any) -> Optional[float]:
+def _positive_policy_number(name: str, value: Any) -> Optional[float]:
     if value is None:
         return None
     number = _number(value)
@@ -65,8 +62,10 @@ def normalize_pre_trade_policy(policy: Optional[Mapping[str, Any]]) -> Dict[str,
     for key in (
         "warn_notional_to_liquidity_ratio",
         "block_notional_to_liquidity_ratio",
+        "warn_risk_age_seconds",
+        "block_risk_age_seconds",
     ):
-        result[key] = _positive_policy_ratio(key, result.get(key))
+        result[key] = _positive_policy_number(key, result.get(key))
 
     warn_ratio = result["warn_notional_to_liquidity_ratio"]
     block_ratio = result["block_notional_to_liquidity_ratio"]
@@ -76,9 +75,18 @@ def normalize_pre_trade_policy(policy: Optional[Mapping[str, Any]]) -> Dict[str,
             "to warn_notional_to_liquidity_ratio"
         )
 
+    warn_age = result["warn_risk_age_seconds"]
+    block_age = result["block_risk_age_seconds"]
+    if warn_age is not None and block_age is not None and block_age < warn_age:
+        raise ValueError(
+            "block_risk_age_seconds must be greater than or equal to "
+            "warn_risk_age_seconds"
+        )
+
     for key in (
         "warn_on_missing_notional",
         "block_on_unverified_liquidity_for_sized_trade",
+        "block_on_unverified_timestamp_when_age_policy_set",
     ):
         if not isinstance(result.get(key), bool):
             raise ValueError(f"{key} must be a boolean")
@@ -113,12 +121,7 @@ def assess_trade_size_liquidity(
     *,
     policy: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Assess proposed USD notional against verified asset-wide liquidity.
-
-    The result never asserts slippage or price impact. It only calculates the
-    dimensionless notional/liquidity ratio from verified inputs and applies
-    explicit caller-provided ratio thresholds when present.
-    """
+    """Assess proposed USD notional against verified asset-wide liquidity."""
     if not isinstance(risk_result, Mapping):
         raise ValueError("risk_result must be a mapping")
     if not isinstance(trade, Mapping):

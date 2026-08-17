@@ -20,6 +20,9 @@ _UNVERIFIED_FLAGS = {
     "risk_evidence_incomplete",
     "trade_notional_unverified",
     "sized_trade_liquidity_unverified",
+    "risk_timestamp_unverified_for_freshness",
+    "evaluation_timestamp_unverified_for_freshness",
+    "risk_timestamp_after_evaluation",
 }
 
 
@@ -81,9 +84,9 @@ def _warnings(result: Mapping[str, Any]) -> list:
 def _service_status(result: Mapping[str, Any]) -> str:
     """Separate service completeness from PASS/WARN/BLOCK severity.
 
-    Verified mismatches or explicit policy threshold breaches are successful
-    deterministic findings and therefore remain ``ok``. Only flags that mean
-    required evidence itself is missing/unverified make the service ``partial``.
+    Verified threshold breaches are successful deterministic findings and remain
+    ``ok``. Only flags representing missing, invalid, or temporally inconsistent
+    required evidence make the service ``partial``.
     """
     flags = result.get("flags")
     flag_set = {str(flag) for flag in flags} if isinstance(flags, list) else set()
@@ -142,17 +145,16 @@ def build_pre_trade_check_response(
     *,
     chain: str = "x1",
     policy: Optional[Mapping[str, Any]] = None,
+    risk_observed_at: Any = None,
+    evaluated_at: Any = None,
     observed_at: Any = None,
 ) -> Dict[str, Any]:
     """Return ``pre_trade_check`` through the shared CMIS service contract.
 
-    The supplied risk input may be the raw deterministic risk result or a CMIS
-    ``risk_check`` envelope. A fully verified PASS, WARN, or BLOCK is service
-    status ``ok``. Missing/unverified required evidence is ``partial``. Missing
-    risk input is ``unavailable`` and malformed input is ``error``.
-
-    ``policy`` controls only deterministic pre-trade size/liquidity thresholds.
-    It never authorizes execution or invents slippage/price-impact assumptions.
+    For a full CMIS risk envelope, the envelope's ``observed_at`` is the risk
+    evidence timestamp used by freshness analysis. The output envelope's
+    optional ``observed_at`` override is presentation/provenance metadata only
+    and never substitutes for the evidence timestamp.
     """
     if risk_result is None:
         return build_service_envelope(
@@ -235,12 +237,20 @@ def build_pre_trade_check_response(
             observed_at=observed_at,
         )
 
+    effective_risk_observed_at = (
+        risk_envelope.get("observed_at")
+        if risk_envelope is not None
+        else risk_observed_at
+    )
+
     try:
         result = build_pre_trade_check(
             raw_risk,
             trade,
             chain=chain,
             policy=policy,
+            risk_observed_at=effective_risk_observed_at,
+            evaluated_at=evaluated_at,
         )
     except ValueError as exc:
         sources = _copy_records(risk_envelope.get("sources")) if risk_envelope else []
@@ -277,6 +287,8 @@ def build_pre_trade_check_response(
         asset=result.get("asset"),
         data={
             "trade": result.get("trade") or {},
+            "risk_observed_at": result.get("risk_observed_at"),
+            "evaluated_at": result.get("evaluated_at"),
             "analysis_only": result.get("analysis_only") is True,
             "execution_authorized": result.get("execution_authorized") is True,
         },
