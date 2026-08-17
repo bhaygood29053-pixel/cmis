@@ -5,6 +5,10 @@ accepts the already-verified pool/vault identity plus per-role outputs from
 ``verify_x1_rpc_token_account_identity`` and proves that the RPC observations
 refer to the exact asset/counter vaults, mints, and shared authority expected by
 the reserve proof chain.
+
+Identity binding is one trust gate only. This adapter never promotes a reserve
+fact by itself; value agreement and observation-scope/freshness remain separate
+requirements in the reserve cross-check.
 """
 
 from __future__ import annotations
