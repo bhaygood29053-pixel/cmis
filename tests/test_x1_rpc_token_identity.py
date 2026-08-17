@@ -1,6 +1,10 @@
 import unittest
 
-from liquidity_scout.providers.x1.rpc_token_account import RPC_METHOD
+from liquidity_scout.providers.x1.rpc_token_account import (
+    ENCODING,
+    RPC_METHOD,
+    RPC_SOURCE,
+)
 from liquidity_scout.providers.x1.rpc_token_identity import (
     verify_x1_rpc_token_account_identity,
 )
@@ -14,8 +18,9 @@ AUTHORITY = "Authority111"
 def observation():
     return {
         "chain": "x1",
-        "source": "X1 RPC",
+        "source": RPC_SOURCE,
         "method": RPC_METHOD,
+        "encoding": ENCODING,
         "account": ACCOUNT,
         "slot": 72254502,
         "mint": MINT,
@@ -37,6 +42,7 @@ class X1RPCTokenIdentityTests(unittest.TestCase):
         self.assertTrue(result["account_verified"])
         self.assertTrue(result["mint_verified"])
         self.assertTrue(result["authority_verified"])
+        self.assertTrue(result["slot_verified"])
         self.assertTrue(result["identity_verified"])
         self.assertFalse(result["cmis_promotable"])
         self.assertEqual(result["rejection_reasons"], [])
@@ -83,6 +89,19 @@ class X1RPCTokenIdentityTests(unittest.TestCase):
         self.assertFalse(result["identity_verified"])
         self.assertIn("authority_identity_mismatch", result["rejection_reasons"])
 
+    def test_wrong_rpc_source_fails_closed(self):
+        item = observation()
+        item["source"] = "Other RPC"
+        result = verify_x1_rpc_token_account_identity(
+            item,
+            expected_account=ACCOUNT,
+            expected_mint=MINT,
+            expected_authority=AUTHORITY,
+        )
+
+        self.assertFalse(result["identity_verified"])
+        self.assertIn("rpc_source_mismatch", result["rejection_reasons"])
+
     def test_wrong_rpc_method_fails_closed(self):
         item = observation()
         item["method"] = "getBalance"
@@ -95,6 +114,33 @@ class X1RPCTokenIdentityTests(unittest.TestCase):
 
         self.assertFalse(result["identity_verified"])
         self.assertIn("rpc_method_mismatch", result["rejection_reasons"])
+
+    def test_wrong_encoding_fails_closed(self):
+        item = observation()
+        item["encoding"] = "base64"
+        result = verify_x1_rpc_token_account_identity(
+            item,
+            expected_account=ACCOUNT,
+            expected_mint=MINT,
+            expected_authority=AUTHORITY,
+        )
+
+        self.assertFalse(result["identity_verified"])
+        self.assertIn("rpc_encoding_mismatch", result["rejection_reasons"])
+
+    def test_invalid_slot_fails_closed(self):
+        item = observation()
+        item["slot"] = True
+        result = verify_x1_rpc_token_account_identity(
+            item,
+            expected_account=ACCOUNT,
+            expected_mint=MINT,
+            expected_authority=AUTHORITY,
+        )
+
+        self.assertFalse(result["slot_verified"])
+        self.assertFalse(result["identity_verified"])
+        self.assertIn("rpc_slot_invalid", result["rejection_reasons"])
 
     def test_unparsed_observation_fails_closed(self):
         item = observation()
