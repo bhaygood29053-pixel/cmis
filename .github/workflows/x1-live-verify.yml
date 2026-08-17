@@ -13,6 +13,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_token_account_enumeration_probe:
+        description: Run read-only XENCAT token-account enumeration candidate probe
+        required: true
+        default: false
+        type: boolean
       run_ohlcv:
         description: Run read-only X1.Ninja OHLCV live contract verification
         required: true
@@ -51,7 +56,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify required secret is available
+      - name: Verify required X1.Ninja secret is available
+        if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_ohlcv || inputs.run_trade_history }}
         shell: bash
         run: |
           if [ -z "${X1_NINJA_API_KEY:-}" ]; then
@@ -92,6 +98,25 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Run XENCAT token-account enumeration candidate probe
+        if: ${{ inputs.run_token_account_enumeration_probe }}
+        env:
+          RUN_X1_TOKEN_ACCOUNT_ENUMERATION_LIVE: "1"
+          X1_TOKEN_ACCOUNT_ENUMERATION_OUTPUT: x1-token-account-enumeration-evidence.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_token_account_enumeration_live -v
+
+      - name: Upload X1 token-account enumeration evidence
+        if: ${{ inputs.run_token_account_enumeration_probe }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-token-account-enumeration-evidence-${{ github.run_id }}
+          path: x1-token-account-enumeration-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run X1.Ninja OHLCV live contract probe
         if: ${{ inputs.run_ohlcv }}
         env:
@@ -122,5 +147,6 @@ jobs:
         run: |
           echo "Read-only provider verification only."
           echo "Reserve scope probes measure evidence timing/slots but do not declare freshness or CMIS promotion."
-          echo "Uploaded reserve-scope artifacts are sanitized and exclude credentials/raw HTTP payloads."
+          echo "Token-account enumeration probes expose candidate counts/set digests but do not declare total coverage or holder semantics."
+          echo "Uploaded live artifacts are sanitized and exclude credentials/raw HTTP or RPC payloads."
           echo "No transaction preparation, signing, broadcasting, or autonomous execution is performed."
