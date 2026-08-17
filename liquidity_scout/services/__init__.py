@@ -17,6 +17,7 @@ from .cmis_pre_trade import build_pre_trade_check_response
 from .cmis_rank import SUPPORTED_RANK_METRICS, build_rank_response
 from .cmis_risk import build_risk_check_response
 from .cmis_tokenomics import build_tokenomics_response
+from .cmis_verification_evidence import build_verification_evidence_response
 from .historical_compare import (
     build_historical_comparison,
     format_historical_comparison,
@@ -78,6 +79,7 @@ __all__ = [
     "build_service_envelope",
     "build_tokenomics_report",
     "build_tokenomics_response",
+    "build_verification_evidence_response",
     "build_verified_market_context",
     "find_asset_rank",
     "format_field_line",
