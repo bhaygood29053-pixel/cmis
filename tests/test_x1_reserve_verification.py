@@ -105,7 +105,8 @@ class X1ReserveVerificationTests(unittest.TestCase):
         )
 
         self.assertEqual(result["verification"]["status"], AGREEMENT)
-        self.assertEqual(result["data_quality"]["quality"], "MEDIUM")
+        self.assertEqual(result["data_quality"]["quality"], "LOW")
+        self.assertIn("FRESHNESS_UNVERIFIED", result["data_quality"]["reasons"])
         self.assertFalse(result["cmis_promotable"])
 
 
