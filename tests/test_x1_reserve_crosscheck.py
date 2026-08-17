@@ -1,4 +1,3 @@
-import copy
 import unittest
 
 from liquidity_scout.cmis.evidence import (
@@ -69,7 +68,7 @@ def semantic_manifest():
         },
         "counter": {
             "field_path": "pool.pooledQuote",
-            "unit": BASE_UNITS,
+            "unit": TOKEN_UNITS,
             "decimals": 6,
             "mint": COUNTER_MINT,
             "vault": COUNTER_VAULT,
@@ -127,6 +126,27 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
                 "HIGH",
             )
             self.assertTrue(result["roles"][role]["cmis_promotable"])
+
+    def test_explicit_base_unit_provider_contract_is_supported_without_inference(self):
+        detail = pool_detail()
+        detail["raw_response"]["pool"]["pooledQuote"] = "9000000"
+        manifest = semantic_manifest()
+        manifest["counter"]["unit"] = BASE_UNITS
+
+        result = run_x1_reserve_crosscheck(
+            detail,
+            vault_identity(),
+            manifest,
+            rpc_balances(),
+            observed_at=1000.0,
+            observation_scope_verified=True,
+        )
+
+        counter_evidence = result["roles"]["counter"]["evidence"]
+        self.assertEqual(result["overall_verification"], AGREEMENT)
+        self.assertEqual(counter_evidence["provider"]["raw_value"], "9000000")
+        self.assertEqual(counter_evidence["provider"]["normalized_value"], "9")
+        self.assertEqual(counter_evidence["rpc"]["normalized_value"], "9")
 
     def test_exact_agreement_without_verified_observation_scope_stays_non_promotable(self):
         result = run_x1_reserve_crosscheck(
