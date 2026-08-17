@@ -245,6 +245,19 @@ class X1ReserveLiveEvidenceTests(unittest.TestCase):
                 clock=lambda: True,
             )
 
+    def test_clock_moving_backwards_fails_closed(self):
+        values = iter([100.0, 101.0, 102.0, 99.0, 104.0, 105.0, 106.0])
+        with self.assertRaisesRegex(RuntimeError, "clock moved backwards"):
+            collect_x1_reserve_live_evidence(
+                POOL,
+                role_specs(),
+                shared_authority=OWNER,
+                pool_detail_fetcher=pool_detail,
+                balance_fetcher=balance,
+                identity_fetcher=identity,
+                clock=lambda: next(values),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
