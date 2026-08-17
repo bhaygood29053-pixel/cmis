@@ -32,6 +32,7 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         self.assertEqual(supply["mint"], self.mint)
         self.assertTrue(supply["supply_verified"])
         self.assertGreaterEqual(supply["context_slot"], 0)
+        self.assertTrue(supply["amount_raw"].isdigit())
 
         self.assertEqual(mint_account["chain"], "solana")
         self.assertEqual(mint_account["source"], "solana_rpc")
@@ -39,6 +40,7 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         self.assertTrue(mint_account["program_identity_verified"])
         self.assertTrue(mint_account["mint_state_verified"])
         self.assertGreaterEqual(mint_account["context_slot"], 0)
+        self.assertTrue(mint_account["amount_raw"].isdigit())
 
         self.assertEqual(largest["chain"], "solana")
         self.assertEqual(largest["source"], "solana_rpc")
@@ -48,10 +50,10 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         self.assertGreaterEqual(largest["context_slot"], 0)
         self.assertLessEqual(largest["account_count_observed"], 20)
 
-        # This is a contract consistency check only. Nearby slots are not
-        # interpreted as a shared freshness/observation scope.
+        # The methods may observe different slots. Decimals are stable mint
+        # identity semantics, but supply values are not compared across calls
+        # until CMIS has an explicit shared observation-scope contract.
         self.assertEqual(supply["decimals"], mint_account["decimals"])
-        self.assertEqual(supply["amount_raw"], mint_account["amount_raw"])
 
 
 if __name__ == "__main__":
