@@ -23,6 +23,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_sse_access_probe:
+        description: Probe X1.Ninja trade-stream SSE handshake/access without consuming events
+        required: true
+        default: false
+        type: boolean
       run_ohlcv:
         description: Run read-only X1.Ninja OHLCV live contract verification
         required: true
@@ -62,7 +67,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Verify required X1.Ninja secret is available
-        if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_holder_observational_probe || inputs.run_ohlcv || inputs.run_trade_history }}
+        if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_holder_observational_probe || inputs.run_sse_access_probe || inputs.run_ohlcv || inputs.run_trade_history }}
         shell: bash
         run: |
           if [ -z "${X1_NINJA_API_KEY:-}" ]; then
@@ -83,6 +88,15 @@ jobs:
           else
             echo "Pool-detail live probe is not present on this ref; skipping."
           fi
+
+      - name: Probe X1.Ninja trade-stream SSE access
+        if: ${{ inputs.run_sse_access_probe }}
+        env:
+          RUN_X1_NINJA_SSE_LIVE_TESTS: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_ninja_trade_stream_live -v
 
       - name: Run bounded XENCAT/XNT reserve scope live probe
         if: ${{ inputs.run_reserve_scope_probe }}
@@ -170,6 +184,7 @@ jobs:
       - name: Safety boundary
         run: |
           echo "Read-only provider verification only."
+          echo "SSE access probing checks the HTTP handshake only and consumes no trade events."
           echo "Reserve scope probes measure evidence timing/slots but do not declare freshness or CMIS promotion."
           echo "Token-account enumeration probes expose candidate counts/set digests but do not declare total coverage or holder semantics."
           echo "Holder observational probes compare sanitized numeric candidates only; they do not authenticate holder semantics, totality, or beneficial ownership."
