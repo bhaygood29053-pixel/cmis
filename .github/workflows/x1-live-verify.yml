@@ -49,15 +49,18 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Verify required X1.Ninja secret is available
         if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_holder_observational_probe || inputs.run_ohlcv || inputs.run_trade_history }}
         shell: bash
@@ -66,6 +69,7 @@ jobs:
             echo "X1_NINJA_API_KEY repository secret is not available to this workflow."
             exit 1
           fi
+
       - name: Run X1.Ninja pool-detail live contract probe
         if: ${{ inputs.run_pool_detail }}
         env:
@@ -74,13 +78,22 @@ jobs:
         run: |
           set -euo pipefail
           file="tests/test_x1_ninja_pool_detail_live.py"
-          if [ -f "$file" ]; then python -m unittest tests.test_x1_ninja_pool_detail_live -v; else echo "Pool-detail live probe is not present on this ref; skipping."; fi
+          if [ -f "$file" ]; then
+            python -m unittest tests.test_x1_ninja_pool_detail_live -v
+          else
+            echo "Pool-detail live probe is not present on this ref; skipping."
+          fi
+
       - name: Run bounded XENCAT/XNT reserve scope live probe
         if: ${{ inputs.run_reserve_scope_probe }}
         env:
           RUN_X1_RESERVE_SCOPE_LIVE: "1"
           X1_RESERVE_SCOPE_OUTPUT: x1-reserve-scope-evidence.json
-        run: python -m unittest tests.test_x1_reserve_scope_live -v
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_reserve_scope_live -v
+
       - name: Upload X1 reserve scope evidence
         if: ${{ inputs.run_reserve_scope_probe }}
         uses: actions/upload-artifact@v4
@@ -89,12 +102,17 @@ jobs:
           path: x1-reserve-scope-evidence.json
           if-no-files-found: error
           retention-days: 14
+
       - name: Run XENCAT token-account enumeration candidate probe
         if: ${{ inputs.run_token_account_enumeration_probe }}
         env:
           RUN_X1_TOKEN_ACCOUNT_ENUMERATION_LIVE: "1"
           X1_TOKEN_ACCOUNT_ENUMERATION_OUTPUT: x1-token-account-enumeration-evidence.json
-        run: python -m unittest tests.test_x1_token_account_enumeration_live -v
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_token_account_enumeration_live -v
+
       - name: Upload X1 token-account enumeration evidence
         if: ${{ inputs.run_token_account_enumeration_probe }}
         uses: actions/upload-artifact@v4
@@ -103,12 +121,17 @@ jobs:
           path: x1-token-account-enumeration-evidence.json
           if-no-files-found: error
           retention-days: 14
+
       - name: Run XENCAT holder observational comparison probe
         if: ${{ inputs.run_holder_observational_probe }}
         env:
           RUN_X1_HOLDER_OBSERVATIONAL_LIVE: "1"
           X1_HOLDER_OBSERVATIONAL_OUTPUT: x1-holder-observational-evidence.json
-        run: python -m unittest tests.test_x1_holder_observational_live -v
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_holder_observational_live -v
+
       - name: Upload X1 holder observational evidence
         if: ${{ inputs.run_holder_observational_probe }}
         uses: actions/upload-artifact@v4
@@ -117,11 +140,14 @@ jobs:
           path: x1-holder-observational-evidence.json
           if-no-files-found: error
           retention-days: 14
+
       - name: Run X1.Ninja OHLCV live contract probe
         if: ${{ inputs.run_ohlcv }}
         env:
           RUN_X1_NINJA_LIVE_TESTS: "1"
-        run: python -m unittest tests.test_x1_ninja_ohlcv_live -v
+        run: |
+          python -m unittest tests.test_x1_ninja_ohlcv_live -v
+
       - name: Run X1.Ninja trade-history live probes
         if: ${{ inputs.run_trade_history }}
         env:
@@ -129,10 +155,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files=(tests/test_x1_ninja_trade_history_live.py tests/test_x1_ninja_trade_semantics_live.py)
+          files=(
+            tests/test_x1_ninja_trade_history_live.py
+            tests/test_x1_ninja_trade_semantics_live.py
+          )
           for file in "${files[@]}"; do
-            if [ -f "$file" ]; then module="${file%.py}"; module="${module//\//.}"; python -m unittest "$module" -v; fi
+            if [ -f "$file" ]; then
+              module="${file%.py}"
+              module="${module//\//.}"
+              python -m unittest "$module" -v
+            fi
           done
+
       - name: Safety boundary
         run: |
           echo "Read-only provider verification only."
