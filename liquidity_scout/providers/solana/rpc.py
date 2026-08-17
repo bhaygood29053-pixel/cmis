@@ -38,12 +38,21 @@ def _text(value: object, *, field: str) -> str:
 def _nonnegative_int(value: object, *, field: str) -> int:
     if isinstance(value, bool):
         raise SolanaRPCError(f"{field} must be a non-negative integer")
-    try:
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and value.isdigit():
         parsed = int(value)
-    except (TypeError, ValueError) as exc:
-        raise SolanaRPCError(f"{field} must be a non-negative integer") from exc
+    else:
+        raise SolanaRPCError(f"{field} must be a non-negative integer")
     if parsed < 0:
         raise SolanaRPCError(f"{field} must be a non-negative integer")
+    return parsed
+
+
+def _u8(value: object, *, field: str) -> int:
+    parsed = _nonnegative_int(value, field=field)
+    if parsed > 255:
+        raise SolanaRPCError(f"{field} must fit in u8")
     return parsed
 
 
@@ -152,7 +161,7 @@ class SolanaRPCProvider:
         if not isinstance(value, Mapping):
             raise SolanaRPCError("getTokenSupply result.value must be an object")
         amount = _raw_amount(value.get("amount"), field="token supply amount")
-        decimals = _nonnegative_int(value.get("decimals"), field="token decimals")
+        decimals = _u8(value.get("decimals"), field="token decimals")
         ui_amount_string = value.get("uiAmountString")
         if ui_amount_string is not None and not isinstance(ui_amount_string, str):
             raise SolanaRPCError("uiAmountString must be a string or null")
@@ -204,7 +213,7 @@ class SolanaRPCProvider:
             raise SolanaRPCError("parsed mint info must be an object")
 
         supply = _raw_amount(info.get("supply"), field="mint supply")
-        decimals = _nonnegative_int(info.get("decimals"), field="mint decimals")
+        decimals = _u8(info.get("decimals"), field="mint decimals")
         mint_authority = info.get("mintAuthority")
         freeze_authority = info.get("freezeAuthority")
         if mint_authority is not None and not isinstance(mint_authority, str):
@@ -254,7 +263,7 @@ class SolanaRPCProvider:
                 )
             address = _text(item.get("address"), field="token account address")
             amount = _raw_amount(item.get("amount"), field="token account amount")
-            decimals = _nonnegative_int(item.get("decimals"), field="token decimals")
+            decimals = _u8(item.get("decimals"), field="token decimals")
             ui_amount_string = item.get("uiAmountString")
             if ui_amount_string is not None and not isinstance(ui_amount_string, str):
                 raise SolanaRPCError("uiAmountString must be a string or null")
