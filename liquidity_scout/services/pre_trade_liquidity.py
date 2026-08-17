@@ -10,19 +10,22 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Dict, Optional
 
+from .pre_trade_capabilities import normalize_required_capabilities
 from .risk import BLOCK, PASS, WARN
 
 
-VERSION = "1.1"
+VERSION = "1.2"
 DEFAULT_PRE_TRADE_POLICY = {
     "warn_notional_to_liquidity_ratio": None,
     "block_notional_to_liquidity_ratio": None,
     "warn_on_missing_notional": True,
     "block_on_unverified_liquidity_for_sized_trade": True,
-    # Evidence-age thresholds are seconds and intentionally unset by default.
     "warn_risk_age_seconds": None,
     "block_risk_age_seconds": None,
     "block_on_unverified_timestamp_when_age_policy_set": True,
+    # Execution estimates remain optional unless the caller explicitly requires
+    # one or more named capabilities.
+    "required_capabilities": [],
 }
 
 
@@ -49,6 +52,7 @@ def _positive_policy_number(name: str, value: Any) -> Optional[float]:
 
 def normalize_pre_trade_policy(policy: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     result = dict(DEFAULT_PRE_TRADE_POLICY)
+    result["required_capabilities"] = []
     if policy is None:
         return result
     if not isinstance(policy, Mapping):
@@ -59,6 +63,9 @@ def normalize_pre_trade_policy(policy: Optional[Mapping[str, Any]]) -> Dict[str,
         raise ValueError(f"unknown pre_trade policy fields: {', '.join(unknown)}")
 
     result.update(policy)
+    result["required_capabilities"] = normalize_required_capabilities(
+        result.get("required_capabilities")
+    )
     for key in (
         "warn_notional_to_liquidity_ratio",
         "block_notional_to_liquidity_ratio",
