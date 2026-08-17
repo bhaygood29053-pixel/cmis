@@ -9,6 +9,7 @@ strengthen data quality/promotion state.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import math
 from typing import Any
 
 from liquidity_scout.services.cmis_verification_evidence import (
@@ -97,6 +98,7 @@ def persist_verification_evidence(
         or not isinstance(inserted, bool)
         or isinstance(receipt_recorded_at, bool)
         or not isinstance(receipt_recorded_at, (int, float))
+        or not math.isfinite(float(receipt_recorded_at))
     ):
         return _failure(
             envelope=envelope,
