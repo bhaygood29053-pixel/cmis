@@ -18,6 +18,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_holder_observational_probe:
+        description: Run sanitized XENCAT provider-RPC holder observational comparison
+        required: true
+        default: false
+        type: boolean
       run_ohlcv:
         description: Run read-only X1.Ninja OHLCV live contract verification
         required: true
@@ -57,7 +62,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Verify required X1.Ninja secret is available
-        if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_ohlcv || inputs.run_trade_history }}
+        if: ${{ inputs.run_pool_detail || inputs.run_reserve_scope_probe || inputs.run_holder_observational_probe || inputs.run_ohlcv || inputs.run_trade_history }}
         shell: bash
         run: |
           if [ -z "${X1_NINJA_API_KEY:-}" ]; then
@@ -117,6 +122,25 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Run XENCAT holder observational comparison probe
+        if: ${{ inputs.run_holder_observational_probe }}
+        env:
+          RUN_X1_HOLDER_OBSERVATIONAL_LIVE: "1"
+          X1_HOLDER_OBSERVATIONAL_OUTPUT: x1-holder-observational-evidence.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_holder_observational_live -v
+
+      - name: Upload X1 holder observational evidence
+        if: ${{ inputs.run_holder_observational_probe }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-holder-observational-evidence-${{ github.run_id }}
+          path: x1-holder-observational-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run X1.Ninja OHLCV live contract probe
         if: ${{ inputs.run_ohlcv }}
         env:
@@ -148,5 +172,6 @@ jobs:
           echo "Read-only provider verification only."
           echo "Reserve scope probes measure evidence timing/slots but do not declare freshness or CMIS promotion."
           echo "Token-account enumeration probes expose candidate counts/set digests but do not declare total coverage or holder semantics."
+          echo "Holder observational probes compare sanitized numeric candidates only; they do not authenticate holder semantics, totality, or beneficial ownership."
           echo "Uploaded live artifacts are sanitized and exclude credentials/raw HTTP or RPC payloads."
           echo "No transaction preparation, signing, broadcasting, or autonomous execution is performed."
