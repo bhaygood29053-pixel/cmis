@@ -85,31 +85,30 @@ class VerificationEvidenceLedgerTests(unittest.TestCase):
         stored = self.ledger.get(first["evidence_id"])
         self.assertEqual(stored["recorded_at"], 2000.0)
         self.assertEqual(stored["envelope"]["service"], "verification_evidence")
-        self.assertEqual(
-            stored["envelope"]["data"]["fact"]["subject_id"],
-            SUBJECT,
-        )
+        self.assertEqual(stored["envelope"]["data"]["fact"]["subject_id"], SUBJECT)
+        self.assertEqual(stored["envelope"]["data"]["fact"]["normalized_value"], "42")
         self.assertTrue(stored["envelope"]["data"]["cmis_promotable"])
 
     def test_content_id_changes_when_sanitized_evidence_changes(self):
         agreement = sanitize_verification_envelope(envelope("42"))
-        conflict = sanitize_verification_envelope(
-            envelope("42", verifier_value="43")
-        )
+        conflict = sanitize_verification_envelope(envelope("42", verifier_value="43"))
 
         self.assertNotEqual(evidence_id_for(agreement), evidence_id_for(conflict))
 
-    def test_sanitization_drops_unknown_asset_and_transport_payload_fields(self):
-        item = envelope()
-        item = copy.deepcopy(item)
+    def test_sanitization_uses_strict_allowlists_for_asset_source_and_warning_records(self):
+        item = copy.deepcopy(envelope())
         item["asset"]["private_note"] = "secret"
         item["sources"][0]["headers"] = {"Authorization": "Bearer secret"}
-        item["data"]["observations"]["primary"]["raw_response"] = {
-            "secret": True
-        }
-        item["data"]["observations"]["primary"]["rpc_url"] = (
-            "https://secret.example"
+        item["sources"][0]["api_key"] = "scalar-secret"
+        item["warnings"].append(
+            {
+                "code": "safe-warning",
+                "message": "safe message",
+                "token": "scalar-secret",
+            }
         )
+        item["data"]["observations"]["primary"]["raw_response"] = {"secret": True}
+        item["data"]["observations"]["primary"]["rpc_url"] = "https://secret.example"
 
         safe = sanitize_verification_envelope(item)
         rendered = str(safe)
@@ -117,9 +116,16 @@ class VerificationEvidenceLedgerTests(unittest.TestCase):
         self.assertNotIn("api_key", safe["asset"])
         self.assertNotIn("private_note", safe["asset"])
         self.assertNotIn("headers", safe["sources"][0])
+        self.assertNotIn("api_key", safe["sources"][0])
+        self.assertEqual(
+            safe["warnings"][-1],
+            {"code": "safe-warning", "message": "safe message"},
+        )
+        self.assertNotIn("token", safe["warnings"][-1])
         self.assertNotIn("raw_response", safe["data"]["observations"]["primary"])
         self.assertNotIn("rpc_url", safe["data"]["observations"]["primary"])
         self.assertNotIn("Bearer secret", rendered)
+        self.assertNotIn("scalar-secret", rendered)
         self.assertNotIn("secret.example", rendered)
 
     def test_find_and_latest_filter_one_exact_fact_identity(self):
@@ -157,19 +163,23 @@ class VerificationEvidenceLedgerTests(unittest.TestCase):
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded["recorded_at"], 123.0)
 
-    def test_conflict_and_nonpromotable_agreement_can_be_stored_as_partial(self):
+    def test_conflict_and_nonpromotable_agreement_store_only_observations_not_promoted_fact(self):
         conflict = envelope("42", verifier_value="43")
         stale = envelope("42", freshness=False)
 
         conflict_id = self.ledger.store(conflict, recorded_at=1.0)["evidence_id"]
         stale_id = self.ledger.store(stale, recorded_at=2.0)["evidence_id"]
 
+        conflict_record = self.ledger.get(conflict_id)["envelope"]
+        stale_record = self.ledger.get(stale_id)["envelope"]
+        self.assertEqual(conflict_record["data"]["verification"]["status"], "CONFLICT")
+        self.assertIsNone(conflict_record["data"]["fact"]["normalized_value"])
+        self.assertFalse(stale_record["data"]["cmis_promotable"])
+        self.assertIsNone(stale_record["data"]["fact"]["normalized_value"])
+        self.assertIsNone(stale_record["data"]["fact"]["unit"])
         self.assertEqual(
-            self.ledger.get(conflict_id)["envelope"]["data"]["verification"]["status"],
-            "CONFLICT",
-        )
-        self.assertFalse(
-            self.ledger.get(stale_id)["envelope"]["data"]["cmis_promotable"]
+            stale_record["data"]["observations"]["primary"]["normalized_value"],
+            "42",
         )
 
     def test_error_or_wrong_service_envelopes_are_not_persisted(self):
@@ -184,24 +194,62 @@ class VerificationEvidenceLedgerTests(unittest.TestCase):
             self.ledger.store(item)
 
     def test_identity_mismatch_is_rejected_even_if_envelope_shape_looks_valid(self):
-        item = envelope()
-        item = copy.deepcopy(item)
+        item = copy.deepcopy(envelope())
         item["data"]["observations"]["verifier"]["subject_id"] = "other"
 
         with self.assertRaisesRegex(ValueError, "observation subject mismatch"):
             self.ledger.store(item)
 
-    def test_invalid_promotion_or_agreement_state_is_rejected(self):
-        item = envelope("42", verifier_value="43")
-        item = copy.deepcopy(item)
+    def test_invalid_promotion_agreement_or_service_status_is_rejected(self):
+        item = copy.deepcopy(envelope("42", verifier_value="43"))
         item["data"]["cmis_promotable"] = True
         with self.assertRaisesRegex(ValueError, "only AGREEMENT"):
             self.ledger.store(item)
 
-        item = envelope()
-        item = copy.deepcopy(item)
+        item = copy.deepcopy(envelope())
         item["data"]["verification"]["agreement"] = "yes"
-        with self.assertRaisesRegex(ValueError, "agreement state is invalid"):
+        with self.assertRaisesRegex(ValueError, "agreement state is inconsistent"):
+            self.ledger.store(item)
+
+        item = copy.deepcopy(envelope(freshness=False))
+        item["status"] = "ok"
+        with self.assertRaisesRegex(ValueError, "ok status requires promotable AGREEMENT"):
+            self.ledger.store(item)
+
+        item = copy.deepcopy(envelope())
+        item["status"] = "partial"
+        with self.assertRaisesRegex(ValueError, "must use ok status"):
+            self.ledger.store(item)
+
+    def test_nonpromotable_record_cannot_smuggle_promoted_fact_value(self):
+        item = copy.deepcopy(envelope(freshness=False))
+        item["data"]["fact"]["normalized_value"] = "42"
+        item["data"]["fact"]["unit"] = "TOKEN_UNITS"
+
+        with self.assertRaisesRegex(ValueError, "must not expose a promoted fact value"):
+            self.ledger.store(item)
+
+    def test_promoted_fact_must_match_both_observations(self):
+        item = copy.deepcopy(envelope())
+        item["data"]["fact"]["normalized_value"] = "99"
+
+        with self.assertRaisesRegex(ValueError, "must match both verified observations"):
+            self.ledger.store(item)
+
+    def test_quality_contract_is_revalidated_at_storage_boundary(self):
+        item = copy.deepcopy(envelope())
+        item["data"]["data_quality"]["quality"] = "VERY_HIGH"
+        with self.assertRaisesRegex(ValueError, "quality level is invalid"):
+            self.ledger.store(item)
+
+        item = copy.deepcopy(envelope())
+        item["data"]["data_quality"]["independent_source_count"] = 1
+        with self.assertRaisesRegex(ValueError, "source count is inconsistent"):
+            self.ledger.store(item)
+
+        item = copy.deepcopy(envelope())
+        item["data"]["data_quality"]["freshness_verified"] = False
+        with self.assertRaisesRegex(ValueError, "freshness quality state is inconsistent"):
             self.ledger.store(item)
 
     def test_recorded_at_and_limit_fail_closed(self):
