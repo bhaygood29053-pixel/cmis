@@ -8,6 +8,11 @@ on:
         required: true
         default: true
         type: boolean
+      run_sse_access_probe:
+        description: Probe X1.Ninja trade-stream SSE handshake/access without consuming events
+        required: true
+        default: false
+        type: boolean
       run_ohlcv:
         description: Run read-only X1.Ninja OHLCV live contract verification
         required: true
@@ -68,6 +73,15 @@ jobs:
             echo "Pool-detail live probe is not present on this ref; skipping."
           fi
 
+      - name: Probe X1.Ninja trade-stream SSE access
+        if: ${{ inputs.run_sse_access_probe }}
+        env:
+          RUN_X1_NINJA_SSE_LIVE_TESTS: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_ninja_trade_stream_live -v
+
       - name: Run X1.Ninja OHLCV live contract probe
         if: ${{ inputs.run_ohlcv }}
         env:
@@ -97,4 +111,5 @@ jobs:
       - name: Safety boundary
         run: |
           echo "Read-only provider verification only."
+          echo "SSE access probing checks the HTTP handshake only and consumes no trade events."
           echo "No transaction preparation, signing, broadcasting, or autonomous execution is performed."
