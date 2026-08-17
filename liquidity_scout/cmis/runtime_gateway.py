@@ -1,8 +1,9 @@
 """Production CMIS runtime composition.
 
-The HTTP runtime needs the accepted risk/trade extensions and the accepted
-persisted ``verification_evidence`` lookup on one cooperative gateway class.
-This module composes those layers without duplicating their dispatch logic.
+The HTTP runtime needs the accepted risk/trade extensions, persisted
+``verification_evidence`` lookup, and narrowly eligible Solana identity layer on
+one cooperative gateway class. These layers compose without duplicating their
+dispatch logic.
 
 Verification evidence persistence is an internal runtime dependency. Callers
 can select evidence only by the public service contract; they cannot choose a
@@ -15,6 +16,7 @@ import os
 from typing import Any
 
 from liquidity_scout.cmis.evidence_ledger import VerificationEvidenceLedger
+from liquidity_scout.cmis.solana_gateway import SolanaAssetLookupMixin
 from liquidity_scout.cmis.trade_gateway import (
     SUPPORTED_SERVICES as TRADE_SUPPORTED_SERVICES,
     TradeAwareCMISGateway,
@@ -40,8 +42,12 @@ SUPPORTED_SERVICES = (
 )
 
 
-class RuntimeCMISGateway(TradeAwareCMISGateway, VerificationCMISGateway):
-    """HTTP/runtime gateway with trade, risk, and persisted evidence services."""
+class RuntimeCMISGateway(
+    SolanaAssetLookupMixin,
+    TradeAwareCMISGateway,
+    VerificationCMISGateway,
+):
+    """HTTP/runtime gateway with X1 services and gated Solana mint identity."""
 
     def __init__(
         self,
