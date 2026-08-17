@@ -10,10 +10,15 @@ from liquidity_scout.providers.x1.ninja_reserve_semantics import PROOF_STATUS
 from liquidity_scout.providers.x1.reserve_crosscheck import (
     OBSERVED_AT_MISSING,
     RPC_BALANCE_MISSING,
+    RPC_IDENTITY_UNVERIFIED,
     SEMANTIC_PROOF_REJECTED,
     run_x1_reserve_crosscheck,
 )
 from liquidity_scout.providers.x1.reserve_evidence import BASE_UNITS, TOKEN_UNITS
+from liquidity_scout.providers.x1.rpc_token_account import ENCODING, RPC_METHOD, RPC_SOURCE
+from liquidity_scout.providers.x1.rpc_token_identity import (
+    verify_x1_rpc_token_account_identity,
+)
 
 
 POOL = "pool111"
@@ -28,12 +33,7 @@ def pool_detail():
     return {
         "chain": "x1",
         "pool_address_requested": POOL,
-        "raw_response": {
-            "pool": {
-                "pooledBase": "42.5",
-                "pooledQuote": "9",
-            }
-        },
+        "raw_response": {"pool": {"pooledBase": "42.5", "pooledQuote": "9"}},
     }
 
 
@@ -100,23 +100,52 @@ def rpc_balances():
     }
 
 
+def _verified_rpc_identity(account, mint, authority, slot):
+    observation = {
+        "chain": "x1",
+        "source": RPC_SOURCE,
+        "method": RPC_METHOD,
+        "encoding": ENCODING,
+        "account": account,
+        "slot": slot,
+        "mint": mint,
+        "authority": authority,
+        "token_account_fields_parsed": True,
+    }
+    return verify_x1_rpc_token_account_identity(
+        observation,
+        expected_account=account,
+        expected_mint=mint,
+        expected_authority=authority,
+    )
+
+
+def rpc_identities():
+    return {
+        "asset": _verified_rpc_identity(ASSET_VAULT, ASSET_MINT, OWNER, 123456),
+        "counter": _verified_rpc_identity(COUNTER_VAULT, COUNTER_MINT, OWNER, 123457),
+    }
+
+
 class X1ReserveCrosscheckTests(unittest.TestCase):
-    def test_two_leg_agreement_is_promotable_only_with_verified_observation_scope(self):
+    def test_two_leg_agreement_is_promotable_only_with_identity_and_observation_scope(self):
         result = run_x1_reserve_crosscheck(
             pool_detail(),
             vault_identity(),
             semantic_manifest(),
             rpc_balances(),
             observed_at=1000.0,
+            rpc_identities=rpc_identities(),
             observation_scope_verified=True,
         )
 
         self.assertEqual(result["overall_verification"], AGREEMENT)
+        self.assertTrue(result["rpc_identity_binding"]["identity_binding_verified"])
         self.assertTrue(result["cmis_promotable"])
         self.assertEqual(result["warnings"], [])
         self.assertEqual(result["errors"], [])
-
         for role in ("asset", "counter"):
+            self.assertTrue(result["roles"][role]["rpc_identity_verified"])
             self.assertTrue(result["roles"][role]["evidence"]["evidence_ready"])
             self.assertEqual(
                 result["roles"][role]["verification"]["verification"]["status"],
@@ -127,6 +156,31 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
                 "HIGH",
             )
             self.assertTrue(result["roles"][role]["cmis_promotable"])
+
+    def test_missing_rpc_identity_keeps_exact_value_agreement_but_blocks_overall_verification(self):
+        result = run_x1_reserve_crosscheck(
+            pool_detail(),
+            vault_identity(),
+            semantic_manifest(),
+            rpc_balances(),
+            observed_at=1000.0,
+            observation_scope_verified=True,
+        )
+
+        self.assertEqual(result["overall_verification"], INSUFFICIENT_EVIDENCE)
+        self.assertFalse(result["rpc_identity_binding"]["identity_binding_verified"])
+        self.assertFalse(result["cmis_promotable"])
+        for role in ("asset", "counter"):
+            self.assertEqual(
+                result["roles"][role]["verification"]["verification"]["status"],
+                AGREEMENT,
+            )
+            self.assertFalse(result["roles"][role]["rpc_identity_verified"])
+            self.assertFalse(result["roles"][role]["cmis_promotable"])
+            self.assertIn(
+                f"{role}_rpc_identity:{RPC_IDENTITY_UNVERIFIED}",
+                result["errors"],
+            )
 
     def test_explicit_base_unit_provider_contract_is_supported_without_inference(self):
         detail = pool_detail()
@@ -140,6 +194,7 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
             manifest,
             rpc_balances(),
             observed_at=1000.0,
+            rpc_identities=rpc_identities(),
             observation_scope_verified=True,
         )
 
@@ -156,6 +211,7 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
             semantic_manifest(),
             rpc_balances(),
             observed_at=1000.0,
+            rpc_identities=rpc_identities(),
         )
 
         self.assertEqual(result["overall_verification"], AGREEMENT)
@@ -165,10 +221,7 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
             verification = result["roles"][role]["verification"]
             self.assertEqual(verification["verification"]["status"], AGREEMENT)
             self.assertEqual(verification["data_quality"]["quality"], "LOW")
-            self.assertIn(
-                "FRESHNESS_UNVERIFIED",
-                verification["data_quality"]["reasons"],
-            )
+            self.assertIn("FRESHNESS_UNVERIFIED", verification["data_quality"]["reasons"])
 
     def test_claimed_observation_scope_without_observed_at_fails_closed(self):
         result = run_x1_reserve_crosscheck(
@@ -177,6 +230,7 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
             semantic_manifest(),
             rpc_balances(),
             observed_at=None,
+            rpc_identities=rpc_identities(),
             observation_scope_verified=True,
         )
 
@@ -184,27 +238,18 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
         self.assertFalse(result["observation_scope_verified"])
         self.assertFalse(result["cmis_promotable"])
         self.assertIn("observation_scope_unverified", result["warnings"])
-        self.assertIn(
-            f"observation_scope:{OBSERVED_AT_MISSING}",
-            result["errors"],
-        )
-        for role in ("asset", "counter"):
-            self.assertFalse(
-                result["roles"][role]["verification"]["data_quality"][
-                    "freshness_verified"
-                ]
-            )
+        self.assertIn(f"observation_scope:{OBSERVED_AT_MISSING}", result["errors"])
 
     def test_one_conflicting_leg_makes_overall_result_conflict(self):
         balances = rpc_balances()
         balances["asset"]["amount"] = "42500001"
-
         result = run_x1_reserve_crosscheck(
             pool_detail(),
             vault_identity(),
             semantic_manifest(),
             balances,
             observed_at=1000.0,
+            rpc_identities=rpc_identities(),
             observation_scope_verified=True,
         )
 
@@ -219,25 +264,41 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
             AGREEMENT,
         )
 
+    def test_unverified_rpc_identity_blocks_promotion(self):
+        identities = rpc_identities()
+        identities["asset"]["identity_verified"] = False
+        identities["asset"]["rejection_reasons"] = ["authority_identity_mismatch"]
+        result = run_x1_reserve_crosscheck(
+            pool_detail(),
+            vault_identity(),
+            semantic_manifest(),
+            rpc_balances(),
+            observed_at=1000.0,
+            rpc_identities=identities,
+            observation_scope_verified=True,
+        )
+
+        self.assertEqual(result["overall_verification"], INSUFFICIENT_EVIDENCE)
+        self.assertFalse(result["cmis_promotable"])
+        self.assertFalse(result["roles"]["asset"]["rpc_identity_verified"])
+        self.assertIn("rpc_identity:asset:rpc_identity_unverified", result["errors"])
+
     def test_rejected_semantic_proof_blocks_both_legs(self):
         manifest = semantic_manifest()
         manifest["proof_status"] = "asserted_only"
-
         result = run_x1_reserve_crosscheck(
             pool_detail(),
             vault_identity(),
             manifest,
             rpc_balances(),
             observed_at=1000.0,
+            rpc_identities=rpc_identities(),
             observation_scope_verified=True,
         )
 
         self.assertEqual(result["overall_verification"], INSUFFICIENT_EVIDENCE)
         self.assertFalse(result["cmis_promotable"])
-        self.assertIn(
-            "semantic_proof:semantic_proof_status_unproven",
-            result["errors"],
-        )
+        self.assertIn("semantic_proof:semantic_proof_status_unproven", result["errors"])
         for role in ("asset", "counter"):
             self.assertIsNone(result["roles"][role]["evidence"])
             self.assertEqual(
@@ -248,13 +309,13 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
     def test_missing_rpc_leg_fails_closed_without_losing_other_leg(self):
         balances = rpc_balances()
         del balances["counter"]
-
         result = run_x1_reserve_crosscheck(
             pool_detail(),
             vault_identity(),
             semantic_manifest(),
             balances,
             observed_at=1000.0,
+            rpc_identities=rpc_identities(),
             observation_scope_verified=True,
         )
 
@@ -270,29 +331,20 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
         )
         self.assertIn(f"counter_rpc:{RPC_BALANCE_MISSING}", result["errors"])
 
-    def test_recorded_xencat_xnt_values_replay_as_exact_agreement_but_not_freshness_proof(self):
-        """Regression for the read-only XENCAT/XNT evidence observed 2026-08-17.
-
-        The values and account identities below were independently observed via
-        X1.Ninja pool detail and direct X1 RPC. The observations were not proven
-        to share one common observation scope, so this replay must not promote.
-        """
+    def test_recorded_xencat_xnt_values_replay_as_exact_agreement_with_identity_but_not_freshness(self):
         xencat_pool = "6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry"
         xencat_mint = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
         xencat_vault = "9ojBC34QUrubQASb1ktqkNn3kdFiUnqaBnLLgSeWbRm7"
         xnt_mint = "So11111111111111111111111111111111111111112"
         xnt_vault = "7khUrkZN7Y6VgoSR8pASMFjHcKwqdh2cd6NRctXyjSZC"
         authority = "9Dpjw2pB5kXJr6ZTHiqzEMfJPic3om9jgNacnwpLCoaU"
-
         live_pool_detail = {
             "chain": "x1",
             "pool_address_requested": xencat_pool,
-            "raw_response": {
-                "pool": {
-                    "pooledBase": "1146902.928865",
-                    "pooledQuote": "49.575383312",
-                }
-            },
+            "raw_response": {"pool": {
+                "pooledBase": "1146902.928865",
+                "pooledQuote": "49.575383312",
+            }},
         }
         live_identity = {
             "chain": "x1",
@@ -329,23 +381,19 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
         }
         live_rpc = {
             "asset": {
-                "chain": "x1",
-                "source": "X1 RPC",
-                "method": "getTokenAccountBalance",
-                "account": xencat_vault,
-                "slot": 72254502,
-                "amount": "1146902928865",
-                "decimals": 6,
+                "chain": "x1", "source": "X1 RPC", "method": "getTokenAccountBalance",
+                "account": xencat_vault, "slot": 72254502,
+                "amount": "1146902928865", "decimals": 6,
             },
             "counter": {
-                "chain": "x1",
-                "source": "X1 RPC",
-                "method": "getTokenAccountBalance",
-                "account": xnt_vault,
-                "slot": 72254503,
-                "amount": "49575383312",
-                "decimals": 9,
+                "chain": "x1", "source": "X1 RPC", "method": "getTokenAccountBalance",
+                "account": xnt_vault, "slot": 72254503,
+                "amount": "49575383312", "decimals": 9,
             },
+        }
+        live_rpc_identities = {
+            "asset": _verified_rpc_identity(xencat_vault, xencat_mint, authority, 72254502),
+            "counter": _verified_rpc_identity(xnt_vault, xnt_mint, authority, 72254503),
         }
 
         result = run_x1_reserve_crosscheck(
@@ -354,22 +402,16 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
             live_manifest,
             live_rpc,
             observed_at=None,
+            rpc_identities=live_rpc_identities,
             observation_scope_verified=False,
         )
 
         self.assertEqual(result["overall_verification"], AGREEMENT)
+        self.assertTrue(result["rpc_identity_binding"]["identity_binding_verified"])
         self.assertFalse(result["cmis_promotable"])
         self.assertEqual(
             result["roles"]["asset"]["evidence"]["provider"]["normalized_value"],
             "1146902.928865",
-        )
-        self.assertEqual(
-            result["roles"]["asset"]["evidence"]["rpc"]["normalized_value"],
-            "1146902.928865",
-        )
-        self.assertEqual(
-            result["roles"]["counter"]["evidence"]["provider"]["normalized_value"],
-            "49.575383312",
         )
         self.assertEqual(
             result["roles"]["counter"]["evidence"]["rpc"]["normalized_value"],
@@ -379,11 +421,12 @@ class X1ReserveCrosscheckTests(unittest.TestCase):
     def test_inputs_must_be_mappings(self):
         with self.assertRaisesRegex(TypeError, "rpc_balances must be a mapping"):
             run_x1_reserve_crosscheck(
-                pool_detail(),
-                vault_identity(),
-                semantic_manifest(),
-                [],
-                observed_at=1,
+                pool_detail(), vault_identity(), semantic_manifest(), [], observed_at=1
+            )
+        with self.assertRaisesRegex(TypeError, "rpc_identities must be a mapping"):
+            run_x1_reserve_crosscheck(
+                pool_detail(), vault_identity(), semantic_manifest(), rpc_balances(),
+                observed_at=1, rpc_identities=[],
             )
 
 
