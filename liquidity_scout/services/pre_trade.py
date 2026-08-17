@@ -2,16 +2,20 @@
 
 This module performs no RPC, DEX, routing, simulation, wallet, signing, or
 transaction work. It consumes an already-computed deterministic ``risk_check``
-result plus proposed trade context and applies fail-closed identity/chain gates.
+result plus proposed trade context and applies fail-closed identity, chain, and
+trade-size-to-verified-liquidity gates.
 
-The result is analysis only. ``PASS`` never authorizes execution, and this core
-intentionally does not invent trade-size, slippage, price-impact, fee, or route
-thresholds before those policies and calculation methods are explicitly defined
-and tested.
+The result is analysis only. ``PASS`` never authorizes execution. Slippage,
+price impact, fees, and route quality remain unavailable until separately
+verified calculation/quote evidence exists; this core never manufactures them.
 """
 
 from typing import Any, Dict, Mapping, Optional
 
+from .pre_trade_liquidity import (
+    DEFAULT_PRE_TRADE_POLICY,
+    assess_trade_size_liquidity,
+)
 from .risk import BLOCK, PASS, WARN
 
 
@@ -200,11 +204,14 @@ def _assess_risk_gate(risk_result: Mapping[str, Any]) -> Dict[str, Any]:
 def _confidence(
     identity_component: Mapping[str, Any],
     risk_component: Mapping[str, Any],
+    size_component: Mapping[str, Any],
 ) -> Dict[str, Any]:
     identity_evidence = identity_component.get("evidence")
     identity_evidence = identity_evidence if isinstance(identity_evidence, Mapping) else {}
     risk_evidence = risk_component.get("evidence")
     risk_evidence = risk_evidence if isinstance(risk_evidence, Mapping) else {}
+    size_evidence = size_component.get("evidence")
+    size_evidence = size_evidence if isinstance(size_evidence, Mapping) else {}
 
     checks = {
         "chain_consistent": identity_component.get("status") != BLOCK
@@ -216,6 +223,9 @@ def _confidence(
         "risk_asset_mint_verified": bool(identity_evidence.get("risk_mint")),
         "asset_identity_matches": identity_evidence.get("mint_match") is True,
         "risk_evidence_complete": risk_evidence.get("risk_confidence_complete") is True,
+        "trade_notional_verified": size_evidence.get("notional_usd") is not None,
+        "liquidity_verified_for_trade": size_evidence.get("liquidity_verified") is True,
+        "trade_size_assessment_complete": size_evidence.get("size_assessment_complete") is True,
     }
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
@@ -233,13 +243,17 @@ def build_pre_trade_check(
     trade: Mapping[str, Any],
     *,
     chain: str = "x1",
+    policy: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Evaluate deterministic pre-trade gates without authorizing execution.
 
-    The core propagates the existing ``risk_check`` severity, blocks chain or
-    mint mismatches, and warns when the supplied risk evidence is incomplete.
-    Trade notional may be carried as context, but this milestone does not use it
-    to calculate slippage, price impact, or a safe-size threshold.
+    The core propagates ``risk_check`` severity, blocks chain/mint mismatches,
+    and evaluates proposed USD notional against the verified asset-wide
+    liquidity already present in the risk result. Warning/block size ratios are
+    applied only when explicitly supplied in ``policy``.
+
+    This does not estimate slippage, price impact, route quality, fees, or
+    transaction success.
     """
     if not isinstance(risk_result, Mapping):
         raise ValueError("risk_result must be a mapping")
@@ -253,15 +267,25 @@ def build_pre_trade_check(
     normalized_trade = _normalize_trade(trade)
     identity = _assess_identity(risk_result, normalized_trade, chain_name)
     risk_gate = _assess_risk_gate(risk_result)
+    trade_size_liquidity = assess_trade_size_liquidity(
+        risk_result,
+        normalized_trade,
+        policy=policy,
+    )
     components = {
         "identity": identity,
         "risk_gate": risk_gate,
+        "trade_size_liquidity": trade_size_liquidity,
     }
-    recommendation = _merge_status(identity["status"], risk_gate["status"])
+    recommendation = _merge_status(
+        identity["status"],
+        risk_gate["status"],
+        trade_size_liquidity["status"],
+    )
 
     flags = []
     reasons = []
-    for name in ("identity", "risk_gate"):
+    for name in ("identity", "risk_gate", "trade_size_liquidity"):
         flags.extend(components[name]["flags"])
         reasons.extend(components[name]["reasons"])
 
@@ -277,9 +301,10 @@ def build_pre_trade_check(
         "trade": normalized_trade,
         "recommendation": recommendation,
         "components": components,
-        "confidence": _confidence(identity, risk_gate),
+        "confidence": _confidence(identity, risk_gate, trade_size_liquidity),
         "flags": flags,
         "reasons": reasons,
+        "policy": dict(trade_size_liquidity.get("policy") or DEFAULT_PRE_TRADE_POLICY),
         "analysis_only": True,
         "execution_authorized": False,
         "authorization_reason": "pre_trade_check_analysis_only",
@@ -289,12 +314,16 @@ def build_pre_trade_check(
                 "asset_identity_consistency",
                 "risk_check_severity_propagation",
                 "risk_evidence_completeness",
+                "trade_size_to_verified_asset_wide_liquidity",
+                "explicit_trade_size_policy_thresholds",
+                "deterministic_policy_notional_thresholds",
             ],
             "not_yet_included": [
-                "trade_size_thresholds",
                 "slippage",
                 "price_impact",
+                "pool_depth_curve_simulation",
                 "route_quality",
+                "bridge_dependency",
                 "transaction_simulation",
                 "fees",
                 "execution_authorization",
@@ -303,4 +332,4 @@ def build_pre_trade_check(
     }
 
 
-__all__ = ["build_pre_trade_check"]
+__all__ = ["DEFAULT_PRE_TRADE_POLICY", "build_pre_trade_check"]
