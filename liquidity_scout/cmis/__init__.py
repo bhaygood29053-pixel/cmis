@@ -14,8 +14,10 @@ from .assets import (
 from .gateway import (
     KNOWN_CHAINS,
     SUPPORTED_CHAINS,
-    SUPPORTED_SERVICES,
+)
+from .verification_gateway import (
     CMISGateway,
+    SUPPORTED_SERVICES,
 )
 
 __all__ = [
