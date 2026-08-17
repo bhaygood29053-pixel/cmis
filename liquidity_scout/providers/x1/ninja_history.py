@@ -305,8 +305,13 @@ def fetch_pool_trades_raw(
 
 
 
-def _validate_observed_ohlcv_shape(body: Any) -> dict[str, Any]:
-    """Validate only the live-observed OHLCV container/row structure."""
+def _validate_observed_ohlcv_shape(
+    body: Any,
+    *,
+    requested_pool_address: str,
+    requested_timeframe: str,
+) -> dict[str, Any]:
+    """Validate the live-observed OHLCV structure and request scope."""
 
     if not isinstance(body, Mapping):
         raise X1NinjaAPIError(
@@ -321,6 +326,22 @@ def _validate_observed_ohlcv_shape(body: Any) -> dict[str, Any]:
         raise X1NinjaAPIError(
             "X1.Ninja OHLCV response is missing live-observed top-level "
             f"field(s): {', '.join(missing_top)}"
+        )
+
+    provider_pool_address = body.get("poolAddress")
+    if provider_pool_address != requested_pool_address:
+        raise X1NinjaAPIError(
+            "X1.Ninja OHLCV poolAddress does not match the requested pool: "
+            f"requested={requested_pool_address!r}, "
+            f"provider={provider_pool_address!r}"
+        )
+
+    provider_timeframe = body.get("timeframe")
+    if provider_timeframe != requested_timeframe:
+        raise X1NinjaAPIError(
+            "X1.Ninja OHLCV timeframe does not match the requested timeframe: "
+            f"requested={requested_timeframe!r}, "
+            f"provider={provider_timeframe!r}"
         )
 
     candles = body.get("ohlcv")
@@ -358,6 +379,7 @@ def _validate_observed_ohlcv_shape(body: Any) -> dict[str, Any]:
         "response_contract_verified": True,
         "candle_schema_verified": True,
         "candle_row_shape_verified": True,
+        "request_scope_verified": True,
         "top_level_keys": sorted(
             str(key) for key in body.keys()
         ),
@@ -445,7 +467,11 @@ def fetch_pool_ohlcv_raw(
             f"X1.Ninja OHLCV response was not valid JSON: {exc}{detail}"
         ) from exc
 
-    contract = _validate_observed_ohlcv_shape(body)
+    contract = _validate_observed_ohlcv_shape(
+        body,
+        requested_pool_address=address,
+        requested_timeframe=tf,
+    )
     rate_limit = _rate_limit_record(response)
     observed_at = observed_at_fn()
 
