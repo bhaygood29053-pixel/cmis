@@ -231,7 +231,7 @@ Burn and mint scanning must remain separate from ordinary XDEX market polling.
 
 ### `verification_evidence`
 
-**Status:** implemented core on the accepted CMIS trust baseline; Roberta-facing wrapper planned and not yet available.
+**Status:** implemented core on the accepted CMIS trust baseline; Roberta-facing wrapper, sanitized evidence ledger, and exact lookup are in draft development and production invocation remains unavailable.
 
 Target purpose:
 
@@ -251,72 +251,80 @@ Target result may include:
 - deterministic comparison outcome such as `AGREEMENT`, `CONFLICT`, or `INSUFFICIENT_EVIDENCE`
 - explainable data-quality level and reasons
 - CMIS-promotion state
+- stable evidence reference when loaded from the CMIS evidence ledger
 
-The underlying CMIS trust primitives are accepted core and are documented in `ROBERTA_CMIS_ACCEPTED_BASELINE.md`. Until a supported Roberta-facing wrapper is implemented and tested, Roberta must still treat `verification_evidence` as unavailable for production invocation rather than simulating it. Acceptance of low-level CMIS core does not by itself make this service callable.
+The draft service architecture keeps fact verification, persistence, and lookup separate:
+
+```text
+fact-specific CMIS verifier
+        ↓
+verification_evidence wrapper
+        ↓
+sanitized content-addressed evidence ledger
+        ↓
+exact read-only lookup
+        ↓
+future CMISGateway dispatch
+        ↓
+Roberta
+```
+
+The future Roberta-facing request must select evidence using exactly one of these modes:
+
+1. a stable CMIS `evidence_id`; or
+2. an exact CMIS fact identity using `fact_type` + `subject_id` to request the latest stored record for that fact.
+
+Roberta must **not**:
+
+- submit raw provider observations or verifier results to this service;
+- choose or rewrite verification/data-quality/promotion state;
+- ask CMIS to guess which evidence belongs to a free-form asset name;
+- reproduce the underlying comparison to create a second opinion;
+- treat a stored `CONFLICT` or `INSUFFICIENT_EVIDENCE` result as a verified value.
+
+A future lookup response may add an `evidence_ref` containing the stable `evidence_id` and ledger `recorded_at` time. It must otherwise preserve the stored CMIS verification result rather than recalculating it.
+
+The underlying CMIS trust primitives are accepted core and are documented in `ROBERTA_CMIS_ACCEPTED_BASELINE.md`. The wrapper/ledger/lookup development stack is not yet wired into `CMISGateway.SUPPORTED_SERVICES`; therefore Roberta must still treat `verification_evidence` as unavailable for production invocation. Draft implementation does not satisfy the runtime eligibility gate by itself.
 
 ### `risk_check`
 
 **Status:** planned for the Scout Risk Engine phase.
 
-Returns the Liquidity Scout risk assessment.
+Returns deterministic market-risk analysis when implemented.
 
 Possible fields include:
 
-- component risks
-- Scout score
-- confidence
-- flags
-- reasons
-- recommendation
-
-Recommendation states should support:
-
-- `PASS`
-- `WARN`
-- `BLOCK`
-
-Risk results must remain explainable.
+- PASS / WARN / BLOCK
+- reason codes
+- liquidity risk
+- concentration risk
+- authority risk
+- verification uncertainty
+- anomaly warnings
 
 ### `pre_trade_check`
 
-**Status:** planned after the required market, tokenomics, and Scout Risk Engine layers are implemented and tested.
+**Status:** planned for the execution-safety phase.
 
-Input:
+Returns deterministic pre-trade market-risk analysis when implemented.
 
-- asset
-- trade side
-- proposed trade size
+It does **not** authorize execution.
 
-Returns, when available:
-
-- current market facts
-- available liquidity
-- trade-size-to-liquidity relationship
-- estimated price impact
-- estimated slippage
-- market-risk factors
-- tokenomics-risk factors
-- Scout risk result
-- confidence
-- reasons
-
-A successful pre-trade check does not itself authorize execution.
+Roberta must treat it as informational risk analysis only unless a future human-approved execution architecture explicitly defines otherwise.
 
 ---
 
-## 6. Target Response Contract
+## 6. Response Contract
 
-Roberta-facing responses should ultimately be structured and machine-readable.
-
-The following common response envelope is a **target interface for the Roberta Interface phase**. It is not a claim that every current reusable service already exposes this exact API shape.
+Roberta-facing services should converge on a stable envelope:
 
 ```json
 {
   "service": "market_report",
+  "chain": "x1",
   "status": "ok",
   "asset": {},
   "data": {},
-  "verification": null,
   "risk": null,
   "confidence": {},
   "sources": [],
@@ -326,214 +334,52 @@ The following common response envelope is a **target interface for the Roberta I
 }
 ```
 
-Exact schemas may evolve independently for each service, but responses should preserve the following properties:
+Supported statuses:
 
-- deterministic facts
-- source traceability
+- `ok`
+- `partial`
+- `unavailable`
+- `ambiguous`
+- `error`
+
+A response must preserve:
+
+- source identity
 - timestamps
-- verification state when applicable
-- confidence/data quality
-- uncertainty
+- confidence or uncertainty
 - warnings
 - explicit errors
 
-The `verification` field is reserved for CMIS-produced verification/provenance results. Roberta must not populate it from its own inference when CMIS did not return verification evidence.
-
-Until the common envelope is implemented, existing reusable service return structures remain internal implementation contracts and must not be represented to Roberta as finalized public APIs.
-
 ---
 
-## 7. Status Semantics
+## 7. Verification Boundary
 
-Recommended service-level statuses for the target Roberta-facing interface:
+Roberta may interpret verified CMIS results.
 
-### `ok`
-
-The requested result was successfully produced from sufficiently verified data.
-
-### `partial`
-
-Useful results were produced, but one or more requested fields could not be verified.
-
-### `unavailable`
-
-The required source or data was unavailable, or the requested capability has not reached the accepted integration baseline.
-
-### `ambiguous`
-
-The requested asset could not be uniquely resolved.
-
-### `conflict`
-
-Independent evidence for the same fact conflicts and CMIS has not promoted a single verified result.
-
-Roberta must surface the conflict rather than averaging, choosing, or inventing a value.
-
-### `error`
-
-The request could not be completed because of a service or processing failure.
-
-Liquidity Scout should prefer explicit partial, unavailable, ambiguous, or conflict results over silently fabricating missing fields.
-
----
-
-## 8. Confidence, Data Quality, and Uncertainty
-
-Liquidity Scout must preserve uncertainty rather than hiding it.
-
-Confidence or data quality may reflect factors such as:
-
-- source availability
-- source freshness
-- asset-resolution confidence
-- LP coverage
-- RPC verification
-- identity verification
-- semantic/unit verification
-- independent-source agreement or conflict
-- historical-data coverage
-- scanner coverage
-- calculation completeness
-
-When CMIS provides a deterministic data-quality result, Roberta should preserve that level and its reasons instead of converting it into a more precise-looking score.
-
-Roberta may use confidence and data-quality information as part of broader reasoning but must not reinterpret an unverified value as verified, a conflict as agreement, or insufficient evidence as a negative fact.
-
----
-
-## 9. Source Traceability and Provenance
-
-Where practical, Liquidity Scout responses should identify the source category used for important facts.
+Roberta must not manufacture stronger facts than the service returned.
 
 Examples:
 
-- `x1_ninja`
-- `xdex`
-- `x1_rpc`
-- `historical_db`
-- `burn_scanner`
-- `mint_scanner`
-- `risk_engine`
-
-Source timestamps should be included for freshness-sensitive values.
-
-For facts that pass through CMIS verification, provenance should preserve enough information for audit without requiring Roberta to inspect raw provider internals. Depending on the service, that may include source identity, source role, observation time, block/slot, raw fact identifier, unit/semantic verification state, and calculation/service version.
-
-Two observations are not independent merely because they have different labels. Independence is a CMIS determination and must not be inferred by Roberta from presentation metadata.
+- `AGREEMENT` with `cmis_promotable=true` may be consumed as the CMIS-verified fact represented by that evidence record;
+- `AGREEMENT` with `cmis_promotable=false` remains non-promoted evidence even if the numerical observations match;
+- `CONFLICT` must remain conflict and must not be averaged by Roberta;
+- `INSUFFICIENT_EVIDENCE` must remain insufficient rather than being completed from memory or a nearby conversational value;
+- missing freshness, unit semantics, identity proof, or source independence must remain explicit uncertainty.
 
 ---
 
-## 10. Failure Rules
+## 8. Change Control
 
-Liquidity Scout must fail safely.
+When CMIS capabilities change, update this contract in the same integration sequence:
 
-It must not:
+```text
+CMIS implementation / tests
+        ↓
+CMIS architecture / accepted baseline
+        ↓
+Roberta integration contract
+        ↓
+Roberta project synchronization
+```
 
-- substitute remembered prices for unavailable live prices
-- invent missing LPs
-- invent supply
-- infer circulating supply from total supply without independent verification
-- invent holder counts
-- invent rankings
-- invent burn or mint totals
-- claim verified net issuance without verified scanner coverage
-- report stale values as current without disclosure
-- convert source failure into false certainty
-- average conflicting independent-source facts unless a documented CMIS rule explicitly defines that calculation for that fact type
-- promote a fact when identity, units, or semantics required by that verifier remain unproven
-
-When deterministic verification fails, the response should clearly expose the failure.
-
----
-
-## 11. Roberta Consumption Rules
-
-When Roberta invokes an implemented Liquidity Scout service:
-
-1. Roberta supplies the required query or asset context.
-2. Liquidity Scout resolves the asset when necessary.
-3. Liquidity Scout obtains or calculates the requested specialist facts.
-4. Liquidity Scout returns structured results using the currently implemented service contract.
-5. Roberta consumes the returned facts as specialist evidence.
-6. Roberta preserves CMIS verification, provenance, conflict, data-quality, and uncertainty semantics when present.
-7. Roberta performs any higher-level reasoning or specialist coordination required.
-8. Roberta produces the final user-facing synthesis.
-
-Roberta must not invoke a service marked **planned** or **draft core** as though it were already implemented on the accepted integration baseline.
-
-For freshness-sensitive market information, Roberta should not substitute remembered values for verified Liquidity Scout values.
-
-When CMIS returns `CONFLICT`, `INSUFFICIENT_EVIDENCE`, low data quality, or an equivalent non-promotable result, Roberta may explain the condition but must not manufacture a definitive market fact from it.
-
----
-
-## 12. Execution Boundary
-
-Liquidity Scout may eventually support controlled execution intelligence such as:
-
-- trade simulation
-- transaction preparation
-- execution-readiness checks
-
-However:
-
-**Liquidity Scout must not autonomously execute live trades until explicit risk controls, human approval boundaries, and execution safeguards have been implemented and tested.**
-
-`pre_trade_check` is analysis.
-
-It is not authorization.
-
-Roberta must not reinterpret analysis, verification, or risk output as permission to move value.
-
----
-
-## 13. Service Independence
-
-Liquidity Scout should remain independently testable.
-
-Its core market and risk services should not require Roberta to function.
-
-This allows:
-
-- deterministic unit testing
-- API testing
-- direct debugging
-- service monitoring
-- future use by other agents
-- clean separation between specialist intelligence and orchestration
-
-Roberta depends on Liquidity Scout's contract.
-
-Liquidity Scout should not depend on Roberta's internal reasoning architecture.
-
----
-
-## 14. Development Boundary
-
-Liquidity Scout should be developed one layer at a time:
-
-1. Foundation
-2. Market Intelligence
-3. Tokenomics
-4. Trust / Independent Verification
-5. Historical Intelligence
-6. Scout Risk Engine
-7. Roberta Interface
-8. Alerts
-9. Controlled Execution Intelligence
-
-Integration work should not bypass unfinished lower-level verification layers.
-
-Service status in this contract should be updated as each roadmap phase becomes implemented, tested, and accepted into the integration baseline.
-
-Open stacked PRs may define future Roberta contract needs, but they do not change the production capability status until accepted.
-
----
-
-## 15. Core Integration Principle
-
-**Liquidity Scout determines what is happening in X1/XDEX markets now and provides the verification state of those facts.**
-
-**Roberta determines what that information means in the larger context.**
-
-That boundary should remain stable even as both systems gain additional capabilities.
+Roberta should consume only the accepted contract relevant to its deployment and must not silently infer capability from an open development branch.
