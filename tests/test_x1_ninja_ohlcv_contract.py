@@ -72,12 +72,16 @@ def observed_ohlcv_candle(**overrides):
     return row
 
 
-def observed_ohlcv_body(*candles):
+def observed_ohlcv_body(
+    *candles,
+    pool_address="POOL1",
+    timeframe="1h",
+):
     return {
         "ohlcv": list(candles),
-        "timeframe": "1h",
+        "timeframe": timeframe,
         "mode": "usd",
-        "poolAddress": "POOL1",
+        "poolAddress": pool_address,
         "currentPrice": 1.5,
         "currentPriceNative": 2.5,
         "currentPriceUsd": 1.5,
@@ -142,7 +146,8 @@ class X1NinjaOHLCVContractTests(unittest.TestCase):
         body = observed_ohlcv_body(
             observed_ohlcv_candle(
                 provider_field="preserve-me"
-            )
+            ),
+            timeframe="5m",
         )
         session = FakeSession(
             FakeResponse(
@@ -215,7 +220,9 @@ class X1NinjaOHLCVContractTests(unittest.TestCase):
     def test_default_timeframe_is_documented_one_hour(self):
         session = FakeSession(
             FakeResponse(
-                body=observed_ohlcv_body(),
+                body=observed_ohlcv_body(
+                    pool_address="POOL2",
+                ),
                 headers=success_headers(),
             )
         )
@@ -251,7 +258,9 @@ class X1NinjaOHLCVContractTests(unittest.TestCase):
                 api_key="secret",
                 session=FakeSession(
                     FakeResponse(
-                        body=observed_ohlcv_body(),
+                        body=observed_ohlcv_body(
+                            pool_address="POOL3",
+                        ),
                         headers=headers,
                     )
                 ),
@@ -300,10 +309,6 @@ class X1NinjaOHLCVContractTests(unittest.TestCase):
         self.assertIn("Retry-After=60", message)
         self.assertIn("upstream unavailable", message)
         self.assertNotIn("secret", message)
-
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class X1NinjaOHLCVObservedShapeTests(unittest.TestCase):
@@ -457,6 +462,45 @@ class X1NinjaOHLCVObservedShapeTests(unittest.TestCase):
                 ),
             )
 
+    def test_provider_pool_address_must_match_requested_pool(self):
+        body = self._body(self._candle())
+        body["poolAddress"] = "DIFFERENT_POOL"
+
+        with self.assertRaisesRegex(
+            X1NinjaAPIError,
+            "poolAddress",
+        ):
+            fetch_pool_ohlcv_raw(
+                "POOL1",
+                api_key="secret",
+                session=FakeSession(
+                    FakeResponse(
+                        body=body,
+                        headers=success_headers(),
+                    )
+                ),
+            )
+
+    def test_provider_timeframe_must_match_requested_timeframe(self):
+        body = self._body(self._candle())
+        body["timeframe"] = "5m"
+
+        with self.assertRaisesRegex(
+            X1NinjaAPIError,
+            "timeframe",
+        ):
+            fetch_pool_ohlcv_raw(
+                "POOL1",
+                api_key="secret",
+                timeframe="1h",
+                session=FakeSession(
+                    FakeResponse(
+                        body=body,
+                        headers=success_headers(),
+                    )
+                ),
+            )
+
     def test_requested_limit_is_not_treated_as_response_cap(self):
         candles = [
             self._candle(time=1000 + index)
@@ -483,3 +527,6 @@ class X1NinjaOHLCVObservedShapeTests(unittest.TestCase):
         self.assertFalse(
             result["semantics"]["range_coverage_verified"]
         )
+
+if __name__ == "__main__":
+    unittest.main()
