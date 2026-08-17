@@ -23,6 +23,7 @@ _UNVERIFIED_FLAGS = {
     "risk_timestamp_unverified_for_freshness",
     "evaluation_timestamp_unverified_for_freshness",
     "risk_timestamp_after_evaluation",
+    "required_pretrade_capability_unavailable",
 }
 
 
@@ -44,14 +45,11 @@ def _append_source(sources: list, source: str, role: str) -> None:
 
 
 def _extract_risk_input(value: Any) -> Tuple[Optional[Mapping[str, Any]], Optional[Mapping[str, Any]]]:
-    """Return ``(risk_result, risk_envelope)`` for raw or CMIS risk input."""
     if not isinstance(value, Mapping):
         return None, None
-
     if _text(value.get("service")) == "risk_check":
         risk = value.get("risk")
         return (risk if isinstance(risk, Mapping) else None), value
-
     return value, None
 
 
@@ -82,12 +80,6 @@ def _warnings(result: Mapping[str, Any]) -> list:
 
 
 def _service_status(result: Mapping[str, Any]) -> str:
-    """Separate service completeness from PASS/WARN/BLOCK severity.
-
-    Verified threshold breaches are successful deterministic findings and remain
-    ``ok``. Only flags representing missing, invalid, or temporally inconsistent
-    required evidence make the service ``partial``.
-    """
     flags = result.get("flags")
     flag_set = {str(flag) for flag in flags} if isinstance(flags, list) else set()
     return PARTIAL if flag_set.intersection(_UNVERIFIED_FLAGS) else OK
@@ -149,13 +141,7 @@ def build_pre_trade_check_response(
     evaluated_at: Any = None,
     observed_at: Any = None,
 ) -> Dict[str, Any]:
-    """Return ``pre_trade_check`` through the shared CMIS service contract.
-
-    For a full CMIS risk envelope, the envelope's ``observed_at`` is the risk
-    evidence timestamp used by freshness analysis. The output envelope's
-    optional ``observed_at`` override is presentation/provenance metadata only
-    and never substitutes for the evidence timestamp.
-    """
+    """Return ``pre_trade_check`` through the shared CMIS service contract."""
     if risk_result is None:
         return build_service_envelope(
             "pre_trade_check",
@@ -289,6 +275,7 @@ def build_pre_trade_check_response(
             "trade": result.get("trade") or {},
             "risk_observed_at": result.get("risk_observed_at"),
             "evaluated_at": result.get("evaluated_at"),
+            "execution_capabilities": result.get("execution_capabilities") or {},
             "analysis_only": result.get("analysis_only") is True,
             "execution_authorized": result.get("execution_authorized") is True,
         },
