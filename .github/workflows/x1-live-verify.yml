@@ -1,0 +1,81 @@
+name: X1 Live Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_ohlcv:
+        description: Run read-only X1.Ninja OHLCV live contract verification
+        required: true
+        default: true
+        type: boolean
+      run_trade_history:
+        description: Run read-only X1.Ninja trade-history live verification
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  x1-live-verify:
+    name: Read-only X1 provider verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify required secret is available
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is not available to this workflow."
+            exit 1
+          fi
+
+      - name: Run X1.Ninja OHLCV live contract probe
+        if: ${{ inputs.run_ohlcv }}
+        env:
+          RUN_X1_NINJA_LIVE_TESTS: "1"
+        run: |
+          python -m unittest tests.test_x1_ninja_ohlcv_live -v
+
+      - name: Run X1.Ninja trade-history live probes
+        if: ${{ inputs.run_trade_history }}
+        env:
+          RUN_X1_NINJA_LIVE_TESTS: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            tests/test_x1_ninja_trade_history_live.py
+            tests/test_x1_ninja_trade_semantics_live.py
+          )
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              module="${file%.py}"
+              module="${module//\//.}"
+              python -m unittest "$module" -v
+            fi
+          done
+
+      - name: Safety boundary
+        run: |
+          echo "Read-only provider verification only."
+          echo "No transaction preparation, signing, broadcasting, or autonomous execution is performed."
