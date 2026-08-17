@@ -8,6 +8,7 @@ from unittest.mock import patch
 from liquidity_scout.integrations.roberta_bridge import (
     RobertaBridgeError,
     ask_roberta,
+    roberta_conversation_enabled,
     roberta_pretrade_enabled,
 )
 
@@ -38,6 +39,18 @@ class RobertaBridgeClientTests(unittest.TestCase):
             clear=True,
         ):
             self.assertTrue(roberta_pretrade_enabled())
+
+    def test_conversation_bridge_is_disabled_by_default(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(roberta_conversation_enabled())
+
+    def test_conversation_bridge_accepts_explicit_enable(self):
+        with patch.dict(
+            os.environ,
+            {"ROBERTA_MOLTGRID_CONVERSATION_ENABLED": "1"},
+            clear=True,
+        ):
+            self.assertTrue(roberta_conversation_enabled())
 
     def test_ask_roberta_sends_only_exact_user_message(self):
         seen = {}
