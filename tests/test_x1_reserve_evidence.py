@@ -2,6 +2,7 @@ import unittest
 
 from liquidity_scout.providers.x1.reserve_evidence import (
     BASE_UNITS,
+    TOKEN_UNITS,
     build_x1_reserve_evidence_pair,
 )
 
@@ -63,6 +64,44 @@ class X1ReserveEvidenceTests(unittest.TestCase):
         self.assertEqual(result["rpc"]["block_slot"], 123456)
         self.assertFalse(result["provider"]["freshness_verified"])
 
+    def test_accepts_explicit_token_units_when_they_match_rpc_base_units(self):
+        proof = semantic_proof()
+        proof["roles"]["asset"].update({
+            "field_path": "pool.pooledBase",
+            "raw_value": 1146902.928865,
+            "unit": TOKEN_UNITS,
+            "decimals": 6,
+        })
+        rpc = rpc_balance()
+        rpc.update({
+            "amount": "1146902928865",
+            "decimals": 6,
+        })
+
+        result = build_x1_reserve_evidence_pair(
+            proof, rpc, role="asset", observed_at=1786967621.2989993
+        )
+
+        self.assertTrue(result["evidence_ready"])
+        self.assertEqual(result["provider"]["raw_identifier"], "pool.pooledBase")
+        self.assertEqual(result["provider"]["normalized_value"], "1146902.928865")
+        self.assertEqual(result["rpc"]["normalized_value"], "1146902.928865")
+        self.assertFalse(result["cmis_promotable"])
+
+    def test_token_units_are_canonicalized_before_comparison(self):
+        proof = semantic_proof()
+        proof["roles"]["asset"].update({
+            "raw_value": "42.000000",
+            "unit": TOKEN_UNITS,
+            "decimals": 6,
+        })
+        result = build_x1_reserve_evidence_pair(
+            proof, rpc_balance(), role="asset", observed_at=1
+        )
+        self.assertTrue(result["evidence_ready"])
+        self.assertEqual(result["provider"]["normalized_value"], "42")
+        self.assertEqual(result["rpc"]["normalized_value"], "42")
+
     def test_freshness_is_explicit_not_inferred(self):
         result = build_x1_reserve_evidence_pair(
             semantic_proof(), rpc_balance(), role="asset", observed_at=1000.0,
@@ -83,7 +122,7 @@ class X1ReserveEvidenceTests(unittest.TestCase):
         proof = semantic_proof()
         proof["roles"]["asset"]["unit"] = "provider_units"
         result = build_x1_reserve_evidence_pair(proof, rpc_balance(), role="asset", observed_at=1)
-        self.assertIn("provider_unit_not_token_base_units", result["rejection_reasons"])
+        self.assertIn("provider_unit_unsupported", result["rejection_reasons"])
 
     def test_rejects_rpc_vault_mismatch(self):
         rpc = rpc_balance()
@@ -102,6 +141,18 @@ class X1ReserveEvidenceTests(unittest.TestCase):
         proof["roles"]["asset"]["raw_value"] = "42.0"
         result = build_x1_reserve_evidence_pair(proof, rpc_balance(), role="asset", observed_at=1)
         self.assertIn("provider_base_units_invalid", result["rejection_reasons"])
+
+    def test_rejects_token_units_beyond_declared_precision(self):
+        proof = semantic_proof()
+        proof["roles"]["asset"].update({
+            "raw_value": "42.0000001",
+            "unit": TOKEN_UNITS,
+            "decimals": 6,
+        })
+        result = build_x1_reserve_evidence_pair(
+            proof, rpc_balance(), role="asset", observed_at=1
+        )
+        self.assertIn("provider_token_units_invalid", result["rejection_reasons"])
 
     def test_rejects_invalid_role(self):
         with self.assertRaisesRegex(ValueError, "role must be asset or counter"):
