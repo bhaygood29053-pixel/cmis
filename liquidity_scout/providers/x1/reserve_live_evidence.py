@@ -48,6 +48,14 @@ def _timestamp(clock: Callable[[], Any]) -> float:
     return parsed
 
 
+def _validate_timeline(started_at: float, sequence: list[dict[str, Any]], ended_at: float) -> None:
+    times = [started_at]
+    times.extend(float(step["completed_at"]) for step in sequence)
+    times.append(ended_at)
+    if any(current < previous for previous, current in zip(times, times[1:])):
+        raise RuntimeError("reserve evidence clock moved backwards during collection")
+
+
 def _field_at_path(value: Mapping[str, Any], path: str) -> Any:
     current: Any = value
     for part in path.split("."):
@@ -186,6 +194,8 @@ def collect_x1_reserve_live_evidence(
         }
 
     ended_at = _timestamp(clock)
+    _validate_timeline(started_at, sequence, ended_at)
+
     identity_verified = all(
         roles[role]["rpc_identity_verification"].get("identity_verified") is True
         for role in ROLES
