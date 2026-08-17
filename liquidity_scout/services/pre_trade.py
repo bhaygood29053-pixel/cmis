@@ -2,8 +2,8 @@
 
 This module performs no RPC, DEX, routing, simulation, wallet, signing, or
 transaction work. It consumes an already-computed deterministic ``risk_check``
-result plus proposed trade context and applies fail-closed identity, chain, and
-trade-size-to-verified-liquidity gates.
+result plus proposed trade context and applies fail-closed identity, chain,
+trade-size/liquidity, and explicit evidence-freshness gates.
 
 The result is analysis only. ``PASS`` never authorizes execution. Slippage,
 price impact, fees, and route quality remain unavailable until separately
@@ -12,6 +12,7 @@ verified calculation/quote evidence exists; this core never manufactures them.
 
 from typing import Any, Dict, Mapping, Optional
 
+from .pre_trade_freshness import assess_risk_freshness
 from .pre_trade_liquidity import (
     DEFAULT_PRE_TRADE_POLICY,
     assess_trade_size_liquidity,
@@ -205,6 +206,7 @@ def _confidence(
     identity_component: Mapping[str, Any],
     risk_component: Mapping[str, Any],
     size_component: Mapping[str, Any],
+    freshness_component: Mapping[str, Any],
 ) -> Dict[str, Any]:
     identity_evidence = identity_component.get("evidence")
     identity_evidence = identity_evidence if isinstance(identity_evidence, Mapping) else {}
@@ -212,6 +214,11 @@ def _confidence(
     risk_evidence = risk_evidence if isinstance(risk_evidence, Mapping) else {}
     size_evidence = size_component.get("evidence")
     size_evidence = size_evidence if isinstance(size_evidence, Mapping) else {}
+    freshness_evidence = freshness_component.get("evidence")
+    freshness_evidence = (
+        freshness_evidence if isinstance(freshness_evidence, Mapping) else {}
+    )
+    freshness_required = freshness_evidence.get("freshness_policy_active") is True
 
     checks = {
         "chain_consistent": identity_component.get("status") != BLOCK
@@ -226,6 +233,17 @@ def _confidence(
         "trade_notional_verified": size_evidence.get("notional_usd") is not None,
         "liquidity_verified_for_trade": size_evidence.get("liquidity_verified") is True,
         "trade_size_assessment_complete": size_evidence.get("size_assessment_complete") is True,
+        "risk_timestamp_verified_for_freshness": (
+            not freshness_required
+            or freshness_evidence.get("risk_observed_at_epoch") is not None
+        ),
+        "evaluation_timestamp_verified_for_freshness": (
+            not freshness_required
+            or freshness_evidence.get("evaluated_at_epoch") is not None
+        ),
+        "risk_freshness_assessment_complete": (
+            freshness_evidence.get("freshness_assessment_complete") is True
+        ),
     }
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
@@ -244,16 +262,15 @@ def build_pre_trade_check(
     *,
     chain: str = "x1",
     policy: Optional[Mapping[str, Any]] = None,
+    risk_observed_at: Any = None,
+    evaluated_at: Any = None,
 ) -> Dict[str, Any]:
     """Evaluate deterministic pre-trade gates without authorizing execution.
 
     The core propagates ``risk_check`` severity, blocks chain/mint mismatches,
-    and evaluates proposed USD notional against the verified asset-wide
-    liquidity already present in the risk result. Warning/block size ratios are
-    applied only when explicitly supplied in ``policy``.
-
-    This does not estimate slippage, price impact, route quality, fees, or
-    transaction success.
+    evaluates USD notional against verified asset-wide liquidity, and applies
+    optional explicit evidence-age thresholds. No size or freshness threshold
+    is invented by CMIS.
     """
     if not isinstance(risk_result, Mapping):
         raise ValueError("risk_result must be a mapping")
@@ -272,20 +289,27 @@ def build_pre_trade_check(
         normalized_trade,
         policy=policy,
     )
+    freshness = assess_risk_freshness(
+        risk_observed_at=risk_observed_at,
+        evaluated_at=evaluated_at,
+        policy=policy,
+    )
     components = {
         "identity": identity,
         "risk_gate": risk_gate,
         "trade_size_liquidity": trade_size_liquidity,
+        "freshness": freshness,
     }
     recommendation = _merge_status(
         identity["status"],
         risk_gate["status"],
         trade_size_liquidity["status"],
+        freshness["status"],
     )
 
     flags = []
     reasons = []
-    for name in ("identity", "risk_gate", "trade_size_liquidity"):
+    for name in ("identity", "risk_gate", "trade_size_liquidity", "freshness"):
         flags.extend(components[name]["flags"])
         reasons.extend(components[name]["reasons"])
 
@@ -301,10 +325,17 @@ def build_pre_trade_check(
         "trade": normalized_trade,
         "recommendation": recommendation,
         "components": components,
-        "confidence": _confidence(identity, risk_gate, trade_size_liquidity),
+        "confidence": _confidence(
+            identity,
+            risk_gate,
+            trade_size_liquidity,
+            freshness,
+        ),
         "flags": flags,
         "reasons": reasons,
         "policy": dict(trade_size_liquidity.get("policy") or DEFAULT_PRE_TRADE_POLICY),
+        "risk_observed_at": risk_observed_at,
+        "evaluated_at": evaluated_at,
         "analysis_only": True,
         "execution_authorized": False,
         "authorization_reason": "pre_trade_check_analysis_only",
@@ -317,6 +348,7 @@ def build_pre_trade_check(
                 "trade_size_to_verified_asset_wide_liquidity",
                 "explicit_trade_size_policy_thresholds",
                 "deterministic_policy_notional_thresholds",
+                "explicit_risk_evidence_freshness_policy",
             ],
             "not_yet_included": [
                 "slippage",
