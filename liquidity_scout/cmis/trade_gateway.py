@@ -112,27 +112,86 @@ class TradeAwareCMISGateway(EvidenceAwareCMISGateway):
         summary = activity.get("summary")
         summary = summary if isinstance(summary, Mapping) else {}
 
+        selected_pool_complete = (
+            summary.get("selected_pool_chain_window_complete") is True
+        )
+        asset_window_complete = summary.get("asset_window_complete") is True
+        asset_completion_promoted = (
+            summary.get("asset_window_completion_promoted") is True
+        )
+
         confidence = response.get("confidence")
         if not isinstance(confidence, dict):
             confidence = {}
             response["confidence"] = confidence
-        confidence["selected_pool_chain_window_complete"] = (
-            summary.get("selected_pool_chain_window_complete") is True
-        )
-        confidence["chain_window_asset_window_complete"] = (
-            summary.get("asset_window_complete") is True
-        )
+        confidence["selected_pool_chain_window_complete"] = selected_pool_complete
+        confidence["chain_window_asset_window_complete"] = asset_window_complete
         confidence["chain_window_asset_completion_promoted"] = (
-            summary.get("asset_window_completion_promoted") is True
+            asset_completion_promoted
+        )
+        confidence["provider_window_coverage_complete"] = (
+            confidence.get("window_coverage_complete") is True
         )
 
         transaction_count = summary.get("unique_window_transaction_count")
         if isinstance(transaction_count, int) and transaction_count >= 0:
             confidence["chain_window_unique_transaction_count"] = transaction_count
             confidence["selected_pool_chain_window_empty"] = (
-                confidence["selected_pool_chain_window_complete"]
-                and transaction_count == 0
+                selected_pool_complete and transaction_count == 0
             )
+
+        activity_window = data.get("activity_window")
+        if isinstance(activity_window, Mapping):
+            activity_window = dict(activity_window)
+            activity_window["provider_coverage_complete"] = (
+                activity_window.get("coverage_complete") is True
+            )
+            activity_window["selected_pool_chain_coverage_complete"] = (
+                selected_pool_complete
+            )
+            activity_window["selected_pool_chain_coverage_basis"] = (
+                "X1_RPC_ADDRESS_HISTORY"
+            )
+            activity_window["asset_window_complete"] = asset_window_complete
+            if asset_window_complete:
+                activity_window["effective_coverage_scope"] = "asset"
+            elif selected_pool_complete:
+                activity_window["effective_coverage_scope"] = "selected_pools"
+            else:
+                activity_window["effective_coverage_scope"] = (
+                    "provider_observations_only"
+                )
+            data["activity_window"] = activity_window
+
+        if selected_pool_complete:
+            warnings = response.get("warnings")
+            warnings = list(warnings) if isinstance(warnings, list) else []
+            reconciled = []
+            for warning in warnings:
+                if not isinstance(warning, Mapping):
+                    reconciled.append(warning)
+                    continue
+                item = dict(warning)
+                code = item.get("code")
+                if code == "activity_window_range_not_proven":
+                    item = {
+                        "code": "activity_window_asset_scope_not_proven",
+                        "message": (
+                            "Direct X1 RPC address-history evidence proves the "
+                            "requested window for every selected pool. Asset-wide "
+                            "window coverage is still not proven because global "
+                            "on-chain pool discovery is not independently exhaustive."
+                        ),
+                    }
+                elif code == "activity_window_timestamp_membership_incomplete":
+                    item["message"] = (
+                        str(item.get("message") or "").rstrip()
+                        + " This affects provider-derived event membership only; "
+                        "direct X1 chain-window evidence remains authoritative for "
+                        "the selected pools."
+                    )
+                reconciled.append(item)
+            response["warnings"] = reconciled
 
         # Deliberately do not alter status/window_coverage_complete. The chain-first
         # service proves selected pool address ranges, not globally exhaustive pool
