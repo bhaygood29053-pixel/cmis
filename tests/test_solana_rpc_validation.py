@@ -1,6 +1,10 @@
 import unittest
 
-from liquidity_scout.providers.solana.rpc import SolanaRPCError, SolanaRPCProvider
+from liquidity_scout.providers.solana.rpc import (
+    SPL_TOKEN_PROGRAM_ID,
+    SolanaRPCError,
+    SolanaRPCProvider,
+)
 
 
 class _Response:
@@ -87,7 +91,7 @@ class SolanaRPCValidationTests(unittest.TestCase):
                 "result": {
                     "context": {"slot": 1},
                     "value": {
-                        "owner": "TokenProgram111",
+                        "owner": SPL_TOKEN_PROGRAM_ID,
                         "data": {
                             "program": "spl-token",
                             "parsed": {
