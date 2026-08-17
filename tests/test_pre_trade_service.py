@@ -12,24 +12,32 @@ from liquidity_scout.services import (
 MINT = "ReferenceMint"
 
 
-def risk_result(*, recommendation=PASS, chain="x1", mint=MINT, verified=8, total=8):
+def risk_result(*, recommendation=PASS, chain="x1", mint=MINT, verified=8, total=8, liquidity=100000.0, liquidity_verified=True):
     return {
         "chain": chain,
         "asset": {"symbol": "REF", "mint": mint},
         "recommendation": recommendation,
+        "components": {
+            "liquidity": {
+                "status": PASS if liquidity_verified else WARN,
+                "flags": [] if liquidity_verified else ["liquidity_unverified"],
+                "reasons": [],
+                "evidence": {"liquidity_usd": liquidity},
+            },
+        },
         "confidence": {
             "level": "high" if verified == total else "medium",
             "verified_checks": verified,
             "total_checks": total,
             "verification_ratio": verified / total if total else 0.0,
-            "checks": {},
+            "checks": {"liquidity_verified": liquidity_verified},
         },
         "flags": [],
         "reasons": [],
     }
 
 
-def trade(*, side="buy", mint=MINT, symbol="REF", chain=None, notional_usd=None):
+def trade(*, side="buy", mint=MINT, symbol="REF", chain=None, notional_usd=1000):
     value = {
         "side": side,
         "asset": {"symbol": symbol, "mint": mint},
@@ -106,14 +114,18 @@ class PreTradeCheckCoreTests(unittest.TestCase):
         self.assertEqual(result["trade"]["notional_usd"], 1000.0)
         self.assertEqual(result["flags"], [])
         self.assertTrue(result["confidence"]["complete"])
+        self.assertEqual(
+            result["components"]["trade_size_liquidity"]["evidence"]["notional_to_liquidity_ratio"],
+            0.01,
+        )
         self.assertTrue(result["analysis_only"])
         self.assertFalse(result["execution_authorized"])
         self.assertEqual(
             result["authorization_reason"],
             "pre_trade_check_analysis_only",
         )
-        self.assertIn("price_impact", result["assessment_scope"]["not_yet_included"])
         self.assertIn("slippage", result["assessment_scope"]["not_yet_included"])
+        self.assertIn("price_impact", result["assessment_scope"]["not_yet_included"])
         self.assertIn("execution_authorization", result["assessment_scope"]["not_yet_included"])
 
     def test_risk_warn_propagates_to_pre_trade_warn(self):
@@ -210,13 +222,82 @@ class PreTradeCheckCoreTests(unittest.TestCase):
         self.assertEqual(result["trade"]["chain"], "solana")
         self.assertEqual(result["recommendation"], PASS)
 
-    def test_notional_is_context_only_and_does_not_invent_trade_size_policy(self):
+    def test_trade_size_ratio_is_calculated_without_inventing_policy_thresholds(self):
         small = build_pre_trade_check(risk_result(), trade(notional_usd=1))
         large = build_pre_trade_check(risk_result(), trade(notional_usd=1000000000))
 
         self.assertEqual(small["recommendation"], PASS)
         self.assertEqual(large["recommendation"], PASS)
-        self.assertIn("trade_size_thresholds", large["assessment_scope"]["not_yet_included"])
+        self.assertEqual(
+            small["components"]["trade_size_liquidity"]["evidence"]["notional_to_liquidity_ratio"],
+            0.00001,
+        )
+        self.assertEqual(
+            large["components"]["trade_size_liquidity"]["evidence"]["notional_to_liquidity_ratio"],
+            10000.0,
+        )
+        self.assertIn(
+            "trade_size_to_verified_asset_wide_liquidity",
+            large["assessment_scope"]["included"],
+        )
+        self.assertIn("slippage", large["assessment_scope"]["not_yet_included"])
+
+    def test_explicit_size_policy_warns_and_blocks_deterministically(self):
+        policy = {
+            "warn_notional_to_liquidity_ratio": 0.05,
+            "block_notional_to_liquidity_ratio": 0.10,
+        }
+        warn = build_pre_trade_check(
+            risk_result(liquidity=100000),
+            trade(notional_usd=5000),
+            policy=policy,
+        )
+        block = build_pre_trade_check(
+            risk_result(liquidity=100000),
+            trade(notional_usd=10000),
+            policy=policy,
+        )
+
+        self.assertEqual(warn["recommendation"], WARN)
+        self.assertIn("trade_size_exceeds_liquidity_warn_ratio", warn["flags"])
+        self.assertEqual(block["recommendation"], BLOCK)
+        self.assertIn("trade_size_exceeds_liquidity_block_ratio", block["flags"])
+        evidence = block["components"]["trade_size_liquidity"]["evidence"]
+        self.assertEqual(evidence["warn_threshold_notional_usd"], 5000.0)
+        self.assertEqual(evidence["hard_block_notional_usd_threshold"], 10000.0)
+        self.assertIsNone(evidence["slippage_estimate_pct"])
+        self.assertIsNone(evidence["price_impact_estimate_pct"])
+
+    def test_sized_trade_without_verified_liquidity_blocks(self):
+        result = build_pre_trade_check(
+            risk_result(liquidity_verified=False),
+            trade(notional_usd=1000),
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertIn("sized_trade_liquidity_unverified", result["flags"])
+        self.assertFalse(result["confidence"]["checks"]["liquidity_verified_for_trade"])
+
+    def test_missing_notional_warns_instead_of_claiming_complete_size_analysis(self):
+        result = build_pre_trade_check(
+            risk_result(),
+            trade(notional_usd=None),
+        )
+
+        self.assertEqual(result["recommendation"], WARN)
+        self.assertIn("trade_notional_unverified", result["flags"])
+        self.assertFalse(result["confidence"]["checks"]["trade_size_assessment_complete"])
+
+    def test_invalid_size_policy_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "block_notional_to_liquidity_ratio"):
+            build_pre_trade_check(
+                risk_result(),
+                trade(),
+                policy={
+                    "warn_notional_to_liquidity_ratio": 0.2,
+                    "block_notional_to_liquidity_ratio": 0.1,
+                },
+            )
 
     def test_invalid_side_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "trade side"):
@@ -246,6 +327,10 @@ class PreTradeCheckCoreTests(unittest.TestCase):
         self.assertEqual(result["recommendation"], PASS)
         self.assertEqual(result["trade"]["side"], "sell")
         self.assertEqual(result["trade"]["asset"]["mint"], MINT)
+        self.assertEqual(
+            result["components"]["trade_size_liquidity"]["evidence"]["notional_to_liquidity_ratio"],
+            0.025,
+        )
         self.assertTrue(result["confidence"]["complete"])
         self.assertFalse(result["execution_authorized"])
 
