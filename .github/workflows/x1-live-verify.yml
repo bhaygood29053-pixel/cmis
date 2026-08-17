@@ -3,6 +3,11 @@ name: X1 Live Verification
 on:
   workflow_dispatch:
     inputs:
+      run_pool_detail:
+        description: Run read-only X1.Ninja single-pool detail contract verification
+        required: true
+        default: true
+        type: boolean
       run_ohlcv:
         description: Run read-only X1.Ninja OHLCV live contract verification
         required: true
@@ -47,6 +52,20 @@ jobs:
           if [ -z "${X1_NINJA_API_KEY:-}" ]; then
             echo "X1_NINJA_API_KEY repository secret is not available to this workflow."
             exit 1
+          fi
+
+      - name: Run X1.Ninja pool-detail live contract probe
+        if: ${{ inputs.run_pool_detail }}
+        env:
+          RUN_X1_NINJA_LIVE_TESTS: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="tests/test_x1_ninja_pool_detail_live.py"
+          if [ -f "$file" ]; then
+            python -m unittest tests.test_x1_ninja_pool_detail_live -v
+          else
+            echo "Pool-detail live probe is not present on this ref; skipping."
           fi
 
       - name: Run X1.Ninja OHLCV live contract probe
