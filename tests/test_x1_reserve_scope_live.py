@@ -1,9 +1,10 @@
 """Opt-in live XENCAT/XNT reserve scope evidence probe.
 
-The optional JSON artifact is intentionally sanitized: it contains the public
-pool/vault/mint identifiers, provider reserve values, RPC amounts/slots, and
-derived scope measurements needed for replay, but excludes credentials and raw
-HTTP/RPC response payloads. The probe never marks freshness or CMIS promotion.
+The optional JSON artifact is intentionally sanitized by the provider artifact
+contract: it contains public pool/vault/mint identifiers, provider reserve
+values, RPC amounts/slots, and deterministic scope measurements needed for
+replay, but excludes credentials and raw HTTP/RPC response payloads. The probe
+never marks freshness or CMIS promotion.
 """
 
 import json
@@ -12,6 +13,9 @@ import unittest
 
 from liquidity_scout.providers.x1.reserve_live_evidence import (
     collect_x1_reserve_live_evidence,
+)
+from liquidity_scout.providers.x1.reserve_scope_artifact import (
+    build_x1_reserve_scope_artifact,
 )
 from liquidity_scout.providers.x1.reserve_scope_measurements import (
     measure_x1_reserve_scope,
@@ -56,74 +60,9 @@ class X1ReserveScopeLiveTests(unittest.TestCase):
             shared_authority=SHARED_AUTHORITY,
         )
         scope = measure_x1_reserve_scope(bundle)
+        artifact = build_x1_reserve_scope_artifact(bundle, scope)
 
-        diagnostic = {
-            "evidence_type": "x1_reserve_scope_probe",
-            "evidence_version": "1.0",
-            "chain": "x1",
-            "pool_address": bundle["pool_address"],
-            "expected_identity": {
-                "shared_authority": SHARED_AUTHORITY,
-                "asset": {
-                    "mint": ASSET_MINT,
-                    "vault": ASSET_VAULT,
-                    "decimals": 6,
-                },
-                "counter": {
-                    "mint": COUNTER_MINT,
-                    "vault": COUNTER_VAULT,
-                    "decimals": 9,
-                },
-            },
-            "collection": bundle["collection"],
-            "provider": {
-                "source": bundle["provider"]["source"],
-                "observed_at": bundle["provider"]["observed_at"],
-                "last_synced_at": bundle["provider"]["last_synced_at"],
-                "last_updated": bundle["provider"]["last_updated"],
-            },
-            "roles": {
-                role: {
-                    "provider_field_path": bundle["roles"][role]["expected"][
-                        "provider_field_path"
-                    ],
-                    "provider_raw_value": bundle["roles"][role][
-                        "provider_raw_value"
-                    ],
-                    "rpc_balance_slot": bundle["roles"][role]["rpc_balance"].get(
-                        "slot"
-                    ),
-                    "rpc_balance_amount": bundle["roles"][role]["rpc_balance"].get(
-                        "amount"
-                    ),
-                    "rpc_balance_decimals": bundle["roles"][role][
-                        "rpc_balance"
-                    ].get("decimals"),
-                    "rpc_identity_slot": bundle["roles"][role][
-                        "rpc_identity_observation"
-                    ].get("slot"),
-                    "rpc_identity_verified": bundle["roles"][role][
-                        "rpc_identity_verification"
-                    ].get("identity_verified"),
-                    "rpc_decimals_match": bundle["roles"][role][
-                        "rpc_decimals_match"
-                    ],
-                }
-                for role in ("asset", "counter")
-            },
-            "scope_status": scope["status"],
-            "scope_metrics": scope["metrics"],
-            "scope_warnings": scope["warnings"],
-            "scope_errors": scope["errors"],
-            "reserve_field_semantics_verified": bundle[
-                "reserve_field_semantics_verified"
-            ],
-            "value_agreement_verified": bundle["value_agreement_verified"],
-            "freshness_verified": scope["freshness_verified"],
-            "observation_scope_verified": scope["observation_scope_verified"],
-            "cmis_promotable": scope["cmis_promotable"],
-        }
-        rendered = json.dumps(diagnostic, indent=2, sort_keys=True, default=str)
+        rendered = json.dumps(artifact, indent=2, sort_keys=True, default=str)
         print("X1 XENCAT/XNT bounded reserve scope probe")
         print(rendered)
 
@@ -149,6 +88,13 @@ class X1ReserveScopeLiveTests(unittest.TestCase):
         self.assertFalse(scope["freshness_verified"])
         self.assertFalse(scope["observation_scope_verified"])
         self.assertFalse(scope["cmis_promotable"])
+
+        self.assertEqual(artifact["evidence_type"], "x1_reserve_scope_evidence")
+        self.assertTrue(artifact["artifact_sanitized"])
+        self.assertEqual(artifact["pool_address"], POOL)
+        self.assertTrue(artifact["identity"]["shared_authority_consistent"])
+        self.assertEqual(artifact["identity"]["shared_authority"], SHARED_AUTHORITY)
+        self.assertFalse(artifact["cmis_promotable"])
 
 
 if __name__ == "__main__":
