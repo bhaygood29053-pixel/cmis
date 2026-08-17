@@ -6,7 +6,7 @@ payloads, or participate in the live listener. Historical market snapshots and
 verification evidence remain separate persistence concerns.
 
 Evidence identifiers are content-addressed SHA-256 hashes over a canonical,
-sanitary projection of the service envelope. Re-storing the same evidence is
+sanitized projection of the service envelope. Re-storing the same evidence is
 idempotent.
 """
 
@@ -20,12 +20,18 @@ import sqlite3
 import time
 from typing import Any, Optional
 
-from liquidity_scout.cmis.evidence import VERIFICATION_STATUSES
+from liquidity_scout.cmis.evidence import (
+    AGREEMENT,
+    CONFLICT,
+    INSUFFICIENT_EVIDENCE,
+    VERIFICATION_STATUSES,
+)
 
 
 VERSION = "1.0"
 SERVICE = "verification_evidence"
 _ALLOWED_SERVICE_STATUSES = frozenset({"ok", "partial"})
+_QUALITY_LEVELS = frozenset({"HIGH", "MEDIUM", "LOW"})
 _ASSET_FIELDS = (
     "canonical_id",
     "symbol",
@@ -33,6 +39,20 @@ _ASSET_FIELDS = (
     "mint",
     "address",
     "role",
+)
+_SOURCE_FIELDS = (
+    "source",
+    "role",
+    "observed_at",
+    "block_slot",
+    "calculation_version",
+)
+_MESSAGE_FIELDS = ("code", "message")
+_QUALITY_BOOLEAN_FIELDS = (
+    "identity_verified",
+    "semantics_verified",
+    "freshness_verified",
+    "independent_agreement_verified",
 )
 
 
@@ -61,20 +81,21 @@ def _safe_asset(value: Any) -> dict[str, Any]:
     }
 
 
-def _safe_list_of_mappings(value: Any) -> list[dict[str, Any]]:
+def _safe_records(value: Any, fields: tuple[str, ...]) -> list[dict[str, Any]]:
+    """Project mapping lists to an explicit scalar-field allowlist."""
     if not isinstance(value, list):
         return []
     result: list[dict[str, Any]] = []
     for item in value:
         if not isinstance(item, Mapping):
             continue
-        safe = {}
-        for key, child in item.items():
-            key_text = _text(key)
-            scalar = _safe_scalar(child)
-            if key_text is not None and scalar is not None:
-                safe[key_text] = scalar
-        result.append(safe)
+        record = {
+            field: _safe_scalar(item.get(field))
+            for field in fields
+            if _safe_scalar(item.get(field)) is not None
+        }
+        if record:
+            result.append(record)
     return result
 
 
@@ -119,14 +140,64 @@ def _safe_quality(value: Any) -> dict[str, Any]:
     fields = (
         "quality",
         "independent_source_count",
-        "identity_verified",
-        "semantics_verified",
-        "freshness_verified",
-        "independent_agreement_verified",
+        *_QUALITY_BOOLEAN_FIELDS,
     )
     record = {field: _safe_scalar(value.get(field)) for field in fields}
     record["reasons"] = _safe_string_list(value.get("reasons"))
     return record
+
+
+def _validate_quality(
+    quality: Mapping[str, Any],
+    *,
+    verification_status: str,
+    promotable: bool,
+    primary: Mapping[str, Any],
+    verifier: Mapping[str, Any],
+) -> None:
+    level = _text(quality.get("quality"))
+    if level not in _QUALITY_LEVELS:
+        raise ValueError("verification evidence data quality level is invalid")
+
+    source_count = quality.get("independent_source_count")
+    if isinstance(source_count, bool) or not isinstance(source_count, int) or source_count < 0:
+        raise ValueError("verification evidence independent_source_count is invalid")
+
+    for field in _QUALITY_BOOLEAN_FIELDS:
+        if not isinstance(quality.get(field), bool):
+            raise ValueError(f"verification evidence {field} must be boolean")
+
+    unique_sources = {
+        _text(record.get("source"))
+        for record in (primary, verifier)
+        if _text(record.get("source")) is not None
+    }
+    if source_count != len(unique_sources):
+        raise ValueError("verification evidence independent source count is inconsistent")
+
+    agreement_verified = quality.get("independent_agreement_verified") is True
+    if agreement_verified != (verification_status == AGREEMENT):
+        raise ValueError("verification evidence agreement quality state is inconsistent")
+
+    expected_identity = all(record.get("identity_verified") is True for record in (primary, verifier))
+    expected_semantics = all(record.get("semantics_verified") is True for record in (primary, verifier))
+    expected_freshness = all(record.get("freshness_verified") is True for record in (primary, verifier))
+    if quality.get("identity_verified") is not expected_identity:
+        raise ValueError("verification evidence identity quality state is inconsistent")
+    if quality.get("semantics_verified") is not expected_semantics:
+        raise ValueError("verification evidence semantics quality state is inconsistent")
+    if quality.get("freshness_verified") is not expected_freshness:
+        raise ValueError("verification evidence freshness quality state is inconsistent")
+
+    if promotable and not (
+        level == "HIGH"
+        and source_count >= 2
+        and expected_identity
+        and expected_semantics
+        and expected_freshness
+        and agreement_verified
+    ):
+        raise ValueError("CMIS-promotable evidence requires HIGH fully verified quality")
 
 
 def sanitize_verification_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
@@ -169,8 +240,22 @@ def sanitize_verification_envelope(envelope: Mapping[str, Any]) -> dict[str, Any
     promotable = data.get("cmis_promotable")
     if not isinstance(promotable, bool):
         raise ValueError("verification evidence promotion state must be boolean")
-    if promotable and verification_status != "AGREEMENT":
+    if promotable and verification_status != AGREEMENT:
         raise ValueError("only AGREEMENT evidence may be CMIS-promotable")
+
+    agreement = verification.get("agreement")
+    expected_agreement = {
+        AGREEMENT: True,
+        CONFLICT: False,
+        INSUFFICIENT_EVIDENCE: None,
+    }[verification_status]
+    if agreement is not expected_agreement:
+        raise ValueError("verification evidence agreement state is inconsistent")
+
+    if status == "ok" and not (promotable and verification_status == AGREEMENT):
+        raise ValueError("verification evidence ok status requires promotable AGREEMENT")
+    if status == "partial" and promotable:
+        raise ValueError("CMIS-promotable verification evidence must use ok status")
 
     primary = _safe_observation(observations.get("primary"))
     verifier = _safe_observation(observations.get("verifier"))
@@ -185,18 +270,34 @@ def sanitize_verification_envelope(envelope: Mapping[str, Any]) -> dict[str, Any
             raise ValueError("verification evidence observation subject mismatch")
 
     safe_quality = _safe_quality(quality)
-    if _text(safe_quality.get("quality")) is None:
-        raise ValueError("verification evidence data quality is required")
+    _validate_quality(
+        safe_quality,
+        verification_status=verification_status,
+        promotable=promotable,
+        primary=primary,
+        verifier=verifier,
+    )
 
-    agreement = verification.get("agreement")
-    if agreement is not None and not isinstance(agreement, bool):
-        raise ValueError("verification evidence agreement state is invalid")
+    normalized_value = _safe_scalar(fact.get("normalized_value"))
+    unit = _text(fact.get("unit"))
+    if promotable:
+        if normalized_value is None or unit is None:
+            raise ValueError("promotable verification evidence requires normalized fact value and unit")
+        if (
+            normalized_value != primary.get("normalized_value")
+            or normalized_value != verifier.get("normalized_value")
+            or unit != _text(primary.get("unit"))
+            or unit != _text(verifier.get("unit"))
+        ):
+            raise ValueError("promoted fact value/unit must match both verified observations")
+    elif normalized_value is not None or unit is not None:
+        raise ValueError("non-promotable verification evidence must not expose a promoted fact value")
 
     safe_fact = {
         "fact_type": fact_type,
         "subject_id": subject_id,
-        "normalized_value": _safe_scalar(fact.get("normalized_value")),
-        "unit": _text(fact.get("unit")),
+        "normalized_value": normalized_value,
+        "unit": unit,
     }
     safe_verification = {
         "status": verification_status,
@@ -218,9 +319,9 @@ def sanitize_verification_envelope(envelope: Mapping[str, Any]) -> dict[str, Any
         },
         "risk": None,
         "confidence": _safe_quality(envelope.get("confidence")),
-        "sources": _safe_list_of_mappings(envelope.get("sources")),
+        "sources": _safe_records(envelope.get("sources"), _SOURCE_FIELDS),
         "observed_at": _safe_scalar(envelope.get("observed_at")),
-        "warnings": _safe_list_of_mappings(envelope.get("warnings")),
+        "warnings": _safe_records(envelope.get("warnings"), _MESSAGE_FIELDS),
         "errors": [],
     }
 
