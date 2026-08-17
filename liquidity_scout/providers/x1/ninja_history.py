@@ -27,6 +27,43 @@ CHAIN = "x1"
 X1_NINJA_SOURCE = "X1.Ninja Developer API"
 X1_NINJA_API_BASE_URL = "https://api.x1.ninja"
 TRADE_HISTORY_PATH = "/v1/trades/{address}"
+OHLCV_PATH = "/v1/ohlcv/{address}"
+
+SUPPORTED_OHLCV_TIMEFRAMES = frozenset({
+    "1m",
+    "5m",
+    "15m",
+    "1h",
+    "4h",
+    "1D",
+})
+
+# Live-observed read-only OHLCV structure, 2026-08-16.
+# These are provider field names only. Their financial/time semantics remain
+# explicitly unverified.
+OBSERVED_OHLCV_TOP_LEVEL_KEYS = frozenset({
+    "baseToken",
+    "candleCount",
+    "currentPrice",
+    "currentPriceNative",
+    "currentPriceUsd",
+    "lastUpdated",
+    "mode",
+    "ohlcv",
+    "pending",
+    "poolAddress",
+    "quoteToken",
+    "timeframe",
+})
+
+OBSERVED_OHLCV_CANDLE_KEYS = frozenset({
+    "time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+})
 
 _REQUIRED_SUCCESS_RATE_LIMIT_HEADERS = (
     "X-RateLimit-Limit",
@@ -129,10 +166,15 @@ def _bounded_response_text(response: Any, *, limit: int = 500) -> str:
     return f" | response: {text}"
 
 
-def _http_error(response: Any, exc: Exception) -> X1NinjaAPIError:
+def _http_error(
+    response: Any,
+    exc: Exception,
+    *,
+    operation: str = "trade-history",
+) -> X1NinjaAPIError:
     status = getattr(response, "status_code", None)
     retry_after = _header(response, "Retry-After")
-    parts = ["X1.Ninja trade-history request failed"]
+    parts = [f"X1.Ninja {operation} request failed"]
     if status is not None:
         parts.append(f"HTTP {status}")
     if retry_after is not None:
@@ -261,13 +303,215 @@ def fetch_pool_trades_raw(
     }
 
 
+
+
+def _validate_observed_ohlcv_shape(
+    body: Any,
+    *,
+    requested_pool_address: str,
+    requested_timeframe: str,
+) -> dict[str, Any]:
+    """Validate the live-observed OHLCV structure and request scope."""
+
+    if not isinstance(body, Mapping):
+        raise X1NinjaAPIError(
+            "X1.Ninja OHLCV response must be a JSON object under the "
+            "live-observed contract."
+        )
+
+    missing_top = sorted(
+        OBSERVED_OHLCV_TOP_LEVEL_KEYS - set(body.keys())
+    )
+    if missing_top:
+        raise X1NinjaAPIError(
+            "X1.Ninja OHLCV response is missing live-observed top-level "
+            f"field(s): {', '.join(missing_top)}"
+        )
+
+    provider_pool_address = body.get("poolAddress")
+    if provider_pool_address != requested_pool_address:
+        raise X1NinjaAPIError(
+            "X1.Ninja OHLCV poolAddress does not match the requested pool: "
+            f"requested={requested_pool_address!r}, "
+            f"provider={provider_pool_address!r}"
+        )
+
+    provider_timeframe = body.get("timeframe")
+    if provider_timeframe != requested_timeframe:
+        raise X1NinjaAPIError(
+            "X1.Ninja OHLCV timeframe does not match the requested timeframe: "
+            f"requested={requested_timeframe!r}, "
+            f"provider={provider_timeframe!r}"
+        )
+
+    candles = body.get("ohlcv")
+    if not isinstance(candles, list):
+        raise X1NinjaAPIError(
+            "X1.Ninja OHLCV 'ohlcv' field must be a JSON array."
+        )
+
+    observed_candle_keys = set()
+
+    for index, row in enumerate(candles):
+        if not isinstance(row, Mapping):
+            raise X1NinjaAPIError(
+                f"X1.Ninja OHLCV candle row {index} must be a JSON object."
+            )
+
+        row_keys = set(row.keys())
+        missing_row = sorted(
+            OBSERVED_OHLCV_CANDLE_KEYS - row_keys
+        )
+        if missing_row:
+            raise X1NinjaAPIError(
+                f"X1.Ninja OHLCV candle row {index} is missing "
+                "live-observed field(s): "
+                f"{', '.join(missing_row)}"
+            )
+
+        observed_candle_keys.update(
+            str(key) for key in row.keys()
+        )
+
+    return {
+        "request_contract_verified": True,
+        "response_json_verified": True,
+        "response_contract_verified": True,
+        "candle_schema_verified": True,
+        "candle_row_shape_verified": True,
+        "request_scope_verified": True,
+        "top_level_keys": sorted(
+            str(key) for key in body.keys()
+        ),
+        "candle_row_keys": sorted(
+            observed_candle_keys
+            or OBSERVED_OHLCV_CANDLE_KEYS
+        ),
+        "returned_candle_count": len(candles),
+        "provider_candle_count_raw": body.get("candleCount"),
+        "provider_last_updated_raw": body.get("lastUpdated"),
+        "provider_timeframe_raw": body.get("timeframe"),
+        "provider_mode_raw": body.get("mode"),
+        "provider_pool_address_raw": body.get("poolAddress"),
+        "provider_base_token_raw": body.get("baseToken"),
+        "provider_quote_token_raw": body.get("quoteToken"),
+    }
+
+
+def fetch_pool_ohlcv_raw(
+    pool_address: str,
+    api_key: Optional[str] = None,
+    *,
+    timeframe: str = "1h",
+    limit: Optional[int] = None,
+    session=requests,
+    timeout: int = 20,
+    observed_at_fn=time.time,
+) -> dict[str, Any]:
+    """Fetch raw X1.Ninja OHLCV JSON without promoting candle semantics.
+
+    The documented request contract and live-observed response structure are
+    verified here. Timestamp units, pair direction, quote units, interval
+    semantics, range coverage, gap behavior, and stale/interpolated behavior
+    remain explicitly unverified.
+    """
+
+    address = _nonempty_text("pool_address", pool_address)
+    key = _api_key(api_key)
+
+    tf = _nonempty_text("timeframe", timeframe)
+    if tf not in SUPPORTED_OHLCV_TIMEFRAMES:
+        supported = ", ".join(sorted(SUPPORTED_OHLCV_TIMEFRAMES))
+        raise ValueError(
+            f"Unsupported X1.Ninja OHLCV timeframe {tf!r}; "
+            f"documented values are: {supported}."
+        )
+
+    if limit is not None:
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise ValueError("OHLCV limit must be an integer when provided.")
+        if limit > 300:
+            raise ValueError(
+                "OHLCV limit exceeds the documented maximum of 300."
+            )
+
+    url = (
+        f"{X1_NINJA_API_BASE_URL}"
+        f"{OHLCV_PATH.format(address=address)}"
+    )
+    params: dict[str, Any] = {"tf": tf}
+    if limit is not None:
+        params["limit"] = limit
+
+    response = None
+    try:
+        response = session.get(
+            url,
+            headers={"Authorization": f"Bearer {key}"},
+            params=params,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        raise _http_error(
+            response,
+            exc,
+            operation="OHLCV",
+        ) from exc
+
+    try:
+        body = response.json()
+    except Exception as exc:
+        detail = _bounded_response_text(response)
+        raise X1NinjaAPIError(
+            f"X1.Ninja OHLCV response was not valid JSON: {exc}{detail}"
+        ) from exc
+
+    contract = _validate_observed_ohlcv_shape(
+        body,
+        requested_pool_address=address,
+        requested_timeframe=tf,
+    )
+    rate_limit = _rate_limit_record(response)
+    observed_at = observed_at_fn()
+
+    return {
+        "chain": CHAIN,
+        "source": X1_NINJA_SOURCE,
+        "endpoint": OHLCV_PATH.format(address=address),
+        "pool_address": address,
+        "timeframe": tf,
+        "requested_limit": limit,
+        "observed_at": observed_at,
+        "response_shape": "object",
+        "raw_response": body,
+        "rate_limit": rate_limit,
+        "contract": contract,
+        "semantics": {
+            "timestamp_unit_verified": False,
+            "pair_direction_verified": False,
+            "quote_unit_verified": False,
+            "interval_semantics_verified": False,
+            "range_coverage_verified": False,
+            "gap_behavior_verified": False,
+            "stale_or_interpolated_behavior_verified": False,
+        },
+        "cmis_promotable": False,
+    }
+
+
 __all__ = [
     "CHAIN",
     "OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS",
     "OBSERVED_TRADE_ROW_KEYS",
+    "OBSERVED_OHLCV_CANDLE_KEYS",
+    "OBSERVED_OHLCV_TOP_LEVEL_KEYS",
+    "OHLCV_PATH",
+    "SUPPORTED_OHLCV_TIMEFRAMES",
     "TRADE_HISTORY_PATH",
     "X1_NINJA_API_BASE_URL",
     "X1_NINJA_SOURCE",
     "X1NinjaAPIError",
+    "fetch_pool_ohlcv_raw",
     "fetch_pool_trades_raw",
 ]
