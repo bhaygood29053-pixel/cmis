@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from decimal import Decimal
+import math
 from typing import Any, Dict, Optional
 
 from liquidity_scout.cmis.evidence import (
@@ -27,6 +28,7 @@ from .cmis_contract import ERROR, OK, PARTIAL, build_service_envelope
 
 
 _SERVICE = "verification_evidence"
+_QUALITY_LEVELS = frozenset({"HIGH", "MEDIUM", "LOW"})
 _TEXT_OBSERVATION_FIELDS = (
     "chain",
     "fact_type",
@@ -48,14 +50,6 @@ _BOOLEAN_OBSERVATION_FIELDS = (
     "semantics_verified",
     "freshness_verified",
 )
-_QUALITY_FIELDS = (
-    "quality",
-    "independent_source_count",
-    "identity_verified",
-    "semantics_verified",
-    "freshness_verified",
-    "independent_agreement_verified",
-)
 
 
 def _text(value: Any) -> Optional[str]:
@@ -67,8 +61,10 @@ def _text(value: Any) -> Optional[str]:
 
 def _safe_scalar(value: Any) -> Any:
     """Expose primitive evidence values only; never nested transport payloads."""
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, (str, int, bool)):
         return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
     if isinstance(value, Decimal):
         return str(value)
     return None
@@ -77,7 +73,11 @@ def _safe_scalar(value: Any) -> Any:
 def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [str(item) for item in value if not isinstance(item, (Mapping, list, tuple, set))]
+    return [
+        str(item)
+        for item in value
+        if not isinstance(item, (Mapping, list, tuple, set))
+    ]
 
 
 def _safe_observation(value: Any) -> Optional[Dict[str, Any]]:
@@ -94,7 +94,9 @@ def _safe_observation(value: Any) -> Optional[Dict[str, Any]]:
     )
     record.update(
         {
-            field: value.get(field) is True
+            field: value.get(field)
+            if isinstance(value.get(field), bool)
+            else None
             for field in _BOOLEAN_OBSERVATION_FIELDS
         }
     )
@@ -105,10 +107,34 @@ def _safe_observation(value: Any) -> Optional[Dict[str, Any]]:
 def _safe_quality(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping):
         return None
-    record = {field: value.get(field) for field in _QUALITY_FIELDS}
-    record["quality"] = _text(record.get("quality"))
-    record["reasons"] = _string_list(value.get("reasons"))
-    return record
+    count = value.get("independent_source_count")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        count = None
+    return {
+        "quality": _text(value.get("quality")),
+        "independent_source_count": count,
+        "identity_verified": (
+            value.get("identity_verified")
+            if isinstance(value.get("identity_verified"), bool)
+            else None
+        ),
+        "semantics_verified": (
+            value.get("semantics_verified")
+            if isinstance(value.get("semantics_verified"), bool)
+            else None
+        ),
+        "freshness_verified": (
+            value.get("freshness_verified")
+            if isinstance(value.get("freshness_verified"), bool)
+            else None
+        ),
+        "independent_agreement_verified": (
+            value.get("independent_agreement_verified")
+            if isinstance(value.get("independent_agreement_verified"), bool)
+            else None
+        ),
+        "reasons": _string_list(value.get("reasons")),
+    }
 
 
 def _source(observation: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
@@ -120,8 +146,9 @@ def _source(observation: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
     if role is not None:
         record["role"] = role
     for field in ("observed_at", "block_slot", "calculation_version"):
-        if observation.get(field) is not None:
-            record[field] = observation.get(field)
+        scalar = _safe_scalar(observation.get(field))
+        if scalar is not None:
+            record[field] = scalar
     return record
 
 
@@ -151,14 +178,6 @@ def build_verification_evidence_response(
     observed_at: Any = None,
 ) -> Dict[str, Any]:
     """Expose one accepted verifier result without recalculating it.
-
-    Expected input shape::
-
-        {
-            "verification": {...},
-            "data_quality": {...},
-            "cmis_promotable": bool,
-        }
 
     The nested ``verification`` must contain the primary/verifier observations
     retained by the fact-specific verifier. This wrapper sanitizes those records
@@ -247,6 +266,26 @@ def build_verification_evidence_response(
             asset=asset,
             observed_at=observed_at,
         )
+    if (
+        quality.get("quality") not in _QUALITY_LEVELS
+        or quality.get("independent_source_count") is None
+        or not all(
+            isinstance(quality.get(field), bool)
+            for field in (
+                "identity_verified",
+                "semantics_verified",
+                "freshness_verified",
+                "independent_agreement_verified",
+            )
+        )
+    ):
+        return _error_response(
+            chain_name,
+            "data_quality_invalid",
+            "The fact-specific verifier returned an invalid data-quality contract.",
+            asset=asset,
+            observed_at=observed_at,
+        )
 
     promotable = verifier_result.get("cmis_promotable")
     if not isinstance(promotable, bool):
@@ -284,11 +323,44 @@ def build_verification_evidence_response(
             observed_at=observed_at,
         )
 
+    quality_agreement = quality.get("independent_agreement_verified")
+    if verification_status == AGREEMENT and quality_agreement is not True:
+        return _error_response(
+            chain_name,
+            "data_quality_agreement_inconsistent",
+            "AGREEMENT verification must be reflected in the verifier's data-quality assessment.",
+            asset=asset,
+            observed_at=observed_at,
+        )
+    if verification_status != AGREEMENT and quality_agreement is True:
+        return _error_response(
+            chain_name,
+            "data_quality_agreement_inconsistent",
+            "Non-agreement verification cannot claim independent agreement in data quality.",
+            asset=asset,
+            observed_at=observed_at,
+        )
+
     if promotable and verification_status != AGREEMENT:
         return _error_response(
             chain_name,
             "promotion_state_inconsistent",
             "Only an AGREEMENT result may be marked CMIS-promotable by a fact-specific verifier.",
+            asset=asset,
+            observed_at=observed_at,
+        )
+    if promotable and (
+        quality.get("quality") != "HIGH"
+        or quality.get("independent_source_count", 0) < 2
+        or quality.get("identity_verified") is not True
+        or quality.get("semantics_verified") is not True
+        or quality.get("freshness_verified") is not True
+        or quality.get("independent_agreement_verified") is not True
+    ):
+        return _error_response(
+            chain_name,
+            "promotion_quality_inconsistent",
+            "CMIS-promotable evidence must retain HIGH quality with verified identity, semantics, freshness, and independent agreement.",
             asset=asset,
             observed_at=observed_at,
         )
@@ -299,13 +371,21 @@ def build_verification_evidence_response(
 
     normalized_fact = None
     normalized_unit = None
-    if verification_status == AGREEMENT:
+    if verification_status == AGREEMENT and promotable:
         primary_value = _safe_scalar(verification.get("primary_value"))
         verifier_value = _safe_scalar(verification.get("verifier_value"))
         unit = _text(verification.get("normalized_unit"))
         if primary_value is not None and primary_value == verifier_value and unit is not None:
             normalized_fact = primary_value
             normalized_unit = unit
+        else:
+            return _error_response(
+                chain_name,
+                "promoted_fact_value_invalid",
+                "Promotable agreement must preserve one equal normalized value and unit.",
+                asset=asset,
+                observed_at=observed_at,
+            )
 
     data = {
         "fact": {
@@ -320,10 +400,7 @@ def build_verification_evidence_response(
             "agreement": agreement,
         },
         "data_quality": quality,
-        "observations": {
-            "primary": primary,
-            "verifier": verifier,
-        },
+        "observations": {"primary": primary, "verifier": verifier},
         "cmis_promotable": promotable,
     }
 
