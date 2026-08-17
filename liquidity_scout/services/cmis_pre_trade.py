@@ -32,6 +32,10 @@ def _text(value: Any) -> Optional[str]:
     return text or None
 
 
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
 def _copy_records(value: Any) -> list:
     if not isinstance(value, list):
         return []
@@ -83,6 +87,79 @@ def _service_status(result: Mapping[str, Any]) -> str:
     flags = result.get("flags")
     flag_set = {str(flag) for flag in flags} if isinstance(flags, list) else set()
     return PARTIAL if flag_set.intersection(_UNVERIFIED_FLAGS) else OK
+
+
+def _public_pre_trade_data(result: Mapping[str, Any]) -> Dict[str, Any]:
+    """Project already-computed evidence into stable presentation fields.
+
+    This function does not calculate new market facts. It aliases verified
+    liquidity and the deterministic size ratio already present in the pre-trade
+    components, while mapping unsupported execution estimates to explicit nulls.
+    """
+    components = _mapping(result.get("components"))
+    size_component = _mapping(components.get("trade_size_liquidity"))
+    size_evidence = _mapping(size_component.get("evidence"))
+    capabilities = _mapping(result.get("execution_capabilities"))
+
+    liquidity = (
+        size_evidence.get("liquidity_usd")
+        if size_evidence.get("liquidity_verified") is True
+        else None
+    )
+    price_impact = _mapping(capabilities.get("price_impact"))
+    slippage = _mapping(capabilities.get("slippage"))
+    fees = _mapping(capabilities.get("fees"))
+    route_quality = _mapping(capabilities.get("route_quality"))
+    bridge_dependency = _mapping(capabilities.get("bridge_dependency"))
+    transaction_simulation = _mapping(capabilities.get("transaction_simulation"))
+
+    execution_statuses = {
+        name: _mapping(record).get("status")
+        for name, record in capabilities.items()
+    }
+    route_status = (
+        "unavailable"
+        if capabilities and any(status != "ok" for status in execution_statuses.values())
+        else ("ok" if capabilities else None)
+    )
+
+    return {
+        "trade": result.get("trade") or {},
+        "market": {
+            "verified_liquidity_usd": liquidity,
+            "verified_volume_24h_usd": None,
+        },
+        "trade_size": {
+            "assessment": size_component.get("status"),
+            "notional_usd": size_evidence.get("notional_usd"),
+            "notional_to_liquidity_ratio": size_evidence.get(
+                "notional_to_liquidity_ratio"
+            ),
+            "warn_threshold_notional_usd": size_evidence.get(
+                "warn_threshold_notional_usd"
+            ),
+            "hard_block_notional_usd_threshold": size_evidence.get(
+                "hard_block_notional_usd_threshold"
+            ),
+            "assessment_complete": size_evidence.get("size_assessment_complete")
+            is True,
+        },
+        "route_analysis": {
+            "status": route_status,
+            "route_scope": None,
+            "estimated_price_impact_percent": price_impact.get("value"),
+            "estimated_slippage_percent": slippage.get("value"),
+            "estimated_fees": fees.get("value"),
+            "route_quality": route_quality.get("value"),
+            "bridge_dependency": bridge_dependency.get("value"),
+            "transaction_simulation": transaction_simulation.get("value"),
+        },
+        "risk_observed_at": result.get("risk_observed_at"),
+        "evaluated_at": result.get("evaluated_at"),
+        "execution_capabilities": dict(capabilities),
+        "analysis_only": result.get("analysis_only") is True,
+        "execution_authorized": result.get("execution_authorized") is True,
+    }
 
 
 def _upstream_failure_response(
@@ -271,14 +348,7 @@ def build_pre_trade_check_response(
         result.get("chain") or chain,
         _service_status(result),
         asset=result.get("asset"),
-        data={
-            "trade": result.get("trade") or {},
-            "risk_observed_at": result.get("risk_observed_at"),
-            "evaluated_at": result.get("evaluated_at"),
-            "execution_capabilities": result.get("execution_capabilities") or {},
-            "analysis_only": result.get("analysis_only") is True,
-            "execution_authorized": result.get("execution_authorized") is True,
-        },
+        data=_public_pre_trade_data(result),
         risk=result,
         confidence=result.get("confidence"),
         sources=sources,
