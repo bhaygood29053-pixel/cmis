@@ -1,0 +1,229 @@
+"""Deterministic trade-size-to-liquidity analysis for CMIS pre-trade checks.
+
+This module is transport-free. It consumes the already-verified liquidity
+component produced by ``risk_check`` plus normalized proposed-trade context.
+It never estimates AMM slippage, price impact, routes, fees, or execution
+outcomes. Numeric warning/block behavior exists only when an explicit caller
+policy supplies the corresponding ratios.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any, Dict, Optional
+
+from .risk import BLOCK, PASS, WARN
+
+
+VERSION = "1.0"
+DEFAULT_PRE_TRADE_POLICY = {
+    # Ratios are fractions of verified asset-wide liquidity. They are unset by
+    # default so CMIS never invents an acceptable market-impact threshold.
+    "warn_notional_to_liquidity_ratio": None,
+    "block_notional_to_liquidity_ratio": None,
+    # Missing trade size means the size-sensitive portion is incomplete.
+    "warn_on_missing_notional": True,
+    # A sized trade cannot be evaluated safely when asset-wide liquidity is not
+    # verified. This is a pre-trade analysis gate, not execution authorization.
+    "block_on_unverified_liquidity_for_sized_trade": True,
+}
+
+
+def _number(value: Any) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    return number
+
+
+def _positive_policy_ratio(name: str, value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    number = _number(value)
+    if number is None or number <= 0:
+        raise ValueError(f"{name} must be a positive finite number or None")
+    return number
+
+
+def normalize_pre_trade_policy(policy: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    result = dict(DEFAULT_PRE_TRADE_POLICY)
+    if policy is None:
+        return result
+    if not isinstance(policy, Mapping):
+        raise ValueError("pre_trade policy must be a mapping or None")
+
+    unknown = sorted(set(policy) - set(DEFAULT_PRE_TRADE_POLICY))
+    if unknown:
+        raise ValueError(f"unknown pre_trade policy fields: {', '.join(unknown)}")
+
+    result.update(policy)
+    for key in (
+        "warn_notional_to_liquidity_ratio",
+        "block_notional_to_liquidity_ratio",
+    ):
+        result[key] = _positive_policy_ratio(key, result.get(key))
+
+    warn_ratio = result["warn_notional_to_liquidity_ratio"]
+    block_ratio = result["block_notional_to_liquidity_ratio"]
+    if warn_ratio is not None and block_ratio is not None and block_ratio < warn_ratio:
+        raise ValueError(
+            "block_notional_to_liquidity_ratio must be greater than or equal "
+            "to warn_notional_to_liquidity_ratio"
+        )
+
+    for key in (
+        "warn_on_missing_notional",
+        "block_on_unverified_liquidity_for_sized_trade",
+    ):
+        if not isinstance(result.get(key), bool):
+            raise ValueError(f"{key} must be a boolean")
+
+    return result
+
+
+def _risk_liquidity(risk_result: Mapping[str, Any]) -> tuple[Optional[float], bool]:
+    components = risk_result.get("components")
+    components = components if isinstance(components, Mapping) else {}
+    liquidity = components.get("liquidity")
+    liquidity = liquidity if isinstance(liquidity, Mapping) else {}
+    evidence = liquidity.get("evidence")
+    evidence = evidence if isinstance(evidence, Mapping) else {}
+    liquidity_usd = _number(evidence.get("liquidity_usd"))
+
+    confidence = risk_result.get("confidence")
+    confidence = confidence if isinstance(confidence, Mapping) else {}
+    checks = confidence.get("checks")
+    checks = checks if isinstance(checks, Mapping) else {}
+    verified = (
+        checks.get("liquidity_verified") is True
+        and liquidity_usd is not None
+        and liquidity_usd >= 0
+    )
+    return liquidity_usd, verified
+
+
+def assess_trade_size_liquidity(
+    risk_result: Mapping[str, Any],
+    trade: Mapping[str, Any],
+    *,
+    policy: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Assess proposed USD notional against verified asset-wide liquidity.
+
+    The result never asserts slippage or price impact. It only calculates the
+    dimensionless notional/liquidity ratio from verified inputs and applies
+    explicit caller-provided ratio thresholds when present.
+    """
+    if not isinstance(risk_result, Mapping):
+        raise ValueError("risk_result must be a mapping")
+    if not isinstance(trade, Mapping):
+        raise ValueError("trade must be a mapping")
+
+    normalized_policy = normalize_pre_trade_policy(policy)
+    notional_usd = _number(trade.get("notional_usd"))
+    liquidity_usd, liquidity_verified = _risk_liquidity(risk_result)
+
+    warn_ratio = normalized_policy["warn_notional_to_liquidity_ratio"]
+    block_ratio = normalized_policy["block_notional_to_liquidity_ratio"]
+    evidence = {
+        "notional_usd": notional_usd,
+        "liquidity_usd": liquidity_usd,
+        "liquidity_verified": liquidity_verified,
+        "notional_to_liquidity_ratio": None,
+        "warn_notional_to_liquidity_ratio": warn_ratio,
+        "block_notional_to_liquidity_ratio": block_ratio,
+        "warn_threshold_notional_usd": (
+            liquidity_usd * warn_ratio
+            if liquidity_verified and liquidity_usd is not None and warn_ratio is not None
+            else None
+        ),
+        "hard_block_notional_usd_threshold": (
+            liquidity_usd * block_ratio
+            if liquidity_verified and liquidity_usd is not None and block_ratio is not None
+            else None
+        ),
+        "size_assessment_complete": False,
+        "slippage_estimate_pct": None,
+        "price_impact_estimate_pct": None,
+        "route_quality": None,
+    }
+
+    if notional_usd is None:
+        return {
+            "status": WARN if normalized_policy["warn_on_missing_notional"] else PASS,
+            "flags": ["trade_notional_unverified"] if normalized_policy["warn_on_missing_notional"] else [],
+            "reasons": [
+                "Trade notional is required to complete trade-size-to-liquidity analysis."
+            ] if normalized_policy["warn_on_missing_notional"] else [],
+            "evidence": evidence,
+            "policy": normalized_policy,
+        }
+
+    if not liquidity_verified:
+        blocking = normalized_policy["block_on_unverified_liquidity_for_sized_trade"]
+        return {
+            "status": BLOCK if blocking else WARN,
+            "flags": ["sized_trade_liquidity_unverified"],
+            "reasons": [
+                "A sized trade cannot be compared with asset-wide liquidity because verified total liquidity is unavailable."
+            ],
+            "evidence": evidence,
+            "policy": normalized_policy,
+        }
+
+    if liquidity_usd == 0:
+        evidence["size_assessment_complete"] = True
+        return {
+            "status": BLOCK,
+            "flags": ["zero_verified_liquidity_for_sized_trade"],
+            "reasons": ["Verified asset-wide liquidity is zero for the proposed sized trade."],
+            "evidence": evidence,
+            "policy": normalized_policy,
+        }
+
+    ratio = notional_usd / liquidity_usd
+    evidence["notional_to_liquidity_ratio"] = ratio
+    evidence["size_assessment_complete"] = True
+
+    if block_ratio is not None and ratio >= block_ratio:
+        return {
+            "status": BLOCK,
+            "flags": ["trade_size_exceeds_liquidity_block_ratio"],
+            "reasons": [
+                "The proposed notional meets or exceeds the explicit pre-trade policy block ratio of verified asset-wide liquidity."
+            ],
+            "evidence": evidence,
+            "policy": normalized_policy,
+        }
+
+    if warn_ratio is not None and ratio >= warn_ratio:
+        return {
+            "status": WARN,
+            "flags": ["trade_size_exceeds_liquidity_warn_ratio"],
+            "reasons": [
+                "The proposed notional meets or exceeds the explicit pre-trade policy warning ratio of verified asset-wide liquidity."
+            ],
+            "evidence": evidence,
+            "policy": normalized_policy,
+        }
+
+    return {
+        "status": PASS,
+        "flags": [],
+        "reasons": [],
+        "evidence": evidence,
+        "policy": normalized_policy,
+    }
+
+
+__all__ = [
+    "DEFAULT_PRE_TRADE_POLICY",
+    "VERSION",
+    "assess_trade_size_liquidity",
+    "normalize_pre_trade_policy",
+]
