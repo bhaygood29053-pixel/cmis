@@ -56,49 +56,79 @@ def fetch_largest_token_accounts_raw(
     body = response.json()
 
     if not isinstance(body, Mapping):
-        raise X1RPCLargestTokenAccountsError("X1 RPC largest-accounts response must be an object.")
+        raise X1RPCLargestTokenAccountsError(
+            "X1 RPC largest-accounts response must be an object."
+        )
     if body.get("error") is not None:
-        raise X1RPCLargestTokenAccountsError(f"X1 RPC returned an error for {RPC_METHOD}.")
+        raise X1RPCLargestTokenAccountsError(
+            f"X1 RPC returned an error for {RPC_METHOD}."
+        )
 
     result = body.get("result")
     if not isinstance(result, Mapping):
-        raise X1RPCLargestTokenAccountsError("X1 RPC largest-accounts result is missing or malformed.")
+        raise X1RPCLargestTokenAccountsError(
+            "X1 RPC largest-accounts result is missing or malformed."
+        )
     context = result.get("context")
     values = result.get("value")
     if not isinstance(context, Mapping) or not isinstance(values, list):
-        raise X1RPCLargestTokenAccountsError("X1 RPC largest-accounts context/value is malformed.")
+        raise X1RPCLargestTokenAccountsError(
+            "X1 RPC largest-accounts context/value is malformed."
+        )
 
     slot = context.get("slot")
     if isinstance(slot, bool) or not isinstance(slot, int) or slot < 0:
-        raise X1RPCLargestTokenAccountsError("X1 RPC largest-accounts context slot is invalid.")
+        raise X1RPCLargestTokenAccountsError(
+            "X1 RPC largest-accounts context slot is invalid."
+        )
 
     accounts: list[dict[str, Any]] = []
     seen: set[str] = set()
     expected_decimals: int | None = None
+    previous_amount: int | None = None
     for index, item in enumerate(values):
         if not isinstance(item, Mapping):
-            raise X1RPCLargestTokenAccountsError(f"largest account entry {index} is malformed.")
+            raise X1RPCLargestTokenAccountsError(
+                f"largest account entry {index} is malformed."
+            )
         address = _text(f"value[{index}].address", item.get("address"))
         amount = item.get("amount")
         decimals = item.get("decimals")
         if address in seen:
-            raise X1RPCLargestTokenAccountsError("X1 RPC largest-accounts response contains duplicate accounts.")
+            raise X1RPCLargestTokenAccountsError(
+                "X1 RPC largest-accounts response contains duplicate accounts."
+            )
         if not isinstance(amount, str) or not amount.isdigit():
-            raise X1RPCLargestTokenAccountsError(f"largest account entry {index} amount is invalid.")
+            raise X1RPCLargestTokenAccountsError(
+                f"largest account entry {index} amount is invalid."
+            )
+        amount_int = int(amount)
+        if previous_amount is not None and amount_int > previous_amount:
+            raise X1RPCLargestTokenAccountsError(
+                "X1 RPC largest-accounts response is not ordered by descending "
+                "raw amount."
+            )
         if isinstance(decimals, bool) or not isinstance(decimals, int) or decimals < 0:
-            raise X1RPCLargestTokenAccountsError(f"largest account entry {index} decimals are invalid.")
+            raise X1RPCLargestTokenAccountsError(
+                f"largest account entry {index} decimals are invalid."
+            )
         if expected_decimals is None:
             expected_decimals = decimals
         elif decimals != expected_decimals:
-            raise X1RPCLargestTokenAccountsError("X1 RPC largest-accounts decimals are inconsistent.")
+            raise X1RPCLargestTokenAccountsError(
+                "X1 RPC largest-accounts decimals are inconsistent."
+            )
+        previous_amount = amount_int
         seen.add(address)
-        accounts.append({
-            "address": address,
-            "amount": amount,
-            "decimals": decimals,
-            "ui_amount": item.get("uiAmount"),
-            "ui_amount_string": item.get("uiAmountString"),
-        })
+        accounts.append(
+            {
+                "address": address,
+                "amount": amount,
+                "decimals": decimals,
+                "ui_amount": item.get("uiAmount"),
+                "ui_amount_string": item.get("uiAmountString"),
+            }
+        )
 
     return {
         "chain": CHAIN,
@@ -110,6 +140,7 @@ def fetch_largest_token_accounts_raw(
         "slot": slot,
         "accounts": accounts,
         "account_count_observed": len(accounts),
+        "descending_amount_order_verified": True,
         "raw_response": dict(body),
         "holder_semantics_verified": False,
         "holder_coverage_verified": False,
