@@ -5,13 +5,13 @@ transaction work. It consumes an already-computed deterministic ``risk_check``
 result plus proposed trade context and applies fail-closed identity, chain,
 trade-size/liquidity, and explicit evidence-freshness gates.
 
-The result is analysis only. ``PASS`` never authorizes execution. Slippage,
-price impact, fees, and route quality remain unavailable until separately
-verified calculation/quote evidence exists; this core never manufactures them.
+Unsupported execution estimates are represented through a machine-readable
+capability contract. The core never fills those fields with guessed values.
 """
 
 from typing import Any, Dict, Mapping, Optional
 
+from .pre_trade_capabilities import build_execution_capability_report
 from .pre_trade_freshness import assess_risk_freshness
 from .pre_trade_liquidity import (
     DEFAULT_PRE_TRADE_POLICY,
@@ -207,6 +207,7 @@ def _confidence(
     risk_component: Mapping[str, Any],
     size_component: Mapping[str, Any],
     freshness_component: Mapping[str, Any],
+    capability_component: Mapping[str, Any],
 ) -> Dict[str, Any]:
     identity_evidence = identity_component.get("evidence")
     identity_evidence = identity_evidence if isinstance(identity_evidence, Mapping) else {}
@@ -217,6 +218,10 @@ def _confidence(
     freshness_evidence = freshness_component.get("evidence")
     freshness_evidence = (
         freshness_evidence if isinstance(freshness_evidence, Mapping) else {}
+    )
+    capability_evidence = capability_component.get("evidence")
+    capability_evidence = (
+        capability_evidence if isinstance(capability_evidence, Mapping) else {}
     )
     freshness_required = freshness_evidence.get("freshness_policy_active") is True
 
@@ -244,6 +249,9 @@ def _confidence(
         "risk_freshness_assessment_complete": (
             freshness_evidence.get("freshness_assessment_complete") is True
         ),
+        "required_execution_capabilities_available": (
+            capability_evidence.get("all_required_capabilities_available") is True
+        ),
     }
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
@@ -265,13 +273,7 @@ def build_pre_trade_check(
     risk_observed_at: Any = None,
     evaluated_at: Any = None,
 ) -> Dict[str, Any]:
-    """Evaluate deterministic pre-trade gates without authorizing execution.
-
-    The core propagates ``risk_check`` severity, blocks chain/mint mismatches,
-    evaluates USD notional against verified asset-wide liquidity, and applies
-    optional explicit evidence-age thresholds. No size or freshness threshold
-    is invented by CMIS.
-    """
+    """Evaluate deterministic pre-trade gates without authorizing execution."""
     if not isinstance(risk_result, Mapping):
         raise ValueError("risk_result must be a mapping")
     if not isinstance(trade, Mapping):
@@ -289,32 +291,47 @@ def build_pre_trade_check(
         normalized_trade,
         policy=policy,
     )
+    normalized_policy = dict(
+        trade_size_liquidity.get("policy") or DEFAULT_PRE_TRADE_POLICY
+    )
     freshness = assess_risk_freshness(
         risk_observed_at=risk_observed_at,
         evaluated_at=evaluated_at,
-        policy=policy,
+        policy=normalized_policy,
+    )
+    execution_capabilities = build_execution_capability_report(
+        normalized_policy.get("required_capabilities")
     )
     components = {
         "identity": identity,
         "risk_gate": risk_gate,
         "trade_size_liquidity": trade_size_liquidity,
         "freshness": freshness,
+        "execution_capabilities": execution_capabilities,
     }
     recommendation = _merge_status(
         identity["status"],
         risk_gate["status"],
         trade_size_liquidity["status"],
         freshness["status"],
+        execution_capabilities["status"],
     )
 
     flags = []
     reasons = []
-    for name in ("identity", "risk_gate", "trade_size_liquidity", "freshness"):
+    for name in (
+        "identity",
+        "risk_gate",
+        "trade_size_liquidity",
+        "freshness",
+        "execution_capabilities",
+    ):
         flags.extend(components[name]["flags"])
         reasons.extend(components[name]["reasons"])
 
     risk_asset = risk_result.get("asset")
     risk_asset = risk_asset if isinstance(risk_asset, Mapping) else {}
+    capability_evidence = execution_capabilities["evidence"]
 
     return {
         "chain": chain_name,
@@ -325,15 +342,17 @@ def build_pre_trade_check(
         "trade": normalized_trade,
         "recommendation": recommendation,
         "components": components,
+        "execution_capabilities": capability_evidence.get("capabilities") or {},
         "confidence": _confidence(
             identity,
             risk_gate,
             trade_size_liquidity,
             freshness,
+            execution_capabilities,
         ),
         "flags": flags,
         "reasons": reasons,
-        "policy": dict(trade_size_liquidity.get("policy") or DEFAULT_PRE_TRADE_POLICY),
+        "policy": normalized_policy,
         "risk_observed_at": risk_observed_at,
         "evaluated_at": evaluated_at,
         "analysis_only": True,
@@ -349,15 +368,16 @@ def build_pre_trade_check(
                 "explicit_trade_size_policy_thresholds",
                 "deterministic_policy_notional_thresholds",
                 "explicit_risk_evidence_freshness_policy",
+                "execution_estimate_capability_availability",
             ],
             "not_yet_included": [
-                "slippage",
-                "price_impact",
+                "slippage_calculation",
+                "price_impact_calculation",
                 "pool_depth_curve_simulation",
-                "route_quality",
-                "bridge_dependency",
-                "transaction_simulation",
-                "fees",
+                "route_quality_calculation",
+                "bridge_dependency_determination",
+                "transaction_simulation_execution",
+                "fee_calculation",
                 "execution_authorization",
             ],
         },
