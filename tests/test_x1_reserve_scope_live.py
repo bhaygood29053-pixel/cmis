@@ -1,3 +1,11 @@
+"""Opt-in live XENCAT/XNT reserve scope evidence probe.
+
+The optional JSON artifact is intentionally sanitized: it contains the public
+pool/vault/mint identifiers, provider reserve values, RPC amounts/slots, and
+derived scope measurements needed for replay, but excludes credentials and raw
+HTTP/RPC response payloads. The probe never marks freshness or CMIS promotion.
+"""
+
 import json
 import os
 import unittest
