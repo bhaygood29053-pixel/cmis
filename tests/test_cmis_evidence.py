@@ -146,6 +146,20 @@ class CMISEvidenceTests(unittest.TestCase):
         self.assertTrue(quality["independent_agreement_verified"])
         self.assertEqual(quality["reasons"], [])
 
+    def test_same_source_with_two_roles_is_not_independent(self):
+        primary = self._observation(source_role="market_provider")
+        verifier = self._observation(source_role="onchain_verifier")
+        verification = compare_same_fact_exact(primary, verifier)
+
+        quality = build_data_quality_assessment(
+            observations=[primary, verifier],
+            verification=verification,
+        )
+
+        self.assertEqual(quality["quality"], "MEDIUM")
+        self.assertEqual(quality["independent_source_count"], 1)
+        self.assertIn("SINGLE_SOURCE_ONLY", quality["reasons"])
+
     def test_single_fresh_verified_source_is_medium_not_high(self):
         primary = self._observation()
 
