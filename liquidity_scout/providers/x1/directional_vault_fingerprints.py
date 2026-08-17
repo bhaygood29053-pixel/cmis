@@ -129,6 +129,17 @@ def _fingerprint_to_dict(fingerprint):
     }
 
 
+def _structural_fingerprint_to_dict(fingerprint):
+    if fingerprint is None:
+        return None
+    return {
+        "program_id": fingerprint[0],
+        "pool_position": fingerprint[1],
+        "asset_position": fingerprint[2],
+        "counter_position": fingerprint[3],
+    }
+
+
 def _direction_summary(
     direction: str,
     records: Mapping[str, Mapping[str, Any]],
@@ -139,6 +150,9 @@ def _direction_summary(
     """Summarize dominant instruction fingerprint for one direction."""
 
     fingerprint_signatures: dict[tuple, set[str]] = defaultdict(set)
+    structural_fingerprint_signatures: dict[
+        tuple, set[str]
+    ] = defaultdict(set)
     direction_signatures = []
 
     for signature, evidence in records.items():
@@ -147,6 +161,16 @@ def _direction_summary(
         direction_signatures.append(signature)
         for fingerprint in evidence.get("fingerprints") or set():
             fingerprint_signatures[fingerprint].add(signature)
+
+            structural_fingerprint = (
+                fingerprint[0],
+                fingerprint[2],
+                fingerprint[3],
+                fingerprint[4],
+            )
+            structural_fingerprint_signatures[
+                structural_fingerprint
+            ].add(signature)
 
     count = len(direction_signatures)
     dominant = None
@@ -159,11 +183,32 @@ def _direction_summary(
         dominant_count = len(signatures)
 
     ratio = dominant_count / count if count else 0.0
+
+    dominant_structural = None
+    dominant_structural_count = 0
+    if structural_fingerprint_signatures:
+        dominant_structural, structural_signatures = max(
+            structural_fingerprint_signatures.items(),
+            key=lambda item: (len(item[1]), item[0]),
+        )
+        dominant_structural_count = len(structural_signatures)
+
+    structural_ratio = (
+        dominant_structural_count / count if count else 0.0
+    )
+
     sufficient_sample = count >= min_direction_occurrences
+
     stable = bool(
         sufficient_sample
         and dominant is not None
         and ratio >= min_fingerprint_ratio
+    )
+
+    structural_stable = bool(
+        sufficient_sample
+        and dominant_structural is not None
+        and structural_ratio >= min_fingerprint_ratio
     )
 
     return {
@@ -175,6 +220,17 @@ def _direction_summary(
         "dominant_instruction_fingerprint_count": dominant_count,
         "dominant_instruction_fingerprint_ratio": round(ratio, 6),
         "fingerprint_stable": stable,
+        "dominant_structural_instruction_fingerprint": (
+            _structural_fingerprint_to_dict(dominant_structural)
+        ),
+        "dominant_structural_instruction_fingerprint_count": (
+            dominant_structural_count
+        ),
+        "dominant_structural_instruction_fingerprint_ratio": round(
+            structural_ratio,
+            6,
+        ),
+        "structural_fingerprint_stable": structural_stable,
     }
 
 
@@ -477,12 +533,28 @@ def correlate_directional_vault_pairs(
             )
         )
 
+        directional_structural_fingerprints_stable = bool(
+            observed_direction_summaries
+            and all(
+                summary["structural_fingerprint_stable"]
+                for summary in observed_direction_summaries
+            )
+        )
+
         stable = bool(
             occurrence_count >= min_occurrences
             and coverage_ratio >= min_coverage_ratio
             and opposite_ratio >= min_opposite_direction_ratio
             and direction_samples_sufficient
             and directional_fingerprints_stable
+        )
+
+        structural_stable = bool(
+            occurrence_count >= min_occurrences
+            and coverage_ratio >= min_coverage_ratio
+            and opposite_ratio >= min_opposite_direction_ratio
+            and direction_samples_sufficient
+            and directional_structural_fingerprints_stable
         )
 
         pairs.append(
@@ -509,7 +581,13 @@ def correlate_directional_vault_pairs(
                 "directional_fingerprints_stable": (
                     directional_fingerprints_stable
                 ),
+                "directional_structural_fingerprints_stable": (
+                    directional_structural_fingerprints_stable
+                ),
                 "stable_directional_pair_candidate": stable,
+                "stable_structural_directional_pair_candidate": (
+                    structural_stable
+                ),
                 "canonical_vault_pair_proven": False,
                 "canonical_vault_mapping_promoted": False,
                 "exact_pool_leg_semantics_promoted": False,

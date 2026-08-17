@@ -85,7 +85,15 @@ def _window_failure(row: Mapping[str, Any]) -> str | None:
         return "history_unproven"
     if row.get("full_pool_instruction_coverage") is not True:
         return "pool_instruction_coverage_incomplete"
-    if row.get("stable_directional_pair_candidate") is not True:
+    structural_stable = row.get(
+        "stable_structural_directional_pair_candidate"
+    )
+    pair_stable = (
+        row.get("stable_directional_pair_candidate") is True
+        if structural_stable is None
+        else structural_stable is True
+    )
+    if not pair_stable:
         return "directional_pair_unstable"
     if row.get("qualifying_family_evidence") is not True:
         return "opposite_flow_unqualified"
@@ -194,6 +202,15 @@ def refine_per_window_coupling_diagnosis(report: Mapping[str, Any]) -> dict[str,
                 "stable_directional_pair_candidate": row.get(
                     "stable_directional_pair_candidate"
                 ) is True,
+                "stable_structural_directional_pair_candidate": (
+                    row.get(
+                        "stable_structural_directional_pair_candidate"
+                    ) is True
+                    if row.get(
+                        "stable_structural_directional_pair_candidate"
+                    ) is not None
+                    else None
+                ),
                 "qualifying_family_evidence": row.get("qualifying_family_evidence")
                 is True,
                 "pool_instruction_coupled": row.get("pool_instruction_coupled") is True,
