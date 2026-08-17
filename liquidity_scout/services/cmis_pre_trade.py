@@ -18,6 +18,8 @@ _UNVERIFIED_FLAGS = {
     "trade_asset_mint_unverified",
     "risk_asset_mint_unverified",
     "risk_evidence_incomplete",
+    "trade_notional_unverified",
+    "sized_trade_liquidity_unverified",
 }
 
 
@@ -79,10 +81,9 @@ def _warnings(result: Mapping[str, Any]) -> list:
 def _service_status(result: Mapping[str, Any]) -> str:
     """Separate service completeness from PASS/WARN/BLOCK severity.
 
-    Verified mismatches (for example, two verified but different mints) are
-    successful deterministic findings and therefore remain ``ok``. Only flags
-    that mean required evidence itself is missing/unverified make the service
-    ``partial``.
+    Verified mismatches or explicit policy threshold breaches are successful
+    deterministic findings and therefore remain ``ok``. Only flags that mean
+    required evidence itself is missing/unverified make the service ``partial``.
     """
     flags = result.get("flags")
     flag_set = {str(flag) for flag in flags} if isinstance(flags, list) else set()
@@ -140,6 +141,7 @@ def build_pre_trade_check_response(
     trade: Any,
     *,
     chain: str = "x1",
+    policy: Optional[Mapping[str, Any]] = None,
     observed_at: Any = None,
 ) -> Dict[str, Any]:
     """Return ``pre_trade_check`` through the shared CMIS service contract.
@@ -149,8 +151,8 @@ def build_pre_trade_check_response(
     status ``ok``. Missing/unverified required evidence is ``partial``. Missing
     risk input is ``unavailable`` and malformed input is ``error``.
 
-    The deterministic result remains under the envelope's ``risk`` field and
-    always carries ``analysis_only=True`` and ``execution_authorized=False``.
+    ``policy`` controls only deterministic pre-trade size/liquidity thresholds.
+    It never authorizes execution or invents slippage/price-impact assumptions.
     """
     if risk_result is None:
         return build_service_envelope(
@@ -234,7 +236,12 @@ def build_pre_trade_check_response(
         )
 
     try:
-        result = build_pre_trade_check(raw_risk, trade, chain=chain)
+        result = build_pre_trade_check(
+            raw_risk,
+            trade,
+            chain=chain,
+            policy=policy,
+        )
     except ValueError as exc:
         sources = _copy_records(risk_envelope.get("sources")) if risk_envelope else []
         return build_service_envelope(
