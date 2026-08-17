@@ -34,6 +34,11 @@ def roberta_pretrade_enabled() -> bool:
     return _env_flag("ROBERTA_MOLTGRID_PRETRADE_ENABLED", default=False)
 
 
+def roberta_conversation_enabled() -> bool:
+    """Return whether MoltGrid general/identity handoff to Roberta is enabled."""
+    return _env_flag("ROBERTA_MOLTGRID_CONVERSATION_ENABLED", default=False)
+
+
 def _base_url(value: str | None = None) -> str:
     raw = value if value is not None else os.getenv("ROBERTA_BASE_URL", DEFAULT_BASE_URL)
     text = str(raw or "").strip().rstrip("/")
@@ -119,5 +124,6 @@ __all__ = [
     "DEFAULT_TIMEOUT_SECONDS",
     "RobertaBridgeError",
     "ask_roberta",
+    "roberta_conversation_enabled",
     "roberta_pretrade_enabled",
 ]
