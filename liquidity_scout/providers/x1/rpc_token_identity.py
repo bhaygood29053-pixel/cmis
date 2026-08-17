@@ -12,7 +12,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from liquidity_scout.providers.x1.rpc_token_account import RPC_METHOD
+from liquidity_scout.providers.x1.rpc_token_account import (
+    ENCODING,
+    RPC_METHOD,
+    RPC_SOURCE,
+)
 
 
 VERSION = "1.0"
@@ -23,6 +27,10 @@ def _text(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _valid_slot(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and value >= 0
 
 
 def verify_x1_rpc_token_account_identity(
@@ -49,12 +57,19 @@ def verify_x1_rpc_token_account_identity(
     observed_account = _text(observation.get("account"))
     observed_mint = _text(observation.get("mint"))
     observed_authority = _text(observation.get("authority"))
+    slot = observation.get("slot")
 
     reasons: list[str] = []
     if observation.get("chain") != "x1":
         reasons.append("wrong_chain")
+    if observation.get("source") != RPC_SOURCE:
+        reasons.append("rpc_source_mismatch")
     if observation.get("method") != RPC_METHOD:
         reasons.append("rpc_method_mismatch")
+    if observation.get("encoding") != ENCODING:
+        reasons.append("rpc_encoding_mismatch")
+    if not _valid_slot(slot):
+        reasons.append("rpc_slot_invalid")
     if observation.get("token_account_fields_parsed") is not True:
         reasons.append("token_account_fields_unparsed")
     if observed_account != expected_account_text:
@@ -74,7 +89,7 @@ def verify_x1_rpc_token_account_identity(
         "account": observed_account,
         "mint": observed_mint,
         "authority": observed_authority,
-        "slot": observation.get("slot"),
+        "slot": slot,
         "expected": {
             "account": expected_account_text,
             "mint": expected_mint_text,
@@ -83,13 +98,15 @@ def verify_x1_rpc_token_account_identity(
         "account_verified": observed_account == expected_account_text,
         "mint_verified": observed_mint == expected_mint_text,
         "authority_verified": observed_authority == expected_authority_text,
+        "slot_verified": _valid_slot(slot),
         "identity_verified": identity_verified,
         "cmis_promotable": False,
         "rejection_reasons": reasons,
         "source_observation": {
             "source": _text(observation.get("source")),
             "method": _text(observation.get("method")),
-            "slot": observation.get("slot"),
+            "encoding": _text(observation.get("encoding")),
+            "slot": slot,
         },
     }
 
