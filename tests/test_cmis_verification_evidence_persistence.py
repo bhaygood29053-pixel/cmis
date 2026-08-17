@@ -10,6 +10,10 @@ from liquidity_scout.providers.x1.reserve_persistence import (
     persist_x1_reserve_crosscheck_evidence,
 )
 from liquidity_scout.providers.x1.reserve_verification import verify_x1_pool_reserve
+from liquidity_scout.providers.x1.rpc_token_account import ENCODING, RPC_METHOD, RPC_SOURCE
+from liquidity_scout.providers.x1.rpc_token_identity import (
+    verify_x1_rpc_token_account_identity,
+)
 from liquidity_scout.services.cmis_verification_evidence_persistence import (
     persist_verification_evidence,
 )
@@ -127,6 +131,33 @@ def rpc_balances():
     }
 
 
+def _verified_rpc_identity(account, mint, authority, slot):
+    raw = {
+        "chain": "x1",
+        "source": RPC_SOURCE,
+        "method": RPC_METHOD,
+        "encoding": ENCODING,
+        "account": account,
+        "slot": slot,
+        "mint": mint,
+        "authority": authority,
+        "token_account_fields_parsed": True,
+    }
+    return verify_x1_rpc_token_account_identity(
+        raw,
+        expected_account=account,
+        expected_mint=mint,
+        expected_authority=authority,
+    )
+
+
+def rpc_identities():
+    return {
+        "asset": _verified_rpc_identity(ASSET_VAULT, ASSET_MINT, OWNER, 123456),
+        "counter": _verified_rpc_identity(COUNTER_VAULT, COUNTER_MINT, OWNER, 123457),
+    }
+
+
 def crosscheck(*, fresh=True, missing_counter=False):
     balances = rpc_balances()
     if missing_counter:
@@ -137,6 +168,7 @@ def crosscheck(*, fresh=True, missing_counter=False):
         semantic_manifest(),
         balances,
         observed_at=1000.0,
+        rpc_identities=rpc_identities(),
         observation_scope_verified=fresh,
     )
 
