@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 from liquidity_scout.integrations.roberta_bridge import (
     MOLTGRID_SCOPE_LIMITATION_MESSAGE,
     ask_roberta,
+    moltgrid_plaintext_reply,
     moltgrid_question_supported,
     moltgrid_simple_only_enabled,
 )
@@ -88,6 +89,28 @@ class MoltGridSimpleScopeTests(unittest.TestCase):
         self.assertEqual(reply, MOLTGRID_SCOPE_LIMITATION_MESSAGE)
         urlopen.assert_not_called()
 
+    def test_plaintext_renderer_removes_markdown_without_changing_facts(self):
+        reply = (
+            "## AGI\n\n"
+            "AGI is **$0.00006715**.\n\n"
+            "- **24h change:** -0.08%\n"
+            "- **Liquidity:** ~$3,464 across 3 LP pools\n"
+            "- `Holders`: 266"
+        )
+
+        rendered = moltgrid_plaintext_reply(reply)
+
+        self.assertEqual(
+            rendered,
+            "AGI\n\n"
+            "AGI is $0.00006715.\n\n"
+            "• 24h change: -0.08%\n"
+            "• Liquidity: ~$3,464 across 3 LP pools\n"
+            "• Holders: 266",
+        )
+        self.assertNotIn("**", rendered)
+        self.assertNotIn("`", rendered)
+
     def test_supported_question_still_reaches_roberta(self):
         urlopen = Mock(
             return_value=_FakeResponse(
@@ -114,6 +137,64 @@ class MoltGridSimpleScopeTests(unittest.TestCase):
 
         self.assertEqual(reply, "AGI is currently $0.000064.")
         urlopen.assert_called_once()
+
+    def test_simple_only_mode_plaintexts_roberta_markdown_reply(self):
+        urlopen = Mock(
+            return_value=_FakeResponse(
+                {
+                    "service": "roberta_bridge",
+                    "status": "ok",
+                    "reply": (
+                        "AGI is **$0.00006715**.\n\n"
+                        "- **24h volume:** ~$109.51\n"
+                        "- **Holders:** 266"
+                    ),
+                }
+            )
+        )
+        with (
+            patch.dict(
+                os.environ,
+                {"ROBERTA_MOLTGRID_SIMPLE_ONLY_ENABLED": "1"},
+                clear=True,
+            ),
+            patch("urllib.request.urlopen", urlopen),
+        ):
+            reply = ask_roberta(
+                "What is the price of AGI?",
+                base_url="http://127.0.0.1:8766",
+                timeout_seconds=5,
+            )
+
+        self.assertEqual(
+            reply,
+            "AGI is $0.00006715.\n\n"
+            "• 24h volume: ~$109.51\n"
+            "• Holders: 266",
+        )
+
+    def test_markdown_is_preserved_when_simple_only_mode_is_disabled(self):
+        source_reply = "AGI is **$0.00006715**."
+        urlopen = Mock(
+            return_value=_FakeResponse(
+                {
+                    "service": "roberta_bridge",
+                    "status": "ok",
+                    "reply": source_reply,
+                }
+            )
+        )
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("urllib.request.urlopen", urlopen),
+        ):
+            reply = ask_roberta(
+                "What is the price of AGI?",
+                base_url="http://127.0.0.1:8766",
+                timeout_seconds=5,
+            )
+
+        self.assertEqual(reply, source_reply)
 
 
 if __name__ == "__main__":
