@@ -93,12 +93,14 @@ def _public_pre_trade_data(result: Mapping[str, Any]) -> Dict[str, Any]:
     """Project already-computed evidence into stable presentation fields.
 
     This function does not calculate new market facts. It aliases verified
-    liquidity and the deterministic size ratio already present in the pre-trade
-    components, while mapping unsupported execution estimates to explicit nulls.
+    liquidity, deterministic sizing evidence, and the exact selected policy
+    already present in the pre-trade core, while mapping unsupported execution
+    estimates to explicit nulls.
     """
     components = _mapping(result.get("components"))
     size_component = _mapping(components.get("trade_size_liquidity"))
     size_evidence = _mapping(size_component.get("evidence"))
+    size_policy = _mapping(size_component.get("policy"))
     capabilities = _mapping(result.get("execution_capabilities"))
 
     liquidity = (
@@ -131,6 +133,8 @@ def _public_pre_trade_data(result: Mapping[str, Any]) -> Dict[str, Any]:
         },
         "trade_size": {
             "assessment": size_component.get("status"),
+            "classification": size_evidence.get("trade_size_classification"),
+            "evidence_status": size_evidence.get("evidence_status"),
             "notional_usd": size_evidence.get("notional_usd"),
             "notional_to_liquidity_ratio": size_evidence.get(
                 "notional_to_liquidity_ratio"
@@ -143,6 +147,23 @@ def _public_pre_trade_data(result: Mapping[str, Any]) -> Dict[str, Any]:
             ),
             "assessment_complete": size_evidence.get("size_assessment_complete")
             is True,
+            "policy": {
+                "contract_version": size_evidence.get("policy_contract_version"),
+                "name": size_evidence.get("policy_name") or size_policy.get("policy_name"),
+                "version": size_evidence.get("policy_version") or size_policy.get("policy_version"),
+                "classification_thresholds_configured": size_evidence.get(
+                    "classification_thresholds_configured"
+                ) is True,
+                "classification_thresholds": dict(
+                    _mapping(size_evidence.get("classification_thresholds"))
+                ),
+                "warn_notional_to_liquidity_ratio": size_evidence.get(
+                    "warn_notional_to_liquidity_ratio"
+                ),
+                "block_notional_to_liquidity_ratio": size_evidence.get(
+                    "block_notional_to_liquidity_ratio"
+                ),
+            },
         },
         "route_analysis": {
             "status": route_status,
