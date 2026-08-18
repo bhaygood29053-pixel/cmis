@@ -56,7 +56,8 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
         )
         numeric_needles = ("3000", "0.003", "0.3")
         strong_rule_patterns = {
-            "max_with_3000": re.compile(r"(?:Math\\.max|max)\\([^)]{0,180}3000|3000[^)]{0,180}(?:Math\\.max|max)\\(", re.I),
+            "max_before_3000": re.compile(r"(?:Math\.max|max)\([^)]{0,180}3000", re.I),
+            "3000_before_max": re.compile(r"3000[^)]{0,180}(?:Math\.max|max)\(", re.I),
             "fee_near_3000": re.compile(r"(?:fee|trade)[A-Za-z_$0-9.]{0,80}.{0,180}3000|3000.{0,180}(?:fee|trade)", re.I | re.S),
             "quote_near_3000": re.compile(r"(?:quote|swap)[A-Za-z_$0-9./:-]{0,120}.{0,240}3000|3000.{0,240}(?:quote|swap)", re.I | re.S),
         }
