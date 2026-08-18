@@ -231,12 +231,21 @@ def _ceil_fee(amount: int, rate_ppm: int) -> int:
     return (amount * rate_ppm + FEE_DENOMINATOR - 1) // FEE_DENOMINATOR
 
 
-def _price_impact_percent(raw_input: int, reserve_in: int, trade_fee_rate_ppm: int) -> Decimal:
+def _price_impact_percent(
+    raw_input: int,
+    reserve_in: int,
+    reserve_out: int,
+    trade_fee_rate_ppm: int,
+) -> Decimal:
+    """Reproduce XDEX CP price impact including integer output rounding."""
     fee = _ceil_fee(raw_input, trade_fee_rate_ppm)
     net_input = raw_input - fee
     if net_input <= 0:
         raise XDEXExactRouteError("trade fee consumes the complete raw input")
-    return Decimal(net_input) * Decimal(100) / Decimal(reserve_in + net_input)
+    if reserve_in <= 0 or reserve_out <= 0:
+        raise XDEXExactRouteError("verified active reserves must be positive")
+    raw_output = net_input * reserve_out // (reserve_in + net_input)
+    return Decimal(raw_output) * Decimal(100) / Decimal(reserve_out)
 
 
 def _bounded_response_text(response: Any, limit: int = 500) -> str:
@@ -324,6 +333,7 @@ def collect_exact_route_snapshot(
     reconstructed_price_impact = _price_impact_percent(
         raw_input,
         reserve_in,
+        reserve_out,
         config["trade_fee_rate_ppm"],
     )
 
