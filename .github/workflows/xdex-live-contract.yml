@@ -44,6 +44,39 @@ jobs:
           print("[XDEX pool-list sample] " + json.dumps(pools[:5], sort_keys=True, default=str))
           PY
 
+      - name: Probe pinned XENCAT and native-XNT quote identifiers
+        run: |
+          python - <<'PY'
+          import json
+          from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
+
+          provider = XDEXReadOnlyProvider(timeout=20)
+          xencat = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
+          xnt = "So11111111111111111111111111111111111111112"
+
+          for token_in, token_out, label in (
+              (xencat, xnt, "XENCAT->So111"),
+              (xnt, xencat, "So111->XENCAT"),
+          ):
+              for amount in (1, 2):
+                  try:
+                      data = provider.swap_quote(
+                          token_in,
+                          token_out,
+                          amount,
+                          is_exact_amount_in=True,
+                      )
+                      print(
+                          f"[XDEX direct quote {label} amount={amount}] SUCCESS "
+                          + json.dumps(data, sort_keys=True, default=str)
+                      )
+                  except Exception as exc:
+                      print(
+                          f"[XDEX direct quote {label} amount={amount}] ERROR "
+                          f"{type(exc).__name__}: {exc}"
+                      )
+          PY
+
       - name: Probe live read-only XDEX contract
         env:
           RUN_XDEX_LIVE_TESTS: "1"
