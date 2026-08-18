@@ -3,13 +3,14 @@ import struct
 import unittest
 
 from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
-from liquidity_scout.providers.x1.rpc import rpc_request
+from liquidity_scout.providers.x1.rpc import X1RPCError, rpc_request
 
 
 RUN_LIVE = os.getenv("RUN_XDEX_OUTPUT_SLIPPAGE_LIVE") == "1"
 POOL = "6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry"
 COMPUTE_BUDGET_PROGRAM = "ComputeBudget111111111111111111111111111111"
 TARGET_SAMPLE_COUNT = 5
+MAX_SIGNATURE_ATTEMPTS = 12
 
 _B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 _B58_INDEX = {char: index for index, char in enumerate(_B58_ALPHABET)}
@@ -127,6 +128,8 @@ def _get_transaction(signature):
                 "maxSupportedTransactionVersion": 0,
             },
         ],
+        retries=2,
+        timeout=15,
     )
 
 
@@ -152,14 +155,24 @@ class XDEXHistoricalComputeBudgetLiveTests(unittest.TestCase):
         self.assertTrue(trades, "X1.Ninja returned no recent rows for the pinned XDEX pool")
 
         diagnostics = []
+        rpc_failures = []
         seen = set()
+        attempted = 0
         for trade in trades:
             signature = str(trade.get("txHash") or "").strip()
             if not signature or signature in seen:
                 continue
             seen.add(signature)
+            attempted += 1
+            if attempted > MAX_SIGNATURE_ATTEMPTS:
+                break
 
-            tx = _get_transaction(signature)
+            try:
+                tx = _get_transaction(signature)
+            except X1RPCError as exc:
+                rpc_failures.append({"signature": signature, "error": str(exc)})
+                continue
+
             if not isinstance(tx, dict):
                 continue
             meta = tx.get("meta")
@@ -177,9 +190,9 @@ class XDEXHistoricalComputeBudgetLiveTests(unittest.TestCase):
             signatures = transaction.get("signatures") or []
             account_keys = _account_keys(tx)
 
-            # This is a diagnostic candidate only. X1 documents dynamic base
-            # fees, so Solana's priority-fee arithmetic must not be promoted as
-            # X1's exact all-in fee formula without X1-specific corroboration.
+            # Diagnostic only. X1 documents dynamic base fees, so Solana's
+            # priority-fee arithmetic is not promoted as X1's exact all-in fee
+            # formula without X1-specific corroboration.
             solana_style_priority_candidate = None
             if isinstance(limit, int) and isinstance(price, int):
                 solana_style_priority_candidate = (limit * price + 999_999) // 1_000_000
@@ -205,11 +218,20 @@ class XDEXHistoricalComputeBudgetLiveTests(unittest.TestCase):
         print("XDEX historical transaction fee / compute-budget diagnostics")
         for row in diagnostics:
             print(row)
+        print("X1 RPC failures during bounded sample")
+        for row in rpc_failures:
+            print(row)
         print(
             "Interpretation boundary: meta.fee is transaction-layer network-fee evidence and ComputeBudget instructions are transaction resource/prioritization evidence. "
             "Neither field is used to relabel the independently observed 2800->3000 XDEX quote-engine curve difference. "
             "The Solana-style priority-fee candidate is diagnostic only because X1 documents congestion-reflective dynamic base fees."
         )
+
+        if len(diagnostics) < 3 and rpc_failures:
+            self.skipTest(
+                "official X1 RPC did not return enough historical transactions in this run; "
+                f"successful={len(diagnostics)} rpc_failures={len(rpc_failures)}"
+            )
 
         self.assertGreaterEqual(
             len(diagnostics),
