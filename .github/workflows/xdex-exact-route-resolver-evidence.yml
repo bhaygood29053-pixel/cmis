@@ -1,0 +1,44 @@
+name: XDEX Exact Route Resolver Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-exact-route-resolver-evidence:
+    name: Read-only exact-route resolver
+    if: github.head_ref == 'agent/xdex-exact-route-resolver'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_EXACT_ROUTE_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Resolve pinned XENCAT/XNT route into pre-trade evidence
+        run: |
+          python -m unittest tests.test_xdex_exact_route_resolver_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only XDEX quote GET and X1 RPC account reads only."
+          echo "No /swap/prepare, transaction construction, signing, broadcasting, custody, simulation, execution, or value movement."
