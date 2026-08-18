@@ -6,13 +6,16 @@ size and both verified mint slots (168/200), once for each mint orientation.
 Every returned account is then re-read and must satisfy the accepted XDEX
 pool/config/vault structure plus positive active reserves.
 
-A unique verified direct candidate may be returned as an exact route. Multiple
-verified candidates are reported as ambiguous and are never ranked or selected.
-This is a program-family claim only, not proof that the recognized XDEX program
-registry is globally exhaustive across every X1 DEX.
+A unique verified direct candidate may be returned only after every enumerated
+exact-pair account has been completely re-verified. Any unclassified/rejected
+candidate makes the result ``verification_incomplete`` and blocks route
+selection. Multiple fully verified candidates are reported as ambiguous and are
+never ranked or selected.
 
-This module performs no quote, route-quality, multi-hop, prepare, simulation,
-signing, broadcasting, custody, execution, or value-moving work.
+This is a program-family claim only, not proof that the recognized XDEX program
+registry is globally exhaustive across every X1 DEX. This module performs no
+quote, route-quality, multi-hop, prepare, simulation, signing, broadcasting,
+custody, execution, or value-moving work.
 """
 
 from __future__ import annotations
@@ -34,7 +37,7 @@ from liquidity_scout.providers.x1.xdex_execution_fee_evidence import X1_PROGRAM
 
 CHAIN = "x1"
 SOURCE = "X1 RPC exact-pair XDEX program discovery"
-VERSION = "1.1"
+VERSION = "1.2"
 POOL_STATE_LENGTH = 637
 CONFIG_MIN_LENGTH = 116
 MINT_0_OFFSET = 168
@@ -309,13 +312,11 @@ def discover_direct_route(
     token_in_mint: str,
     token_out_mint: str,
     *,
-    candidate_provider: Callable[..., Mapping[str, Any]] = (
-        discover_pair_program_accounts
-    ),
+    candidate_provider: Callable[..., Mapping[str, Any]] = discover_pair_program_accounts,
     account_state_fetcher: Callable[[str], Any] = fetch_account_state,
     token_account_fetcher: Callable[[str], Any] = get_token_account_info,
 ) -> dict[str, Any]:
-    """Discover a unique verified direct XDEX route or fail closed on ambiguity."""
+    """Discover a verified direct XDEX route only with complete classification."""
     token_in = _text(token_in_mint, "token_in_mint")
     token_out = _text(token_out_mint, "token_out_mint")
     if token_in == token_out:
@@ -380,8 +381,13 @@ def discover_direct_route(
         verified_by_key.setdefault(key, candidate)
 
     verified = list(verified_by_key.values())
-    if not verified:
+    candidate_verification_complete = not rejected
+    if not candidate_addresses:
         status = "unavailable"
+        route = None
+        selection_claim = None
+    elif not candidate_verification_complete:
+        status = "verification_incomplete"
         route = None
         selection_claim = None
     elif len(verified) == 1:
@@ -396,10 +402,15 @@ def discover_direct_route(
         selection_claim = (
             "unique_verified_direct_candidate_in_accepted_xdex_program_family"
         )
-    else:
+    elif len(verified) > 1:
         status = "ambiguous"
         route = None
         selection_claim = None
+    else:
+        status = "verification_incomplete"
+        route = None
+        selection_claim = None
+        candidate_verification_complete = False
 
     return {
         "service": "xdex_direct_route_discovery",
@@ -413,6 +424,7 @@ def discover_direct_route(
         "selection_claim": selection_claim,
         "program_id": discovery.get("program_id") or X1_PROGRAM,
         "program_family_pair_enumeration_complete": True,
+        "candidate_verification_complete": candidate_verification_complete,
         "recognized_program_registry_globally_exhaustive": False,
         "all_x1_dex_pair_enumeration_complete": False,
         "enumerated_candidate_count": len(candidate_addresses),
