@@ -54,6 +54,11 @@ jobs:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
         run: python -m unittest tests.test_xdex_frontend_quote_bundle_live -v
 
+      - name: Compare deployed frontend and research quote routes
+        env:
+          RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
+        run: python -m unittest tests.test_xdex_frontend_quote_route_live -v
+
       - name: Safety boundary
         if: always()
         run: |
