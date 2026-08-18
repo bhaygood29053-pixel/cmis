@@ -37,6 +37,11 @@ def classify_secondary_rpc_response(
     A structurally valid response proves only that the candidate answered the
     requested method with the expected basic shape. It never proves archival
     completeness, retention depth, finality semantics, or CMIS promotion.
+
+    ``getBlock`` responses do not carry the requested slot in the result body.
+    ``parentSlot`` is therefore never converted into an inferred block slot:
+    skipped slots can make ``parentSlot + 1`` differ from the requested slot.
+    Exact request-slot binding must come from the captured request context.
     """
     source = source.strip()
     method = method.strip()
@@ -74,14 +79,6 @@ def classify_secondary_rpc_response(
                 observed_slot = result
         elif method == "getBlock":
             result_ok = isinstance(result, Mapping)
-            if result_ok:
-                parent_slot = result.get("parentSlot")
-                if (
-                    isinstance(parent_slot, int)
-                    and not isinstance(parent_slot, bool)
-                    and parent_slot >= 0
-                ):
-                    observed_slot = parent_slot + 1
 
     return SecondaryRpcContractObservation(
         source=source,
