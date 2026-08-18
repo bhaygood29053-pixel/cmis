@@ -26,37 +26,25 @@ jobs:
       - name: Install probe dependency
         run: python -m pip install requests
 
-      - name: Probe oracle endpoint contract
+      - name: Probe oracle price, details, and sell-quote contracts
         run: |
           python - <<'PY'
           import json
           import requests
 
-          URL = 'https://oracle.xdex.xyz/api/v1/token/price'
+          PRICE_URL = 'https://oracle.xdex.xyz/api/v1/token/price'
+          SELL_QUOTE_URL = 'https://oracle.xdex.xyz/api/v1/token/sell-quote'
           XENCAT = 'DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb'
           XNT = 'So11111111111111111111111111111111111111112'
 
-          probes = [
-              ('no_params', {}),
-              ('token_address_xencat', {'token_address': XENCAT}),
-              ('address_xencat', {'address': XENCAT}),
-              ('mint_xencat', {'mint': XENCAT}),
-              ('token_xencat', {'token': XENCAT}),
-              ('token_address_xnt', {'token_address': XNT}),
-              ('address_xnt', {'address': XNT}),
-              ('mint_xnt', {'mint': XNT}),
-              ('token_xnt', {'token': XNT}),
-          ]
-
-          for label, params in probes:
+          def probe(label, url, params):
               try:
-                  response = requests.get(URL, params=params, timeout=20)
-                  text = response.text[:2000]
+                  response = requests.get(url, params=params, timeout=20)
                   try:
                       body = response.json()
                   except Exception:
-                      body = text
-                  print('[XDEX oracle price evidence] ' + json.dumps({
+                      body = response.text[:4000]
+                  print('[XDEX oracle evidence] ' + json.dumps({
                       'probe': label,
                       'status': response.status_code,
                       'content_type': response.headers.get('content-type'),
@@ -64,10 +52,21 @@ jobs:
                       'body': body,
                   }, sort_keys=True, default=str))
               except Exception as exc:
-                  print('[XDEX oracle price evidence] ' + json.dumps({
+                  print('[XDEX oracle evidence] ' + json.dumps({
                       'probe': label,
                       'error': f'{type(exc).__name__}: {exc}',
                   }, sort_keys=True))
+
+          probe('single_xencat', PRICE_URL, {'token_address': XENCAT})
+          probe('single_xnt', PRICE_URL, {'token_address': XNT})
+          probe('all_details', PRICE_URL, {'all': 'true', 'details': 'true'})
+
+          for amount in ('1', '2', '1000', '50000'):
+              probe(
+                  f'sell_quote_xencat_{amount}',
+                  SELL_QUOTE_URL,
+                  {'token_address': XENCAT, 'amount_in': amount},
+              )
           PY
 
       - name: Safety boundary
