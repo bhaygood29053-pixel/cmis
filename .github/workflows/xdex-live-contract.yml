@@ -32,6 +32,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Capture current public XDEX pool-list schema
+        run: |
+          python - <<'PY'
+          import json
+          from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
+
+          pools = XDEXReadOnlyProvider(timeout=20).pool_list()
+          print(f"[XDEX pool-list evidence] count={len(pools)}")
+          print("[XDEX pool-list keys] " + json.dumps(sorted({key for row in pools[:25] for key in row.keys()})))
+          print("[XDEX pool-list sample] " + json.dumps(pools[:5], sort_keys=True, default=str))
+          PY
+
       - name: Probe live read-only XDEX contract
         env:
           RUN_XDEX_LIVE_TESTS: "1"
