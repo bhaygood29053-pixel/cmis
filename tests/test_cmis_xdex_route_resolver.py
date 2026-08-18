@@ -58,15 +58,17 @@ def snapshot_for(route=None, **overrides):
 
 
 class XDEXRouteResolverTests(unittest.TestCase):
-    def test_exact_bounded_route_emits_price_impact_and_fee_evidence(self):
+    def test_exact_bounded_route_emits_amount_scoped_price_impact_and_fee_evidence(self):
         evidence = resolve_xdex_route_evidence(
             ROUTE,
-            "1000",
+            "1000.000",
             collector=lambda route, amount: snapshot_for(route),
         )
 
+        self.assertEqual(evidence["schema_version"], 2)
         self.assertEqual(evidence["source"], "cmis_xdex_route_resolver")
         self.assertEqual(evidence["route"], ROUTE)
+        self.assertEqual(evidence["token_in_amount"], "1000")
         self.assertEqual(set(evidence["capabilities"]), {"price_impact", "fees"})
         self.assertEqual(
             evidence["capabilities"]["price_impact"]["semantic"],
@@ -78,7 +80,7 @@ class XDEXRouteResolverTests(unittest.TestCase):
         )
         self.assertNotIn("slippage", evidence["capabilities"])
 
-    def test_evidence_is_accepted_by_pre_trade_route_contract(self):
+    def test_evidence_is_accepted_only_for_same_trade_amount(self):
         evidence = resolve_xdex_route_evidence(
             ROUTE,
             "1000",
@@ -88,10 +90,13 @@ class XDEXRouteResolverTests(unittest.TestCase):
             evidence,
             target_chain="x1",
             trade_route=ROUTE,
+            trade_token_in_amount="1000.0",
             evaluated_at="2026-08-18T21:58:05Z",
             max_age_seconds=30,
         )
 
+        self.assertTrue(result["audit"]["route_match"])
+        self.assertTrue(result["audit"]["amount_match"])
         self.assertEqual(
             set(result["audit"]["usable_capabilities"]),
             {"price_impact", "fees"},
@@ -99,6 +104,28 @@ class XDEXRouteResolverTests(unittest.TestCase):
         self.assertEqual(result["overrides"]["price_impact"]["status"], "ok")
         self.assertEqual(result["overrides"]["fees"]["status"], "ok")
         self.assertFalse(result["audit"]["rejected_capabilities"])
+
+    def test_evidence_is_rejected_for_different_trade_amount(self):
+        evidence = resolve_xdex_route_evidence(
+            ROUTE,
+            "1000",
+            collector=lambda route, amount: snapshot_for(route),
+        )
+        result = evaluate_route_evidence(
+            evidence,
+            target_chain="x1",
+            trade_route=ROUTE,
+            trade_token_in_amount="1",
+            evaluated_at="2026-08-18T21:58:05Z",
+            max_age_seconds=30,
+        )
+
+        self.assertFalse(result["audit"]["amount_match"])
+        self.assertEqual(
+            result["audit"]["global_rejection_reason"],
+            "route_evidence_input_amount_mismatch",
+        )
+        self.assertFalse(result["overrides"])
 
     def test_other_verified_route_does_not_inherit_bounded_fee_evidence(self):
         other = {
@@ -112,12 +139,25 @@ class XDEXRouteResolverTests(unittest.TestCase):
             "1",
             collector=lambda route, amount: snapshot_for(
                 route,
+                token_in_amount="1",
                 trade_fee_rate_ppm=3000,
             ),
         )
 
+        self.assertEqual(evidence["token_in_amount"], "1")
         self.assertEqual(set(evidence["capabilities"]), {"price_impact"})
         self.assertNotIn("fees", evidence["capabilities"])
+
+    def test_collector_amount_mismatch_fails_closed(self):
+        with self.assertRaisesRegex(XDEXRouteResolverError, "requested exact input amount"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    token_in_amount="1",
+                ),
+            )
 
     def test_price_impact_disagreement_fails_closed(self):
         with self.assertRaisesRegex(
