@@ -85,6 +85,32 @@ class CMISPreTradeRuntimePolicyTests(unittest.TestCase):
         self.assertIn("trade_size_exceeds_liquidity_block_ratio", response["risk"]["flags"])
         self.assertFalse(response["risk"]["execution_authorized"])
 
+    def test_runtime_without_explicit_policy_selects_named_x1_profile(self):
+        risk = risk_envelope(liquidity=3380.0)
+        with patch.object(self.gateway, "_risk_check", return_value=risk):
+            response = self.gateway.dispatch({
+                "service": "pre_trade_check",
+                "chain": "x1",
+                "asset": "AGI",
+                "params": {
+                    "trade": {"side": "buy", "notional_usd": 500},
+                },
+            })
+
+        self.assertEqual(response["status"], "ok")
+        self.assertEqual(response["risk"]["recommendation"], "BLOCK")
+        size = response["data"]["trade_size"]
+        self.assertEqual(size["classification"], "VERY_HIGH")
+        self.assertEqual(size["evidence_status"], "verified")
+        self.assertAlmostEqual(size["notional_to_liquidity_ratio"], 500 / 3380)
+        self.assertEqual(size["policy"]["contract_version"], "2.0")
+        self.assertEqual(size["policy"]["name"], "cmis_x1_trade_size_conservative")
+        self.assertEqual(size["policy"]["version"], "1.0")
+        self.assertEqual(size["policy"]["warn_notional_to_liquidity_ratio"], 0.05)
+        self.assertEqual(size["policy"]["block_notional_to_liquidity_ratio"], 0.10)
+        self.assertTrue(response["data"]["analysis_only"])
+        self.assertFalse(response["data"]["execution_authorized"])
+
     def test_caller_liquidity_fields_are_not_used_as_pretrade_evidence(self):
         risk = risk_envelope(liquidity=100000.0)
         with patch.object(self.gateway, "_risk_check", return_value=risk):
@@ -108,6 +134,8 @@ class CMISPreTradeRuntimePolicyTests(unittest.TestCase):
         self.assertEqual(evidence["liquidity_usd"], 100000.0)
         self.assertEqual(evidence["notional_to_liquidity_ratio"], 0.10)
         self.assertEqual(response["risk"]["recommendation"], "BLOCK")
+        # An explicit partial policy does not inherit the production X1 profile.
+        self.assertIsNone(evidence["trade_size_classification"])
 
     def test_invalid_pretrade_policy_fails_before_risk_collection(self):
         with patch.object(self.gateway, "_risk_check") as risk_check:
