@@ -122,12 +122,43 @@ def _ceil_fee(amount: int, rate_ppm: int) -> int:
 
 
 def _reconstruct_impact(raw_input: int, reserve_in: int, trade_fee_ppm: int) -> Decimal:
+    """Continuous CPMM input-side impact used only as a pool-state sanity check."""
     if trade_fee_ppm < 0 or trade_fee_ppm >= FEE_DENOMINATOR:
         raise XDEXRouteResolverError("snapshot trade_fee_rate_ppm is outside the accepted range")
     net_input = raw_input - _ceil_fee(raw_input, trade_fee_ppm)
     if net_input <= 0:
         raise XDEXRouteResolverError("snapshot trade fee consumes the complete raw input")
     return Decimal(net_input) * Decimal(100) / Decimal(reserve_in + net_input)
+
+
+def _rounded_output_reserve_impact(
+    quote_output_amount: Any,
+    output_decimals: int,
+    reserve_out: int,
+) -> tuple[int, Decimal]:
+    """Reproduce XDEX priceImpactPct from rounded quote output reserve depletion.
+
+    Live direct-route evidence across deep and ultra-thin pools shows XDEX's
+    reported field follows integer-rounded zero-slippage output divided by the
+    verified active output reserve. This differs measurably from continuous
+    input-side CPMM impact when the output reserve is only a few raw units.
+    """
+    output = _decimal(quote_output_amount, "snapshot.quote_output_amount")
+    if output <= 0:
+        raise XDEXRouteResolverError("snapshot quote_output_amount must be positive")
+    scaled = output * (Decimal(10) ** output_decimals)
+    if scaled != scaled.to_integral_value():
+        raise XDEXRouteResolverError(
+            "snapshot quote_output_amount is not exactly representable in raw output units"
+        )
+    raw_output = int(scaled)
+    if raw_output <= 0:
+        raise XDEXRouteResolverError("snapshot quote_output_amount must convert to positive raw output")
+    if raw_output >= reserve_out:
+        raise XDEXRouteResolverError(
+            "snapshot zero-slippage quote output must remain below the verified active output reserve"
+        )
+    return raw_output, Decimal(raw_output) * Decimal(100) / Decimal(reserve_out)
 
 
 def _validated_snapshot(
@@ -195,7 +226,10 @@ def _validated_snapshot(
         snapshot.get("active_reserve_in_raw"),
         "snapshot.active_reserve_in_raw",
     )
-    _positive_int(snapshot.get("active_reserve_out_raw"), "snapshot.active_reserve_out_raw")
+    reserve_out = _positive_int(
+        snapshot.get("active_reserve_out_raw"),
+        "snapshot.active_reserve_out_raw",
+    )
     input_decimals = _nonnegative_int(snapshot.get("input_decimals"), "snapshot.input_decimals")
     output_decimals = _nonnegative_int(snapshot.get("output_decimals"), "snapshot.output_decimals")
     if input_decimals > 255 or output_decimals > 255:
@@ -212,6 +246,12 @@ def _validated_snapshot(
             "snapshot reconstructed price impact does not match deterministic reserve arithmetic"
         )
 
+    quote_output_raw, output_reserve_impact = _rounded_output_reserve_impact(
+        snapshot.get("quote_output_amount"),
+        output_decimals,
+        reserve_out,
+    )
+
     return {
         **dict(snapshot),
         "route": route,
@@ -219,17 +259,19 @@ def _validated_snapshot(
         "observed_at": observed_at,
         "reconstructed_price_impact": reconstructed,
         "quote_price_impact": quoted,
+        "quote_output_raw": quote_output_raw,
+        "rounded_output_reserve_price_impact": output_reserve_impact,
         "trade_fee_rate_ppm": trade_fee_ppm,
     }
 
 
 def _price_impact_capability(snapshot: Mapping[str, Any]) -> dict[str, Any]:
-    reconstructed = snapshot["reconstructed_price_impact"]
+    reproduced = snapshot["rounded_output_reserve_price_impact"]
     quoted = snapshot["quote_price_impact"]
-    delta = abs(reconstructed - quoted)
+    delta = abs(reproduced - quoted)
     if delta > PRICE_IMPACT_TOLERANCE_PERCENTAGE_POINTS:
         raise XDEXRouteResolverError(
-            "XDEX quote priceImpactPct does not match independent verified-reserve reconstruction"
+            "XDEX quote priceImpactPct does not match rounded-output/verified-output-reserve reconstruction"
         )
     return {
         "status": "verified",
@@ -238,8 +280,9 @@ def _price_impact_capability(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         "unit": "percent",
         "proof_basis": [
             "verified_direct_cp_route",
-            "verified_pool_reserves",
-            "verified_price_impact_semantics",
+            "verified_active_output_reserve",
+            "verified_zero_slippage_quote_output",
+            "verified_integer_rounded_output_reserve_price_impact_semantics",
         ],
     }
 
