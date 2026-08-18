@@ -38,6 +38,7 @@ jobs:
           python -m unittest \
             tests.test_xdex_onchain_slippage_semantics_live \
             tests.test_xdex_slippage_layering_pinned_live \
+            tests.test_xdex_cross_transaction_half_percent_live \
             -v
 
       - name: Safety boundary
