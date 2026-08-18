@@ -1,6 +1,7 @@
 import os
 import unittest
 
+from liquidity_scout.providers.x1.xdex import fetch_pool_list
 from liquidity_scout.providers.x1.xdex_direct_route_discovery import discover_direct_route
 from liquidity_scout.providers.x1.xdex_execution_fee_evidence import XENCAT_MINT, XNT_MINT
 
@@ -17,7 +18,26 @@ PINNED_XENCAT_CONFIG = "2eFPWosizV6nSAGeSvi5tRgXLoqhjnSesra23ALA248c"
 )
 class XDEXDirectRouteDiscoveryLiveTests(unittest.TestCase):
     def test_pinned_xencat_xnt_pair_has_one_verified_direct_route(self):
-        result = discover_direct_route(XENCAT_MINT, XNT_MINT)
+        pools = fetch_pool_list()
+        pinned_rows = [
+            row for row in pools
+            if isinstance(row, dict) and row.get("address") == PINNED_XENCAT_POOL
+        ]
+        xencat_rows = [
+            row for row in pools
+            if XENCAT_MINT in repr(row)
+        ]
+        print({
+            "catalog_total": len(pools),
+            "pinned_pool_rows": pinned_rows,
+            "rows_containing_xencat_mint": xencat_rows[:5],
+        })
+
+        result = discover_direct_route(
+            XENCAT_MINT,
+            XNT_MINT,
+            pool_fetcher=lambda: pools,
+        )
 
         self.assertEqual(result["status"], "verified_unique")
         self.assertEqual(result["verified_candidate_count"], 1)
