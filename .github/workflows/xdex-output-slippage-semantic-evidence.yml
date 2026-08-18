@@ -44,6 +44,11 @@ jobs:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
         run: python -m unittest tests.test_xdex_executed_swap_minimum_out_live -v
 
+      - name: Inspect completed swaps for separate 2bp fee transfers
+        env:
+          RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
+        run: python -m unittest tests.test_xdex_historical_integrator_fee_transfer_live -v
+
       - name: Inspect deployed XDEX frontend quote bundle
         env:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
