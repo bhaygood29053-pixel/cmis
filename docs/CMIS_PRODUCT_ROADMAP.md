@@ -27,12 +27,22 @@ Accepted execution milestones:
 > **Post-Phase-10 evidence-quality milestone — Evidence Receipts + Proof Score: COMPLETE.**
 >
 > **Remaining X1 evidence gaps — CLASSIFIED at an explicit fail-closed capability boundary.**
+>
+> **Deterministic pre-trade trade-size/impact milestone — COMPLETE.**
+>
+> **CMIS Phase 11 — read-only Verified Intelligence foundation: COMPLETE.**
 
 Phase 10 completion is recorded in [`PHASE_10_COMPLETION.md`](./PHASE_10_COMPLETION.md) and GitHub Issue #78. The final production-composition change was merged in PR #158.
 
 CMIS contract `1.7.0` added deterministic evidence receipts, deterministic proof scoring, evidence-quality metadata in normal runtime envelopes, and machine-readable evidence-quality requirements in the capability manifest. This work was merged in PR #166.
 
 The remaining X1 evidence gaps are no longer an ambiguous backlog. PR #167 established an explicit machine-readable capability boundary classifying each tracked fact as `verified`, `bounded`, or `unavailable`. The human-readable boundary is documented in [`X1_EVIDENCE_CAPABILITY_BOUNDARY.md`](./X1_EVIDENCE_CAPABILITY_BOUNDARY.md). An unavailable capability may be reconsidered when a new provider/evidence contract is actually proven, but CMIS must not infer it in the meantime.
+
+The deterministic pre-trade trade-size/impact milestone tracked in GitHub Issue #99 is complete. CMIS evaluates requested notional against verified liquidity where available, applies versioned trade-size policy, and keeps price-impact, slippage, route-quality, and fee fields explicitly unavailable where their semantics are not proven. The work remains analysis-only and does not authorize execution.
+
+Phase 11 completion is recorded in [`PHASE_11_COMPLETION.md`](./PHASE_11_COMPLETION.md) and GitHub Issue #171. PRs #170, #172, #176, and #177 established top-account concentration primitives, neutral wallet-activity facts, sanitized sparse historical intelligence storage/comparison, and evidence-bound intelligence conclusions.
+
+CMIS contract `1.8.0` adds a discoverable read-only `intelligence_foundation` capability boundary. The Phase 11 primitives remain outside the public `supported_services` surface, and automatic downstream Scout reliance remains unpromoted until a new accepted service contract explicitly authorizes it.
 
 The accepted system now has:
 
@@ -42,12 +52,19 @@ The accepted system now has:
 - persisted verification evidence;
 - deterministic X1 trade verification and bounded verified-activity coverage;
 - deterministic risk and bounded pre-trade analysis;
+- deterministic, versioned trade-size analysis against verified liquidity;
 - deterministic evidence receipts and proof scores attached to CMIS service envelopes;
 - an explicit X1 evidence-capability boundary for remaining provider limitations;
 - a read-only Solana provider/runtime foundation beneath the same CMIS contract;
-- read-only Solana live acceptance in GitHub Actions.
+- read-only Solana live acceptance in GitHub Actions;
+- exact top-account concentration observations and numeric concentration-change primitives;
+- neutral verified wallet-activity facts without behavioral labels;
+- sanitized sparse historical intelligence storage and compatible-series comparison;
+- evidence-bound Phase 11 conclusions with content-addressed receipts, proof scores, and conclusion fingerprints;
+- explicit separation of provider-reported observations from independently verified observations;
+- explicit non-promotion of Phase 11 primitives into new public services or automatic Scout dependencies.
 
-Current active analytical work is the deterministic pre-trade trade-size/impact milestone tracked in GitHub Issue #99. It must remain analysis-only and fail closed where route, slippage, fee, or price-impact semantics are not verified.
+No new post-Phase-11 execution milestone is active in this roadmap yet. Future public-service exposure, automatic Scout reliance, behavioral intelligence, alerting, relationship graphs, or additional cross-chain expansion must begin under a separately accepted contract with explicit evidence and safety gates.
 
 This roadmap does **not** authorize execution. Signing, custody, broadcasting, and autonomous value movement remain separate future boundaries.
 
@@ -148,9 +165,11 @@ See [`X1_EVIDENCE_CAPABILITY_BOUNDARY.md`](./X1_EVIDENCE_CAPABILITY_BOUNDARY.md)
 
 The CMIS runtime exposes a versioned machine-readable capability contract. Chain/service combinations are explicitly classified as supported, bounded, partial, or unavailable.
 
-The manifest also advertises evidence-receipt schema 1, proof-score schema 1, that risk remains separate from proof, and that missing evidence remains unknown rather than becoming a fabricated false/zero value.
+The manifest advertises evidence-receipt schema 1, proof-score schema 1, that risk remains separate from proof, and that missing evidence remains unknown rather than becoming a fabricated false/zero value.
 
-This prevents downstream Scouts from assuming that a service or evidence quality exists merely because another chain supports it.
+Under contract `1.8.0`, the manifest also advertises the bounded read-only Phase 11 `intelligence_foundation` while explicitly keeping those primitives outside the public supported-service surface and outside automatic Scout reliance.
+
+This prevents downstream Scouts from assuming that a service or evidence quality exists merely because another chain supports it or because an internal deterministic primitive exists.
 
 See [`CMIS_CAPABILITY_CONTRACT.md`](./CMIS_CAPABILITY_CONTRACT.md).
 
@@ -161,6 +180,19 @@ CMIS now attaches deterministic evidence-quality metadata to completed service e
 Evidence receipts preserve available provenance, verification state, evidence scope, freshness indicators, disagreements, limitations, and unresolved fields. They summarize evidence already present in the CMIS result; they do not fetch a second provider, invent missing semantics, or promote a provider assertion into independent proof.
 
 Proof scores are deterministic/reproducible and keep proof strength separate from risk. Missing proof lowers or limits evidence quality rather than being converted into a safe value.
+
+### Deterministic pre-trade trade-size/impact analysis — COMPLETE / ACTIVE
+
+GitHub Issue #99 is complete.
+
+CMIS now:
+
+- evaluates requested notional rather than carrying it only as conversational context;
+- computes notional-to-liquidity ratio when verified liquidity is available;
+- applies a deterministic, versioned trade-size policy;
+- fails closed when liquidity evidence is missing or conflicting;
+- exposes price-impact, slippage, route-quality, fee, and simulation capabilities only where their semantics are actually verified, otherwise keeping them explicitly unavailable;
+- remains analysis-only with no signing, broadcasting, custody, trade execution, or autonomous value movement.
 
 ### Phase 10 Solana read-only foundation — COMPLETE
 
@@ -184,6 +216,25 @@ Accepted Phase 10 components include:
 - live read-only runtime acceptance.
 
 Solana ranking, pre-trade execution modeling, trade verification, verified asset-wide activity, signing, broadcasting, and custody remain unavailable until separately implemented and promoted.
+
+### Phase 11 read-only Verified Intelligence foundation — COMPLETE
+
+Phase 11 is complete and documented in [`PHASE_11_COMPLETION.md`](./PHASE_11_COMPLETION.md).
+
+Accepted primitives include:
+
+- exact top-account concentration observations with raw rational evidence;
+- compatible-scope numeric concentration-change comparison;
+- neutral verified wallet balance, transfer, trade-direction, LP-action, and deployer-originated activity facts where the required evidence is independently established;
+- bounded activity windows, first/last observed activity, transaction counts, and verified volume with explicit units;
+- sanitized persistence of concentration, wallet activity, liquidity, supply, price, and activity observations;
+- compatible-series historical comparison ordered by canonical observation time;
+- explicit sparse-history semantics with no interpolation or zero filling;
+- evidence-bound intelligence conclusions using exact CMIS Evidence Receipts and recomputed Proof Scores;
+- content-addressed observation, receipt, conclusion, and evidence-bundle identities;
+- explicit separation of provider-reported observations from verifier observations.
+
+Phase 11 does **not** promote whale, insider, bot, market-maker, accumulator, distributor, ownership, relationship, scam, manipulation, or behavioral-intent claims. The primitives remain read-only foundations and are not automatically public services or Scout dependencies.
 
 ---
 
@@ -209,17 +260,27 @@ Foundation largely established on X1 and partially established on Solana:
 
 ### Layer B — Verified Intelligence
 
-Foundation work is now ready to expand into higher-level intelligence, but classifications must remain evidence-backed:
+The **read-only deterministic foundation is now established** for selected Phase 11 primitives, but higher-level classifications remain deferred until separately contracted and proven.
 
-- wallet activity primitives;
+Accepted foundation:
+
+- top-account concentration facts and compatible numeric change;
+- neutral wallet activity facts;
+- provenance-safe sparse historical intelligence storage/comparison;
+- evidence-bound intelligence conclusions.
+
+Potential future layers, not yet promoted:
+
 - wallet behavior profiles;
 - wallet relationship graphs;
 - verified whale activity;
 - liquidity deterioration analysis;
 - token-distribution changes;
 - abnormal mint/burn/authority behavior;
-- historical pattern comparison;
-- cross-source disagreement detection.
+- historical pattern interpretation;
+- cross-source disagreement intelligence beyond the accepted deterministic evidence layer.
+
+Any future classification must preserve fact/proof/risk/inference boundaries and requires a new accepted service contract before public or automatic Scout reliance.
 
 ### Layer C — Early Warning
 
@@ -266,23 +327,23 @@ Rules remain:
 - a risky asset can have strongly verified facts;
 - Roberta/Scouts may explain the score but do not recompute it into a second authoritative proof grade.
 
-### 4.3 Wallet Intelligence — NEXT MAJOR INTELLIGENCE FOUNDATION
+### 4.3 Wallet Intelligence — READ-ONLY FOUNDATION COMPLETE / INTERPRETIVE LAYERS DEFERRED
 
-Build deterministic wallet activity primitives before behavior labels. Candidate primitives include observed inflows/outflows, provable buys/sells, transfers, LP actions, deployer-originated transfers, balance changes, observation windows, transaction counts, and verified volume.
+Phase 11 completed the deterministic wallet-activity foundation before behavior labels. Accepted primitives include observed balance changes, verified transfer direction, independently verified BUY/SELL direction, verified LP actions, independently established deployer-originated transfers, bounded observation windows, transaction counts, first/last observed activity, and verified volume with explicit units.
 
-Only after the primitives exist should CMIS build behavior profiles such as:
+The foundation does **not** yet authorize behavior profiles such as:
 
 - whale/large participant;
 - early buyer;
 - accumulator/distributor;
-- LP provider;
+- LP provider as an inferred persistent identity;
 - high-frequency or bot-like behavior;
-- deployer-linked candidate;
+- deployer-linked candidate beyond independently established deployer-originated events;
 - market-maker-like behavior;
-- newly funded wallet;
-- historically profitable behavior when sufficient history exists.
+- newly funded wallet as a behavioral classification;
+- historically profitable behavior.
 
-Every classification should state the evidence, observation window, confidence, and whether it is fact, heuristic, or inference.
+Any future classification must state the evidence, observation window, proof strength, uncertainty, and whether the output is fact, heuristic, or inference. Public service exposure or automatic Scout reliance requires a new accepted contract.
 
 ### 4.4 Wallet Relationship Graphs
 
@@ -387,34 +448,37 @@ Tier boundaries are product-planning concepts only and never change the underlyi
 
 Do not build premium analytics faster than the evidence foundation can support them.
 
-### Active / immediate work
+### Completed immediate work
 
-1. Complete GitHub Issue #99: deterministic pre-trade trade-size and impact analysis.
-2. Evaluate `notional_usd` against verified liquidity and return a deterministic, versioned trade-size classification where evidence supports it.
-3. Add price-impact, slippage, route-quality, and fee fields only where their semantics are verified; otherwise return explicit unavailable/insufficient evidence.
-4. Preserve evidence receipts, proof scores, provenance, and fail-closed behavior through every new analytical field.
-5. Keep all pre-trade work analysis-only; no signing, broadcasting, custody, or execution authority.
+1. GitHub Issue #99 — deterministic pre-trade trade-size and impact analysis: **COMPLETE**.
+2. Phase 11 top-account concentration primitives: **COMPLETE**.
+3. Phase 11 wallet activity facts before labels: **COMPLETE**.
+4. Phase 11 provenance-safe historical intelligence storage/comparison: **COMPLETE**.
+5. Phase 11 Evidence Receipt / Proof Score integration and capability boundary: **COMPLETE**.
 
-### Next intelligence work
+### Next accepted-milestone candidates — NOT YET ACTIVE
 
-6. Expand provenance-safe historical storage where it materially improves reproducible evidence.
-7. Add wallet activity primitives before wallet relationship, insider, whale, bot, accumulator, or distributor labels.
-8. Build verified whale intelligence only after the underlying wallet/trade primitives are accepted.
-9. Add alert rules only when their underlying evidence fields have explicit scope and freshness semantics.
+6. Define a new public-service/Scout-reliance contract before exposing Phase 11 intelligence primitives as callable services or automatic downstream inputs.
+7. Define explicit inference and classification contracts before whale, insider, bot, accumulator, distributor, market-maker, or wallet-behavior labels are introduced.
+8. Add wallet relationship evidence only after relationship scope, identity, provenance, and non-ownership semantics are formally accepted.
+9. Add alert rules only when their underlying evidence fields have explicit scope, freshness, threshold, and persistence semantics.
+10. Expand historical retention only where the source can support the claimed archival/continuous coverage; otherwise preserve sparse-sample semantics.
 
-### Cross-chain expansion
+### Cross-chain expansion candidates
 
-10. Mature Solana coverage field-by-field rather than treating Phase 10 as full Solana parity with X1.
-11. Add direct Solana venue evidence only where scope/non-overlap semantics are defensible.
-12. Begin chain-neutral capital-flow primitives after cross-chain identity/provenance contracts are stable.
-13. Add Ethereum provider/verification work only after an explicit Ethereum capability table and acceptance plan exist.
+11. Mature Solana coverage field-by-field rather than treating Phase 10 as full Solana parity with X1.
+12. Add direct Solana venue evidence only where scope/non-overlap semantics are defensible.
+13. Begin chain-neutral capital-flow primitives after cross-chain identity/provenance contracts are stable.
+14. Add Ethereum provider/verification work only after an explicit Ethereum capability table and acceptance plan exist.
 
-### Productization
+### Productization candidates
 
-14. Investigation mode and evidence export.
-15. Premium authentication/quotas.
-16. Streaming/webhook alerts.
-17. Institutional audit/retention/access controls and service commitments.
+15. Investigation mode and evidence export.
+16. Premium authentication/quotas.
+17. Streaming/webhook alerts.
+18. Institutional audit/retention/access controls and service commitments.
+
+None of these candidates is an active execution milestone merely by appearing in this roadmap. Each requires an explicit accepted scope before implementation begins.
 
 ---
 
