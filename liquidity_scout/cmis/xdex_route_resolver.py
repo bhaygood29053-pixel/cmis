@@ -121,13 +121,19 @@ def _ceil_fee(amount: int, rate_ppm: int) -> int:
     return (amount * rate_ppm + FEE_DENOMINATOR - 1) // FEE_DENOMINATOR
 
 
-def _reconstruct_impact(raw_input: int, reserve_in: int, trade_fee_ppm: int) -> Decimal:
+def _reconstruct_impact(
+    raw_input: int,
+    reserve_in: int,
+    reserve_out: int,
+    trade_fee_ppm: int,
+) -> Decimal:
     if trade_fee_ppm < 0 or trade_fee_ppm >= FEE_DENOMINATOR:
         raise XDEXRouteResolverError("snapshot trade_fee_rate_ppm is outside the accepted range")
     net_input = raw_input - _ceil_fee(raw_input, trade_fee_ppm)
     if net_input <= 0:
         raise XDEXRouteResolverError("snapshot trade fee consumes the complete raw input")
-    return Decimal(net_input) * Decimal(100) / Decimal(reserve_in + net_input)
+    raw_output = net_input * reserve_out // (reserve_in + net_input)
+    return Decimal(raw_output) * Decimal(100) / Decimal(reserve_out)
 
 
 def _validated_snapshot(
@@ -195,7 +201,10 @@ def _validated_snapshot(
         snapshot.get("active_reserve_in_raw"),
         "snapshot.active_reserve_in_raw",
     )
-    _positive_int(snapshot.get("active_reserve_out_raw"), "snapshot.active_reserve_out_raw")
+    reserve_out = _positive_int(
+        snapshot.get("active_reserve_out_raw"),
+        "snapshot.active_reserve_out_raw",
+    )
     input_decimals = _nonnegative_int(snapshot.get("input_decimals"), "snapshot.input_decimals")
     output_decimals = _nonnegative_int(snapshot.get("output_decimals"), "snapshot.output_decimals")
     if input_decimals > 255 or output_decimals > 255:
@@ -206,7 +215,12 @@ def _validated_snapshot(
     if scaled != Decimal(raw_input):
         raise XDEXRouteResolverError("snapshot token_in_amount/raw_input_amount are inconsistent")
 
-    independently_reconstructed = _reconstruct_impact(raw_input, reserve_in, trade_fee_ppm)
+    independently_reconstructed = _reconstruct_impact(
+        raw_input,
+        reserve_in,
+        reserve_out,
+        trade_fee_ppm,
+    )
     if reconstructed != independently_reconstructed:
         raise XDEXRouteResolverError(
             "snapshot reconstructed price impact does not match deterministic reserve arithmetic"
