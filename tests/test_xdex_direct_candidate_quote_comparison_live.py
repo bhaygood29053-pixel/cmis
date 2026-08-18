@@ -23,6 +23,19 @@ def _live_quote_provider(candidate, token_in, token_out, amount):
         "amm_config": candidate["amm_config"],
     }
     snapshot = collect_exact_route_snapshot(route, amount)
+    print({
+        "candidate_snapshot": {
+            "pool": candidate["pool"],
+            "amm_config": candidate["amm_config"],
+            "raw_input_amount": snapshot.get("raw_input_amount"),
+            "active_reserve_in_raw": snapshot.get("active_reserve_in_raw"),
+            "trade_fee_rate_ppm": snapshot.get("trade_fee_rate_ppm"),
+            "creator_fee_rate_ppm": snapshot.get("creator_fee_rate_ppm"),
+            "reconstructed_price_impact_percent": snapshot.get("reconstructed_price_impact_percent"),
+            "quote_price_impact_percent": snapshot.get("quote_price_impact_percent"),
+            "quote_output_amount": snapshot.get("quote_output_amount"),
+        }
+    })
 
     # Re-run the accepted CMIS exact-route validation over this exact snapshot.
     # The comparator is allowed to use the quote output only after the route
