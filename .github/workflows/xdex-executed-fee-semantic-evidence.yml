@@ -1,0 +1,41 @@
+name: XDEX Executed Fee Semantic Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  executed-fee-probe:
+    name: Read-only completed XDEX 2800 vs 3000 execution probe
+    if: github.head_ref == 'agent/xdex-executed-fee-semantics'
+    runs-on: ubuntu-latest
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime requirements
+        run: python -m pip install -r requirements.txt
+
+      - name: Inspect completed XDEX swaps for executed 2800 vs 3000 evidence
+        env:
+          RUN_XDEX_EXECUTED_FEE_LIVE: '1'
+        run: python -m unittest tests.test_xdex_executed_fee_semantics_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo 'Read-only X1.Ninja history and X1 RPC completed-transaction reads only.'
+          echo 'No /swap/prepare, transaction construction, signing, broadcasting, custody, execution, or value movement.'
