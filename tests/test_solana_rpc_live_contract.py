@@ -1,16 +1,25 @@
-"""Opt-in read-only live contract probe for the Solana RPC provider.
+"""Opt-in read-only live acceptance for the Solana Phase 10 runtime.
 
-This module is skipped in normal CI. It accepts no signing keypair and calls
-only getTokenSupply, getAccountInfo(jsonParsed), and getTokenLargestAccounts.
+Normal CI skips this module. The required live gate exercises the canonical RPC
+facts used by promoted CMIS services: getTokenSupply and
+getAccountInfo(jsonParsed). The concentration-only getTokenLargestAccounts
+probe remains available behind a second flag because shared public Solana RPC
+endpoints may block/rate-limit that heavier method and no promoted Phase 10
+service depends on it.
+
+No test accepts a signing keypair or constructs/broadcasts a transaction.
 """
 
 import os
+import tempfile
 import unittest
 
+from liquidity_scout.cmis.runtime_gateway import RuntimeCMISGateway
 from liquidity_scout.providers.solana.rpc import SolanaRPCProvider
 
 
 RUN_LIVE = os.getenv("RUN_SOLANA_LIVE_TESTS") == "1"
+RUN_LARGEST = os.getenv("RUN_SOLANA_LARGEST_ACCOUNTS_LIVE_TESTS") == "1"
 
 
 @unittest.skipUnless(RUN_LIVE, "RUN_SOLANA_LIVE_TESTS=1 is required")
@@ -22,10 +31,9 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         self.mint = mint
         self.provider = SolanaRPCProvider()
 
-    def test_read_only_token_rpc_contracts(self):
+    def test_required_canonical_token_rpc_contracts(self):
         supply = self.provider.get_token_supply(self.mint)
         mint_account = self.provider.get_mint_account(self.mint)
-        largest = self.provider.get_token_largest_accounts(self.mint)
 
         self.assertEqual(supply["chain"], "solana")
         self.assertEqual(supply["source"], "solana_rpc")
@@ -42,6 +50,18 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         self.assertGreaterEqual(mint_account["context_slot"], 0)
         self.assertTrue(mint_account["amount_raw"].isdigit())
 
+        # The methods may observe different slots. Decimals are stable mint
+        # identity semantics, but supply values are not compared across calls
+        # until CMIS has an explicit shared observation-scope contract.
+        self.assertEqual(supply["decimals"], mint_account["decimals"])
+
+    @unittest.skipUnless(
+        RUN_LARGEST,
+        "RUN_SOLANA_LARGEST_ACCOUNTS_LIVE_TESTS=1 is required",
+    )
+    def test_optional_largest_token_accounts_concentration_contract(self):
+        largest = self.provider.get_token_largest_accounts(self.mint)
+
         self.assertEqual(largest["chain"], "solana")
         self.assertEqual(largest["source"], "solana_rpc")
         self.assertEqual(largest["mint"], self.mint)
@@ -50,10 +70,57 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         self.assertGreaterEqual(largest["context_slot"], 0)
         self.assertLessEqual(largest["account_count_observed"], 20)
 
-        # The methods may observe different slots. Decimals are stable mint
-        # identity semantics, but supply values are not compared across calls
-        # until CMIS has an explicit shared observation-scope contract.
-        self.assertEqual(supply["decimals"], mint_account["decimals"])
+    def test_production_runtime_exact_mint_identity_and_tokenomics(self):
+        rpc_url = os.getenv("SOLANA_RPC_URL", "").strip()
+        with tempfile.TemporaryDirectory() as directory:
+            gateway = RuntimeCMISGateway(
+                verification_evidence_db_path=":memory:",
+                solana_runtime_env={
+                    "CMIS_SOLANA_PROVIDER_ENABLED": "1",
+                    "SOLANA_RPC_URL": rpc_url,
+                    "CMIS_SOLANA_OBSERVATION_DB": os.path.join(
+                        directory, "solana-observations.db"
+                    ),
+                },
+            )
+
+            identity = gateway.dispatch({
+                "service": "asset_lookup",
+                "chain": "solana",
+                "asset": self.mint,
+                "params": {},
+            })
+            tokenomics = gateway.dispatch({
+                "service": "tokenomics",
+                "chain": "solana",
+                "asset": self.mint,
+                "params": {},
+            })
+
+        self.assertEqual(identity["status"], "ok")
+        self.assertEqual(identity["chain"], "solana")
+        self.assertEqual(identity["asset"]["mint"], self.mint)
+        self.assertTrue(identity["data"]["program"]["identity_verified"])
+        self.assertTrue(
+            any(
+                source.get("source") == "solana_rpc"
+                and source.get("role") == "canonical_mint_identity"
+                for source in identity["sources"]
+            )
+        )
+
+        self.assertEqual(tokenomics["status"], "partial")
+        self.assertEqual(tokenomics["chain"], "solana")
+        self.assertEqual(tokenomics["asset"]["mint"], self.mint)
+        self.assertTrue(tokenomics["data"]["supply_verified"])
+        self.assertIsNotNone(tokenomics["data"]["total_supply"])
+        self.assertFalse(tokenomics["data"]["circulating_supply_verified"])
+        self.assertFalse(tokenomics["data"]["maximum_supply_verified"])
+        self.assertTrue(gateway.solana_runtime_configuration["enabled"])
+        self.assertTrue(gateway.solana_runtime_configuration["rpc_configured"])
+        self.assertFalse(
+            gateway.solana_runtime_configuration["execution_authorized"]
+        )
 
 
 if __name__ == "__main__":
