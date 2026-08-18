@@ -4,17 +4,23 @@ CMIS must not manufacture slippage, price impact, route quality, bridge
 requirements, fees, or transaction simulation results when no verified producer
 exists. This module reports those capabilities explicitly as unavailable and can
 fail closed when a caller explicitly requires one of them.
+
+An internal CMIS producer may supply an explicit route-evidence envelope. Such
+evidence is accepted only after exact route, freshness, semantic, value, and
+proof-basis validation. Generic pre-trade behavior remains unchanged when no
+route evidence is supplied.
 """
 
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Mapping
 
+from .pre_trade_route_evidence import evaluate_route_evidence
 from .risk import BLOCK, PASS
 
 
-VERSION = "1.0"
+VERSION = "1.1"
 CAPABILITY_NAMES = (
     "slippage",
     "price_impact",
@@ -104,18 +110,51 @@ def normalize_required_capabilities(value: Any) -> list[str]:
 
 def build_execution_capability_report(
     required_capabilities: Iterable[str] | None = None,
+    *,
+    route_evidence: Any = None,
+    target_chain: str = "x1",
+    trade_route: Mapping[str, Any] | None = None,
+    evaluated_at: Any = None,
+    route_evidence_max_age_seconds: Any = None,
 ) -> Dict[str, Any]:
-    """Report unsupported execution estimates without synthesizing values."""
+    """Report execution-estimate availability without synthesizing values."""
     required = normalize_required_capabilities(
         list(required_capabilities) if required_capabilities is not None else []
     )
     capabilities = deepcopy(_CAPABILITIES)
+
+    route_result = evaluate_route_evidence(
+        route_evidence,
+        target_chain=target_chain,
+        trade_route=trade_route,
+        evaluated_at=evaluated_at,
+        max_age_seconds=route_evidence_max_age_seconds,
+    )
+    route_overrides = route_result["overrides"]
+    route_audit = route_result["audit"]
+
+    for name, override in route_overrides.items():
+        required_evidence = capabilities[name]["required_evidence"]
+        capabilities[name].update(deepcopy(override))
+        capabilities[name]["required_evidence"] = required_evidence
+
+    rejected = route_audit.get("rejected_capabilities")
+    rejected = rejected if isinstance(rejected, Mapping) else {}
+    for name, rejection in rejected.items():
+        if name not in capabilities or capabilities[name]["status"] == "ok":
+            continue
+        if isinstance(rejection, Mapping) and rejection.get("reason_code"):
+            capabilities[name]["reason_code"] = str(rejection["reason_code"])
+
     unavailable_required = [
         name for name in required if capabilities[name]["status"] != "ok"
     ]
 
     reasons = [
-        f"Required pre-trade capability '{name}' is unavailable because verified supporting evidence is not implemented."
+        (
+            f"Required pre-trade capability '{name}' is unavailable "
+            f"({capabilities[name]['reason_code']})."
+        )
         for name in unavailable_required
     ]
 
@@ -133,6 +172,7 @@ def build_execution_capability_report(
             "required_capabilities": required,
             "unavailable_required_capabilities": unavailable_required,
             "all_required_capabilities_available": not unavailable_required,
+            "route_evidence": route_audit,
             "execution_authorization_supported": False,
         },
     }

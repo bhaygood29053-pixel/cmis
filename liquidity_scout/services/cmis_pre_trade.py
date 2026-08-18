@@ -4,6 +4,10 @@ The wrapper accepts either a raw deterministic ``risk_check`` result or the
 full CMIS ``risk_check`` envelope. It performs no market collection, routing,
 simulation, wallet, signing, or transaction work. A pre-trade PASS/WARN/BLOCK
 is analysis only and never authorizes execution.
+
+Route evidence may be supplied only as already-collected internal CMIS evidence.
+The deterministic core validates its exact route, freshness, semantics, and
+proof basis before exposing any execution capability as available.
 """
 
 from collections.abc import Mapping
@@ -94,14 +98,15 @@ def _public_pre_trade_data(result: Mapping[str, Any]) -> Dict[str, Any]:
 
     This function does not calculate new market facts. It aliases verified
     liquidity, deterministic sizing evidence, and the exact selected policy
-    already present in the pre-trade core, while mapping unsupported execution
-    estimates to explicit nulls.
+    already present in the pre-trade core. Route values are exposed only when
+    their capability record has already passed the core route-evidence gate.
     """
     components = _mapping(result.get("components"))
     size_component = _mapping(components.get("trade_size_liquidity"))
     size_evidence = _mapping(size_component.get("evidence"))
     size_policy = _mapping(size_component.get("policy"))
     capabilities = _mapping(result.get("execution_capabilities"))
+    route_evidence = _mapping(result.get("route_evidence"))
 
     liquidity = (
         size_evidence.get("liquidity_usd")
@@ -119,10 +124,21 @@ def _public_pre_trade_data(result: Mapping[str, Any]) -> Dict[str, Any]:
         name: _mapping(record).get("status")
         for name, record in capabilities.items()
     }
-    route_status = (
-        "unavailable"
-        if capabilities and any(status != "ok" for status in execution_statuses.values())
-        else ("ok" if capabilities else None)
+    if not capabilities:
+        route_status = None
+    elif execution_statuses and all(
+        status == "ok" for status in execution_statuses.values()
+    ):
+        route_status = "ok"
+    elif any(status == "ok" for status in execution_statuses.values()):
+        route_status = "partial"
+    else:
+        route_status = "unavailable"
+
+    route_scope = (
+        dict(_mapping(route_evidence.get("route")))
+        if route_evidence.get("scope_match") is True
+        else None
     )
 
     return {
@@ -167,13 +183,14 @@ def _public_pre_trade_data(result: Mapping[str, Any]) -> Dict[str, Any]:
         },
         "route_analysis": {
             "status": route_status,
-            "route_scope": None,
+            "route_scope": route_scope,
             "estimated_price_impact_percent": price_impact.get("value"),
             "estimated_slippage_percent": slippage.get("value"),
             "estimated_fees": fees.get("value"),
             "route_quality": route_quality.get("value"),
             "bridge_dependency": bridge_dependency.get("value"),
             "transaction_simulation": transaction_simulation.get("value"),
+            "evidence": dict(route_evidence),
         },
         "risk_observed_at": result.get("risk_observed_at"),
         "evaluated_at": result.get("evaluated_at"),
@@ -238,6 +255,8 @@ def build_pre_trade_check_response(
     risk_observed_at: Any = None,
     evaluated_at: Any = None,
     observed_at: Any = None,
+    route_evidence: Any = None,
+    route_evidence_max_age_seconds: Any = None,
 ) -> Dict[str, Any]:
     """Return ``pre_trade_check`` through the shared CMIS service contract."""
     if risk_result is None:
@@ -335,6 +354,8 @@ def build_pre_trade_check_response(
             policy=policy,
             risk_observed_at=effective_risk_observed_at,
             evaluated_at=evaluated_at,
+            route_evidence=route_evidence,
+            route_evidence_max_age_seconds=route_evidence_max_age_seconds,
         )
     except ValueError as exc:
         sources = _copy_records(risk_envelope.get("sources")) if risk_envelope else []
@@ -358,6 +379,9 @@ def build_pre_trade_check_response(
 
     sources = _copy_records(risk_envelope.get("sources")) if risk_envelope else []
     _append_source(sources, "pre_trade_engine", "pre_trade_check")
+    route_audit = _mapping(result.get("route_evidence"))
+    if route_audit.get("usable_capabilities") and _text(route_audit.get("source")):
+        _append_source(sources, _text(route_audit.get("source")), "route_evidence")
     effective_observed_at = (
         observed_at
         if observed_at is not None
