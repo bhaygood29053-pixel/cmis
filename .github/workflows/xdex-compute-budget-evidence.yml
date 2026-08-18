@@ -1,0 +1,41 @@
+name: XDEX Compute Budget Evidence
+
+on:
+  pull_request:
+    paths:
+      - "tests/test_xdex_historical_compute_budget_live.py"
+      - ".github/workflows/xdex-compute-budget-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  historical-compute-budget:
+    name: Read-only XDEX transaction fee and compute budget
+    runs-on: ubuntu-24.04
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime requirements
+        run: python -m pip install -r requirements.txt
+
+      - name: Extract historical transaction fee and compute budget evidence
+        run: python -m unittest tests.test_xdex_historical_compute_budget_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo 'Read-only X1.Ninja history and X1 RPC transaction reads only.'
+          echo 'No /swap/prepare, transaction construction, signing, broadcasting, custody, execution, or value movement.'
