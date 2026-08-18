@@ -8,7 +8,7 @@ import requests
 from liquidity_scout.providers.x1.candidate_pool_role import encode_base58_pubkey
 from liquidity_scout.providers.x1.pool_state_fingerprint import fetch_account_state
 from liquidity_scout.providers.x1.rpc import get_token_account_info
-from liquidity_scout.providers.x1.xdex import fetch_swap_quote
+from liquidity_scout.providers.x1.xdex import SWAP_QUOTE_URL
 
 
 RUN_LIVE = os.getenv("RUN_XDEX_OUTPUT_SLIPPAGE_LIVE") == "1"
@@ -20,10 +20,9 @@ XNT = "So11111111111111111111111111111111111111112"
 ORACLE_SELL_QUOTE = "https://oracle.xdex.xyz/api/v1/token/sell-quote"
 FEE_DENOM = 1_000_000
 EXPECTED_TRADE_FEE_RATE = 2_800
+CANDIDATE_EFFECTIVE_FEE_RATE = 3_000
 BPS_DENOM = Decimal("10000")
 HALF_PERCENT_FACTOR = Decimal("0.995")
-# Wide enough for a live reserve/quote race, but narrow enough to distinguish
-# a 28-bps trade-fee effect from the no-fee curve hypothesis.
 ORACLE_NO_FEE_TOLERANCE_BPS = Decimal("10")
 
 
@@ -99,11 +98,29 @@ def _curve_no_fee(raw_input, reserve_in, reserve_out):
     return raw_input * reserve_out // (reserve_in + raw_input)
 
 
-def _curve_exact_in(raw_input, reserve_in, reserve_out, trade_fee_rate):
-    trade_fee = _ceil_fee(raw_input, trade_fee_rate)
-    net_input = raw_input - trade_fee
+def _curve_exact_in(raw_input, reserve_in, reserve_out, fee_rate):
+    fee = _ceil_fee(raw_input, fee_rate)
+    net_input = raw_input - fee
     raw_output = net_input * reserve_out // (reserve_in + net_input)
-    return raw_output, trade_fee
+    return raw_output, fee
+
+
+def _swap_quote(token_in, token_out, amount, *, slippage=None):
+    params = {
+        "network": "X1 Mainnet",
+        "token_in": token_in,
+        "token_out": token_out,
+        "token_in_amount": format(Decimal(str(amount)), "f"),
+        "is_exact_amount_in": "true",
+    }
+    if slippage is not None:
+        params["slippage"] = format(Decimal(str(slippage)), "f")
+    response = requests.get(SWAP_QUOTE_URL, params=params, timeout=20)
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or body.get("success") is not True or not isinstance(body.get("data"), dict):
+        raise AssertionError(f"Unexpected XDEX swap quote response: {body}")
+    return body["data"]
 
 
 def _oracle_sell_quote(amount):
@@ -140,8 +157,6 @@ class XDEXOutputSlippageSemanticLiveTests(unittest.TestCase):
 
         rows = []
         for amount in (Decimal("1"), Decimal("2"), Decimal("1000"), Decimal("10000")):
-            # Refresh pool fee accrual and vault balances immediately before each
-            # quote comparison to minimize live-state drift.
             pool = _pool_state()
             self.assertEqual(pool["amm_config"], AMM_CONFIG)
             r0, r1 = _active_reserves(pool)
@@ -160,7 +175,7 @@ class XDEXOutputSlippageSemanticLiveTests(unittest.TestCase):
             no_fee_ui_output = Decimal(no_fee_raw_output) / (Decimal(10) ** decimals_out)
             fee_cp_ui_output = Decimal(fee_cp_raw_output) / (Decimal(10) ** decimals_out)
 
-            swap = fetch_swap_quote(XENCAT, XNT, amount, is_exact_amount_in=True)
+            swap = _swap_quote(XENCAT, XNT, amount)
             oracle = _oracle_sell_quote(amount)
 
             self.assertEqual(swap.get("inputMint"), XENCAT)
@@ -204,10 +219,6 @@ class XDEXOutputSlippageSemanticLiveTests(unittest.TestCase):
         for row in rows:
             print(row)
 
-        # Field-level evidence only. The Oracle output must stay close to the
-        # independently reconstructed no-fee curve across all tested sizes.
-        # This localizes the Oracle quote relative to the AMM trade fee without
-        # claiming that its output is executable or fee-complete.
         self.assertTrue(rows)
         for row in rows:
             self.assertLessEqual(
@@ -215,11 +226,78 @@ class XDEXOutputSlippageSemanticLiveTests(unittest.TestCase):
                 ORACLE_NO_FEE_TOLERANCE_BPS,
                 f"Oracle amount_out_quote no longer tracks the independently reconstructed no-fee curve: {row}",
             )
-            # Preserve the unresolved swap-layer adjustment as a visible fact.
             self.assertLess(
                 Decimal(row["swap_vs_fee_cp_delta_bps"]),
                 Decimal("-40"),
                 f"Previously observed post-trade-fee XDEX output adjustment disappeared: {row}",
+            )
+
+    def test_zero_slippage_quote_implied_fee_rate_across_sizes_and_directions(self):
+        config = _config_state()
+        self.assertEqual(config["trade_fee_rate"], EXPECTED_TRADE_FEE_RATE)
+
+        # Each direction uses amounts chosen to be exactly representable and to
+        # cover small/medium changes without approaching destructive size.
+        cases = (
+            (XENCAT, XNT, (Decimal("100"), Decimal("1000"), Decimal("10000"))),
+            (XNT, XENCAT, (Decimal("0.01"), Decimal("0.1"), Decimal("1"))),
+        )
+        rows = []
+
+        for token_in, token_out, amounts in cases:
+            for amount in amounts:
+                pool = _pool_state()
+                r0, r1 = _active_reserves(pool)
+                by_mint = {
+                    pool["mint_0"]: (r0, pool["decimals_0"]),
+                    pool["mint_1"]: (r1, pool["decimals_1"]),
+                }
+                reserve_in, decimals_in = by_mint[token_in]
+                reserve_out, decimals_out = by_mint[token_out]
+                raw_input = _raw_amount(amount, decimals_in)
+
+                output_2800, _ = _curve_exact_in(
+                    raw_input, reserve_in, reserve_out, EXPECTED_TRADE_FEE_RATE
+                )
+                output_3000, _ = _curve_exact_in(
+                    raw_input, reserve_in, reserve_out, CANDIDATE_EFFECTIVE_FEE_RATE
+                )
+                quote = _swap_quote(token_in, token_out, amount, slippage=Decimal("0"))
+                self.assertEqual(quote.get("inputMint"), token_in)
+                self.assertEqual(quote.get("outputMint"), token_out)
+                self.assertEqual(quote.get("amm_config_address"), AMM_CONFIG)
+
+                observed_raw_decimal = Decimal(str(quote["outputAmount"])) * (Decimal(10) ** decimals_out)
+                self.assertEqual(observed_raw_decimal, observed_raw_decimal.to_integral_value())
+                observed_raw = int(observed_raw_decimal)
+
+                rows.append({
+                    "direction": f"{token_in[:6]}->{token_out[:6]}",
+                    "amount": str(amount),
+                    "observed_zero_slippage_raw": observed_raw,
+                    "cp_2800_raw": output_2800,
+                    "cp_3000_raw": output_3000,
+                    "observed_vs_2800_delta_raw": observed_raw - output_2800,
+                    "observed_vs_3000_delta_raw": observed_raw - output_3000,
+                    "observed_vs_2800_delta_bps": str(_ratio_bps_delta(observed_raw, output_2800)),
+                    "observed_vs_3000_delta_bps": str(_ratio_bps_delta(observed_raw, output_3000)),
+                })
+
+        print("XDEX zero-slippage effective-fee localization evidence")
+        for row in rows:
+            print(row)
+
+        self.assertTrue(rows)
+        # We do NOT call 3000 ppm a verified fee. This test only determines
+        # whether the zero-slippage quote numerically tracks that candidate
+        # effective deduction more closely than the decoded 2800-ppm AMM fee.
+        for row in rows:
+            delta_2800 = abs(Decimal(row["observed_vs_2800_delta_bps"]))
+            delta_3000 = abs(Decimal(row["observed_vs_3000_delta_bps"]))
+            self.assertLess(
+                delta_3000,
+                delta_2800,
+                f"3000-ppm candidate no longer explains the residual better than 2800 ppm: {row}",
             )
 
 
