@@ -34,6 +34,12 @@ def _nonnegative_int(name: str, value: Any) -> int:
     return result
 
 
+def _bool(name: str, value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be a boolean.")
+    return value
+
+
 def build_top_account_concentration(
     *,
     chain: Any,
@@ -56,6 +62,8 @@ def build_top_account_concentration(
     source_text = _text("source", source)
     total_supply = _nonnegative_int("supply_raw", supply_raw)
     decimals = _nonnegative_int("supply_decimals", supply_decimals)
+    supply_identity = _bool("supply_identity_verified", supply_identity_verified)
+    account_identity = _bool("account_identity_verified", account_identity_verified)
 
     normalized: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -99,7 +107,7 @@ def build_top_account_concentration(
         share = format(share_decimal, "f")
         share_bps = format(share_decimal * Decimal(10000), "f")
 
-    identity_verified = bool(supply_identity_verified and account_identity_verified)
+    identity_verified = supply_identity and account_identity
     return {
         "schema": "cmis_top_account_concentration.v1",
         "chain": chain_text,
