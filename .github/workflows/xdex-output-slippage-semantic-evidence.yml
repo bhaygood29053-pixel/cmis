@@ -39,11 +39,6 @@ jobs:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
         run: python -m unittest tests.test_xdex_quote_slippage_parameter_live -v
 
-      - name: Probe second XDEX market for effective fee localization
-        env:
-          RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
-        run: python -m unittest tests.test_xdex_second_pool_effective_fee_live -v
-
       - name: Decode completed XDEX swap minimum-output instruction
         env:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
@@ -63,6 +58,11 @@ jobs:
         env:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
         run: python -m unittest tests.test_xdex_forced_config_quote_live -v
+
+      - name: Probe second XDEX market for effective fee localization
+        env:
+          RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
+        run: python -m unittest tests.test_xdex_second_pool_effective_fee_live -v
 
       - name: Safety boundary
         if: always()
