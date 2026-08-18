@@ -1,0 +1,46 @@
+name: XDEX Direct Candidate Quote Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-direct-candidate-quote-evidence:
+    name: Read-only direct-candidate quote comparison
+    if: github.head_ref == 'agent/xdex-direct-candidate-quote-live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_DIRECT_CANDIDATE_QUOTE_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compare verified direct XDEX candidates read-only
+        run: |
+          python -m unittest tests.test_xdex_direct_candidate_quote_comparison_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1 RPC exact-pair discovery and XDEX quote GET only."
+          echo "Every direct candidate is re-verified through the accepted exact-route resolver before quote output participates."
+          echo "A preferred result means only highest zero-slippage quote output among verified direct XDEX candidates."
+          echo "No global route optimality, independent corroboration, expected fill/slippage, route quality, simulation, /swap/prepare, signing, broadcasting, custody, execution, or value movement."
