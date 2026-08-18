@@ -40,18 +40,27 @@ def raw_risk():
     }
 
 
-def trade(*, include_route=True, route=None):
+def trade(*, include_route=True, route=None, token_in_amount="1000"):
     value = {
         "side": "buy",
         "asset": {"symbol": "AGI", "mint": ASSET_MINT},
         "notional_usd": 1000,
     }
+    if token_in_amount is not None:
+        value["token_in_amount"] = token_in_amount
     if include_route:
         value["route"] = dict(ROUTE if route is None else route)
     return value
 
 
-def route_evidence(*, observed_at=990, route=None, capabilities=None, source="cmis_xdex_route_resolver"):
+def route_evidence(
+    *,
+    observed_at=990,
+    route=None,
+    token_in_amount="1000",
+    capabilities=None,
+    source="cmis_xdex_route_resolver",
+):
     if capabilities is None:
         capabilities = {
             "price_impact": {
@@ -80,10 +89,11 @@ def route_evidence(*, observed_at=990, route=None, capabilities=None, source="cm
             },
         }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "source": source,
         "chain": "x1",
         "route": dict(ROUTE if route is None else route),
+        "token_in_amount": token_in_amount,
         "observed_at": observed_at,
         "capabilities": capabilities,
     }
@@ -100,17 +110,18 @@ class CMISPreTradeRouteEvidenceTests(unittest.TestCase):
             self.assertIsNone(result["execution_capabilities"][name]["value"])
         self.assertFalse(result["execution_authorized"])
 
-    def test_exact_fresh_route_can_satisfy_required_price_impact_and_fee_capabilities(self):
+    def test_exact_fresh_route_and_amount_can_satisfy_required_capabilities(self):
         result = build_pre_trade_check(
             raw_risk(),
-            trade(),
+            trade(token_in_amount="1000.000"),
             policy={"required_capabilities": ["price_impact", "fees"]},
             evaluated_at=1000,
-            route_evidence=route_evidence(),
+            route_evidence=route_evidence(token_in_amount=1000),
             route_evidence_max_age_seconds=60,
         )
 
         self.assertEqual(result["recommendation"], PASS)
+        self.assertEqual(result["trade"]["token_in_amount"], "1000")
         self.assertEqual(result["execution_capabilities"]["price_impact"]["status"], "ok")
         self.assertEqual(result["execution_capabilities"]["price_impact"]["value"], 1.25)
         self.assertEqual(result["execution_capabilities"]["fees"]["status"], "ok")
@@ -119,13 +130,66 @@ class CMISPreTradeRouteEvidenceTests(unittest.TestCase):
         self.assertEqual(fees["bounded_historical_execution_model_fee_percent"], 0.28)
         self.assertNotIn("quote_effective_curve_deduction_percent", fees)
         audit = result["route_evidence"]
+        self.assertTrue(audit["route_match"])
+        self.assertTrue(audit["amount_match"])
         self.assertTrue(audit["scope_match"])
+        self.assertEqual(audit["token_in_amount"], "1000")
+        self.assertEqual(audit["trade_token_in_amount"], "1000")
         self.assertTrue(audit["fresh"])
         self.assertEqual(set(audit["usable_capabilities"]), {"price_impact", "fees"})
         self.assertNotIn("price_impact", result["assessment_scope"]["not_yet_included"])
         self.assertNotIn("fees", result["assessment_scope"]["not_yet_included"])
         self.assertIn("verified_route_price_impact", result["assessment_scope"]["included"])
+        provenance = result["execution_capabilities"]["price_impact"]["route_evidence"]
+        self.assertEqual(provenance["token_in_amount"], "1000")
         self.assertFalse(result["execution_authorized"])
+
+    def test_input_amount_mismatch_fails_closed(self):
+        result = build_pre_trade_check(
+            raw_risk(),
+            trade(token_in_amount="1000"),
+            policy={"required_capabilities": ["price_impact"]},
+            evaluated_at=1000,
+            route_evidence=route_evidence(token_in_amount="1"),
+            route_evidence_max_age_seconds=60,
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertTrue(result["route_evidence"]["route_match"])
+        self.assertFalse(result["route_evidence"]["amount_match"])
+        self.assertFalse(result["route_evidence"]["scope_match"])
+        self.assertEqual(
+            result["execution_capabilities"]["price_impact"]["reason_code"],
+            "route_evidence_input_amount_mismatch",
+        )
+        self.assertIsNone(result["execution_capabilities"]["price_impact"]["value"])
+
+    def test_route_evidence_requires_explicit_trade_input_amount(self):
+        result = build_pre_trade_check(
+            raw_risk(),
+            trade(token_in_amount=None),
+            policy={"required_capabilities": ["price_impact"]},
+            evaluated_at=1000,
+            route_evidence=route_evidence(),
+            route_evidence_max_age_seconds=60,
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertEqual(
+            result["execution_capabilities"]["price_impact"]["reason_code"],
+            "explicit_trade_input_amount_unavailable",
+        )
+        self.assertFalse(result["route_evidence"]["amount_match"])
+
+    def test_boolean_trade_input_amount_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "token_in_amount"):
+            build_pre_trade_check(raw_risk(), trade(token_in_amount=True))
+
+    def test_non_finite_trade_input_amount_is_rejected(self):
+        for amount in ("NaN", "Infinity", "-Infinity", "0", "-1"):
+            with self.subTest(amount=amount):
+                with self.assertRaisesRegex(ValueError, "token_in_amount"):
+                    build_pre_trade_check(raw_risk(), trade(token_in_amount=amount))
 
     def test_public_projection_exposes_only_core_accepted_route_values(self):
         response = build_pre_trade_check_response(

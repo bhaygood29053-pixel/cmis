@@ -18,6 +18,7 @@ ROUTE = {
     "pool": POOL,
     "amm_config": AMM_CONFIG,
 }
+TOKEN_IN_AMOUNT = "1000"
 
 
 @unittest.skipUnless(
@@ -25,11 +26,13 @@ ROUTE = {
     "set RUN_XDEX_EXACT_ROUTE_LIVE=1 to run the read-only exact-route resolver probe",
 )
 class XDEXExactRouteResolverLiveTests(unittest.TestCase):
-    def test_pinned_xencat_xnt_route_resolves_to_accepted_pre_trade_evidence(self):
-        evidence = resolve_xdex_route_evidence(ROUTE, "1000")
+    def test_pinned_xencat_xnt_route_resolves_to_amount_scoped_pre_trade_evidence(self):
+        evidence = resolve_xdex_route_evidence(ROUTE, TOKEN_IN_AMOUNT)
 
+        self.assertEqual(evidence["schema_version"], 2)
         self.assertEqual(evidence["source"], "cmis_xdex_route_resolver")
         self.assertEqual(evidence["route"], ROUTE)
+        self.assertEqual(evidence["token_in_amount"], TOKEN_IN_AMOUNT)
         self.assertIn("price_impact", evidence["capabilities"])
         self.assertIn("fees", evidence["capabilities"])
         self.assertNotIn("slippage", evidence["capabilities"])
@@ -38,9 +41,13 @@ class XDEXExactRouteResolverLiveTests(unittest.TestCase):
             evidence,
             target_chain="x1",
             trade_route=ROUTE,
+            trade_token_in_amount=TOKEN_IN_AMOUNT,
             evaluated_at=evidence["observed_at"],
             max_age_seconds=30,
         )
+        self.assertTrue(evaluated["audit"]["route_match"])
+        self.assertTrue(evaluated["audit"]["amount_match"])
+        self.assertTrue(evaluated["audit"]["scope_match"])
         self.assertEqual(
             set(evaluated["audit"]["usable_capabilities"]),
             {"price_impact", "fees"},
@@ -52,6 +59,7 @@ class XDEXExactRouteResolverLiveTests(unittest.TestCase):
         print(
             {
                 "route": evidence["route"],
+                "token_in_amount": evidence["token_in_amount"],
                 "observed_at": evidence["observed_at"],
                 "price_impact_percent": evidence["capabilities"]["price_impact"]["value"],
                 "fee_evidence": evidence["capabilities"]["fees"]["value"],
