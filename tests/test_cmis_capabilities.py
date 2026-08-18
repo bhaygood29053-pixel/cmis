@@ -65,8 +65,8 @@ class CMISCapabilityContractTests(unittest.TestCase):
             "unavailable",
         )
 
-        # XDEX is now field-classified instead of all-or-nothing. The coarse
-        # capabilities stay bounded because only exact sub-scopes are proven.
+        # XDEX remains field-classified instead of all-or-nothing. Coarse
+        # capabilities stay bounded because the accepted evidence is scoped.
         self.assertEqual(
             capabilities["xdex_history_semantics"]["state"],
             "bounded",
@@ -121,10 +121,37 @@ class CMISCapabilityContractTests(unittest.TestCase):
             capabilities["xdex_quote_price_impact_semantics"]
             ["usable_as_verified_fact"]
         )
+
+        # Issue #182 resolves the read-only slippage contract without claiming
+        # that a quote predicts actual fill quality.
         for name in (
-            "xdex_quote_output_amount_decomposition",
+            "xdex_quote_slippage_parameter_semantics",
+            "xdex_quote_default_slippage",
+            "xdex_quote_output_slippage_transform",
+            "xdex_quote_effective_curve_deduction",
+        ):
+            self.assertEqual(capabilities[name]["state"], "verified", name)
+            self.assertTrue(capabilities[name]["usable_as_verified_fact"], name)
+
+        self.assertEqual(
+            capabilities["xdex_quote_output_amount_decomposition"]["state"],
+            "bounded",
+        )
+        self.assertFalse(
+            capabilities["xdex_quote_output_amount_decomposition"]
+            ["usable_as_verified_fact"]
+        )
+        self.assertEqual(
+            capabilities["xdex_quote_slippage_minimum_received"]["state"],
+            "bounded",
+        )
+        self.assertFalse(
+            capabilities["xdex_quote_slippage_minimum_received"]
+            ["usable_as_verified_fact"]
+        )
+
+        for name in (
             "xdex_quote_total_fee_decomposition",
-            "xdex_quote_slippage_minimum_received",
             "xdex_quote_route_quality",
             "xdex_quote_fill_quality",
         ):
@@ -160,9 +187,10 @@ class CMISCapabilityContractTests(unittest.TestCase):
         report = build_execution_capability_report()
         capabilities = report["evidence"]["capabilities"]
 
-        # The accepted XDEX proof is pinned to the verified XENCAT/native-XNT
-        # route. Until a runtime producer resolves and re-verifies an arbitrary
-        # requested asset/route, generic pre-trade must remain fail-closed.
+        # Accepted XDEX proof is route/config scoped. Until a runtime producer
+        # resolves and re-verifies an arbitrary requested asset/route, generic
+        # pre-trade remains fail-closed even though XDEX slippage semantics are
+        # now known for the tested direct quote contract.
         self.assertEqual(capabilities["price_impact"]["status"], "unavailable")
         self.assertIsNone(capabilities["price_impact"]["value"])
         self.assertEqual(capabilities["fees"]["status"], "unavailable")
