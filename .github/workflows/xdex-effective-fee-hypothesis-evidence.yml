@@ -1,0 +1,38 @@
+name: XDEX Effective Fee Hypothesis Evidence
+
+on:
+  pull_request:
+    paths:
+      - "tests/test_xdex_effective_fee_hypotheses_live.py"
+      - "tests/test_xdex_second_pool_effective_fee_live.py"
+      - ".github/workflows/xdex-effective-fee-hypothesis-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-effective-fee-hypotheses:
+    runs-on: ubuntu-24.04
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime requirements
+        run: python -m pip install -r requirements.txt
+
+      - name: Falsify universal +200 ppm vs test 3000 ppm floor candidate
+        run: python -m unittest tests.test_xdex_effective_fee_hypotheses_live -v
+
+      - name: Safety boundary
+        run: |
+          echo 'Read-only provider GETs and X1 RPC reads only.'
+          echo 'No /swap/prepare, transaction construction, signing, broadcasting, custody, execution, or value movement.'
