@@ -22,15 +22,24 @@ _ALLOWED_PROOF_TYPES = frozenset(
 )
 _SENSITIVE_QUERY_KEYS = frozenset(
     {
-        "api_key",
         "apikey",
+        "xapikey",
         "authorization",
         "auth",
         "key",
         "secret",
+        "clientsecret",
         "signature",
         "sig",
         "token",
+        "accesstoken",
+        "refreshtoken",
+        "password",
+        "credential",
+        "credentials",
+        "session",
+        "sessionid",
+        "jwt",
     }
 )
 
@@ -39,6 +48,7 @@ _SENSITIVE_QUERY_KEYS = frozenset(
 class BridgeSourceProof:
     proof_type: str
     reference: str
+    exact_url: str
 
 
 @dataclass(frozen=True)
@@ -57,13 +67,17 @@ class BridgeSourceProvenance:
         return asdict(self)
 
 
+def _normalized_query_key(key: str) -> str:
+    return "".join(character for character in key.casefold() if character.isalnum())
+
+
 def _validate_candidate_url(url: str) -> tuple[str, str]:
     if not isinstance(url, str) or not url.strip():
         raise ValueError("url must be a non-empty string")
 
     normalized_url = url.strip()
     parsed = urlsplit(normalized_url)
-    if parsed.scheme != "https" or not parsed.hostname:
+    if parsed.scheme.casefold() != "https" or not parsed.hostname:
         raise ValueError("bridge source URL must be an absolute https URL")
     if parsed.username or parsed.password:
         raise ValueError("bridge source URL must not contain credentials")
@@ -71,7 +85,7 @@ def _validate_candidate_url(url: str) -> tuple[str, str]:
         raise ValueError("bridge source URL must not contain a fragment")
 
     for key, _value in parse_qsl(parsed.query, keep_blank_values=True):
-        if key.casefold() in _SENSITIVE_QUERY_KEYS:
+        if _normalized_query_key(key) in _SENSITIVE_QUERY_KEYS:
             raise ValueError("bridge source URL must not contain credential-like query parameters")
 
     return normalized_url, parsed.hostname.lower()
@@ -86,6 +100,8 @@ def evaluate_bridge_source_provenance(
 
     Eligibility means only that a later GET/read-only contract probe may be built for
     the exact URL. It does not verify endpoint semantics or any bridge market fact.
+    Accepted proof types are useful only when the proof explicitly binds to this same
+    candidate URL; an allowed proof label by itself is never enough.
     """
 
     normalized_url, host = _validate_candidate_url(url)
@@ -99,6 +115,11 @@ def evaluate_bridge_source_provenance(
         reference = proof.reference.strip()
         if not proof_type or not reference:
             raise ValueError("bridge source proofs require proof_type and reference")
+
+        proof_url, _proof_host = _validate_candidate_url(proof.exact_url)
+        if proof_url != normalized_url:
+            warnings.append("provenance proof does not bind to the exact candidate URL")
+            continue
         if proof_type not in _ALLOWED_PROOF_TYPES:
             warnings.append(f"unsupported provenance proof type: {proof_type}")
             continue
