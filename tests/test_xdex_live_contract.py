@@ -35,10 +35,17 @@ def _text(value):
 
 
 def _token_address(token):
-    """Return the pool token's public address, preferring explicit address over mint."""
+    """Return the pool token's public API address, preferring address over mint."""
     if not isinstance(token, Mapping):
         return None
     return _text(token.get("address") or token.get("mint"))
+
+
+def _token_mint(token):
+    """Return the token's on-chain mint metadata when the catalog supplies it."""
+    if not isinstance(token, Mapping):
+        return None
+    return _text(token.get("mint") or token.get("address"))
 
 
 def _is_native_xnt_side(token):
@@ -47,10 +54,12 @@ def _is_native_xnt_side(token):
     symbol = (_text(token.get("symbol")) or "").upper()
     name = (_text(token.get("name")) or "").casefold()
     address = _token_address(token)
+    mint = _token_mint(token)
     return (
         symbol in _NATIVE_XNT_SYMBOLS
         or "wrapped xnt" in name
         or address in _NATIVE_XNT_MINTS
+        or mint in _NATIVE_XNT_MINTS
     )
 
 
@@ -119,6 +128,74 @@ def select_verified_onchain_live_pool_pair(report, *, target_mint):
             "quote_address": counter_mint,
             "base_symbol": None,
             "quote_symbol": None,
+        }
+    return None
+
+
+def select_verified_catalog_xnt_pair(catalog_pools, report, *, target_mint):
+    """Use XDEX's API-side XNT identity only for an independently verified pool.
+
+    The catalog decides the API request identifiers; the on-chain program-pool
+    proof decides whether the exact pool address is accepted. Neither source is
+    allowed to prove the other's semantics by itself.
+    """
+
+    if not isinstance(report, Mapping):
+        return None
+    if report.get("summary", {}).get(
+        "recognized_program_asset_pool_set_structurally_verified"
+    ) is not True:
+        return None
+
+    verified_addresses = {
+        _text(pool.get("pool_address"))
+        for pool in report.get("pools") or []
+        if isinstance(pool, Mapping)
+        and pool.get("pool_state_structural_role_verified") is True
+        and _text(pool.get("pool_address"))
+    }
+    target_mint = _text(target_mint)
+    if not target_mint or not verified_addresses:
+        return None
+
+    for pool in catalog_pools:
+        if not isinstance(pool, Mapping):
+            continue
+        pool_address = _text(pool.get("address"))
+        if not pool_address or pool_address not in verified_addresses:
+            continue
+        base = pool.get("baseToken")
+        quote = pool.get("quoteToken")
+        if not isinstance(base, Mapping) or not isinstance(quote, Mapping):
+            continue
+
+        base_mint = _token_mint(base)
+        quote_mint = _token_mint(quote)
+        if base_mint == target_mint and _is_native_xnt_side(quote):
+            target_token, xnt_token = base, quote
+        elif quote_mint == target_mint and _is_native_xnt_side(base):
+            target_token, xnt_token = quote, base
+        else:
+            continue
+
+        target_api_address = _token_address(target_token)
+        xnt_api_address = _token_address(xnt_token)
+        if (
+            not target_api_address
+            or not xnt_api_address
+            or target_api_address == xnt_api_address
+        ):
+            continue
+
+        return {
+            "pool_address": pool_address,
+            "base_address": target_api_address,
+            "quote_address": xnt_api_address,
+            "base_symbol": _text(target_token.get("symbol")),
+            "quote_symbol": _text(xnt_token.get("symbol")),
+            "target_mint": target_mint,
+            "xnt_catalog_mint": _token_mint(xnt_token),
+            "xnt_catalog_address": _text(xnt_token.get("address")),
         }
     return None
 
@@ -262,6 +339,53 @@ class XDEXLivePairSelectionTests(unittest.TestCase):
             )
         )
 
+    def test_catalog_xnt_pair_requires_same_verified_pool_address(self):
+        catalog = [
+            {
+                "address": "P_VERIFIED",
+                "baseToken": {"symbol": "XENCAT", "mint": _XENCAT_MINT},
+                "quoteToken": {
+                    "symbol": "XNT",
+                    "name": "Wrapped XNT",
+                    "address": "XNT_API_ID",
+                    "mint": next(iter(_NATIVE_XNT_MINTS)),
+                },
+            }
+        ]
+        report = {
+            "summary": {
+                "recognized_program_asset_pool_set_structurally_verified": True,
+            },
+            "pools": [
+                {
+                    "pool_address": "P_VERIFIED",
+                    "mint_0": _XENCAT_MINT,
+                    "mint_1": next(iter(_NATIVE_XNT_MINTS)),
+                    "pool_state_structural_role_verified": True,
+                }
+            ],
+        }
+
+        pair = select_verified_catalog_xnt_pair(
+            catalog,
+            report,
+            target_mint=_XENCAT_MINT,
+        )
+
+        self.assertEqual(pair["pool_address"], "P_VERIFIED")
+        self.assertEqual(pair["base_address"], _XENCAT_MINT)
+        self.assertEqual(pair["quote_address"], "XNT_API_ID")
+        self.assertEqual(pair["xnt_catalog_mint"], next(iter(_NATIVE_XNT_MINTS)))
+
+        report["pools"][0]["pool_address"] = "OTHER_POOL"
+        self.assertIsNone(
+            select_verified_catalog_xnt_pair(
+                catalog,
+                report,
+                target_mint=_XENCAT_MINT,
+            )
+        )
+
 
 @unittest.skipUnless(
     RUN_LIVE,
@@ -284,28 +408,53 @@ class XDEXLiveContractTests(unittest.TestCase):
 
         cls.live_pair = select_non_native_live_pool_pair(pools)
         cls.live_pair_source = "xdex_public_pool_list"
+        verified_pool_set = None
+
         if cls.live_pair is None:
             try:
                 verified_pool_set = verify_recognized_program_asset_pool_set(
                     asset_mint=_XENCAT_MINT,
                     catalog_pools=pools,
                 )
+                print(
+                    "[XDEX verified pool-set evidence] "
+                    + json.dumps(
+                        _public_evidence(
+                            {
+                                "status": verified_pool_set.get("status"),
+                                "program_id": verified_pool_set.get("program_id"),
+                                "summary": verified_pool_set.get("summary"),
+                                "pools": verified_pool_set.get("pools"),
+                            }
+                        ),
+                        sort_keys=True,
+                        default=str,
+                    )
+                )
             except Exception as exc:
-                verified_pool_set = None
                 print(
                     "[XDEX live probe] verified on-chain pool-set fallback failed: "
                     f"{type(exc).__name__}: {exc}"
                 )
+
             cls.live_pair = select_verified_onchain_live_pool_pair(
                 verified_pool_set,
                 target_mint=_XENCAT_MINT,
             )
             cls.live_pair_source = "verified_onchain_xdex_program_pool_set"
 
+        if cls.live_pair is None and verified_pool_set is not None:
+            cls.live_pair = select_verified_catalog_xnt_pair(
+                pools,
+                verified_pool_set,
+                target_mint=_XENCAT_MINT,
+            )
+            cls.live_pair_source = "verified_pool_plus_xdex_catalog_xnt_identity"
+
         if cls.live_pair is None:
             message = (
-                "No usable non-XNT quote pair was proven by either the public "
-                "XDEX pool list or the verified on-chain XDEX program pool set."
+                "No usable quote pair was proven by the public XDEX list plus "
+                "the independently verified on-chain XDEX program pool set."
             )
             if REQUIRE_LIVE_PAIR:
                 raise RuntimeError(message)
@@ -313,9 +462,8 @@ class XDEXLiveContractTests(unittest.TestCase):
 
         print(
             "[XDEX live probe] source="
-            f"{cls.live_pair_source} pool={cls.live_pair['pool_address']} pair="
-            f"{cls.live_pair['base_symbol'] or cls.live_pair['base_address']} -> "
-            f"{cls.live_pair['quote_symbol'] or cls.live_pair['quote_address']}"
+            f"{cls.live_pair_source} pair_evidence="
+            + json.dumps(_public_evidence(cls.live_pair), sort_keys=True, default=str)
         )
 
     def setUp(self):
