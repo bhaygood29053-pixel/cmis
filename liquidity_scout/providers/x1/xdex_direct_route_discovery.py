@@ -58,16 +58,24 @@ def _u64(data: bytes, offset: int) -> int:
     return struct.unpack_from("<Q", data, offset)[0]
 
 
-def _catalog_token_mint(token: Any) -> str | None:
-    """Return the catalog's on-chain mint identity when present.
+def _catalog_token_identities(token: Any) -> frozenset[str]:
+    """Return every explicit catalog identity for one token side.
 
-    The live XDEX contract has shown both ``mint`` and ``address`` token fields.
-    ``mint`` is preferred for on-chain pair matching; ``address`` is only a
-    fallback for rows that do not provide separate mint metadata.
+    XDEX catalog rows have exposed both ``mint`` and ``address``. They are only
+    discovery hints, so either may shortlist a row. Exact trust is established
+    later by decoding the pool account's on-chain mint slots.
     """
     if not isinstance(token, Mapping):
-        return None
-    return _optional_text(token.get("mint")) or _optional_text(token.get("address"))
+        return frozenset()
+    identities = {
+        text
+        for text in (
+            _optional_text(token.get("mint")),
+            _optional_text(token.get("address")),
+        )
+        if text
+    }
+    return frozenset(identities)
 
 
 def _catalog_candidate_addresses(
@@ -77,14 +85,18 @@ def _catalog_candidate_addresses(
 ) -> list[str]:
     if not isinstance(rows, list):
         raise XDEXDirectRouteDiscoveryError("XDEX pool catalog must be a list")
-    wanted = {token_in_mint, token_out_mint}
     addresses: list[str] = []
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        base = _catalog_token_mint(row.get("baseToken"))
-        quote = _catalog_token_mint(row.get("quoteToken"))
-        if not base or not quote or base == quote or {base, quote} != wanted:
+        base_ids = _catalog_token_identities(row.get("baseToken"))
+        quote_ids = _catalog_token_identities(row.get("quoteToken"))
+        directional_match = (
+            token_in_mint in base_ids and token_out_mint in quote_ids
+        ) or (
+            token_out_mint in base_ids and token_in_mint in quote_ids
+        )
+        if not directional_match:
             continue
         address = _optional_text(row.get("address"))
         if address and address not in addresses:
@@ -123,8 +135,6 @@ def _verify_config(account: Any, amm_config: str) -> None:
     data = account.get("data")
     if not isinstance(data, (bytes, bytearray)) or len(data) < CONFIG_MIN_LENGTH:
         raise XDEXDirectRouteDiscoveryError("candidate AMM config does not match the accepted layout")
-    # Reading the fee field proves the expected config layout is materially
-    # present without interpreting it as a route-selection score.
     trade_fee_rate_ppm = _u64(bytes(data), 12)
     if trade_fee_rate_ppm >= 1_000_000:
         raise XDEXDirectRouteDiscoveryError("candidate AMM config trade fee rate is invalid")
@@ -168,18 +178,8 @@ def _verified_candidate(
 
     gross_0 = _vault_raw_amount(token_account_fetcher, decoded["vault_0"], decoded["mint_0"])
     gross_1 = _vault_raw_amount(token_account_fetcher, decoded["vault_1"], decoded["mint_1"])
-    active_0 = (
-        gross_0
-        - decoded["protocol_fees_0"]
-        - decoded["fund_fees_0"]
-        - decoded["creator_fees_0"]
-    )
-    active_1 = (
-        gross_1
-        - decoded["protocol_fees_1"]
-        - decoded["fund_fees_1"]
-        - decoded["creator_fees_1"]
-    )
+    active_0 = gross_0 - decoded["protocol_fees_0"] - decoded["fund_fees_0"] - decoded["creator_fees_0"]
+    active_1 = gross_1 - decoded["protocol_fees_1"] - decoded["fund_fees_1"] - decoded["creator_fees_1"]
     if active_0 <= 0 or active_1 <= 0:
         raise XDEXDirectRouteDiscoveryError("candidate pool active reserves are not positive")
 
@@ -232,10 +232,7 @@ def discover_direct_route(
                 token_account_fetcher=token_account_fetcher,
             )
         except Exception as exc:
-            rejected.append({
-                "pool": pool,
-                "reason": f"{type(exc).__name__}: {exc}",
-            })
+            rejected.append({"pool": pool, "reason": f"{type(exc).__name__}: {exc}"})
             continue
         key = (candidate["pool"], candidate["amm_config"])
         verified_by_key.setdefault(key, candidate)
