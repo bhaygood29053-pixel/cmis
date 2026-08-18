@@ -95,12 +95,14 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.7.1")
+        self.assertEqual(response["contract_version"], "1.8.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
         self.assertEqual(len(response["supported_services"]), 10)
         self.assertIn("verification_evidence", response["supported_services"])
         self.assertIn("trade_verification", response["supported_services"])
         self.assertIn("verified_asset_activity", response["supported_services"])
+        self.assertNotIn("wallet_activity_facts", response["supported_services"])
+        self.assertNotIn("top_account_concentration", response["supported_services"])
         self.assertEqual(response["supported_chains"], ["x1"])
         self.assertIn("solana", response["known_chains"])
 
@@ -113,6 +115,42 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         )
         self.assertTrue(evidence_quality["risk_separate_from_proof"])
         self.assertTrue(evidence_quality["missing_evidence_is_unknown"])
+
+        intelligence = response["intelligence_foundation"]
+        self.assertEqual(intelligence["schema_version"], 1)
+        self.assertEqual(
+            intelligence["phase"], "phase_11_verified_intelligence_foundation"
+        )
+        self.assertTrue(intelligence["read_only"])
+        self.assertFalse(intelligence["public_service_promoted"])
+        self.assertFalse(intelligence["scout_reliance_promoted"])
+        self.assertEqual(
+            intelligence["promotion_rule"],
+            "new_accepted_public_service_contract_required",
+        )
+        self.assertEqual(intelligence["intelligence_evidence_schema_version"], 1)
+        self.assertEqual(
+            set(intelligence["capabilities"]),
+            {
+                "top_account_concentration",
+                "wallet_activity_facts",
+                "sanitized_intelligence_history",
+                "evidence_bound_conclusions",
+            },
+        )
+        for capability in intelligence["capabilities"].values():
+            self.assertEqual(capability["state"], "bounded")
+            self.assertTrue(capability["read_only"])
+            self.assertFalse(capability["public_service_promoted"])
+            self.assertFalse(capability["scout_reliance_promoted"])
+
+        evidence_bound = intelligence["capabilities"]["evidence_bound_conclusions"]
+        self.assertIn(
+            "valid_content_addressed_evidence_receipt",
+            evidence_bound["requirements"],
+        )
+        self.assertIn("proof_strength_separate_from_risk", evidence_bound["limitations"])
+        self.assertIn("execution_authorized_false", evidence_bound["limitations"])
 
         x1_record = response["chains"]["x1"]
         x1 = x1_record["services"]
