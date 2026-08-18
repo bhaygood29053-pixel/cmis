@@ -11,7 +11,9 @@ permissions:
 jobs:
   xdex-exact-route-resolver-evidence:
     name: Read-only exact-route resolver
-    if: github.head_ref == 'agent/xdex-exact-route-resolver'
+    if: >-
+      github.head_ref == 'agent/xdex-exact-route-resolver' ||
+      github.head_ref == 'agent/xdex-route-evidence-amount-scope'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
