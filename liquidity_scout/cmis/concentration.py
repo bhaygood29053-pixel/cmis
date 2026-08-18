@@ -7,10 +7,11 @@ accounts with wallets, people, beneficial owners, or complete holder coverage.
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, getcontext
+from decimal import Decimal, localcontext
 from typing import Any, Iterable, Mapping
 
-getcontext().prec = 50
+
+_DISPLAY_PRECISION = 50
 
 
 def _text(name: str, value: Any) -> str:
@@ -34,10 +35,29 @@ def _nonnegative_int(name: str, value: Any) -> int:
     return result
 
 
+def _positive_int(name: str, value: Any) -> int:
+    result = _nonnegative_int(name, value)
+    if result == 0:
+        raise ValueError(f"{name} must be a positive integer.")
+    return result
+
+
 def _bool(name: str, value: Any) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"{name} must be a boolean.")
     return value
+
+
+def _decimal_ratio(numerator: int, denominator: int) -> str:
+    """Return a deterministic decimal presentation for an exact raw ratio.
+
+    The raw numerator/denominator remain the source of truth. This presentation
+    is intentionally finite and must never be used as the exact comparison key.
+    """
+    with localcontext() as context:
+        context.prec = _DISPLAY_PRECISION
+        value = Decimal(numerator) / Decimal(denominator)
+        return format(value, "f")
 
 
 def build_top_account_concentration(
@@ -47,6 +67,7 @@ def build_top_account_concentration(
     source: Any,
     supply_raw: Any,
     supply_decimals: Any,
+    requested_account_limit: Any,
     accounts: Iterable[Mapping[str, Any]],
     supply_identity_verified: bool,
     account_identity_verified: bool,
@@ -54,14 +75,17 @@ def build_top_account_concentration(
     """Measure observed top-account concentration without holder semantics.
 
     ``accounts`` must contain unique ``address`` and raw base-unit ``amount``
-    values using the same decimals as ``supply_raw``. The function reports only
-    the share represented by the supplied observed account set.
+    values using the same decimals as ``supply_raw``. ``requested_account_limit``
+    records the top-N scope contract independently from how many rows were
+    actually observed. The exact share is preserved as raw numerator/denominator
+    evidence; decimal strings are presentation only.
     """
     chain_text = _text("chain", chain)
     asset_text = _text("asset_id", asset_id)
     source_text = _text("source", source)
     total_supply = _nonnegative_int("supply_raw", supply_raw)
     decimals = _nonnegative_int("supply_decimals", supply_decimals)
+    requested_limit = _positive_int("requested_account_limit", requested_account_limit)
     supply_identity = _bool("supply_identity_verified", supply_identity_verified)
     account_identity = _bool("account_identity_verified", account_identity_verified)
 
@@ -70,7 +94,12 @@ def build_top_account_concentration(
     observed_sum = 0
     previous_amount: int | None = None
 
-    for index, account in enumerate(accounts):
+    try:
+        iterator = iter(accounts)
+    except TypeError as exc:
+        raise ValueError("accounts must be an iterable of account objects.") from exc
+
+    for index, account in enumerate(iterator):
         if not isinstance(account, Mapping):
             raise ValueError(f"accounts[{index}] must be an object.")
         address = _text(f"accounts[{index}].address", account.get("address"))
@@ -91,21 +120,30 @@ def build_top_account_concentration(
             {"address": address, "amount": str(amount), "decimals": decimals}
         )
 
-    if total_supply == 0 and observed_sum > 0:
-        raise ValueError("positive observed balances cannot exceed zero total supply.")
+    observed_count = len(normalized)
+    if observed_count > requested_limit:
+        raise ValueError("observed account count exceeds requested_account_limit.")
+    if total_supply > 0 and observed_count == 0:
+        raise ValueError(
+            "positive total supply requires at least one observed top account; "
+            "empty evidence is not zero concentration."
+        )
+    if total_supply == 0 and observed_count > 0:
+        raise ValueError("zero total supply requires an empty observed account set.")
     if total_supply > 0 and observed_sum > total_supply:
         raise ValueError("observed account balances exceed total supply.")
 
     if total_supply == 0:
+        share_exact = None
         share = None
         share_bps = None
     else:
-        try:
-            share_decimal = Decimal(observed_sum) / Decimal(total_supply)
-        except (InvalidOperation, ZeroDivisionError) as exc:  # pragma: no cover
-            raise ValueError("unable to calculate concentration share.") from exc
-        share = format(share_decimal, "f")
-        share_bps = format(share_decimal * Decimal(10000), "f")
+        share_exact = {
+            "numerator": str(observed_sum),
+            "denominator": str(total_supply),
+        }
+        share = _decimal_ratio(observed_sum, total_supply)
+        share_bps = _decimal_ratio(observed_sum * 10000, total_supply)
 
     identity_verified = supply_identity and account_identity
     return {
@@ -115,8 +153,11 @@ def build_top_account_concentration(
         "source": source_text,
         "supply_raw": str(total_supply),
         "decimals": decimals,
-        "observed_account_count": len(normalized),
+        "requested_account_limit": requested_limit,
+        "observed_account_count": observed_count,
+        "scope_limit_filled": observed_count == requested_limit,
         "observed_balance_raw": str(observed_sum),
+        "observed_share_exact": share_exact,
         "observed_share": share,
         "observed_share_bps": share_bps,
         "accounts": normalized,
@@ -130,6 +171,7 @@ def build_top_account_concentration(
             "token_accounts_are_not_unique_holder_identities",
             "observed_top_account_set_is_not_total_holder_coverage",
             "concentration_is_account_level_not_beneficial_owner_level",
+            "decimal_share_is_presentation_only_exact_ratio_is_raw_numerator_denominator",
         ],
     }
 
