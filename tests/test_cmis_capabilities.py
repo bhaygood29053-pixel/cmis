@@ -12,6 +12,9 @@ from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
     validate_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.pre_trade_capabilities import (
+    build_execution_capability_report,
+)
 
 
 class CMISCapabilityContractTests(unittest.TestCase):
@@ -61,14 +64,73 @@ class CMISCapabilityContractTests(unittest.TestCase):
             capabilities["archival_history_completeness"]["state"],
             "unavailable",
         )
+
+        # XDEX is now field-classified instead of all-or-nothing. The coarse
+        # capabilities stay bounded because only exact sub-scopes are proven.
         self.assertEqual(
             capabilities["xdex_history_semantics"]["state"],
-            "unavailable",
+            "bounded",
         )
         self.assertEqual(
             capabilities["xdex_quote_semantics"]["state"],
+            "bounded",
+        )
+
+        self.assertEqual(
+            capabilities["xdex_history_timestamp_interval"]["state"],
+            "verified",
+        )
+        self.assertTrue(
+            capabilities["xdex_history_timestamp_interval"]
+            ["usable_as_verified_fact"]
+        )
+        self.assertEqual(
+            capabilities["xdex_history_native_close_price"]["state"],
+            "verified",
+        )
+        self.assertEqual(
+            capabilities["xdex_history_native_ohlc"]["state"],
+            "bounded",
+        )
+        self.assertEqual(
+            capabilities["xdex_history_volume_semantics"]["state"],
             "unavailable",
         )
+        self.assertEqual(
+            capabilities["xdex_history_range_completeness"]["state"],
+            "unavailable",
+        )
+
+        self.assertEqual(
+            capabilities["xdex_quote_mint_identity"]["state"],
+            "verified",
+        )
+        self.assertEqual(
+            capabilities["xdex_quote_amm_config_identity"]["state"],
+            "verified",
+        )
+        self.assertEqual(
+            capabilities["xdex_quote_trade_fee_rate"]["state"],
+            "verified",
+        )
+        self.assertEqual(
+            capabilities["xdex_quote_price_impact_semantics"]["state"],
+            "verified",
+        )
+        self.assertTrue(
+            capabilities["xdex_quote_price_impact_semantics"]
+            ["usable_as_verified_fact"]
+        )
+        for name in (
+            "xdex_quote_output_amount_decomposition",
+            "xdex_quote_total_fee_decomposition",
+            "xdex_quote_slippage_minimum_received",
+            "xdex_quote_route_quality",
+            "xdex_quote_fill_quality",
+        ):
+            self.assertEqual(capabilities[name]["state"], "unavailable", name)
+            self.assertFalse(capabilities[name]["usable_as_verified_fact"], name)
+
         self.assertEqual(
             capabilities["native_xnt_canonical_translation"]["state"],
             "verified",
@@ -79,7 +141,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
         self.assertEqual(
             capabilities["native_xnt_xdex_quote_translation"]["state"],
-            "unavailable",
+            "verified",
         )
         self.assertEqual(
             capabilities["x1_ninja_sse_live_event_evidence"]["state"],
@@ -93,6 +155,20 @@ class CMISCapabilityContractTests(unittest.TestCase):
             capabilities["warp_bridge_guardian_state"]["state"],
             "unavailable",
         )
+
+    def test_route_specific_xdex_proof_does_not_leak_into_generic_pretrade(self):
+        report = build_execution_capability_report()
+        capabilities = report["evidence"]["capabilities"]
+
+        # The accepted XDEX proof is pinned to the verified XENCAT/native-XNT
+        # route. Until a runtime producer resolves and re-verifies an arbitrary
+        # requested asset/route, generic pre-trade must remain fail-closed.
+        self.assertEqual(capabilities["price_impact"]["status"], "unavailable")
+        self.assertIsNone(capabilities["price_impact"]["value"])
+        self.assertEqual(capabilities["fees"]["status"], "unavailable")
+        self.assertIsNone(capabilities["fees"]["value"])
+        self.assertEqual(capabilities["slippage"]["status"], "unavailable")
+        self.assertIsNone(capabilities["slippage"]["value"])
 
     def test_new_runtime_service_without_manifest_classification_fails_loudly(self):
         with self.assertRaisesRegex(RuntimeError, "service drift"):
