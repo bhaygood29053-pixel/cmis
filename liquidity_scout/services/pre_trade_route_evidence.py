@@ -2,23 +2,25 @@
 
 This module does not collect provider data. It accepts evidence only after an
 internal CMIS producer has resolved one explicit route and passes that evidence
-through exact chain/route, freshness, semantic, and proof-basis gates.
+through exact chain/route, freshness, semantic, value-shape, and proof-basis
+gates.
 
 A symbol or asset mint alone is never enough to bind route evidence. The trade
 must name token-in, token-out, pool, and AMM config explicitly. Missing,
-stale, mismatched, or semantically incompatible evidence is reported as
-unusable instead of being converted into a guessed execution estimate.
+stale, mismatched, semantically incompatible, or weakly-proven evidence is
+reported as unusable instead of being converted into a guessed execution
+estimate.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 
-VERSION = "1.0"
+VERSION = "1.1"
 SCHEMA_VERSION = 1
 ROUTE_FIELDS = (
     "token_in_mint",
@@ -26,30 +28,68 @@ ROUTE_FIELDS = (
     "pool",
     "amm_config",
 )
+_ROUTE_EVIDENCE_FIELDS = frozenset(
+    {"schema_version", "source", "chain", "route", "observed_at", "capabilities"}
+)
+_CAPABILITY_FIELDS = frozenset({"status", "semantic", "value", "unit", "proof_basis"})
+_ACCEPTED_SOURCES = frozenset({"cmis_xdex_route_resolver"})
 
 # These semantic labels are intentionally narrower than the public capability
 # names. In particular, XDEX's user slippage tolerance / minimum-received
 # parameter is not an expected execution-slippage estimate and therefore does
 # not satisfy the generic ``slippage`` capability.
 _ACCEPTED_SEMANTICS = {
-    "slippage": frozenset({"expected_execution_slippage_percent"}),
-    "price_impact": frozenset({"route_price_impact_percent"}),
-    "fees": frozenset({"route_execution_fee_estimate"}),
+    "slippage": "expected_execution_slippage_percent",
+    "price_impact": "route_price_impact_percent",
+    "fees": "route_execution_fee_estimate",
 }
+_EXPECTED_UNITS = {
+    "slippage": "percent",
+    "price_impact": "percent",
+    "fees": "structured",
+}
+_REQUIRED_PROOF_BASIS = {
+    "slippage": frozenset(
+        {
+            "verified_expected_execution_slippage_semantics",
+            "verified_route_execution_slippage_observation",
+        }
+    ),
+    "price_impact": frozenset(
+        {
+            "verified_direct_cp_route",
+            "verified_pool_reserves",
+            "verified_price_impact_semantics",
+        }
+    ),
+    "fees": frozenset(
+        {
+            "verified_amm_config_trade_fee_rate",
+            "bounded_historical_execution_corroboration",
+        }
+    ),
+}
+_FEE_VALUE_FIELDS = frozenset(
+    {
+        "amm_trade_fee_rate_percent",
+        "bounded_historical_execution_model_fee_percent",
+    }
+)
 
 
 def _text(value: Any) -> Optional[str]:
-    text = str(value or "").strip()
-    return text or None
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or text != value:
+        return None
+    return text
 
 
 def _number(value: Any) -> Optional[float]:
-    if value is None or isinstance(value, bool):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
+    number = float(value)
     if number != number or number in (float("inf"), float("-inf")):
         return None
     return number
@@ -61,8 +101,10 @@ def _epoch(value: Any) -> Optional[float]:
     if isinstance(value, (int, float)):
         number = _number(value)
         return number if number is not None and number >= 0 else None
+    if not isinstance(value, str):
+        return None
 
-    text = str(value).strip()
+    text = _text(value)
     if not text:
         return None
     normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
@@ -70,10 +112,19 @@ def _epoch(value: Any) -> Optional[float]:
         parsed = datetime.fromisoformat(normalized)
     except ValueError:
         return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
     epoch = parsed.timestamp()
     return epoch if epoch >= 0 else None
+
+
+def _unknown_keys(value: Mapping[str, Any], allowed: frozenset[str], field: str) -> None:
+    non_string = [key for key in value if not isinstance(key, str)]
+    if non_string:
+        raise ValueError(f"{field} keys must be strings")
+    unknown = sorted(set(value) - set(allowed))
+    if unknown:
+        raise ValueError(f"unknown {field} fields: " + ", ".join(unknown))
 
 
 def normalize_trade_route(
@@ -88,16 +139,14 @@ def normalize_trade_route(
     if not isinstance(route, Mapping):
         raise ValueError("trade route must be a mapping when supplied")
 
-    unknown = sorted(set(route) - set(ROUTE_FIELDS))
-    if unknown:
-        raise ValueError("unknown trade route fields: " + ", ".join(unknown))
+    _unknown_keys(route, frozenset(ROUTE_FIELDS), "trade route")
 
     normalized: Dict[str, str] = {}
     for field in ROUTE_FIELDS:
         value = _text(route.get(field))
         if not value:
             raise ValueError(
-                "trade route requires token_in_mint, token_out_mint, pool, and amm_config"
+                "trade route requires normalized string token_in_mint, token_out_mint, pool, and amm_config"
             )
         normalized[field] = value
 
@@ -118,29 +167,50 @@ def normalize_trade_route(
 def _normalize_evidence_route(value: Any) -> Dict[str, str]:
     if not isinstance(value, Mapping):
         raise ValueError("route_evidence.route must be a mapping")
-    unknown = sorted(set(value) - set(ROUTE_FIELDS))
-    if unknown:
-        raise ValueError("unknown route_evidence route fields: " + ", ".join(unknown))
+    _unknown_keys(value, frozenset(ROUTE_FIELDS), "route_evidence route")
     result: Dict[str, str] = {}
     for field in ROUTE_FIELDS:
         text = _text(value.get(field))
         if not text:
             raise ValueError(
-                "route_evidence.route requires token_in_mint, token_out_mint, pool, and amm_config"
+                "route_evidence.route requires normalized string token_in_mint, token_out_mint, pool, and amm_config"
             )
         result[field] = text
     return result
 
 
-def _proof_basis(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
+def _proof_basis(value: Any) -> Optional[frozenset[str]]:
+    if not isinstance(value, list) or not value:
+        return None
     result: list[str] = []
     for item in value:
         text = _text(item)
-        if text and text not in result:
-            result.append(text)
-    return result
+        if not text or text in result:
+            return None
+        result.append(text)
+    return frozenset(result)
+
+
+def _fee_value(value: Any) -> Optional[dict[str, float]]:
+    if not isinstance(value, Mapping):
+        return None
+    if any(not isinstance(key, str) for key in value):
+        return None
+    if set(value) != set(_FEE_VALUE_FIELDS):
+        return None
+
+    amm_rate = _number(value.get("amm_trade_fee_rate_percent"))
+    bounded_rate = _number(value.get("bounded_historical_execution_model_fee_percent"))
+    if amm_rate is None or bounded_rate is None:
+        return None
+    if not (0 <= amm_rate < 100 and 0 <= bounded_rate < 100):
+        return None
+    if amm_rate != bounded_rate:
+        return None
+    return {
+        "amm_trade_fee_rate_percent": amm_rate,
+        "bounded_historical_execution_model_fee_percent": bounded_rate,
+    }
 
 
 def _capability_value(name: str, record: Mapping[str, Any]) -> Any:
@@ -151,9 +221,7 @@ def _capability_value(name: str, record: Mapping[str, Any]) -> Any:
             return None
         return number
     if name == "fees":
-        if not isinstance(value, Mapping) or not value:
-            return None
-        return deepcopy(dict(value))
+        return _fee_value(value)
     return None
 
 
@@ -192,20 +260,22 @@ def evaluate_route_evidence(
     if not isinstance(route_evidence, Mapping):
         raise ValueError("route_evidence must be a mapping or None")
 
+    _unknown_keys(route_evidence, _ROUTE_EVIDENCE_FIELDS, "route_evidence")
+
     schema_version = route_evidence.get("schema_version")
-    if schema_version != SCHEMA_VERSION:
-        raise ValueError(
-            f"route_evidence schema_version must be {SCHEMA_VERSION}"
-        )
+    if isinstance(schema_version, bool) or schema_version != SCHEMA_VERSION:
+        raise ValueError(f"route_evidence schema_version must be {SCHEMA_VERSION}")
 
     source = _text(route_evidence.get("source"))
     if not source:
-        raise ValueError("route_evidence source is required")
+        raise ValueError("route_evidence source must be a normalized non-empty string")
+    if source not in _ACCEPTED_SOURCES:
+        raise ValueError("route_evidence source is not accepted by this contract")
     audit["source"] = source
 
     evidence_chain = (_text(route_evidence.get("chain")) or "").lower()
     if not evidence_chain:
-        raise ValueError("route_evidence chain is required")
+        raise ValueError("route_evidence chain must be a normalized non-empty string")
     audit["chain"] = evidence_chain
 
     evidence_route = _normalize_evidence_route(route_evidence.get("route"))
@@ -237,19 +307,13 @@ def evaluate_route_evidence(
     evaluated_epoch = audit["evaluated_at_epoch"]
     if audit["global_rejection_reason"] is None:
         if max_age is None:
-            audit["global_rejection_reason"] = (
-                "route_evidence_freshness_policy_unconfigured"
-            )
+            audit["global_rejection_reason"] = "route_evidence_freshness_policy_unconfigured"
         elif observed_epoch is None:
             audit["global_rejection_reason"] = "route_evidence_timestamp_unverified"
         elif evaluated_epoch is None:
-            audit["global_rejection_reason"] = (
-                "route_evidence_evaluation_timestamp_unverified"
-            )
+            audit["global_rejection_reason"] = "route_evidence_evaluation_timestamp_unverified"
         elif observed_epoch > evaluated_epoch:
-            audit["global_rejection_reason"] = (
-                "route_evidence_timestamp_after_evaluation"
-            )
+            audit["global_rejection_reason"] = "route_evidence_timestamp_after_evaluation"
         else:
             age = evaluated_epoch - observed_epoch
             audit["age_seconds"] = age
@@ -262,18 +326,20 @@ def evaluate_route_evidence(
     capabilities = route_evidence.get("capabilities")
     if not isinstance(capabilities, Mapping):
         raise ValueError("route_evidence capabilities must be a mapping")
+    if any(not isinstance(name, str) for name in capabilities):
+        raise ValueError("route_evidence capability names must be strings")
 
     unknown_capabilities = sorted(set(capabilities) - set(_ACCEPTED_SEMANTICS))
     if unknown_capabilities:
         raise ValueError(
-            "unsupported route_evidence capabilities: "
-            + ", ".join(unknown_capabilities)
+            "unsupported route_evidence capabilities: " + ", ".join(unknown_capabilities)
         )
 
     overrides: Dict[str, Any] = {}
     for name, raw_record in capabilities.items():
         if not isinstance(raw_record, Mapping):
             raise ValueError(f"route_evidence capability '{name}' must be a mapping")
+        _unknown_keys(raw_record, _CAPABILITY_FIELDS, f"route_evidence capability '{name}'")
 
         reason = audit["global_rejection_reason"]
         status = (_text(raw_record.get("status")) or "").lower()
@@ -284,14 +350,14 @@ def evaluate_route_evidence(
 
         if reason is None and status != "verified":
             reason = "route_evidence_capability_not_verified"
-        if reason is None and semantic not in _ACCEPTED_SEMANTICS[name]:
+        if reason is None and semantic != _ACCEPTED_SEMANTICS[name]:
             reason = "route_evidence_semantic_not_accepted"
-        if reason is None and not proof:
-            reason = "route_evidence_proof_basis_unavailable"
+        if reason is None and proof != _REQUIRED_PROOF_BASIS[name]:
+            reason = "route_evidence_proof_basis_not_accepted"
         if reason is None and value is None:
             reason = "route_evidence_value_invalid"
-        if reason is None and not unit:
-            reason = "route_evidence_unit_unavailable"
+        if reason is None and unit != _EXPECTED_UNITS[name]:
+            reason = "route_evidence_unit_not_accepted"
 
         if reason is not None:
             audit["rejected_capabilities"][name] = {
@@ -316,7 +382,7 @@ def evaluate_route_evidence(
                 "age_seconds": audit["age_seconds"],
                 "max_age_seconds": max_age,
                 "semantic": semantic,
-                "proof_basis": proof,
+                "proof_basis": sorted(proof),
             },
         }
         audit["usable_capabilities"].append(name)
