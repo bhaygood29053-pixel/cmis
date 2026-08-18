@@ -85,7 +85,7 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         self.assertEqual(response["data"]["echo_asset"], "AGI")
         self.assertEqual(running.gateway.requests[0]["asset"], "AGI")
 
-    def test_capabilities_expose_service_contract(self):
+    def test_capabilities_expose_versioned_chain_contract(self):
         with RunningServer() as running:
             with urlopen(
                 running.base_url + "/v1/cmis/capabilities",
@@ -93,7 +93,10 @@ class CMISHTTPGatewayTests(unittest.TestCase):
             ) as raw:
                 response = json.loads(raw.read().decode("utf-8"))
 
+        # Original flat fields remain for backward compatibility.
         self.assertEqual(response["version"], 1)
+        self.assertEqual(response["schema_version"], 1)
+        self.assertEqual(response["contract_version"], "1.6.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
         self.assertEqual(len(response["supported_services"]), 10)
         self.assertIn("verification_evidence", response["supported_services"])
@@ -101,6 +104,20 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         self.assertIn("verified_asset_activity", response["supported_services"])
         self.assertEqual(response["supported_chains"], ["x1"])
         self.assertIn("solana", response["known_chains"])
+
+        x1 = response["chains"]["x1"]["services"]
+        solana = response["chains"]["solana"]["services"]
+        self.assertEqual(x1["risk_check"]["state"], "supported")
+        self.assertTrue(x1["risk_check"]["callable"])
+        self.assertEqual(x1["pre_trade_check"]["state"], "bounded")
+        self.assertIn("analysis_only", x1["pre_trade_check"]["limitations"])
+        self.assertEqual(solana["asset_lookup"]["state"], "bounded")
+        self.assertTrue(solana["asset_lookup"]["callable"])
+        self.assertIn("exact_mint", solana["asset_lookup"]["requirements"])
+        self.assertEqual(solana["risk_check"]["state"], "partial")
+        self.assertFalse(solana["pre_trade_check"]["callable"])
+        self.assertEqual(solana["pre_trade_check"]["state"], "unavailable")
+        self.assertFalse(solana["verification_evidence"]["callable"])
 
     def test_bearer_auth_is_enforced_when_configured(self):
         with RunningServer(api_key="test-secret") as running:
