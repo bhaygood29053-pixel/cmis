@@ -1,12 +1,8 @@
 """Machine-readable CMIS capability contract for external Chain Scouts.
 
-This module is the CMIS-side source of truth for *service eligibility*. It does
-not claim that a provider is healthy, that a requested asset is available, or
-that a service will return ``ok`` for every request. Those remain runtime facts
-expressed by the normal CMIS service envelope.
-
-The contract intentionally sits between Chain Scouts and CMIS. Roberta does not
-need to call or understand this endpoint directly.
+This module is the CMIS-side source of truth for service eligibility and for the
+accepted X1 evidence boundary. Runtime capability does not imply provider
+health, universal asset coverage, or proof beyond the scope explicitly named.
 """
 
 from __future__ import annotations
@@ -14,9 +10,13 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Iterable, Mapping
 
+from liquidity_scout.cmis.x1_evidence_capabilities import (
+    build_x1_evidence_capability_manifest,
+)
+
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.7.0"
+CMIS_CONTRACT_VERSION = "1.7.1"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 CAPABILITY_STATES = frozenset({"supported", "bounded", "partial", "unavailable"})
@@ -38,10 +38,6 @@ def _capability(
     }
 
 
-# Every runtime-advertised service must appear for every known chain. This is
-# deliberately explicit: adding a runtime service without classifying its chain
-# eligibility should fail contract validation instead of silently reaching a
-# Scout with an ambiguous capability boundary.
 _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
     "x1": {
         "asset_lookup": _capability("supported"),
@@ -174,7 +170,6 @@ def validate_capability_contract(
     known_chains: Iterable[object],
 ) -> None:
     """Fail loudly when runtime services/chains drift from the manifest."""
-
     services = set(_normalized(runtime_services))
     chains = set(_normalized(known_chains))
     manifest_chains = set(_CHAIN_SERVICE_CAPABILITIES)
@@ -213,14 +208,7 @@ def build_capability_manifest(
     known_chains: Iterable[object],
     request_path: str = "/v1/cmis",
 ) -> dict[str, Any]:
-    """Return a fresh JSON-safe capability manifest for Chain Scouts.
-
-    ``legacy_supported_chains`` is retained because the original HTTP contract
-    exposed the base gateway's fully supported chain list. Chain-specific
-    runtime mixins can now expose narrower capabilities for other known chains,
-    so consumers should use ``chains[*].services`` for eligibility decisions.
-    """
-
+    """Return a fresh JSON-safe capability manifest for Chain Scouts."""
     runtime_services = _normalized(runtime_services)
     known_chains = _normalized(known_chains)
     legacy_supported_chains = _normalized(legacy_supported_chains)
@@ -232,7 +220,7 @@ def build_capability_manifest(
     chains: dict[str, Any] = {}
     for chain in known_chains:
         services = deepcopy(_CHAIN_SERVICE_CAPABILITIES[chain])
-        chains[chain] = {
+        chain_record: dict[str, Any] = {
             "services": services,
             "callable_services": [
                 service
@@ -240,6 +228,16 @@ def build_capability_manifest(
                 if services[service]["callable"] is True
             ],
         }
+        if chain == "x1":
+            x1_evidence = build_x1_evidence_capability_manifest()
+            chain_record["evidence_capability_schema_version"] = x1_evidence[
+                "schema_version"
+            ]
+            chain_record["evidence_promotion_rule"] = x1_evidence[
+                "promotion_rule"
+            ]
+            chain_record["evidence_capabilities"] = x1_evidence["capabilities"]
+        chains[chain] = chain_record
 
     return {
         "service": "cmis_gateway",
@@ -253,8 +251,6 @@ def build_capability_manifest(
             "risk_separate_from_proof": True,
             "missing_evidence_is_unknown": True,
         },
-        # Backward-compatible flat fields. New Scouts should consume the
-        # chain-specific service table above.
         "supported_services": list(runtime_services),
         "supported_chains": list(legacy_supported_chains),
         "known_chains": list(known_chains),
@@ -269,7 +265,6 @@ def service_capability(
     service: str,
 ) -> Mapping[str, Any] | None:
     """Read one capability record from a manifest without guessing defaults."""
-
     chains = manifest.get("chains")
     if not isinstance(chains, Mapping):
         return None
