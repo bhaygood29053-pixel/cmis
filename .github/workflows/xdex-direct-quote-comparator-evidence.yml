@@ -1,0 +1,46 @@
+name: XDEX Direct Quote Comparator Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-direct-quote-comparator-evidence:
+    name: Read-only direct-candidate quote comparison
+    if: github.head_ref == 'agent/xdex-direct-quote-comparator-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_DIRECT_QUOTE_COMPARATOR_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compare every verified direct XDEX candidate read-only
+        run: |
+          python -m unittest tests.test_xdex_direct_quote_comparator_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1 RPC discovery/account reads plus XDEX quote GET only."
+          echo "Every verified direct candidate must validate and quote before comparison can complete."
+          echo "Preference means only highest current zero-slippage quote output among compared direct XDEX candidates."
+          echo "No best-execution claim, expected fill/slippage, route quality, global X1 DEX optimum, /swap/prepare, transaction construction, signing, broadcasting, custody, simulation, execution, or value movement."
