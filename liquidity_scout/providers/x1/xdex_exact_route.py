@@ -61,8 +61,9 @@ def _route(value: Any) -> dict[str, str]:
     if any(not isinstance(key, str) for key in value):
         raise ValueError("route keys must be strings")
     unknown = sorted(set(value) - set(ROUTE_FIELDS))
-    if unknown:
-        raise ValueError("unknown route fields: " + ", ".join(unknown))
+    missing = sorted(set(ROUTE_FIELDS) - set(value))
+    if unknown or missing:
+        raise ValueError(f"route fields mismatch: missing={missing!r}, unknown={unknown!r}")
     result = {field: _text(value.get(field), f"route.{field}") for field in ROUTE_FIELDS}
     if result["token_in_mint"] == result["token_out_mint"]:
         raise ValueError("route token_in_mint and token_out_mint must differ")
@@ -70,10 +71,12 @@ def _route(value: Any) -> dict[str, str]:
 
 
 def _decimal(value: Any, field: str, *, positive: bool = False) -> Decimal:
-    if isinstance(value, bool):
+    if value is None or isinstance(value, bool):
+        raise ValueError(f"{field} must be a finite decimal")
+    if isinstance(value, str) and (not value or value.strip() != value):
         raise ValueError(f"{field} must be a finite decimal")
     try:
-        result = Decimal(str(value).strip())
+        result = Decimal(str(value))
     except (InvalidOperation, ValueError, AttributeError) as exc:
         raise ValueError(f"{field} must be a finite decimal") from exc
     if not result.is_finite() or (positive and result <= 0):
@@ -90,14 +93,32 @@ def _pubkey(data: bytes, offset: int) -> str:
     return encode_base58_pubkey(data[offset : offset + 32])
 
 
-def _decode_pool_state(account: Mapping[str, Any], *, pool: str) -> dict[str, Any]:
-    owner = account.get("owner")
+def _verified_program_account(
+    account: Mapping[str, Any],
+    *,
+    expected_account: str,
+    label: str,
+) -> bytes:
+    if not isinstance(account, Mapping):
+        raise XDEXExactRouteError(f"{label} account state is unavailable")
+    if account.get("account") != expected_account:
+        raise XDEXExactRouteError(f"{label} account identity does not match the requested address")
+    if account.get("account_exists") is not True:
+        raise XDEXExactRouteError(f"{label} account does not exist")
+    if account.get("response_integrity_verified") is not True:
+        raise XDEXExactRouteError(f"{label} account response integrity is not verified")
+    if account.get("owner") != X1_PROGRAM:
+        raise XDEXExactRouteError(f"{label} is not owned by the accepted XDEX X1 program")
     data = account.get("data")
-    if owner != X1_PROGRAM:
-        raise XDEXExactRouteError("exact pool is not owned by the accepted XDEX X1 program")
-    if not isinstance(data, (bytes, bytearray)) or len(data) != POOL_STATE_LENGTH:
+    if not isinstance(data, (bytes, bytearray)):
+        raise XDEXExactRouteError(f"{label} account returned no verified binary data")
+    return bytes(data)
+
+
+def _decode_pool_state(account: Mapping[str, Any], *, pool: str) -> dict[str, Any]:
+    raw = _verified_program_account(account, expected_account=pool, label="exact pool")
+    if len(raw) != POOL_STATE_LENGTH:
         raise XDEXExactRouteError("exact pool state does not match the accepted XDEX layout")
-    raw = bytes(data)
     return {
         "pool": pool,
         "amm_config": _pubkey(raw, 8),
@@ -117,13 +138,13 @@ def _decode_pool_state(account: Mapping[str, Any], *, pool: str) -> dict[str, An
 
 
 def _decode_config_state(account: Mapping[str, Any], *, amm_config: str) -> dict[str, Any]:
-    owner = account.get("owner")
-    data = account.get("data")
-    if owner != X1_PROGRAM:
-        raise XDEXExactRouteError("AMM config is not owned by the accepted XDEX X1 program")
-    if not isinstance(data, (bytes, bytearray)) or len(data) < 116:
+    raw = _verified_program_account(
+        account,
+        expected_account=amm_config,
+        label="AMM config",
+    )
+    if len(raw) < 116:
         raise XDEXExactRouteError("AMM config state does not match the accepted XDEX layout")
-    raw = bytes(data)
     return {
         "amm_config": amm_config,
         "trade_fee_rate_ppm": _u64(raw, 12),
@@ -133,31 +154,55 @@ def _decode_config_state(account: Mapping[str, Any], *, amm_config: str) -> dict
     }
 
 
-def _verified_vault_raw_amount(
+def _verified_vault(
     fetcher: Callable[[str], Any],
     vault: str,
     mint: str,
-) -> int:
+    decimals: int,
+) -> tuple[int, str]:
     record = fetcher(vault)
-    if not isinstance(record, Mapping) or record.get("identity_verified") is not True:
+    if not isinstance(record, Mapping):
+        raise XDEXExactRouteError("pool vault token-account evidence is unavailable")
+    if record.get("account") != vault:
+        raise XDEXExactRouteError("pool vault account identity does not match the requested vault")
+    if record.get("account_exists") is not True:
+        raise XDEXExactRouteError("pool vault token account does not exist")
+    if record.get("identity_verified") is not True:
         raise XDEXExactRouteError("pool vault token-account identity is not verified")
     if record.get("mint") != mint:
         raise XDEXExactRouteError("pool vault mint identity does not match decoded pool state")
+    if record.get("decimals") != decimals:
+        raise XDEXExactRouteError("pool vault decimals do not match decoded pool state")
+    authority = record.get("token_authority")
+    if not isinstance(authority, str) or not authority or authority.strip() != authority:
+        raise XDEXExactRouteError("pool vault token authority is not verified")
     raw = record.get("raw_amount")
-    if isinstance(raw, bool):
-        raise XDEXExactRouteError("pool vault raw amount is invalid")
-    try:
-        amount = int(raw)
-    except (TypeError, ValueError) as exc:
-        raise XDEXExactRouteError("pool vault raw amount is invalid") from exc
-    if amount < 0:
-        raise XDEXExactRouteError("pool vault raw amount must be non-negative")
-    return amount
+    if not isinstance(raw, str) or not raw.isdigit():
+        raise XDEXExactRouteError("pool vault raw amount must be a canonical non-negative integer string")
+    amount = int(raw)
+    if str(amount) != raw:
+        raise XDEXExactRouteError("pool vault raw amount must be a canonical non-negative integer string")
+    return amount, authority
 
 
-def _active_reserves(pool: Mapping[str, Any], token_account_fetcher: Callable[[str], Any]) -> tuple[int, int]:
-    gross_0 = _verified_vault_raw_amount(token_account_fetcher, pool["vault_0"], pool["mint_0"])
-    gross_1 = _verified_vault_raw_amount(token_account_fetcher, pool["vault_1"], pool["mint_1"])
+def _active_reserves(
+    pool: Mapping[str, Any],
+    token_account_fetcher: Callable[[str], Any],
+) -> tuple[int, int]:
+    gross_0, authority_0 = _verified_vault(
+        token_account_fetcher,
+        pool["vault_0"],
+        pool["mint_0"],
+        pool["decimals_0"],
+    )
+    gross_1, authority_1 = _verified_vault(
+        token_account_fetcher,
+        pool["vault_1"],
+        pool["mint_1"],
+        pool["decimals_1"],
+    )
+    if authority_0 != authority_1:
+        raise XDEXExactRouteError("verified XDEX pool vaults do not share the same token authority")
     reserve_0 = gross_0 - pool["protocol_fees_0"] - pool["fund_fees_0"] - pool["creator_fees_0"]
     reserve_1 = gross_1 - pool["protocol_fees_1"] - pool["fund_fees_1"] - pool["creator_fees_1"]
     if reserve_0 <= 0 or reserve_1 <= 0:
@@ -177,6 +222,8 @@ def _raw_amount(ui_amount: Any, decimals: int) -> int:
 
 
 def _ceil_fee(amount: int, rate_ppm: int) -> int:
+    if isinstance(rate_ppm, bool) or not isinstance(rate_ppm, int):
+        raise XDEXExactRouteError("AMM trade fee rate must be an integer")
     if rate_ppm < 0 or rate_ppm >= FEE_DENOMINATOR:
         raise XDEXExactRouteError("AMM trade fee rate is outside the accepted range")
     if rate_ppm == 0:
@@ -253,8 +300,6 @@ def collect_exact_route_snapshot(
     """Collect a fully verified direct-route snapshot without preparing execution."""
     normalized = _route(route)
     pool_account = account_state_fetcher(normalized["pool"])
-    if not isinstance(pool_account, Mapping):
-        raise XDEXExactRouteError("pool account state is unavailable")
     pool = _decode_pool_state(pool_account, pool=normalized["pool"])
     if pool["amm_config"] != normalized["amm_config"]:
         raise XDEXExactRouteError("decoded pool AMM config does not match the requested route")
@@ -265,8 +310,6 @@ def collect_exact_route_snapshot(
         raise XDEXExactRouteError("decoded pool mint pair does not match the requested route")
 
     config_account = account_state_fetcher(normalized["amm_config"])
-    if not isinstance(config_account, Mapping):
-        raise XDEXExactRouteError("AMM config account state is unavailable")
     config = _decode_config_state(config_account, amm_config=normalized["amm_config"])
 
     reserve_0, reserve_1 = _active_reserves(pool, token_account_fetcher)
