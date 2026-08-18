@@ -34,6 +34,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Verify deterministic route resolver regressions
+        run: |
+          python -m unittest tests.test_cmis_xdex_route_resolver -v
+
       - name: Diagnose 3000ppm price-impact metadata
         run: |
           python -m unittest tests.test_xdex_3000_price_impact_diagnostic_live -v
