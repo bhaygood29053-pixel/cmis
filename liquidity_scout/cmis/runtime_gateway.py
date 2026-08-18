@@ -2,12 +2,13 @@
 
 The HTTP runtime needs the accepted risk/trade extensions, persisted
 ``verification_evidence`` lookup, narrowly eligible Solana identity/tokenomics/
-market/history/risk layers, and deterministic evidence-quality metadata on one
-cooperative gateway class.
+market/history/risk layers, deterministic XDEX route evidence, and evidence-
+quality metadata on one cooperative gateway class.
 
-Verification evidence persistence is an internal runtime dependency. Callers
-can select evidence only by the public service contract; they cannot choose a
-SQLite path or inject a ledger through an HTTP request.
+Verification evidence persistence and the XDEX exact-route resolver are internal
+runtime dependencies. Callers can select evidence only by the public service
+contract; they cannot inject a ledger, trusted route evidence, or resolver
+through an HTTP request.
 
 Solana service code remains provider-injected, but the production runtime can
 construct accepted read-only providers from deployment environment
@@ -46,6 +47,7 @@ from liquidity_scout.cmis.verification_gateway import (
 from liquidity_scout.cmis.verified_xdex_program_scope_gateway import (
     VerifiedXDEXProgramScopeMixin,
 )
+from liquidity_scout.cmis.xdex_route_resolver import resolve_xdex_route_evidence
 
 
 DEFAULT_VERIFICATION_EVIDENCE_DB = os.path.join(
@@ -83,6 +85,7 @@ class RuntimeCMISGateway(
         verification_evidence_ledger: Any = None,
         verification_evidence_db_path: str | None = None,
         solana_runtime_env: Any = None,
+        xdex_route_resolver: Any = None,
         **kwargs: Any,
     ):
         ledger = verification_evidence_ledger
@@ -115,6 +118,14 @@ class RuntimeCMISGateway(
         for name, dependency in solana_dependencies.items():
             kwargs.setdefault(name, dependency)
         self.solana_runtime_configuration = solana_status
+
+        self.xdex_route_resolver = (
+            resolve_xdex_route_evidence
+            if xdex_route_resolver is None
+            else xdex_route_resolver
+        )
+        if not callable(self.xdex_route_resolver):
+            raise ValueError("xdex_route_resolver must be callable when supplied")
 
         super().__init__(verification_evidence_ledger=ledger, **kwargs)
 
