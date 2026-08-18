@@ -90,6 +90,12 @@ Those requests receive this professional response:
 > this site at this time. I can still help here with general questions and
 > concise information.
 
+Supported Roberta replies are also converted to MoltGrid-safe plain text in
+simple-only mode. Markdown headings, bold/code markers, and list syntax are
+removed as presentation only; answer facts are not summarized or recalculated.
+List items are rendered with Unicode bullets so the response remains readable
+when MoltGrid does not interpret Markdown.
+
 Disable the flag later when MoltGrid presentation capabilities improve or when
 a richer response surface is available.
 
@@ -109,32 +115,102 @@ They are retained for rollback and compatibility. Once a compatibility route
 has been handed to Roberta, a Roberta bridge failure returns the same concise
 availability message instead of exposing a legacy formatter response.
 
-## Start order
+## Recommended production service stack
 
-1. Start the CMIS gateway from the Liquidity Scout environment:
+The production deployment should run CMIS, Roberta, and the MoltGrid listener as
+managed systemd services. This removes the need to keep terminal sessions open.
+
+1. Install the CMIS gateway from the Liquidity Scout repository:
+
+```bash
+bash scripts/install_cmis_systemd.sh
+```
+
+CMIS listens on `127.0.0.1:8765`, starts automatically, and restarts after an
+unexpected failure.
+
+2. Install the Roberta bridge from the `roberta-langgraph` repository:
+
+```bash
+bash scripts/install_roberta_bridge_systemd.sh
+```
+
+Roberta listens on `127.0.0.1:8766`. Its installer stores model secrets outside
+Git and waits for the bridge health endpoint before declaring success.
+
+3. After the existing `liquidity-scout.service` listener unit is installed,
+   install the startup dependency drop-in from this repository:
+
+```bash
+bash scripts/install_moltgrid_service_dependencies.sh
+```
+
+The helper writes a systemd drop-in that declares:
+
+```ini
+[Unit]
+Wants=roberta-bridge.service cmis-gateway.service
+After=roberta-bridge.service cmis-gateway.service
+```
+
+It also adds pre-start health gates for both `http://127.0.0.1:8766/healthz`
+and `http://127.0.0.1:8765/healthz`. Each dependency gets up to 30 seconds to
+become healthy before the MoltGrid listener startup fails closed.
+
+The listener remains loosely coupled with `Wants=` rather than `Requires=` so a
+later Roberta or CMIS restart does not automatically tear down the transport.
+Roberta's user-facing availability handling remains responsible for temporary
+runtime outages.
+
+If the listener unit uses a different service name, set
+`LIQUIDITY_SCOUT_SERVICE_NAME` when running the helper.
+
+Expected managed topology:
+
+```text
+cmis-gateway.service       -> 127.0.0.1:8765
+roberta-bridge.service     -> 127.0.0.1:8766
+            \                 /
+             \               /
+              v             v
+             liquidity-scout.service
+                     |
+                     v
+              MoltGrid / Signal
+                     |
+                     v
+                  Roberta
+                     |
+                  X1 Scout
+                     |
+                    CMIS
+```
+
+## Manual development start order
+
+For local development only, the same components can still be launched manually
+in separate terminals:
 
 ```bash
 python -m liquidity_scout.cmis.http
 ```
 
-2. Start Roberta from the `roberta-langgraph` environment after exporting the
-   live model key:
+then, from the Roberta repository after loading its model environment:
 
 ```bash
 roberta-serve
 ```
 
-For production, prefer a managed Roberta bridge service with an environment file
-outside the repository rather than keeping a terminal open or storing model
-secrets in source control.
-
-3. Start the MoltGrid listener from the Liquidity Scout environment:
+then the MoltGrid listener:
 
 ```bash
 ROBERTA_MOLTGRID_ALL_QUESTIONS_ENABLED=1 \
 ROBERTA_MOLTGRID_SIMPLE_ONLY_ENABLED=1 \
 python -m liquidity_scout.integrations.moltgrid_roberta
 ```
+
+Do not run a manual listener at the same time as the managed
+`liquidity-scout.service` listener.
 
 Defaults:
 
