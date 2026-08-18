@@ -1,0 +1,312 @@
+name: XDEX Live Contract Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-live-contract:
+    name: Read-only XDEX quote/history contract
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.head_ref == 'agent/issue28-xdex-quote-semantics'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Capture current public XDEX pool-list schema
+        run: |
+          python - <<'PY'
+          import json
+          from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
+
+          pools = XDEXReadOnlyProvider(timeout=20).pool_list()
+          print(f"[XDEX pool-list evidence] count={len(pools)}")
+          print("[XDEX pool-list keys] " + json.dumps(sorted({key for row in pools[:25] for key in row.keys()})))
+          print("[XDEX pool-list sample] " + json.dumps(pools[:5], sort_keys=True, default=str))
+          PY
+
+      - name: Probe pinned XENCAT and native-XNT quote identifiers
+        run: |
+          python - <<'PY'
+          import json
+          from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
+
+          provider = XDEXReadOnlyProvider(timeout=20)
+          xencat = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
+          xnt = "So11111111111111111111111111111111111111112"
+
+          for token_in, token_out, label in (
+              (xencat, xnt, "XENCAT->So111"),
+              (xnt, xencat, "So111->XENCAT"),
+          ):
+              for amount in (1, 2):
+                  data = provider.swap_quote(
+                      token_in,
+                      token_out,
+                      amount,
+                      is_exact_amount_in=True,
+                  )
+                  print(
+                      f"[XDEX direct quote {label} amount={amount}] SUCCESS "
+                      + json.dumps(data, sort_keys=True, default=str)
+                  )
+          PY
+
+      - name: Compare live quote with verified XENCAT XNT CP-swap candidates
+        run: |
+          python - <<'PY'
+          import json
+          import struct
+          from decimal import Decimal
+
+          from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
+          from liquidity_scout.providers.x1.candidate_pool_role import (
+              encode_base58_pubkey,
+              verify_candidate_pool_role,
+          )
+          from liquidity_scout.providers.x1.mint_filtered_pool_discovery import (
+              discover_program_state_accounts_for_mint,
+          )
+          from liquidity_scout.providers.x1.pool_state_fingerprint import fetch_account_state
+          from liquidity_scout.providers.x1.rpc import get_token_account_info
+
+          PROGRAM = "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN"
+          XENCAT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
+          XNT = "So11111111111111111111111111111111111111112"
+          FEE_DENOM = 1_000_000
+
+          def u64(data, offset):
+              return struct.unpack_from("<Q", data, offset)[0]
+
+          def pubkey(data, offset):
+              return encode_base58_pubkey(data[offset:offset + 32])
+
+          def ceil_fee(amount, rate):
+              return (amount * rate + FEE_DENOM - 1) // FEE_DENOM if rate else 0
+
+          def parse_pool(account):
+              state = fetch_account_state(account)
+              data = state["data"]
+              if state.get("owner") != PROGRAM or len(data) != 637:
+                  return None
+              return {
+                  "account": account,
+                  "amm_config": pubkey(data, 8),
+                  "vault_0": pubkey(data, 72),
+                  "vault_1": pubkey(data, 104),
+                  "mint_0": pubkey(data, 168),
+                  "mint_1": pubkey(data, 200),
+                  "mint_0_decimals": data[331],
+                  "mint_1_decimals": data[332],
+                  "protocol_fees_0": u64(data, 341),
+                  "protocol_fees_1": u64(data, 349),
+                  "fund_fees_0": u64(data, 357),
+                  "fund_fees_1": u64(data, 365),
+                  "creator_fee_on": data[389],
+                  "enable_creator_fee": bool(data[390]),
+                  "creator_fees_0": u64(data, 397),
+                  "creator_fees_1": u64(data, 405),
+              }
+
+          config_cache = {}
+          def parse_config(address):
+              if address in config_cache:
+                  return config_cache[address]
+              state = fetch_account_state(address)
+              data = state["data"]
+              if state.get("owner") != PROGRAM or len(data) < 108:
+                  return None
+              config = {
+                  "address": address,
+                  "owner": state.get("owner"),
+                  "space": state.get("space"),
+                  "trade_fee_rate": u64(data, 12),
+                  "protocol_fee_rate": u64(data, 20),
+                  "fund_fee_rate": u64(data, 28),
+                  "creator_fee_rate": u64(data, 108) if len(data) >= 116 else 0,
+              }
+              config_cache[address] = config
+              return config
+
+          def creator_fee_on_input(pool, config, direction):
+              rate = config.get("creator_fee_rate", 0)
+              if not pool["enable_creator_fee"] or rate == 0:
+                  return False, 0
+              mode = pool["creator_fee_on"]
+              return (
+                  mode == 0
+                  or (mode == 1 and direction == "0to1")
+                  or (mode == 2 and direction == "1to0")
+              ), rate
+
+          def cp_exact_in(raw_input, rin, rout, pool, config, direction):
+              creator_on_input, creator_rate = creator_fee_on_input(pool, config, direction)
+              trade_rate = config["trade_fee_rate"]
+              if creator_on_input:
+                  total_fee = ceil_fee(raw_input, trade_rate + creator_rate)
+                  creator_fee = (
+                      total_fee * creator_rate // (trade_rate + creator_rate)
+                      if creator_rate else 0
+                  )
+                  trade_fee = total_fee - creator_fee
+                  less_fees = raw_input - total_fee
+              else:
+                  trade_fee = ceil_fee(raw_input, trade_rate)
+                  creator_fee = 0
+                  less_fees = raw_input - trade_fee
+
+              swapped = less_fees * rout // (rin + less_fees)
+              if not creator_on_input and creator_rate:
+                  creator_fee = ceil_fee(swapped, creator_rate)
+                  output = swapped - creator_fee
+              else:
+                  output = swapped
+              return output, trade_fee, creator_fee
+
+          provider = XDEXReadOnlyProvider(timeout=20)
+          quotes = {
+              ("0to1", 1): provider.swap_quote(XNT, XENCAT, 1, is_exact_amount_in=True),
+              ("0to1", 2): provider.swap_quote(XNT, XENCAT, 2, is_exact_amount_in=True),
+              ("1to0", 1): provider.swap_quote(XENCAT, XNT, 1, is_exact_amount_in=True),
+              ("1to0", 2): provider.swap_quote(XENCAT, XNT, 2, is_exact_amount_in=True),
+          }
+
+          discovery = discover_program_state_accounts_for_mint(
+              mint=XENCAT,
+              program_id=PROGRAM,
+              account_space=637,
+              mint_offsets=(168, 200),
+          )
+          assert discovery["summary"]["all_filter_queries_integrity_verified"] is True
+          print("[XDEX mint-filtered discovery] " + json.dumps({
+              "summary": discovery["summary"],
+              "accounts": [row["pubkey"] for row in discovery["accounts"]],
+          }, sort_keys=True, default=str))
+
+          candidates = []
+          for row in discovery["accounts"]:
+              account = row["pubkey"]
+              role = verify_candidate_pool_role(
+                  account=account,
+                  target_mint=XENCAT,
+                  program_id=PROGRAM,
+                  signature_limit=1,
+              )
+              if role.get("summary", {}).get("pool_state_structural_role_verified") is not True:
+                  continue
+              pool = parse_pool(account)
+              if not pool or {pool["mint_0"], pool["mint_1"]} != {XNT, XENCAT}:
+                  continue
+              config = parse_config(pool["amm_config"])
+              if not config:
+                  continue
+
+              v0 = get_token_account_info(pool["vault_0"])
+              v1 = get_token_account_info(pool["vault_1"])
+              if not v0 or not v1 or not v0.get("identity_verified") or not v1.get("identity_verified"):
+                  continue
+              if v0["mint"] != pool["mint_0"] or v1["mint"] != pool["mint_1"]:
+                  continue
+
+              r0 = int(v0["raw_amount"]) - pool["protocol_fees_0"] - pool["fund_fees_0"] - pool["creator_fees_0"]
+              r1 = int(v1["raw_amount"]) - pool["protocol_fees_1"] - pool["fund_fees_1"] - pool["creator_fees_1"]
+              if r0 <= 0 or r1 <= 0:
+                  continue
+
+              evidence = {
+                  "pool": account,
+                  "amm_config": pool["amm_config"],
+                  "trade_fee_rate": config["trade_fee_rate"],
+                  "trade_fee_pct": str(Decimal(config["trade_fee_rate"]) / Decimal(10_000)),
+                  "reserves_ui": {
+                      "mint0": str(Decimal(r0) / (Decimal(10) ** pool["mint_0_decimals"])),
+                      "mint1": str(Decimal(r1) / (Decimal(10) ** pool["mint_1_decimals"])),
+                  },
+                  "matches": [],
+              }
+
+              for direction, amount in (("0to1", 1), ("0to1", 2), ("1to0", 1), ("1to0", 2)):
+                  if direction == "0to1":
+                      rin, rout = r0, r1
+                      din, dout = pool["mint_0_decimals"], pool["mint_1_decimals"]
+                  else:
+                      rin, rout = r1, r0
+                      din, dout = pool["mint_1_decimals"], pool["mint_0_decimals"]
+                  raw_input = amount * (10 ** din)
+                  expected_raw, trade_fee_raw, creator_fee_raw = cp_exact_in(
+                      raw_input, rin, rout, pool, config, direction
+                  )
+                  expected_ui = Decimal(expected_raw) / (Decimal(10) ** dout)
+                  quoted_ui = Decimal(str(quotes[(direction, amount)]["outputAmount"]))
+                  raw_delta = int((quoted_ui - expected_ui) * (Decimal(10) ** dout))
+                  less_fees = raw_input - trade_fee_raw
+                  curve_impact_pct = (
+                      Decimal(less_fees) / Decimal(rin + less_fees) * Decimal(100)
+                  )
+                  evidence["matches"].append({
+                      "direction": direction,
+                      "amount": amount,
+                      "quoted_output": str(quoted_ui),
+                      "reproduced_output": str(expected_ui),
+                      "raw_output_delta": raw_delta,
+                      "trade_fee_raw": trade_fee_raw,
+                      "creator_fee_raw": creator_fee_raw,
+                      "computed_curve_impact_pct": str(curve_impact_pct),
+                      "provider_price_impact_pct": quotes[(direction, amount)].get("priceImpactPct"),
+                      "provider_amm_config": quotes[(direction, amount)].get("amm_config_address"),
+                  })
+              candidates.append(evidence)
+
+          print("[XDEX all verified XENCAT/XNT CP-swap candidates] " + json.dumps(candidates, sort_keys=True, default=str))
+          assert candidates, "No structurally verified XENCAT/XNT pools were found."
+
+          ranked = sorted(
+              candidates,
+              key=lambda row: sum(abs(m["raw_output_delta"]) for m in row["matches"]),
+          )
+          best = ranked[0]
+          reproduction_verified = all(abs(m["raw_output_delta"]) <= 2 for m in best["matches"])
+          best["curve_reproduction_verified"] = reproduction_verified
+          best["curve_reproduction_interpretation"] = (
+              "provider quote reproduced at raw-token rounding precision"
+              if reproduction_verified
+              else "provider route identity is observed, but curve/fee/output semantics remain unverified"
+          )
+          print("[XDEX best route comparison] " + json.dumps(best, sort_keys=True, default=str))
+
+          # Route/config identity is independently observable and remains a hard gate.
+          assert all(m["provider_amm_config"] == best["amm_config"] for m in best["matches"]), best
+          # A quote/output mismatch is evidence about incomplete curve/fee semantics, not a reason to
+          # suppress the downstream read-only response-contract probe.
+          PY
+
+      - name: Probe live structurally verified XDEX native-pair contract
+        env:
+          RUN_XDEX_LIVE_TESTS: "1"
+        run: |
+          python -m unittest tests.test_xdex_verified_native_pair_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "This workflow performs read-only XDEX GET/RPC evidence probes only."
+          echo "No swap prepare, transaction construction, signing, broadcasting, custody, or value movement is permitted."

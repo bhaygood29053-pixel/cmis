@@ -1,0 +1,44 @@
+name: XDEX Price Impact Semantic Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-price-impact-semantic-evidence:
+    name: Read-only XDEX price-impact semantics
+    if: github.head_ref == 'agent/issue28-xdex-quote-semantics'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_PRICE_IMPACT_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Reproduce XDEX price impact from X1 RPC pool state
+        run: |
+          python -m unittest tests.test_xdex_price_impact_semantics_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only XDEX GET and X1 RPC evidence only."
+          echo "No swap preparation, transaction construction, signing, broadcasting, custody, execution, or value movement."

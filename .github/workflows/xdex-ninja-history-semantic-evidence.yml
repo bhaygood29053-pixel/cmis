@@ -1,0 +1,56 @@
+name: XDEX Ninja History Semantic Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  history-semantic-evidence:
+    name: Read-only XDEX vs X1.Ninja history semantics
+    if: github.head_ref == 'agent/issue28-xdex-quote-semantics'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_NINJA_HISTORY_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Cross-check XDEX history against X1.Ninja indexed evidence
+        run: |
+          python -m unittest \
+            tests.test_xdex_ninja_history_semantics_live \
+            tests.test_xdex_history_field_semantics_live \
+            -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only HTTP/RPC evidence only."
+          echo "No swap preparation, transaction construction, signing, broadcasting, custody, execution, or value movement."
