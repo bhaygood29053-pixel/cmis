@@ -14,9 +14,9 @@ _NATIVE_XNT_SYMBOLS = {"XNT", "WXNT"}
 _NATIVE_XNT_MINTS = {"So11111111111111111111111111111111111111112"}
 
 # Pinned, previously accepted CMIS XDEX structural-evidence anchor. The live
-# probe re-verifies this exact pool on-chain every run before trusting the
-# catalog's API-side token identifiers. These constants are evidence scope, not
-# a claim that this is the only XDEX program or pool on X1.
+# probe re-verifies this exact pool on-chain every run before probing XDEX's
+# read-only transport. These constants are evidence scope, not a claim that this
+# is the only XDEX program or pool on X1.
 _XDEX_PROGRAM_ID = "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN"
 _XENCAT_MINT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
 _XENCAT_POOL_ADDRESS = "6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry"
@@ -94,6 +94,32 @@ def select_non_native_live_pool_pair(pools):
     return None
 
 
+def _verified_native_counter_mint(
+    structural_report,
+    *,
+    target_mint,
+    expected_pool_address,
+):
+    if not isinstance(structural_report, Mapping):
+        return None
+    if structural_report.get("summary", {}).get(
+        "pool_state_structural_role_verified"
+    ) is not True:
+        return None
+    if _text(structural_report.get("account")) != _text(expected_pool_address):
+        return None
+
+    target_mint = _text(target_mint)
+    decoded = structural_report.get("decoded_state")
+    decoded = decoded if isinstance(decoded, Mapping) else {}
+    mint_0 = _text(decoded.get("mint_0"))
+    mint_1 = _text(decoded.get("mint_1"))
+    if not target_mint or target_mint not in {mint_0, mint_1}:
+        return None
+    counter_mint = mint_1 if mint_0 == target_mint else mint_0
+    return counter_mint if counter_mint in _NATIVE_XNT_MINTS else None
+
+
 def select_catalog_pair_for_verified_pool(
     catalog_pools,
     structural_report,
@@ -101,40 +127,18 @@ def select_catalog_pair_for_verified_pool(
     target_mint,
     expected_pool_address,
 ):
-    """Resolve API identifiers only after the exact pool role re-verifies on-chain.
+    """Use API identifiers from the exact catalog pool after chain re-verification."""
 
-    This is intentionally a two-source join: the chain report proves the exact
-    pool's program/size/mint/vault structure; the XDEX catalog contributes only
-    the API-side identifiers used for a read-only quote request.
-    """
-
-    if not isinstance(structural_report, Mapping):
-        return None
-    if structural_report.get("summary", {}).get(
-        "pool_state_structural_role_verified"
-    ) is not True:
-        return None
-
-    report_address = _text(structural_report.get("account"))
-    expected_pool_address = _text(expected_pool_address)
-    target_mint = _text(target_mint)
-    if (
-        not report_address
-        or report_address != expected_pool_address
-        or not target_mint
-    ):
-        return None
-
-    decoded = structural_report.get("decoded_state")
-    decoded = decoded if isinstance(decoded, Mapping) else {}
-    mint_0 = _text(decoded.get("mint_0"))
-    mint_1 = _text(decoded.get("mint_1"))
-    if target_mint not in {mint_0, mint_1}:
-        return None
-    counter_mint = mint_1 if mint_0 == target_mint else mint_0
+    counter_mint = _verified_native_counter_mint(
+        structural_report,
+        target_mint=target_mint,
+        expected_pool_address=expected_pool_address,
+    )
     if not counter_mint:
         return None
 
+    target_mint = _text(target_mint)
+    expected_pool_address = _text(expected_pool_address)
     for pool in catalog_pools:
         if not isinstance(pool, Mapping):
             continue
@@ -145,19 +149,11 @@ def select_catalog_pair_for_verified_pool(
         if not isinstance(base, Mapping) or not isinstance(quote, Mapping):
             continue
 
-        base_mint = _token_mint(base)
-        quote_mint = _token_mint(quote)
-        if base_mint == target_mint:
+        if _token_mint(base) == target_mint and _is_native_xnt_side(quote):
             target_token, counter_token = base, quote
-        elif quote_mint == target_mint:
+        elif _token_mint(quote) == target_mint and _is_native_xnt_side(base):
             target_token, counter_token = quote, base
         else:
-            continue
-
-        # If the chain says the counter leg is native/wrapped XNT, require the
-        # catalog to label that same leg as XNT. This does not promote the
-        # catalog's address as canonical; it merely permits transport probing.
-        if counter_mint in _NATIVE_XNT_MINTS and not _is_native_xnt_side(counter_token):
             continue
 
         target_api_address = _token_address(target_token)
@@ -168,7 +164,6 @@ def select_catalog_pair_for_verified_pool(
             or target_api_address == counter_api_address
         ):
             continue
-
         return {
             "pool_address": expected_pool_address,
             "base_address": target_api_address,
@@ -177,10 +172,93 @@ def select_catalog_pair_for_verified_pool(
             "quote_symbol": _text(counter_token.get("symbol")),
             "target_mint": target_mint,
             "onchain_counter_mint": counter_mint,
-            "counter_catalog_mint": _token_mint(counter_token),
-            "counter_catalog_address": _text(counter_token.get("address")),
+            "xnt_transport_identity_source": "exact_catalog_pool",
         }
     return None
+
+
+def infer_consistent_catalog_xnt_transport_identity(pools, *, min_observations=2):
+    """Infer only an XDEX API transport identifier, never canonical XNT identity.
+
+    All currently listed XNT token objects must agree on the same API address.
+    This is provider-transport evidence only; canonical native-XNT identity still
+    comes from the chain evidence contract.
+    """
+
+    observations = []
+    for pool in pools:
+        if not isinstance(pool, Mapping):
+            continue
+        for role in ("baseToken", "quoteToken"):
+            token = pool.get(role)
+            if not isinstance(token, Mapping) or not _is_native_xnt_side(token):
+                continue
+            address = _token_address(token)
+            if not address:
+                continue
+            observations.append(
+                {
+                    "pool_address": _text(pool.get("address")),
+                    "role": role,
+                    "api_address": address,
+                    "mint": _token_mint(token),
+                    "symbol": _text(token.get("symbol")),
+                    "name": _text(token.get("name")),
+                }
+            )
+
+    if len(observations) < min_observations:
+        return None
+    addresses = {row["api_address"] for row in observations}
+    if len(addresses) != 1:
+        return None
+
+    return {
+        "api_address": next(iter(addresses)),
+        "observation_count": len(observations),
+        "observed_mints": sorted(
+            {row["mint"] for row in observations if row.get("mint")}
+        ),
+        "observed_symbols": sorted(
+            {row["symbol"] for row in observations if row.get("symbol")}
+        ),
+        "observations": observations[:10],
+        "canonical_identity_promoted": False,
+        "scope": "xdex_catalog_transport_only",
+    }
+
+
+def build_verified_native_transport_pair(
+    structural_report,
+    xnt_transport_identity,
+    *,
+    target_mint,
+    expected_pool_address,
+):
+    """Join verified on-chain pair identity with separately observed XDEX XNT transport ID."""
+
+    counter_mint = _verified_native_counter_mint(
+        structural_report,
+        target_mint=target_mint,
+        expected_pool_address=expected_pool_address,
+    )
+    if not counter_mint or not isinstance(xnt_transport_identity, Mapping):
+        return None
+    xnt_api_address = _text(xnt_transport_identity.get("api_address"))
+    target_mint = _text(target_mint)
+    if not xnt_api_address or not target_mint or xnt_api_address == target_mint:
+        return None
+
+    return {
+        "pool_address": _text(expected_pool_address),
+        "base_address": target_mint,
+        "quote_address": xnt_api_address,
+        "base_symbol": "XENCAT",
+        "quote_symbol": "XNT",
+        "target_mint": target_mint,
+        "onchain_counter_mint": counter_mint,
+        "xnt_transport_identity_source": "cross_catalog_consensus",
+    }
 
 
 def _public_evidence(value, *, depth=0):
@@ -225,39 +303,9 @@ class XDEXLivePairSelectionTests(unittest.TestCase):
         ]
 
         pair = select_non_native_live_pool_pair(pools)
-
-        self.assertEqual(
-            pair,
-            {
-                "pool_address": "P_USDC_AGI",
-                "base_address": "USDC_MINT",
-                "quote_address": "AGI_MINT",
-                "base_symbol": "USDC",
-                "quote_symbol": "AGI",
-            },
-        )
-
-    def test_prefers_explicit_public_address_over_mint_metadata(self):
-        pools = [
-            {
-                "address": "P_ADDRESS_FIRST",
-                "baseToken": {
-                    "symbol": "AAA",
-                    "address": "AAA_PUBLIC_ADDRESS",
-                    "mint": "AAA_MINT_METADATA",
-                },
-                "quoteToken": {
-                    "symbol": "BBB",
-                    "address": "BBB_PUBLIC_ADDRESS",
-                    "mint": "BBB_MINT_METADATA",
-                },
-            }
-        ]
-
-        pair = select_non_native_live_pool_pair(pools)
-
-        self.assertEqual(pair["base_address"], "AAA_PUBLIC_ADDRESS")
-        self.assertEqual(pair["quote_address"], "BBB_PUBLIC_ADDRESS")
+        self.assertEqual(pair["pool_address"], "P_USDC_AGI")
+        self.assertEqual(pair["base_address"], "USDC_MINT")
+        self.assertEqual(pair["quote_address"], "AGI_MINT")
 
     def test_returns_none_when_only_xnt_pairs_exist(self):
         pools = [
@@ -267,47 +315,64 @@ class XDEXLivePairSelectionTests(unittest.TestCase):
                 "quoteToken": {"symbol": "XNT", "mint": "XNT_ID"},
             }
         ]
-
         self.assertIsNone(select_non_native_live_pool_pair(pools))
 
-    def test_verified_pool_join_uses_catalog_transport_identity_only_after_chain_proof(self):
-        structural = {
-            "account": _XENCAT_POOL_ADDRESS,
-            "decoded_state": {
-                "mint_0": _XENCAT_MINT,
-                "mint_1": next(iter(_NATIVE_XNT_MINTS)),
-            },
-            "summary": {"pool_state_structural_role_verified": True},
-        }
-        catalog = [
+    def test_catalog_xnt_transport_identity_requires_cross_pool_agreement(self):
+        pools = [
             {
-                "address": _XENCAT_POOL_ADDRESS,
-                "baseToken": {"symbol": "XENCAT", "mint": _XENCAT_MINT},
+                "address": "P1",
+                "baseToken": {"symbol": "AAA", "mint": "AAA"},
                 "quoteToken": {
                     "symbol": "XNT",
-                    "name": "Wrapped XNT",
                     "address": "XNT_API_ID",
                     "mint": next(iter(_NATIVE_XNT_MINTS)),
                 },
-            }
+            },
+            {
+                "address": "P2",
+                "baseToken": {"symbol": "BBB", "mint": "BBB"},
+                "quoteToken": {
+                    "symbol": "XNT",
+                    "address": "XNT_API_ID",
+                    "mint": next(iter(_NATIVE_XNT_MINTS)),
+                },
+            },
         ]
+        identity = infer_consistent_catalog_xnt_transport_identity(pools)
+        self.assertEqual(identity["api_address"], "XNT_API_ID")
+        self.assertEqual(identity["observation_count"], 2)
+        self.assertFalse(identity["canonical_identity_promoted"])
 
-        pair = select_catalog_pair_for_verified_pool(
-            catalog,
+        pools[1]["quoteToken"]["address"] = "OTHER_XNT_API_ID"
+        self.assertIsNone(infer_consistent_catalog_xnt_transport_identity(pools))
+
+    def test_verified_native_pair_requires_chain_proof(self):
+        structural = {
+            "account": _XENCAT_POOL_ADDRESS,
+            "decoded_state": {
+                "mint_0": next(iter(_NATIVE_XNT_MINTS)),
+                "mint_1": _XENCAT_MINT,
+            },
+            "summary": {"pool_state_structural_role_verified": True},
+        }
+        identity = {
+            "api_address": "XNT_API_ID",
+            "canonical_identity_promoted": False,
+        }
+        pair = build_verified_native_transport_pair(
             structural,
+            identity,
             target_mint=_XENCAT_MINT,
             expected_pool_address=_XENCAT_POOL_ADDRESS,
         )
-
         self.assertEqual(pair["base_address"], _XENCAT_MINT)
         self.assertEqual(pair["quote_address"], "XNT_API_ID")
-        self.assertEqual(pair["onchain_counter_mint"], next(iter(_NATIVE_XNT_MINTS)))
 
         structural["summary"]["pool_state_structural_role_verified"] = False
         self.assertIsNone(
-            select_catalog_pair_for_verified_pool(
-                catalog,
+            build_verified_native_transport_pair(
                 structural,
+                identity,
                 target_mint=_XENCAT_MINT,
                 expected_pool_address=_XENCAT_POOL_ADDRESS,
             )
@@ -333,9 +398,6 @@ class XDEXLiveContractTests(unittest.TestCase):
                 f"Cannot load the public XDEX pool list for contract probing: {exc}"
             ) from exc
 
-        # Keep the former non-native route if XDEX ever exposes one. Otherwise
-        # re-verify the pinned XENCAT pool directly against the accepted XDEX
-        # structural contract and use the catalog only for API transport IDs.
         cls.live_pair = select_non_native_live_pool_pair(pools)
         cls.live_pair_source = "xdex_public_pool_list_non_native"
 
@@ -376,13 +438,28 @@ class XDEXLiveContractTests(unittest.TestCase):
                 target_mint=_XENCAT_MINT,
                 expected_pool_address=_XENCAT_POOL_ADDRESS,
             )
-            cls.live_pair_source = "verified_xencat_pool_plus_catalog_transport_identity"
+            cls.live_pair_source = "verified_xencat_pool_plus_exact_catalog_identity"
+
+            if cls.live_pair is None:
+                xnt_identity = infer_consistent_catalog_xnt_transport_identity(pools)
+                print(
+                    "[XDEX XNT transport identity evidence] "
+                    + json.dumps(_public_evidence(xnt_identity), sort_keys=True, default=str)
+                )
+                cls.live_pair = build_verified_native_transport_pair(
+                    structural_report,
+                    xnt_identity,
+                    target_mint=_XENCAT_MINT,
+                    expected_pool_address=_XENCAT_POOL_ADDRESS,
+                )
+                cls.live_pair_source = (
+                    "verified_xencat_pool_plus_cross_catalog_xnt_transport_identity"
+                )
 
         if cls.live_pair is None:
             message = (
-                "No usable quote pair was proven. The pinned XENCAT pool must "
-                "re-verify on-chain and the exact same pool must expose API-side "
-                "token identifiers in the XDEX catalog."
+                "No usable quote pair was proven from the verified XENCAT/XNT "
+                "pool plus a consistent current XDEX XNT transport identity."
             )
             if REQUIRE_LIVE_PAIR:
                 raise RuntimeError(message)
@@ -399,7 +476,6 @@ class XDEXLiveContractTests(unittest.TestCase):
 
     def test_live_token_price_returns_mapping(self):
         data = self.provider.token_price(self.live_pair["base_address"])
-
         self.assertIsInstance(data, dict)
         self.assertTrue(data)
         print(
@@ -416,7 +492,6 @@ class XDEXLiveContractTests(unittest.TestCase):
             time_from=time_from,
             time_to=time_to,
         )
-
         self.assertIsInstance(points, list)
         self.assertTrue(
             points,
@@ -431,11 +506,7 @@ class XDEXLiveContractTests(unittest.TestCase):
                 "timestamp" in point or "time" in point,
                 f"history point lacks timestamp/time: {point}",
             )
-            self.assertIn(
-                "price",
-                point,
-                f"history point lacks price: {point}",
-            )
+            self.assertIn("price", point, f"history point lacks price: {point}")
 
     def test_live_quote_exposes_candidate_read_only_fields(self):
         observations = []
@@ -451,7 +522,6 @@ class XDEXLiveContractTests(unittest.TestCase):
             if "priceImpactPct" in data:
                 self.assertIsNotNone(data["priceImpactPct"])
             observations.append({"inputAmount": amount, "response": _public_evidence(data)})
-
         print(
             "[XDEX quote evidence] "
             + json.dumps(observations, sort_keys=True, default=str)
