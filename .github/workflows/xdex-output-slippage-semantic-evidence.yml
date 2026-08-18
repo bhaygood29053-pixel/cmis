@@ -13,6 +13,9 @@ jobs:
     name: Read-only XDEX output/slippage localization
     if: github.head_ref == 'agent/xdex-output-slippage-semantics'
     runs-on: ubuntu-latest
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
 
     steps:
       - name: Check out repository
@@ -41,8 +44,13 @@ jobs:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
         run: python -m unittest tests.test_xdex_second_pool_effective_fee_live -v
 
+      - name: Decode completed XDEX swap minimum-output instruction
+        env:
+          RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
+        run: python -m unittest tests.test_xdex_executed_swap_minimum_out_live -v
+
       - name: Safety boundary
         if: always()
         run: |
-          echo 'Read-only HTTP GET and X1 RPC reads only.'
+          echo 'Read-only HTTP GET, historical transaction inspection, and X1 RPC reads only.'
           echo 'No /swap/prepare, transaction construction, signing, broadcasting, custody, execution, or value movement.'
