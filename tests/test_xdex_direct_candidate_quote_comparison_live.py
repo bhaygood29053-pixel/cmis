@@ -1,11 +1,7 @@
 import os
-import struct
 import unittest
 
 from liquidity_scout.cmis.xdex_route_resolver import resolve_xdex_route_evidence
-from liquidity_scout.providers.x1.candidate_pool_role import encode_base58_pubkey
-from liquidity_scout.providers.x1.pool_state_fingerprint import fetch_account_state
-from liquidity_scout.providers.x1.rpc import get_token_account_info
 from liquidity_scout.providers.x1.xdex_direct_candidate_quote_comparison import (
     SELECTION_CLAIM,
     compare_direct_candidate_quotes,
@@ -17,60 +13,6 @@ from liquidity_scout.providers.x1.xdex_execution_fee_evidence import XENCAT_MINT
 
 RUN_LIVE = os.getenv("RUN_XDEX_DIRECT_CANDIDATE_QUOTE_LIVE") == "1"
 USDC_X_MINT = "B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq"
-POOL_U64_DIAGNOSTIC_OFFSETS = (333, 341, 349, 357, 365, 373, 381, 389, 397, 405, 413)
-
-
-def _pubkey(data, offset):
-    return encode_base58_pubkey(data[offset : offset + 32])
-
-
-def _u64(data, offset):
-    return struct.unpack_from("<Q", data, offset)[0]
-
-
-def _pool_accounting_diagnostics(candidate):
-    state = fetch_account_state(candidate["pool"])
-    data = state.get("data")
-    if not isinstance(data, (bytes, bytearray)) or len(data) != 637:
-        return {"error": "pool state unavailable for accounting diagnostics"}
-    data = bytes(data)
-    vault_0 = _pubkey(data, 72)
-    vault_1 = _pubkey(data, 104)
-    mint_0 = _pubkey(data, 168)
-    mint_1 = _pubkey(data, 200)
-    vault_0_info = get_token_account_info(vault_0)
-    vault_1_info = get_token_account_info(vault_1)
-    gross_0 = int(vault_0_info["raw_amount"])
-    gross_1 = int(vault_1_info["raw_amount"])
-    protocol_0 = _u64(data, 341)
-    protocol_1 = _u64(data, 349)
-    fund_0 = _u64(data, 357)
-    fund_1 = _u64(data, 365)
-    creator_0 = _u64(data, 397)
-    creator_1 = _u64(data, 405)
-    return {
-        "pool": candidate["pool"],
-        "amm_config": candidate["amm_config"],
-        "mint_0": mint_0,
-        "mint_1": mint_1,
-        "vault_0": vault_0,
-        "vault_1": vault_1,
-        "gross_0": gross_0,
-        "gross_1": gross_1,
-        "decoded_protocol_0": protocol_0,
-        "decoded_protocol_1": protocol_1,
-        "decoded_fund_0": fund_0,
-        "decoded_fund_1": fund_1,
-        "decoded_creator_0": creator_0,
-        "decoded_creator_1": creator_1,
-        "decoded_active_0": gross_0 - protocol_0 - fund_0 - creator_0,
-        "decoded_active_1": gross_1 - protocol_1 - fund_1 - creator_1,
-        "u64_window": {
-            str(offset): _u64(data, offset)
-            for offset in POOL_U64_DIAGNOSTIC_OFFSETS
-            if offset + 8 <= len(data)
-        },
-    }
 
 
 def _live_quote_provider(candidate, token_in, token_out, amount):
@@ -81,20 +23,6 @@ def _live_quote_provider(candidate, token_in, token_out, amount):
         "amm_config": candidate["amm_config"],
     }
     snapshot = collect_exact_route_snapshot(route, amount)
-    print({"pool_accounting": _pool_accounting_diagnostics(candidate)})
-    print({
-        "candidate_snapshot": {
-            "pool": candidate["pool"],
-            "amm_config": candidate["amm_config"],
-            "raw_input_amount": snapshot.get("raw_input_amount"),
-            "active_reserve_in_raw": snapshot.get("active_reserve_in_raw"),
-            "trade_fee_rate_ppm": snapshot.get("trade_fee_rate_ppm"),
-            "creator_fee_rate_ppm": snapshot.get("creator_fee_rate_ppm"),
-            "reconstructed_price_impact_percent": snapshot.get("reconstructed_price_impact_percent"),
-            "quote_price_impact_percent": snapshot.get("quote_price_impact_percent"),
-            "quote_output_amount": snapshot.get("quote_output_amount"),
-        }
-    })
 
     # Re-run the accepted CMIS exact-route validation over this exact snapshot.
     # The comparator is allowed to use the quote output only after the route
