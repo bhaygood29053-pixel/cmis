@@ -8,6 +8,10 @@ from liquidity_scout.cmis.capabilities import (
 )
 from liquidity_scout.cmis.gateway import KNOWN_CHAINS, SUPPORTED_CHAINS
 from liquidity_scout.cmis.runtime_gateway import SUPPORTED_SERVICES
+from liquidity_scout.cmis.x1_evidence_capabilities import (
+    build_x1_evidence_capability_manifest,
+    validate_x1_evidence_capability_manifest,
+)
 
 
 class CMISCapabilityContractTests(unittest.TestCase):
@@ -16,6 +20,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
             runtime_services=SUPPORTED_SERVICES,
             known_chains=KNOWN_CHAINS,
         )
+        validate_x1_evidence_capability_manifest()
 
         manifest = build_capability_manifest(
             runtime_services=SUPPORTED_SERVICES,
@@ -24,6 +29,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.7.1")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -32,6 +38,60 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertEqual(
             set(manifest["chains"]["solana"]["services"]),
             set(SUPPORTED_SERVICES),
+        )
+        self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
+        self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])
+
+    def test_x1_gap_decisions_are_machine_readable_and_fail_closed(self):
+        capabilities = build_x1_evidence_capability_manifest()["capabilities"]
+
+        self.assertEqual(
+            capabilities["holder_wallet_or_beneficial_owner_total"]["state"],
+            "unavailable",
+        )
+        self.assertFalse(
+            capabilities["holder_wallet_or_beneficial_owner_total"]
+            ["usable_as_verified_fact"]
+        )
+        self.assertEqual(
+            capabilities["token_account_concentration"]["state"],
+            "bounded",
+        )
+        self.assertEqual(
+            capabilities["archival_history_completeness"]["state"],
+            "unavailable",
+        )
+        self.assertEqual(
+            capabilities["xdex_history_semantics"]["state"],
+            "unavailable",
+        )
+        self.assertEqual(
+            capabilities["xdex_quote_semantics"]["state"],
+            "unavailable",
+        )
+        self.assertEqual(
+            capabilities["native_xnt_canonical_translation"]["state"],
+            "verified",
+        )
+        self.assertTrue(
+            capabilities["native_xnt_canonical_translation"]
+            ["usable_as_verified_fact"]
+        )
+        self.assertEqual(
+            capabilities["native_xnt_xdex_quote_translation"]["state"],
+            "unavailable",
+        )
+        self.assertEqual(
+            capabilities["x1_ninja_sse_live_event_evidence"]["state"],
+            "unavailable",
+        )
+        self.assertEqual(
+            capabilities["warp_bridge_operational_state"]["state"],
+            "unavailable",
+        )
+        self.assertEqual(
+            capabilities["warp_bridge_guardian_state"]["state"],
+            "unavailable",
         )
 
     def test_new_runtime_service_without_manifest_classification_fails_loudly(self):
@@ -84,6 +144,9 @@ class CMISCapabilityContractTests(unittest.TestCase):
             known_chains=KNOWN_CHAINS,
         )
         first["chains"]["x1"]["services"]["risk_check"]["state"] = "unavailable"
+        first["chains"]["x1"]["evidence_capabilities"][
+            "native_xnt_canonical_translation"
+        ]["state"] = "unavailable"
 
         second = build_capability_manifest(
             runtime_services=SUPPORTED_SERVICES,
@@ -93,6 +156,12 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertEqual(
             second["chains"]["x1"]["services"]["risk_check"]["state"],
             "supported",
+        )
+        self.assertEqual(
+            second["chains"]["x1"]["evidence_capabilities"][
+                "native_xnt_canonical_translation"
+            ]["state"],
+            "verified",
         )
 
 
