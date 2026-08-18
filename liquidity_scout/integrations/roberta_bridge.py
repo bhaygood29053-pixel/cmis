@@ -7,7 +7,9 @@ recompute market/risk facts.
 MoltGrid can also be placed in a conservative ``simple-only`` presentation
 mode. In that mode, concise conversational and single-fact questions continue
 to Roberta while requests that normally require long structured output receive
-a short professional interface-limitation response instead.
+a short professional interface-limitation response instead. Roberta replies
+that do pass the channel policy are rendered as plain text so MoltGrid never
+needs to interpret Markdown correctly.
 """
 
 from __future__ import annotations
@@ -135,6 +137,40 @@ def moltgrid_question_supported(message: str) -> bool:
     return not any(pattern.search(text) for pattern in _MOLTGRID_ADVANCED_PATTERNS)
 
 
+def moltgrid_plaintext_reply(reply: str) -> str:
+    """Convert a concise Roberta reply into MoltGrid-safe plain text.
+
+    MoltGrid currently displays Markdown markers literally. This function only
+    removes presentation syntax; it does not summarize, reinterpret, round, or
+    otherwise alter deterministic facts in Roberta's answer.
+    """
+    text = str(reply or "").strip()
+    if not text:
+        return text
+
+    # Remove fenced-code markers and heading syntax without changing content.
+    text = re.sub(r"(?m)^\s*```[^\n]*\n?", "", text)
+    text = text.replace("```", "")
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
+
+    # Preserve linked destinations as plain text instead of relying on Markdown.
+    text = re.sub(
+        r"\[([^\]\n]+)\]\(([^)\n]+)\)",
+        r"\1 (\2)",
+        text,
+    )
+
+    # Strip common inline Markdown decoration while preserving the enclosed text.
+    text = re.sub(r"\*\*([^*\n]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_\n]+)__", r"\1", text)
+    text = re.sub(r"`([^`\n]+)`", r"\1", text)
+
+    # Unicode bullets remain readable even if MoltGrid collapses line breaks.
+    text = re.sub(r"(?m)^\s*[-*+]\s+", "• ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def _base_url(value: str | None = None) -> str:
     raw = value if value is not None else os.getenv("ROBERTA_BASE_URL", DEFAULT_BASE_URL)
     text = str(raw or "").strip().rstrip("/")
@@ -172,7 +208,8 @@ def ask_roberta(
     if not user_text:
         raise RobertaBridgeError("A non-empty user message is required.")
 
-    if moltgrid_simple_only_enabled() and not moltgrid_question_supported(user_text):
+    simple_only = moltgrid_simple_only_enabled()
+    if simple_only and not moltgrid_question_supported(user_text):
         return MOLTGRID_SCOPE_LIMITATION_MESSAGE
 
     url = f"{_base_url(base_url)}/v1/roberta"
@@ -215,7 +252,9 @@ def ask_roberta(
     reply = payload.get("reply")
     if not isinstance(reply, str) or not reply.strip():
         raise RobertaBridgeError("Roberta bridge returned no assistant reply.")
-    return reply.strip()
+
+    answer = reply.strip()
+    return moltgrid_plaintext_reply(answer) if simple_only else answer
 
 
 __all__ = [
@@ -224,6 +263,7 @@ __all__ = [
     "MOLTGRID_SCOPE_LIMITATION_MESSAGE",
     "RobertaBridgeError",
     "ask_roberta",
+    "moltgrid_plaintext_reply",
     "moltgrid_question_supported",
     "moltgrid_simple_only_enabled",
     "roberta_all_questions_enabled",
