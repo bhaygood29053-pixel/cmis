@@ -23,6 +23,8 @@ _B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 _B58_INDEX = {char: index for index, char in enumerate(_B58_ALPHABET)}
 _SWAP_BASE_INPUT_DISC = hashlib.sha256(b"global:swap_base_input").digest()[:8]
 _SWAP_EVENT_DISC = hashlib.sha256(b"event:SwapEvent").digest()[:8]
+_XDEX_EMBEDDED_SWAP_EVENT_LEN = 89
+_MODERN_RAYDIUM_SWAP_EVENT_LEN = 170
 
 
 def _b58decode(text):
@@ -61,6 +63,14 @@ def _close_raw(left, right):
 
 def _ceil_fee(amount, rate_ppm):
     return (int(amount) * int(rate_ppm) + FEE_RATE_DENOMINATOR - 1) // FEE_RATE_DENOMINATOR
+
+
+def _cp_output_raw(amount_in, reserve_in, reserve_out, rate_ppm):
+    fee = _ceil_fee(amount_in, rate_ppm)
+    net_in = int(amount_in) - fee
+    if net_in <= 0 or reserve_in <= 0 or reserve_out <= 0:
+        return 0
+    return (net_in * int(reserve_out)) // (int(reserve_in) + net_in)
 
 
 def _program_id(ix, account_keys):
@@ -126,44 +136,84 @@ def _decode_swap_base_input(tx):
 
 
 def _decode_swap_event_payload(data):
-    if len(data) != 170 or data[:8] != _SWAP_EVENT_DISC:
+    if not data.startswith(_SWAP_EVENT_DISC):
         return None
-    offset = 8
-    pool_id = _b58encode(data[offset : offset + 32])
-    offset += 32
-    (
-        input_vault_before,
-        output_vault_before,
-        input_amount,
-        output_amount,
-        input_transfer_fee,
-        output_transfer_fee,
-    ) = struct.unpack_from("<QQQQQQ", data, offset)
-    offset += 48
-    base_input = bool(data[offset])
-    offset += 1
-    input_mint = _b58encode(data[offset : offset + 32])
-    offset += 32
-    output_mint = _b58encode(data[offset : offset + 32])
-    offset += 32
-    trade_fee, creator_fee = struct.unpack_from("<QQ", data, offset)
-    offset += 16
-    creator_fee_on_input = bool(data[offset])
-    return {
-        "pool_id": pool_id,
-        "input_vault_before": input_vault_before,
-        "output_vault_before": output_vault_before,
-        "input_amount": input_amount,
-        "output_amount": output_amount,
-        "input_transfer_fee": input_transfer_fee,
-        "output_transfer_fee": output_transfer_fee,
-        "base_input": base_input,
-        "input_mint": input_mint,
-        "output_mint": output_mint,
-        "trade_fee": trade_fee,
-        "creator_fee": creator_fee,
-        "creator_fee_on_input": creator_fee_on_input,
-    }
+
+    # The currently deployed XDEX frontend embeds a raydium_cp_swap v0.1.0 IDL
+    # whose SwapEvent contains exactly these fields and is 89 bytes including
+    # the Anchor event discriminator. Keep this layout separate from newer
+    # Raydium events so we do not silently import fields XDEX does not expose.
+    if len(data) == _XDEX_EMBEDDED_SWAP_EVENT_LEN:
+        offset = 8
+        pool_id = _b58encode(data[offset : offset + 32])
+        offset += 32
+        (
+            input_vault_before,
+            output_vault_before,
+            input_amount,
+            output_amount,
+            input_transfer_fee,
+            output_transfer_fee,
+        ) = struct.unpack_from("<QQQQQQ", data, offset)
+        offset += 48
+        base_input = bool(data[offset])
+        return {
+            "layout": "xdex_embedded_raydium_cp_swap_v0.1.0",
+            "pool_id": pool_id,
+            "input_vault_before": input_vault_before,
+            "output_vault_before": output_vault_before,
+            "input_amount": input_amount,
+            "output_amount": output_amount,
+            "input_transfer_fee": input_transfer_fee,
+            "output_transfer_fee": output_transfer_fee,
+            "base_input": base_input,
+            "input_mint": None,
+            "output_mint": None,
+            "trade_fee": None,
+            "creator_fee": None,
+            "creator_fee_on_input": None,
+        }
+
+    if len(data) == _MODERN_RAYDIUM_SWAP_EVENT_LEN:
+        offset = 8
+        pool_id = _b58encode(data[offset : offset + 32])
+        offset += 32
+        (
+            input_vault_before,
+            output_vault_before,
+            input_amount,
+            output_amount,
+            input_transfer_fee,
+            output_transfer_fee,
+        ) = struct.unpack_from("<QQQQQQ", data, offset)
+        offset += 48
+        base_input = bool(data[offset])
+        offset += 1
+        input_mint = _b58encode(data[offset : offset + 32])
+        offset += 32
+        output_mint = _b58encode(data[offset : offset + 32])
+        offset += 32
+        trade_fee, creator_fee = struct.unpack_from("<QQ", data, offset)
+        offset += 16
+        creator_fee_on_input = bool(data[offset])
+        return {
+            "layout": "modern_raydium_cp_swap",
+            "pool_id": pool_id,
+            "input_vault_before": input_vault_before,
+            "output_vault_before": output_vault_before,
+            "input_amount": input_amount,
+            "output_amount": output_amount,
+            "input_transfer_fee": input_transfer_fee,
+            "output_transfer_fee": output_transfer_fee,
+            "base_input": base_input,
+            "input_mint": input_mint,
+            "output_mint": output_mint,
+            "trade_fee": trade_fee,
+            "creator_fee": creator_fee,
+            "creator_fee_on_input": creator_fee_on_input,
+        }
+
+    return None
 
 
 def _decode_swap_events(tx):
@@ -211,7 +261,7 @@ class XDEXExecutedSwapMinimumOutLiveTests(unittest.TestCase):
         self.assertTrue(trades, "X1.Ninja returned no recent rows for the pinned XDEX pool")
 
         rows = []
-        fee_event_rows = []
+        event_rows = []
         seen_signatures = set()
         for trade in trades:
             signature = str(trade.get("txHash") or "").strip()
@@ -277,33 +327,52 @@ class XDEXExecutedSwapMinimumOutLiveTests(unittest.TestCase):
 
             if matched_instruction is not None:
                 for event in _decode_swap_events(tx):
-                    if event["pool_id"] != POOL:
+                    if event["pool_id"] != POOL or not event["base_input"]:
                         continue
                     if not _close_raw(event["input_amount"], matched_instruction["amount_in_raw"]):
                         continue
-                    expected_2800 = _ceil_fee(event["input_amount"], 2800)
-                    expected_3000 = _ceil_fee(event["input_amount"], 3000)
-                    fee_event_rows.append({
+
+                    cp_2800 = _cp_output_raw(
+                        event["input_amount"],
+                        event["input_vault_before"],
+                        event["output_vault_before"],
+                        2800,
+                    )
+                    cp_3000 = _cp_output_raw(
+                        event["input_amount"],
+                        event["input_vault_before"],
+                        event["output_vault_before"],
+                        3000,
+                    )
+                    event_row = {
                         "signature": signature,
                         "slot": tx.get("slot"),
+                        "layout": event["layout"],
                         "pool_id": event["pool_id"],
-                        "input_mint": event["input_mint"],
-                        "output_mint": event["output_mint"],
                         "input_amount_raw": event["input_amount"],
                         "output_amount_raw": event["output_amount"],
-                        "trade_fee_raw": event["trade_fee"],
-                        "creator_fee_raw": event["creator_fee"],
+                        "input_vault_before_raw": event["input_vault_before"],
+                        "output_vault_before_raw": event["output_vault_before"],
                         "input_transfer_fee_raw": event["input_transfer_fee"],
                         "output_transfer_fee_raw": event["output_transfer_fee"],
-                        "expected_trade_fee_2800_raw": expected_2800,
-                        "expected_trade_fee_3000_raw": expected_3000,
-                        "matches_2800": event["trade_fee"] == expected_2800,
-                        "matches_3000": event["trade_fee"] == expected_3000,
-                        "observed_trade_fee_ppm": str(
-                            Decimal(event["trade_fee"]) * Decimal(FEE_RATE_DENOMINATOR)
-                            / Decimal(event["input_amount"])
-                        ),
-                    })
+                        "cp_output_2800_raw": cp_2800,
+                        "cp_output_3000_raw": cp_3000,
+                        "delta_vs_2800_raw": event["output_amount"] - cp_2800,
+                        "delta_vs_3000_raw": event["output_amount"] - cp_3000,
+                        "matches_2800": event["output_amount"] == cp_2800,
+                        "matches_3000": event["output_amount"] == cp_3000,
+                    }
+                    if event["trade_fee"] is not None:
+                        expected_2800 = _ceil_fee(event["input_amount"], 2800)
+                        expected_3000 = _ceil_fee(event["input_amount"], 3000)
+                        event_row.update({
+                            "trade_fee_raw": event["trade_fee"],
+                            "expected_trade_fee_2800_raw": expected_2800,
+                            "expected_trade_fee_3000_raw": expected_3000,
+                            "trade_fee_matches_2800": event["trade_fee"] == expected_2800,
+                            "trade_fee_matches_3000": event["trade_fee"] == expected_3000,
+                        })
+                    event_rows.append(event_row)
                     break
 
             if len(rows) >= TARGET_SAMPLE_COUNT:
@@ -313,8 +382,8 @@ class XDEXExecutedSwapMinimumOutLiveTests(unittest.TestCase):
         for row in rows:
             print(row)
 
-        print("XDEX completed-swap Raydium-style SwapEvent fee diagnostics")
-        for row in fee_event_rows:
+        print("XDEX completed-swap embedded-IDL SwapEvent curve diagnostics")
+        for row in event_rows:
             print(row)
 
         self.assertGreaterEqual(
@@ -334,20 +403,32 @@ class XDEXExecutedSwapMinimumOutLiveTests(unittest.TestCase):
             )
             self.assertGreaterEqual(gap, Decimal("0"))
 
-        if fee_event_rows:
-            matches_2800 = sum(1 for row in fee_event_rows if row["matches_2800"])
-            matches_3000 = sum(1 for row in fee_event_rows if row["matches_3000"])
+        if event_rows:
+            matches_2800 = sum(1 for row in event_rows if row["matches_2800"])
+            matches_3000 = sum(1 for row in event_rows if row["matches_3000"])
             print(
-                "Executed SwapEvent fee match counts:",
-                {"2800_ppm": matches_2800, "3000_ppm": matches_3000, "decoded_events": len(fee_event_rows)},
+                "Executed SwapEvent CP match counts:",
+                {"2800_ppm": matches_2800, "3000_ppm": matches_3000, "decoded_events": len(event_rows)},
             )
+            for row in event_rows:
+                self.assertEqual(
+                    row["input_transfer_fee_raw"],
+                    0,
+                    "pinned classic SPL-token pair should not introduce an input transfer fee",
+                )
+                self.assertEqual(
+                    row["output_transfer_fee_raw"],
+                    0,
+                    "pinned classic SPL-token pair should not introduce an output transfer fee",
+                )
             print(
-                "Interpretation boundary: Raydium-style event decoding is diagnostic until XDEX-specific event compatibility is corroborated; "
-                "if the emitted trade_fee consistently matches one candidate rate, that localizes executed fee behavior independently of the quote API."
+                "Interpretation boundary: the 89-byte event layout comes from the currently deployed XDEX frontend's embedded "
+                "raydium_cp_swap v0.1.0 IDL. Exact CP matching can localize executed curve behavior, but does not assign a business "
+                "label to any quote-service-only adjustment."
             )
         else:
             print(
-                "No Raydium-style SwapEvent payloads were decoded from the sampled XDEX transactions; "
+                "No XDEX embedded-IDL SwapEvent payloads were decoded from the sampled XDEX transactions; "
                 "do not infer executed fee rate from the quote API alone."
             )
 
