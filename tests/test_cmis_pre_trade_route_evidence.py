@@ -51,7 +51,7 @@ def trade(*, include_route=True, route=None):
     return value
 
 
-def route_evidence(*, observed_at=990, route=None, capabilities=None):
+def route_evidence(*, observed_at=990, route=None, capabilities=None, source="cmis_xdex_route_resolver"):
     if capabilities is None:
         capabilities = {
             "price_impact": {
@@ -70,19 +70,18 @@ def route_evidence(*, observed_at=990, route=None, capabilities=None):
                 "semantic": "route_execution_fee_estimate",
                 "value": {
                     "amm_trade_fee_rate_percent": 0.28,
-                    "quote_effective_curve_deduction_percent": 0.30,
+                    "bounded_historical_execution_model_fee_percent": 0.28,
                 },
                 "unit": "structured",
                 "proof_basis": [
                     "verified_amm_config_trade_fee_rate",
                     "bounded_historical_execution_corroboration",
-                    "verified_quote_effective_curve_deduction",
                 ],
             },
         }
     return {
         "schema_version": 1,
-        "source": "cmis_xdex_route_resolver",
+        "source": source,
         "chain": "x1",
         "route": dict(ROUTE if route is None else route),
         "observed_at": observed_at,
@@ -115,10 +114,10 @@ class CMISPreTradeRouteEvidenceTests(unittest.TestCase):
         self.assertEqual(result["execution_capabilities"]["price_impact"]["status"], "ok")
         self.assertEqual(result["execution_capabilities"]["price_impact"]["value"], 1.25)
         self.assertEqual(result["execution_capabilities"]["fees"]["status"], "ok")
-        self.assertEqual(
-            result["execution_capabilities"]["fees"]["value"]["amm_trade_fee_rate_percent"],
-            0.28,
-        )
+        fees = result["execution_capabilities"]["fees"]["value"]
+        self.assertEqual(fees["amm_trade_fee_rate_percent"], 0.28)
+        self.assertEqual(fees["bounded_historical_execution_model_fee_percent"], 0.28)
+        self.assertNotIn("quote_effective_curve_deduction_percent", fees)
         audit = result["route_evidence"]
         self.assertTrue(audit["scope_match"])
         self.assertTrue(audit["fresh"])
@@ -147,6 +146,10 @@ class CMISPreTradeRouteEvidenceTests(unittest.TestCase):
         self.assertEqual(
             route_analysis["estimated_fees"]["amm_trade_fee_rate_percent"],
             0.28,
+        )
+        self.assertNotIn(
+            "quote_effective_curve_deduction_percent",
+            route_analysis["estimated_fees"],
         )
         self.assertIsNone(route_analysis["estimated_slippage_percent"])
         self.assertIn(
@@ -188,6 +191,100 @@ class CMISPreTradeRouteEvidenceTests(unittest.TestCase):
             "route_evidence_semantic_not_accepted",
         )
         self.assertFalse(result["execution_authorized"])
+
+    def test_arbitrary_proof_labels_cannot_promote_price_impact(self):
+        evidence = route_evidence(
+            capabilities={
+                "price_impact": {
+                    "status": "verified",
+                    "semantic": "route_price_impact_percent",
+                    "value": 1.25,
+                    "unit": "percent",
+                    "proof_basis": ["caller_says_verified"],
+                }
+            }
+        )
+        result = build_pre_trade_check(
+            raw_risk(),
+            trade(),
+            policy={"required_capabilities": ["price_impact"]},
+            evaluated_at=1000,
+            route_evidence=evidence,
+            route_evidence_max_age_seconds=60,
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertEqual(
+            result["execution_capabilities"]["price_impact"]["reason_code"],
+            "route_evidence_proof_basis_not_accepted",
+        )
+        self.assertIsNone(result["execution_capabilities"]["price_impact"]["value"])
+
+    def test_fee_mapping_cannot_smuggle_quote_layer_deduction(self):
+        evidence = route_evidence(
+            capabilities={
+                "fees": {
+                    "status": "verified",
+                    "semantic": "route_execution_fee_estimate",
+                    "value": {
+                        "amm_trade_fee_rate_percent": 0.28,
+                        "bounded_historical_execution_model_fee_percent": 0.28,
+                        "quote_effective_curve_deduction_percent": 0.30,
+                    },
+                    "unit": "structured",
+                    "proof_basis": [
+                        "verified_amm_config_trade_fee_rate",
+                        "bounded_historical_execution_corroboration",
+                    ],
+                }
+            }
+        )
+        result = build_pre_trade_check(
+            raw_risk(),
+            trade(),
+            policy={"required_capabilities": ["fees"]},
+            evaluated_at=1000,
+            route_evidence=evidence,
+            route_evidence_max_age_seconds=60,
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertEqual(
+            result["execution_capabilities"]["fees"]["reason_code"],
+            "route_evidence_value_invalid",
+        )
+        self.assertIsNone(result["execution_capabilities"]["fees"]["value"])
+
+    def test_wrong_unit_cannot_promote_price_impact(self):
+        evidence = route_evidence(
+            capabilities={
+                "price_impact": {
+                    "status": "verified",
+                    "semantic": "route_price_impact_percent",
+                    "value": 1.25,
+                    "unit": "basis_points",
+                    "proof_basis": [
+                        "verified_direct_cp_route",
+                        "verified_pool_reserves",
+                        "verified_price_impact_semantics",
+                    ],
+                }
+            }
+        )
+        result = build_pre_trade_check(
+            raw_risk(),
+            trade(),
+            policy={"required_capabilities": ["price_impact"]},
+            evaluated_at=1000,
+            route_evidence=evidence,
+            route_evidence_max_age_seconds=60,
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertEqual(
+            result["execution_capabilities"]["price_impact"]["reason_code"],
+            "route_evidence_unit_not_accepted",
+        )
 
     def test_route_scope_mismatch_fails_closed(self):
         wrong_route = dict(ROUTE)
@@ -243,6 +340,39 @@ class CMISPreTradeRouteEvidenceTests(unittest.TestCase):
             "route_evidence_stale",
         )
 
+    def test_naive_timestamp_cannot_complete_freshness(self):
+        result = build_pre_trade_check(
+            raw_risk(),
+            trade(),
+            policy={"required_capabilities": ["price_impact"]},
+            evaluated_at="2026-08-18T21:00:30Z",
+            route_evidence=route_evidence(observed_at="2026-08-18T21:00:00"),
+            route_evidence_max_age_seconds=60,
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertEqual(
+            result["execution_capabilities"]["price_impact"]["reason_code"],
+            "route_evidence_timestamp_unverified",
+        )
+        self.assertFalse(result["route_evidence"]["freshness_complete"])
+
+    def test_string_freshness_window_is_not_coerced(self):
+        result = build_pre_trade_check(
+            raw_risk(),
+            trade(),
+            policy={"required_capabilities": ["price_impact"]},
+            evaluated_at=1000,
+            route_evidence=route_evidence(),
+            route_evidence_max_age_seconds="60",
+        )
+
+        self.assertEqual(result["recommendation"], BLOCK)
+        self.assertEqual(
+            result["execution_capabilities"]["price_impact"]["reason_code"],
+            "route_evidence_freshness_policy_unconfigured",
+        )
+
     def test_route_evidence_without_explicit_freshness_window_cannot_promote(self):
         result = build_pre_trade_check(
             raw_risk(),
@@ -257,6 +387,17 @@ class CMISPreTradeRouteEvidenceTests(unittest.TestCase):
             result["execution_capabilities"]["price_impact"]["reason_code"],
             "route_evidence_freshness_policy_unconfigured",
         )
+
+    def test_unaccepted_route_evidence_source_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "source is not accepted"):
+            build_pre_trade_check(
+                raw_risk(),
+                trade(),
+                policy={"required_capabilities": ["price_impact"]},
+                evaluated_at=1000,
+                route_evidence=route_evidence(source="caller_supplied_claim"),
+                route_evidence_max_age_seconds=60,
+            )
 
     def test_buy_route_must_end_at_proposed_asset_mint(self):
         invalid_route = dict(ROUTE)
