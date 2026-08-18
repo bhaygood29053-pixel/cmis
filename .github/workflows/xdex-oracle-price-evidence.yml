@@ -1,0 +1,74 @@
+name: XDEX Oracle Price Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-price-probe:
+    name: Read-only XDEX oracle price contract
+    if: github.head_ref == 'agent/issue28-xdex-quote-semantics'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Probe oracle endpoint contract
+        run: |
+          python - <<'PY'
+          import json
+          import requests
+
+          URL = 'https://oracle.xdex.xyz/api/v1/token/price'
+          XENCAT = 'DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb'
+          XNT = 'So11111111111111111111111111111111111111112'
+
+          probes = [
+              ('no_params', {}),
+              ('token_address_xencat', {'token_address': XENCAT}),
+              ('address_xencat', {'address': XENCAT}),
+              ('mint_xencat', {'mint': XENCAT}),
+              ('token_xencat', {'token': XENCAT}),
+              ('token_address_xnt', {'token_address': XNT}),
+              ('address_xnt', {'address': XNT}),
+              ('mint_xnt', {'mint': XNT}),
+              ('token_xnt', {'token': XNT}),
+          ]
+
+          for label, params in probes:
+              try:
+                  response = requests.get(URL, params=params, timeout=20)
+                  text = response.text[:2000]
+                  try:
+                      body = response.json()
+                  except Exception:
+                      body = text
+                  print('[XDEX oracle price evidence] ' + json.dumps({
+                      'probe': label,
+                      'status': response.status_code,
+                      'content_type': response.headers.get('content-type'),
+                      'request_url': response.url,
+                      'body': body,
+                  }, sort_keys=True, default=str))
+              except Exception as exc:
+                  print('[XDEX oracle price evidence] ' + json.dumps({
+                      'probe': label,
+                      'error': f'{type(exc).__name__}: {exc}',
+                  }, sort_keys=True))
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo 'Read-only HTTP GET requests only.'
+          echo 'No transaction construction, signing, broadcasting, custody, or value movement.'
