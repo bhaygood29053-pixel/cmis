@@ -48,6 +48,7 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
             "api.xdex.xyz",
             "/api/xendex/swap/quote",
             "xendex/swap/quote",
+            "swap/quote",
             "tradeFeeRate",
             "trade_fee_rate",
             "feeRate",
@@ -83,8 +84,11 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
 
             contexts = []
             focus_terms = (
+                "api.xdex.xyz",
+                "/api/xendex",
                 "/api/xendex/swap/quote",
                 "xendex/swap/quote",
+                "swap/quote",
                 "tradeFeeRate",
                 "trade_fee_rate",
                 "feeRate",
@@ -94,17 +98,17 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
             for term in focus_terms:
                 start = 0
                 hits = 0
-                while hits < 4:
+                while hits < 6:
                     idx = text.find(term, start)
                     if idx < 0:
                         break
-                    left = max(0, idx - 260)
-                    right = min(len(text), idx + len(term) + 260)
+                    left = max(0, idx - 520)
+                    right = min(len(text), idx + len(term) + 760)
                     contexts.append(
                         {
                             "term": term,
                             "offset": idx,
-                            "context": text[left:right].replace("\n", " ")[:620],
+                            "context": text[left:right].replace("\n", " ")[:1400],
                         }
                     )
                     hits += 1
@@ -138,6 +142,7 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
             for row in bundle_findings
             if "/api/xendex/swap/quote" in row["needles"]
             or "xendex/swap/quote" in row["needles"]
+            or "swap/quote" in row["needles"]
             or "api.xdex.xyz" in row["needles"]
         ]
         print(
@@ -148,8 +153,6 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
         )
         print({"quote_bundle_count": len(quote_bundles)})
 
-        # This is an evidence probe, not an assumption that the endpoint must be emitted literally.
-        # Modern bundlers can split strings, proxy through relative routes, or move logic server-side.
         self.assertGreater(total_bytes, 0)
 
 
