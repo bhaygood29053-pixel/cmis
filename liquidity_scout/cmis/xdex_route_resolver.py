@@ -23,9 +23,10 @@ from liquidity_scout.providers.x1.xdex_execution_fee_evidence import (
     XENCAT_MINT,
     XNT_MINT,
 )
+from liquidity_scout.services.pre_trade_route_evidence import normalize_token_in_amount
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SOURCE = "cmis_xdex_route_resolver"
 SNAPSHOT_SCHEMA = "xdex_exact_route_snapshot.v1"
 PRICE_IMPACT_TOLERANCE_PERCENTAGE_POINTS = Decimal("0.001")
@@ -81,7 +82,11 @@ def _literal_true(snapshot: Mapping[str, Any], field: str) -> None:
         raise XDEXRouteResolverError(f"snapshot {field} must be literally true")
 
 
-def _validated_snapshot(snapshot: Any, requested_route: Mapping[str, Any]) -> dict[str, Any]:
+def _validated_snapshot(
+    snapshot: Any,
+    requested_route: Mapping[str, Any],
+    requested_amount: str,
+) -> dict[str, Any]:
     if not isinstance(snapshot, Mapping):
         raise XDEXRouteResolverError("route collector did not return a mapping")
     if snapshot.get("schema") != SNAPSHOT_SCHEMA:
@@ -96,6 +101,12 @@ def _validated_snapshot(snapshot: Any, requested_route: Mapping[str, Any]) -> di
     route = _route(snapshot.get("route"))
     if route != dict(requested_route):
         raise XDEXRouteResolverError("route collector snapshot does not match the requested exact route")
+    try:
+        snapshot_amount = normalize_token_in_amount(snapshot.get("token_in_amount"))
+    except ValueError as exc:
+        raise XDEXRouteResolverError("route collector snapshot input amount is invalid") from exc
+    if snapshot_amount is None or snapshot_amount != requested_amount:
+        raise XDEXRouteResolverError("route collector snapshot does not match the requested exact input amount")
 
     for field in (
         "quote_identity_verified",
@@ -127,6 +138,7 @@ def _validated_snapshot(snapshot: Any, requested_route: Mapping[str, Any]) -> di
     return {
         **dict(snapshot),
         "route": route,
+        "token_in_amount": snapshot_amount,
         "observed_at": observed_at,
         "reconstructed_price_impact": reconstructed,
         "quote_price_impact": quoted,
@@ -190,16 +202,24 @@ def resolve_xdex_route_evidence(
     *,
     collector: Callable[..., Mapping[str, Any]] = collect_exact_route_snapshot,
 ) -> dict[str, Any]:
-    """Return the trusted route-evidence envelope accepted by pre-trade v1.1.
+    """Return trusted route-and-amount evidence accepted by pre-trade v1.2.
 
     Only capabilities with an accepted proof basis are emitted. In particular,
     user slippage tolerance is deliberately absent because it is not an expected
     execution-slippage observation.
     """
     normalized_route = _route(route)
+    try:
+        normalized_amount = normalize_token_in_amount(token_in_amount)
+    except ValueError as exc:
+        raise XDEXRouteResolverError("token_in_amount must be a positive finite decimal") from exc
+    if normalized_amount is None:
+        raise XDEXRouteResolverError("token_in_amount is required for route evidence")
+
     snapshot = _validated_snapshot(
-        collector(normalized_route, token_in_amount),
+        collector(normalized_route, normalized_amount),
         normalized_route,
+        normalized_amount,
     )
 
     capabilities: dict[str, Any] = {
@@ -217,6 +237,7 @@ def resolve_xdex_route_evidence(
         "source": SOURCE,
         "chain": "x1",
         "route": normalized_route,
+        "token_in_amount": normalized_amount,
         "observed_at": snapshot["observed_at"],
         "capabilities": capabilities,
     }
