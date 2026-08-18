@@ -77,10 +77,12 @@ def snapshot_for(route=None, **overrides):
         "fund_fee_rate_ppm_of_trade_fee": 50000,
         "creator_fee_rate_ppm": 0,
         "reconstructed_price_impact_percent": "1.955401473022048269316746802",
+        # XDEX priceImpactPct follows rounded zero-slippage output / verified
+        # active output reserve. 195,540,100 / 10,000,000,000 * 100 = 1.955401%.
         "quote_price_impact_percent": "1.9554010",
-        # Deliberately nonsensical. These fields must never become proof of
-        # fees, fills, slippage, or execution quality.
-        "quote_output_amount": "999999999999999999999999",
+        "quote_output_amount": "0.195540100",
+        # quote_rate is deliberately not used as proof of fees, fills,
+        # slippage, or execution quality.
         "quote_rate": "999999",
         "quote_slippage_percent": 0,
         "quote_identity_verified": True,
@@ -112,8 +114,32 @@ class XDEXRouteResolverTests(unittest.TestCase):
             evidence["capabilities"]["price_impact"]["semantic"],
             "route_price_impact_percent",
         )
+        self.assertIn(
+            "verified_integer_rounded_output_reserve_price_impact_semantics",
+            evidence["capabilities"]["price_impact"]["proof_basis"],
+        )
         self.assertNotIn("slippage", evidence["capabilities"])
         self.assertNotIn("fees", evidence["capabilities"])
+
+    def test_thin_pool_integer_rounding_semantics_are_accepted_without_relaxing_tolerance(self):
+        evidence = resolve_xdex_route_evidence(
+            ROUTE,
+            "0.001",
+            collector=lambda route, amount: snapshot_for(
+                route,
+                token_in_amount="0.001",
+                raw_input_amount=1000,
+                active_reserve_in_raw=180,
+                active_reserve_out_raw=56,
+                trade_fee_rate_ppm=3000,
+                reconstructed_price_impact_percent="84.70688190314358538657604078",
+                quote_output_amount="0.000000047",
+                quote_price_impact_percent="83.9286",
+            ),
+        )
+
+        self.assertEqual(evidence["capabilities"]["price_impact"]["value"], 83.9286)
+        self.assertFalse(evidence.get("execution_authorized", False))
 
     def test_bounded_fee_requires_explicit_accepted_historical_evidence(self):
         evidence = resolve_xdex_route_evidence(
@@ -243,6 +269,7 @@ class XDEXRouteResolverTests(unittest.TestCase):
                     trade_fee_rate_ppm=3000,
                     reconstructed_price_impact_percent="1.955016961782065611702649175",
                     quote_price_impact_percent="1.9550169",
+                    quote_output_amount="0.195501690",
                 ),
                 execution_fee_observation=execution_fee_observation(),
             )
@@ -250,7 +277,7 @@ class XDEXRouteResolverTests(unittest.TestCase):
     def test_price_impact_disagreement_fails_closed(self):
         with self.assertRaisesRegex(
             XDEXRouteResolverError,
-            "does not match independent verified-reserve reconstruction",
+            "rounded-output/verified-output-reserve reconstruction",
         ):
             resolve_xdex_route_evidence(
                 ROUTE,
@@ -258,6 +285,17 @@ class XDEXRouteResolverTests(unittest.TestCase):
                 collector=lambda route, amount: snapshot_for(
                     route,
                     quote_price_impact_percent="2.1",
+                ),
+            )
+
+    def test_quote_output_must_be_exactly_representable(self):
+        with self.assertRaisesRegex(XDEXRouteResolverError, "exactly representable"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    quote_output_amount="0.0000000001",
                 ),
             )
 
