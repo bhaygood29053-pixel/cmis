@@ -4,9 +4,8 @@ This module owns transport and minimal response-shape validation only. CMIS
 remains responsible for deterministic interpretation, historical comparison,
 risk, and pre-trade policy.
 
-Request shapes are promoted here only when supported by user-supplied API
-documentation or live XDEX error/response evidence. Field units and semantics
-remain gated until the opt-in live contract probe verifies them.
+Request shapes are promoted here only when supported by accepted API/live
+evidence. Field semantics remain subject to their separate CMIS evidence gates.
 """
 
 from __future__ import annotations
@@ -65,6 +64,18 @@ def _positive_decimal_text(name: str, value: Any) -> str:
     return format(parsed, "f")
 
 
+def _nonnegative_decimal_text(name: str, value: Any) -> str:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a non-negative finite number.")
+    try:
+        parsed = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError, AttributeError) as exc:
+        raise ValueError(f"{name} must be a non-negative finite number.") from exc
+    if not parsed.is_finite() or parsed < 0:
+        raise ValueError(f"{name} must be a non-negative finite number.")
+    return format(parsed, "f")
+
+
 def _error_message(body: Mapping[str, Any]) -> str:
     raw = body.get("error")
     if isinstance(raw, Mapping):
@@ -101,15 +112,7 @@ def _parse_success_data(
 
 
 def _parse_price_history_data(body: Any) -> list[Any]:
-    """Return the raw history list from either observed XDEX envelope shape.
-
-    Historical XDEX evidence initially showed the common ``success/data``
-    envelope. A live read-only probe on 2026-08-18 also observed a top-level
-    ``bars`` list. This function accepts only those two explicit shapes and
-    preserves every provider bar key unchanged. In particular, compact keys
-    such as ``o/h/l/c/v/t`` are *not* relabeled as semantic price/time fields
-    here; their meaning, units, interval, and completeness remain unverified.
-    """
+    """Return the raw history list from either observed XDEX envelope shape."""
 
     if not isinstance(body, Mapping):
         raise XDEXAPIError("price history response must be a JSON object.")
@@ -164,12 +167,7 @@ def fetch_pool_list(
     session=requests,
     timeout: int = 15,
 ) -> list[dict[str, Any]]:
-    """Fetch XDEX's public pool list without requiring X1.Ninja credentials.
-
-    The pool-list route uses the generic `mainnet` network value from the
-    user-supplied XDEX API contract. This is intentionally separate from the
-    `X1 Mainnet` label live-verified for price/history/quote routes.
-    """
+    """Fetch XDEX's public pool list without requiring X1.Ninja credentials."""
 
     network_name = _nonempty_text("network", network)
     body = _get_json(
@@ -227,14 +225,7 @@ def fetch_price_history(
     session=requests,
     timeout: int = 15,
 ) -> list[dict[str, Any]]:
-    """Fetch raw pair price-history observations for an explicit time window.
-
-    XDEX live evidence confirms the required parameter names and currently
-    exposes at least two response-envelope shapes. Returned bar keys are kept
-    verbatim. The transport does not infer OHLC meaning, timestamp units,
-    interval, completeness, or a canonical CMIS price from compact provider
-    fields such as ``o/h/l/c/v/t``.
-    """
+    """Fetch raw pair price-history observations for an explicit time window."""
 
     from_token_text = _nonempty_text("from_token", from_token)
     to_token_text = _nonempty_text("to_token", to_token)
@@ -277,14 +268,19 @@ def fetch_swap_quote(
     token_in_amount: Any,
     *,
     is_exact_amount_in: bool = True,
+    slippage: Any = None,
+    amm_config_address: str | None = None,
     network: str = XDEX_NETWORK_X1_MAINNET,
     session=requests,
     timeout: int = 15,
 ) -> dict[str, Any]:
     """Fetch a read-only XDEX swap quote.
 
-    This does not prepare, sign, or broadcast a transaction. Quote field
-    semantics remain unpromoted until the live contract probe verifies units.
+    ``slippage`` and ``amm_config_address`` are optional read-only quote scoping
+    parameters accepted from the separately verified XDEX contract. Supplying
+    them still performs quote retrieval only: this function never calls a swap
+    preparation endpoint and never constructs, signs, or broadcasts a
+    transaction.
     """
 
     token_in_text = _nonempty_text("token_in", token_in)
@@ -296,15 +292,23 @@ def fetch_swap_quote(
         raise ValueError("is_exact_amount_in must be a boolean.")
     network_name = _nonempty_text("network", network)
 
+    params: dict[str, Any] = {
+        "network": network_name,
+        "token_in": token_in_text,
+        "token_out": token_out_text,
+        "token_in_amount": amount_text,
+        "is_exact_amount_in": str(is_exact_amount_in).lower(),
+    }
+    if slippage is not None:
+        params["slippage"] = _nonnegative_decimal_text("slippage", slippage)
+    if amm_config_address is not None:
+        params["amm_config_address"] = _nonempty_text(
+            "amm_config_address", amm_config_address
+        )
+
     body = _get_json(
         SWAP_QUOTE_URL,
-        params={
-            "network": network_name,
-            "token_in": token_in_text,
-            "token_out": token_out_text,
-            "token_in_amount": amount_text,
-            "is_exact_amount_in": str(is_exact_amount_in).lower(),
-        },
+        params=params,
         session=session,
         timeout=timeout,
     )
@@ -375,12 +379,16 @@ class XDEXReadOnlyProvider:
         token_in_amount: Any,
         *,
         is_exact_amount_in: bool = True,
+        slippage: Any = None,
+        amm_config_address: str | None = None,
     ) -> dict[str, Any]:
         return fetch_swap_quote(
             token_in,
             token_out,
             token_in_amount,
             is_exact_amount_in=is_exact_amount_in,
+            slippage=slippage,
+            amm_config_address=amm_config_address,
             network=self.network,
             session=self.session,
             timeout=self.timeout,
