@@ -1,12 +1,12 @@
 """Machine-readable CMIS capability contract for external Chain Scouts.
 
-This module is the CMIS-side source of truth for *service eligibility*.  It does
+This module is the CMIS-side source of truth for *service eligibility*. It does
 not claim that a provider is healthy, that a requested asset is available, or
-that a service will return ``ok`` for every request.  Those remain runtime
-facts expressed by the normal CMIS service envelope.
+that a service will return ``ok`` for every request. Those remain runtime facts
+expressed by the normal CMIS service envelope.
 
-The contract intentionally sits between Chain Scouts and CMIS.  Roberta does
-not need to call or understand this endpoint directly.
+The contract intentionally sits between Chain Scouts and CMIS. Roberta does not
+need to call or understand this endpoint directly.
 """
 
 from __future__ import annotations
@@ -16,7 +16,9 @@ from typing import Any, Iterable, Mapping
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.6.0"
+CMIS_CONTRACT_VERSION = "1.7.0"
+EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
+PROOF_SCORE_SCHEMA_VERSION = 1
 CAPABILITY_STATES = frozenset({"supported", "bounded", "partial", "unavailable"})
 
 
@@ -36,7 +38,7 @@ def _capability(
     }
 
 
-# Every runtime-advertised service must appear for every known chain.  This is
+# Every runtime-advertised service must appear for every known chain. This is
 # deliberately explicit: adding a runtime service without classifying its chain
 # eligibility should fail contract validation instead of silently reaching a
 # Scout with an ambiguous capability boundary.
@@ -214,7 +216,7 @@ def build_capability_manifest(
     """Return a fresh JSON-safe capability manifest for Chain Scouts.
 
     ``legacy_supported_chains`` is retained because the original HTTP contract
-    exposed the base gateway's fully supported chain list.  Chain-specific
+    exposed the base gateway's fully supported chain list. Chain-specific
     runtime mixins can now expose narrower capabilities for other known chains,
     so consumers should use ``chains[*].services`` for eligibility decisions.
     """
@@ -244,7 +246,14 @@ def build_capability_manifest(
         "schema_version": CAPABILITY_SCHEMA_VERSION,
         "contract_version": CMIS_CONTRACT_VERSION,
         "request_path": request_path,
-        # Backward-compatible flat fields.  New Scouts should consume the
+        "evidence_quality": {
+            "evidence_receipt_schema_version": EVIDENCE_RECEIPT_SCHEMA_VERSION,
+            "proof_score_schema_version": PROOF_SCORE_SCHEMA_VERSION,
+            "proof_strength_values": ["STRONG", "MODERATE", "WEAK"],
+            "risk_separate_from_proof": True,
+            "missing_evidence_is_unknown": True,
+        },
+        # Backward-compatible flat fields. New Scouts should consume the
         # chain-specific service table above.
         "supported_services": list(runtime_services),
         "supported_chains": list(legacy_supported_chains),
@@ -278,6 +287,8 @@ __all__ = [
     "CAPABILITY_SCHEMA_VERSION",
     "CAPABILITY_STATES",
     "CMIS_CONTRACT_VERSION",
+    "EVIDENCE_RECEIPT_SCHEMA_VERSION",
+    "PROOF_SCORE_SCHEMA_VERSION",
     "build_capability_manifest",
     "service_capability",
     "validate_capability_contract",

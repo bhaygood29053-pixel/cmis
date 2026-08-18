@@ -96,7 +96,7 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         # Original flat fields remain for backward compatibility.
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.6.0")
+        self.assertEqual(response["contract_version"], "1.7.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
         self.assertEqual(len(response["supported_services"]), 10)
         self.assertIn("verification_evidence", response["supported_services"])
@@ -104,6 +104,16 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         self.assertIn("verified_asset_activity", response["supported_services"])
         self.assertEqual(response["supported_chains"], ["x1"])
         self.assertIn("solana", response["known_chains"])
+
+        evidence_quality = response["evidence_quality"]
+        self.assertEqual(evidence_quality["evidence_receipt_schema_version"], 1)
+        self.assertEqual(evidence_quality["proof_score_schema_version"], 1)
+        self.assertEqual(
+            evidence_quality["proof_strength_values"],
+            ["STRONG", "MODERATE", "WEAK"],
+        )
+        self.assertTrue(evidence_quality["risk_separate_from_proof"])
+        self.assertTrue(evidence_quality["missing_evidence_is_unknown"])
 
         x1 = response["chains"]["x1"]["services"]
         solana = response["chains"]["solana"]["services"]
