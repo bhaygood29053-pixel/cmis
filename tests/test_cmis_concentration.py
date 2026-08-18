@@ -11,6 +11,7 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
             source="X1 RPC",
             supply_raw="1000",
             supply_decimals=6,
+            requested_account_limit=20,
             accounts=[
                 {"address": "acct-a", "amount": "250", "decimals": 6},
                 {"address": "acct-b", "amount": "150", "decimals": 6},
@@ -20,14 +21,39 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
         )
 
         self.assertEqual(result["observed_balance_raw"], "400")
+        self.assertEqual(
+            result["observed_share_exact"],
+            {"numerator": "400", "denominator": "1000"},
+        )
         self.assertEqual(result["observed_share"], "0.4")
-        self.assertEqual(result["observed_share_bps"], "4000.0")
+        self.assertEqual(result["observed_share_bps"], "4000")
+        self.assertEqual(result["requested_account_limit"], 20)
         self.assertEqual(result["observed_account_count"], 2)
+        self.assertFalse(result["scope_limit_filled"])
         self.assertTrue(result["identity_verified"])
         self.assertFalse(result["scope_complete"])
         self.assertFalse(result["holder_semantics_verified"])
         self.assertFalse(result["beneficial_owner_identity_verified"])
         self.assertFalse(result["cmis_promotable"])
+
+    def test_nonterminating_decimal_preserves_exact_raw_ratio(self):
+        result = build_top_account_concentration(
+            chain="x1",
+            asset_id="mint-1",
+            source="X1 RPC",
+            supply_raw=3,
+            supply_decimals=0,
+            requested_account_limit=1,
+            accounts=[{"address": "acct-a", "amount": 1, "decimals": 0}],
+            supply_identity_verified=True,
+            account_identity_verified=True,
+        )
+        self.assertEqual(
+            result["observed_share_exact"],
+            {"numerator": "1", "denominator": "3"},
+        )
+        self.assertTrue(result["observed_share"].startswith("0.333333333333"))
+        self.assertTrue(result["scope_limit_filled"])
 
     def test_identity_requires_both_supply_and_account_identity(self):
         result = build_top_account_concentration(
@@ -36,6 +62,7 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
             source="X1 RPC",
             supply_raw=100,
             supply_decimals=0,
+            requested_account_limit=20,
             accounts=[{"address": "acct-a", "amount": 25, "decimals": 0}],
             supply_identity_verified=True,
             account_identity_verified=False,
@@ -50,6 +77,7 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
                 source="X1 RPC",
                 supply_raw=100,
                 supply_decimals=0,
+                requested_account_limit=20,
                 accounts=[],
                 supply_identity_verified="false",
                 account_identity_verified=True,
@@ -62,22 +90,40 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
             source="Solana RPC",
             supply_raw=0,
             supply_decimals=9,
+            requested_account_limit=20,
             accounts=[],
             supply_identity_verified=True,
             account_identity_verified=True,
         )
+        self.assertIsNone(result["observed_share_exact"])
         self.assertIsNone(result["observed_share"])
         self.assertIsNone(result["observed_share_bps"])
+        self.assertEqual(result["observed_account_count"], 0)
 
-    def test_rejects_positive_balance_against_zero_supply(self):
-        with self.assertRaisesRegex(ValueError, "zero total supply"):
+    def test_positive_supply_empty_observation_is_not_zero_concentration(self):
+        with self.assertRaisesRegex(ValueError, "empty evidence is not zero concentration"):
+            build_top_account_concentration(
+                chain="x1",
+                asset_id="mint-1",
+                source="X1 RPC",
+                supply_raw=100,
+                supply_decimals=0,
+                requested_account_limit=20,
+                accounts=[],
+                supply_identity_verified=True,
+                account_identity_verified=True,
+            )
+
+    def test_zero_supply_requires_empty_observed_set_even_for_zero_balance_row(self):
+        with self.assertRaisesRegex(ValueError, "zero total supply requires an empty"):
             build_top_account_concentration(
                 chain="x1",
                 asset_id="mint-1",
                 source="X1 RPC",
                 supply_raw=0,
                 supply_decimals=0,
-                accounts=[{"address": "acct-a", "amount": 1, "decimals": 0}],
+                requested_account_limit=20,
+                accounts=[{"address": "acct-a", "amount": 0, "decimals": 0}],
                 supply_identity_verified=True,
                 account_identity_verified=True,
             )
@@ -90,7 +136,39 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
                 source="X1 RPC",
                 supply_raw=100,
                 supply_decimals=0,
+                requested_account_limit=20,
                 accounts=[{"address": "acct-a", "amount": 101, "decimals": 0}],
+                supply_identity_verified=True,
+                account_identity_verified=True,
+            )
+
+    def test_rejects_observed_count_beyond_requested_top_n(self):
+        with self.assertRaisesRegex(ValueError, "exceeds requested_account_limit"):
+            build_top_account_concentration(
+                chain="x1",
+                asset_id="mint-1",
+                source="X1 RPC",
+                supply_raw=100,
+                supply_decimals=0,
+                requested_account_limit=1,
+                accounts=[
+                    {"address": "acct-a", "amount": 50, "decimals": 0},
+                    {"address": "acct-b", "amount": 25, "decimals": 0},
+                ],
+                supply_identity_verified=True,
+                account_identity_verified=True,
+            )
+
+    def test_requested_account_limit_must_be_positive(self):
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            build_top_account_concentration(
+                chain="x1",
+                asset_id="mint-1",
+                source="X1 RPC",
+                supply_raw=100,
+                supply_decimals=0,
+                requested_account_limit=0,
+                accounts=[{"address": "acct-a", "amount": 50, "decimals": 0}],
                 supply_identity_verified=True,
                 account_identity_verified=True,
             )
@@ -103,6 +181,7 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
                 source="X1 RPC",
                 supply_raw=100,
                 supply_decimals=0,
+                requested_account_limit=20,
                 accounts=[
                     {"address": "acct-a", "amount": 50, "decimals": 0},
                     {"address": "acct-a", "amount": 25, "decimals": 0},
@@ -119,6 +198,7 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
                 source="X1 RPC",
                 supply_raw=100,
                 supply_decimals=0,
+                requested_account_limit=20,
                 accounts=[
                     {"address": "acct-a", "amount": 10, "decimals": 0},
                     {"address": "acct-b", "amount": 20, "decimals": 0},
@@ -133,6 +213,7 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
                 source="X1 RPC",
                 supply_raw=100,
                 supply_decimals=6,
+                requested_account_limit=20,
                 accounts=[{"address": "acct-a", "amount": 10, "decimals": 9}],
                 supply_identity_verified=True,
                 account_identity_verified=True,
@@ -146,6 +227,7 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
                 source="X1 RPC",
                 supply_raw=True,
                 supply_decimals=0,
+                requested_account_limit=20,
                 accounts=[],
                 supply_identity_verified=True,
                 account_identity_verified=True,
