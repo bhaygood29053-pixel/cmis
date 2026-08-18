@@ -13,6 +13,12 @@ on:
         required: true
         default: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
         type: string
+  pull_request:
+    paths:
+      - "liquidity_scout/providers/solana/**"
+      - "liquidity_scout/cmis/solana_*.py"
+      - "tests/test_solana_rpc_live_contract.py"
+      - ".github/workflows/solana-live-verify.yml"
 
 permissions:
   contents: read
@@ -24,8 +30,11 @@ jobs:
     timeout-minutes: 10
     env:
       # Optional repository secret for a production RPC provider. When absent,
-      # the step below uses Solana's public mainnet RPC. Never print this value.
+      # the required gate uses Solana's public mainnet RPC. Never print this value.
       SOLANA_RPC_URL_SECRET: ${{ secrets.SOLANA_RPC_URL }}
+      # Pull-request acceptance always uses the fixed known USDC mint. Manual
+      # dispatch may override it with another exact mint.
+      SOLANA_LIVE_TEST_MINT: ${{ github.event_name == 'workflow_dispatch' && inputs.mint || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' }}
 
     steps:
       - name: Check out repository
@@ -43,10 +52,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Validate probe mint
-        if: ${{ inputs.run_rpc_contract }}
+        if: ${{ github.event_name == 'pull_request' || inputs.run_rpc_contract }}
         shell: bash
-        env:
-          SOLANA_LIVE_TEST_MINT: ${{ inputs.mint }}
         run: |
           set -euo pipefail
           if [ -z "${SOLANA_LIVE_TEST_MINT:-}" ]; then
@@ -55,19 +62,22 @@ jobs:
           fi
           echo "Read-only token RPC contract probe configured."
 
-      - name: Run canonical Solana token RPC contract probe
-        if: ${{ inputs.run_rpc_contract }}
+      - name: Run canonical Solana runtime acceptance
+        if: ${{ github.event_name == 'pull_request' || inputs.run_rpc_contract }}
         shell: bash
         env:
           RUN_SOLANA_LIVE_TESTS: "1"
-          SOLANA_LIVE_TEST_MINT: ${{ inputs.mint }}
         run: |
           set -euo pipefail
           export SOLANA_RPC_URL="${SOLANA_RPC_URL_SECRET:-https://api.mainnet-beta.solana.com}"
+          if [ -n "${SOLANA_RPC_URL_SECRET:-}" ]; then
+            export RUN_SOLANA_LARGEST_ACCOUNTS_LIVE_TESTS=1
+          fi
           python -m unittest tests.test_solana_rpc_live_contract -v
 
       - name: Safety boundary
         run: |
-          echo "Read-only Solana RPC verification only."
-          echo "Probe methods: getTokenSupply, getAccountInfo(jsonParsed), getTokenLargestAccounts."
+          echo "Required live methods: getTokenSupply and getAccountInfo(jsonParsed)."
+          echo "Production runtime asset_lookup and tokenomics are exercised against the known mint."
+          echo "getTokenLargestAccounts concentration evidence is additionally exercised when a dedicated RPC secret is configured."
           echo "No wallet key, transaction preparation, simulation, signing, broadcasting, swap route, or value movement is used."
