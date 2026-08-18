@@ -1,0 +1,46 @@
+name: XDEX Live Contract Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-live-contract:
+    name: Read-only XDEX quote/history contract
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.head_ref == 'agent/issue28-xdex-quote-semantics'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Probe live read-only XDEX contract
+        env:
+          RUN_XDEX_LIVE_TESTS: "1"
+          XDEX_LIVE_REQUIRE_QUOTE_PAIR: "1"
+        run: |
+          python -m unittest tests.test_xdex_live_contract -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "This workflow performs read-only XDEX GET/RPC evidence probes only."
+          echo "No swap prepare, transaction construction, signing, broadcasting, custody, or value movement is permitted."
