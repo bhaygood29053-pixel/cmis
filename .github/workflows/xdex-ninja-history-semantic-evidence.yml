@@ -44,7 +44,10 @@ jobs:
 
       - name: Cross-check XDEX history against X1.Ninja indexed evidence
         run: |
-          python -m unittest tests.test_xdex_ninja_history_semantics_live -v
+          python -m unittest \
+            tests.test_xdex_ninja_history_semantics_live \
+            tests.test_xdex_history_field_semantics_live \
+            -v
 
       - name: Safety boundary
         if: always()
