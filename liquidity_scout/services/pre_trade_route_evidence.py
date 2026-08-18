@@ -67,8 +67,9 @@ _REQUIRED_PROOF_BASIS = {
     "price_impact": frozenset(
         {
             "verified_direct_cp_route",
-            "verified_pool_reserves",
-            "verified_price_impact_semantics",
+            "verified_active_output_reserve",
+            "verified_zero_slippage_quote_output",
+            "verified_integer_rounded_output_reserve_price_impact_semantics",
         }
     ),
     "fees": frozenset(
