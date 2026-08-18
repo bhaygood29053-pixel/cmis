@@ -1,7 +1,7 @@
 """Evidence-bound CMIS Phase 11 intelligence conclusions.
 
 This module attaches already-built CMIS Evidence Receipts and their exact
-recomputed Proof Scores to validated read-only intelligence facts.  It does not
+recomputed Proof Scores to validated read-only intelligence facts. It does not
 upgrade risk, infer behavior, promote provider assertions, or create a public
 Scout service.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, localcontext
 from fractions import Fraction
 import hashlib
@@ -84,6 +84,30 @@ def _canonical_json(value: Mapping[str, Any]) -> str:
 
 def _content_id(prefix: str, value: Mapping[str, Any]) -> str:
     return prefix + hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _decimal_normalized(value: Decimal) -> str:
+    if not value.is_finite():
+        raise ValueError("decimal value must be finite")
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return "0" if text in {"", "-0"} else text
+
+
+def _canonical_z_datetime(name: str, value: Any) -> datetime:
+    text = _text(name, value, required=True)
+    assert text is not None
+    if not text.endswith("Z"):
+        raise ValueError(f"{name} must be canonical UTC")
+    try:
+        parsed = datetime.fromisoformat(text[:-1] + "+00:00")
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a canonical timestamp") from exc
+    canonical = parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    if canonical != text:
+        raise ValueError(f"{name} must be canonical UTC")
+    return parsed
 
 
 def _validate_receipt(receipt: Mapping[str, Any]) -> dict[str, Any]:
@@ -196,11 +220,8 @@ def _validate_concentration_change(record: Mapping[str, Any]) -> dict[str, Any]:
         _text(field, supplied.get(field), required=True)
     if supplied.get("scope") != "observed_top_token_accounts":
         raise ValueError("unsupported concentration change scope")
-    for field in (
-        "identity_verified",
-    ):
-        if supplied.get(field) is not True:
-            raise ValueError(f"concentration change {field} must be true")
+    if supplied.get("identity_verified") is not True:
+        raise ValueError("concentration change identity_verified must be true")
     for field in (
         "scope_complete",
         "holder_semantics_verified",
@@ -237,16 +258,13 @@ def _validate_concentration_change(record: Mapping[str, Any]) -> dict[str, Any]:
         if supplied.get(field) != expected:
             raise ValueError(f"concentration change {field} is inconsistent")
 
-    for field in ("before_observed_at", "after_observed_at"):
-        value = _text(field, supplied.get(field), required=True)
-        assert value is not None
-        if not value.endswith("Z"):
-            raise ValueError(f"{field} must be canonical UTC")
-        try:
-            datetime.fromisoformat(value[:-1] + "+00:00")
-        except ValueError as exc:
-            raise ValueError(f"{field} must be a canonical timestamp") from exc
-    if supplied["after_observed_at"] <= supplied["before_observed_at"]:
+    before_time = _canonical_z_datetime(
+        "before_observed_at", supplied.get("before_observed_at")
+    )
+    after_time = _canonical_z_datetime(
+        "after_observed_at", supplied.get("after_observed_at")
+    )
+    if after_time <= before_time:
         raise ValueError("concentration change observation times are not ordered")
     return supplied
 
@@ -374,7 +392,10 @@ def _validate_historical_comparison(record: Mapping[str, Any]) -> dict[str, Any]
         before = _fraction(first_ratio, name="first.exact_ratio")
         after = _fraction(last_ratio, name="last.exact_ratio")
         delta = after - before
-        exact_delta = {"numerator": str(delta.numerator), "denominator": str(delta.denominator)}
+        exact_delta = {
+            "numerator": str(delta.numerator),
+            "denominator": str(delta.denominator),
+        }
         absolute = _fraction_decimal(delta)
         percent = None if before == 0 else _fraction_decimal((delta / before) * 100)
         if supplied.get("exact_ratio_change") != exact_delta:
@@ -385,24 +406,32 @@ def _validate_historical_comparison(record: Mapping[str, Any]) -> dict[str, Any]
             after_decimal = Decimal(last["value"])
         except (InvalidOperation, ValueError) as exc:
             raise ValueError("historical comparison values are invalid") from exc
+        if not before_decimal.is_finite() or not after_decimal.is_finite():
+            raise ValueError("historical comparison values are invalid")
         delta_decimal = after_decimal - before_decimal
-        absolute = format(delta_decimal, "f").rstrip("0").rstrip(".") or "0"
-        if before_decimal == 0:
-            percent = None
-        else:
-            percent_decimal = (delta_decimal / before_decimal) * Decimal(100)
-            percent = format(percent_decimal, "f").rstrip("0").rstrip(".") or "0"
+        absolute = _decimal_normalized(delta_decimal)
+        percent = (
+            None
+            if before_decimal == 0
+            else _decimal_normalized((delta_decimal / before_decimal) * Decimal(100))
+        )
         if supplied.get("exact_ratio_change") is not None:
             raise ValueError("non-ratio historical comparison cannot claim exact ratio change")
     if supplied.get("absolute_change") != absolute or supplied.get("percent_change") != percent:
         raise ValueError("historical comparison change values are inconsistent")
     window = supplied.get("observed_window")
-    if not isinstance(window, Mapping) or window.get("start") != first["observed_at"] or window.get("end") != last["observed_at"]:
+    if (
+        not isinstance(window, Mapping)
+        or window.get("start") != first["observed_at"]
+        or window.get("end") != last["observed_at"]
+    ):
         raise ValueError("historical comparison observed window is inconsistent")
     return supplied
 
 
-def _validated_conclusion(conclusion_type: str, conclusion: Mapping[str, Any]) -> dict[str, Any]:
+def _validated_conclusion(
+    conclusion_type: str, conclusion: Mapping[str, Any]
+) -> dict[str, Any]:
     validators = {
         "top_account_concentration": _validate_concentration,
         "top_account_concentration_change": _validate_concentration_change,
@@ -414,16 +443,33 @@ def _validated_conclusion(conclusion_type: str, conclusion: Mapping[str, Any]) -
     return validators[conclusion_type](conclusion)
 
 
-def _conclusion_bindings(conclusion_type: str, conclusion: Mapping[str, Any]) -> tuple[str, set[str], set[str]]:
-    if conclusion_type in {"top_account_concentration", "top_account_concentration_change"}:
-        return conclusion["chain"].lower(), {conclusion["source"]}, {conclusion["asset_id"]}
+def _conclusion_bindings(
+    conclusion_type: str, conclusion: Mapping[str, Any]
+) -> tuple[str, set[str], set[str]]:
+    if conclusion_type in {
+        "top_account_concentration",
+        "top_account_concentration_change",
+    }:
+        return (
+            conclusion["chain"].lower(),
+            {conclusion["source"]},
+            {conclusion["asset_id"]},
+        )
     if conclusion_type == "wallet_activity_observation":
-        return conclusion["chain"].lower(), {conclusion["source"]}, {conclusion["asset_id"]}
+        return (
+            conclusion["chain"].lower(),
+            {conclusion["source"]},
+            {conclusion["asset_id"]},
+        )
     if conclusion_type == "wallet_activity_summary":
         assets = {item["asset_id"] for item in conclusion["observations"]}
         return conclusion["chain"].lower(), set(conclusion["sources"]), assets
     if conclusion_type == "history_observation":
-        assets = set() if conclusion["category"] == "wallet" else {conclusion["subject_id"]}
+        assets = (
+            set()
+            if conclusion["category"] == "wallet"
+            else {conclusion["subject_id"]}
+        )
         return conclusion["chain"].lower(), {conclusion["source"]}, assets
     first = conclusion["first_observation"]
     assets = set() if first["category"] == "wallet" else {first["subject_id"]}
@@ -440,7 +486,7 @@ def build_intelligence_evidence_bundle(
 
     Evidence coverage is fail-closed: every conclusion source and every asset
     identity that can be deterministically extracted from the conclusion must be
-    represented by the supplied receipts.  The resulting bundle remains
+    represented by the supplied receipts. The resulting bundle remains
     explicitly unpromoted for downstream Scout reliance.
     """
 
@@ -448,7 +494,9 @@ def build_intelligence_evidence_bundle(
     assert type_text is not None
     if type_text not in CONCLUSION_TYPES:
         raise ValueError(f"unsupported conclusion_type: {type_text!r}")
-    if isinstance(evidence_bundles, (str, bytes, bytearray)) or not isinstance(evidence_bundles, Sequence):
+    if isinstance(evidence_bundles, (str, bytes, bytearray)) or not isinstance(
+        evidence_bundles, Sequence
+    ):
         raise TypeError("evidence_bundles must be a sequence")
     if not evidence_bundles:
         raise ValueError("at least one evidence bundle is required")
@@ -456,7 +504,9 @@ def build_intelligence_evidence_bundle(
         raise ValueError("evidence_bundles exceeds the bounded maximum of 64")
 
     safe_conclusion = _validated_conclusion(type_text, conclusion)
-    chain, conclusion_sources, conclusion_assets = _conclusion_bindings(type_text, safe_conclusion)
+    chain, conclusion_sources, conclusion_assets = _conclusion_bindings(
+        type_text, safe_conclusion
+    )
 
     normalized_bundles: list[dict[str, Any]] = []
     seen_receipts: set[str] = set()
@@ -471,7 +521,9 @@ def build_intelligence_evidence_bundle(
         if not isinstance(bundle, Mapping):
             raise TypeError(f"evidence_bundles[{index}] must be a mapping")
         if set(bundle) != {"evidence_receipt", "proof_score"}:
-            raise ValueError("each evidence bundle must contain only evidence_receipt and proof_score")
+            raise ValueError(
+                "each evidence bundle must contain only evidence_receipt and proof_score"
+            )
         receipt = _validate_receipt(bundle["evidence_receipt"])
         proof = _validate_proof_score(receipt, bundle["proof_score"])
         if receipt["chain"].lower() != chain:
@@ -501,19 +553,29 @@ def build_intelligence_evidence_bundle(
                 if isinstance(value, str) and value.strip():
                     receipt_assets.add(value.strip())
         verification = receipt["verification"]
-        independently_verified = independently_verified or verification["independently_verified"] is True
+        independently_verified = (
+            independently_verified
+            or verification["independently_verified"] is True
+        )
         normalized_bundles.append(
             {"evidence_receipt": receipt, "proof_score": proof}
         )
 
     missing_sources = sorted(conclusion_sources - receipt_sources)
     if missing_sources:
-        raise ValueError(f"evidence receipts do not cover conclusion sources: {missing_sources!r}")
+        raise ValueError(
+            f"evidence receipts do not cover conclusion sources: {missing_sources!r}"
+        )
     missing_assets = sorted(conclusion_assets - receipt_assets)
     if missing_assets:
-        raise ValueError(f"evidence receipts do not cover conclusion assets: {missing_assets!r}")
+        raise ValueError(
+            f"evidence receipts do not cover conclusion assets: {missing_assets!r}"
+        )
 
-    if type_text == "history_observation" and safe_conclusion.get("evidence_receipt_id") is not None:
+    if (
+        type_text == "history_observation"
+        and safe_conclusion.get("evidence_receipt_id") is not None
+    ):
         embedded_id = safe_conclusion["evidence_receipt_id"]
         matching = [
             item
@@ -521,17 +583,25 @@ def build_intelligence_evidence_bundle(
             if item["evidence_receipt"]["receipt_id"] == embedded_id
         ]
         if len(matching) != 1:
-            raise ValueError("history observation evidence_receipt_id is not present exactly once")
+            raise ValueError(
+                "history observation evidence_receipt_id is not present exactly once"
+            )
         embedded = matching[0]["proof_score"]
-        expected_percent = str(embedded["proof_percent"])
-        if "." in expected_percent:
-            expected_percent = expected_percent.rstrip("0").rstrip(".")
+        expected_percent = _decimal_normalized(
+            Decimal(str(embedded["proof_percent"]))
+        )
         if safe_conclusion.get("proof_strength") != embedded["proof_strength"]:
-            raise ValueError("history observation proof_strength does not match attached proof")
+            raise ValueError(
+                "history observation proof_strength does not match attached proof"
+            )
         if safe_conclusion.get("proof_percent") != expected_percent:
-            raise ValueError("history observation proof_percent does not match attached proof")
+            raise ValueError(
+                "history observation proof_percent does not match attached proof"
+            )
         if safe_conclusion.get("proof_score_method") != embedded["method"]:
-            raise ValueError("history observation proof_score_method does not match attached proof")
+            raise ValueError(
+                "history observation proof_score_method does not match attached proof"
+            )
 
     conclusion_fingerprint = _content_id("ic_", safe_conclusion)
     base = {
