@@ -9,6 +9,8 @@ RUN_LIVE = os.getenv("RUN_XDEX_OUTPUT_SLIPPAGE_LIVE") == "1"
 SWAP_QUOTE_URL = "https://api.xdex.xyz/api/xendex/swap/quote"
 XENCAT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
 XNT = "So11111111111111111111111111111111111111112"
+XNT_DECIMALS = 9
+RAW_SCALE = 10**XNT_DECIMALS
 BASE_PARAMS = {
     "network": "X1 Mainnet",
     "token_in": XENCAT,
@@ -37,6 +39,7 @@ def _request(extra=None):
     result["body_success"] = body.get("success") if isinstance(body, dict) else None
     data = body.get("data") if isinstance(body, dict) else None
     if isinstance(data, dict):
+        result["data"] = dict(data)
         result["outputAmount"] = data.get("outputAmount")
         result["priceImpactPct"] = data.get("priceImpactPct")
         result["amm_config_address"] = data.get("amm_config_address")
@@ -45,56 +48,100 @@ def _request(extra=None):
     return result
 
 
+def _raw_output(row):
+    amount = Decimal(str(row["outputAmount"])) * RAW_SCALE
+    if amount != amount.to_integral_value():
+        raise AssertionError(f"XDEX outputAmount is not aligned to XNT raw units: {row}")
+    return int(amount)
+
+
+def _expected_raw_after_slippage(zero_slippage_raw, slippage_percent):
+    # The tested values are exact whole basis points: 0.01% = 1 bp.
+    bps = int(Decimal(str(slippage_percent)) * 100)
+    return zero_slippage_raw * (10_000 - bps) // 10_000
+
+
 @unittest.skipUnless(
     RUN_LIVE,
     "set RUN_XDEX_OUTPUT_SLIPPAGE_LIVE=1 to probe read-only XDEX quote parameters",
 )
 class XDEXQuoteSlippageParameterLiveTests(unittest.TestCase):
-    def test_common_slippage_parameter_names_are_observed_not_assumed(self):
+    def test_slippage_parameter_is_percent_and_default_is_half_percent(self):
+        # Query zero first so every other result can be compared to the service's
+        # own no-slippage output rather than to our AMM reconstruction.
+        zero = _request({"slippage": "0"})
+        self.assertEqual(zero["status_code"], 200, zero)
+        self.assertTrue(zero.get("body_success"), zero)
+        zero_raw = _raw_output(zero)
+
+        explicit = {}
+        for value in ("0.01", "0.1", "0.5", "1.0"):
+            row = _request({"slippage": value})
+            self.assertEqual(row["status_code"], 200, row)
+            self.assertTrue(row.get("body_success"), row)
+            explicit[value] = row
+
         baseline = _request()
         self.assertEqual(baseline["status_code"], 200, baseline)
         self.assertTrue(baseline.get("body_success"), baseline)
-        self.assertIsNotNone(baseline.get("outputAmount"), baseline)
+
+        print("XDEX quote slippage semantic baseline/no-slippage")
+        print({"zero": zero, "baseline": baseline})
+        print("XDEX quote explicit slippage values")
+        for value, row in explicit.items():
+            print({"slippage_percent": value, "result": row})
+
+        # For whole-basis-point values, XDEX applies the supplied number as a
+        # percentage to the slippage=0 quote and floors to output raw units.
+        for value, row in explicit.items():
+            observed_raw = _raw_output(row)
+            expected_raw = _expected_raw_after_slippage(zero_raw, value)
+            self.assertLessEqual(
+                abs(observed_raw - expected_raw),
+                1,
+                f"slippage={value} no longer follows percent/bps minimum-output semantics",
+            )
+
+        # Omitting slippage is equivalent to explicitly supplying 0.5% on the
+        # same live quote contract (allow one raw unit for response serialization).
+        self.assertLessEqual(
+            abs(_raw_output(baseline) - _raw_output(explicit["0.5"])),
+            1,
+            "XDEX quote default is no longer equivalent to explicit slippage=0.5",
+        )
+
+        # The price-impact field is independent of the slippage tolerance in
+        # this controlled request set; slippage changes minimum output only.
+        impact_values = {
+            str(zero.get("priceImpactPct")),
+            str(baseline.get("priceImpactPct")),
+            *(str(row.get("priceImpactPct")) for row in explicit.values()),
+        }
+        self.assertEqual(len(impact_values), 1, impact_values)
+
+    def test_alternate_slippage_parameter_names_do_not_show_a_quote_effect(self):
+        baseline = _request()
+        self.assertEqual(baseline["status_code"], 200, baseline)
+        self.assertTrue(baseline.get("body_success"), baseline)
         baseline_output = Decimal(str(baseline["outputAmount"]))
 
         candidates = [
-            {"slippage": "0"},
-            {"slippage": "0.005"},
-            {"slippage": "0.5"},
             {"slippage_bps": "0"},
             {"slippage_bps": "50"},
             {"slippageBps": "50"},
             {"slippage_tolerance": "0.5"},
             {"slippageTolerance": "0.5"},
         ]
+        rows = [_request(extra) for extra in candidates]
 
-        rows = []
-        effects = []
-        for extra in candidates:
-            row = _request(extra)
-            rows.append(row)
-            if row.get("status_code") == 200 and row.get("body_success") and row.get("outputAmount") is not None:
-                output = Decimal(str(row["outputAmount"]))
-                if output != baseline_output:
-                    effects.append({
-                        "request_extra": extra,
-                        "baseline_output": str(baseline_output),
-                        "observed_output": str(output),
-                    })
-
-        print("XDEX quote slippage-parameter probe baseline")
-        print(baseline)
-        print("XDEX quote slippage-parameter probe candidates")
+        print("XDEX alternate slippage-parameter probe")
         for row in rows:
             print(row)
-        print("XDEX quote slippage-parameter observed effects")
-        print(effects)
 
-        # This test intentionally does not assert that undocumented parameters
-        # must be rejected or ignored. Its role is to capture whether the live
-        # service visibly reacts to common candidate names without invoking any
-        # transaction-preparation endpoint.
-        self.assertEqual(len(rows), len(candidates))
+        for row in rows:
+            self.assertEqual(row["status_code"], 200, row)
+            self.assertTrue(row.get("body_success"), row)
+            self.assertEqual(Decimal(str(row["outputAmount"])), baseline_output, row)
 
 
 if __name__ == "__main__":
