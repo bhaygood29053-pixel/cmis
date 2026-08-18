@@ -52,30 +52,80 @@ X1.Ninja remains an indexed XDEX market-history source, not a substitute for raw
 
 ## XDEX quote semantics
 
-The accepted quote evidence is deliberately scoped to the pinned XENCAT/native-XNT CP-swap-compatible route and AMM configuration:
+The quote contract is now classified field-by-field. Some accepted proofs began with the pinned XENCAT/native-XNT route and were then corroborated against a second XNT/USDC.X market and a second AMM configuration.
+
+Primary verified identities used in the evidence set include:
 
 - XDEX program: `sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN`
 - XENCAT mint: `DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb`
 - native/wrapped-XNT market identity used by XDEX: `So11111111111111111111111111111111111111112`
-- verified pool: `6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry`
-- verified AMM config: `2eFPWosizV6nSAGeSvi5tRgXLoqhjnSesra23ALA248c`
+- pinned XENCAT/XNT pool: `6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry`
+- 2800-ppm AMM config: `2eFPWosizV6nSAGeSvi5tRgXLoqhjnSesra23ALA248c`
+- second observed 3000-ppm AMM config: `ECVmujod2RNv98T4JrkNwTTVEiMGDMyGztTaTXsYFL4x`
 
 | Capability | State | Boundary |
 |---|---|---|
-| Direct XDEX quote semantics, coarse | bounded | Mint identity, AMM config, AMM trade fee, and route-scoped `priceImpactPct` are proven; output decomposition, all-in fees, slippage, route quality, fill quality, and freshness/expiry are not. |
-| Input/output mint identity | verified | Exact XENCAT/native-XNT mint identifiers are accepted and preserved by the read-only quote endpoint in both directions. |
-| AMM config identity | verified | Provider `amm_config_address` matches the independently decoded on-chain config for the verified route. This is not route optimality. |
-| AMM trade fee rate | verified | On-chain AMM config decodes `2800 / 1,000,000 = 0.28%`. This is the AMM trade fee only, not an all-in fee. |
-| `priceImpactPct` | verified | Across eight tested sizes/directions, XDEX `priceImpactPct` remained within 0.002 percentage points of an independent CP-curve calculation using X1 RPC reserves after the verified trade fee. This is route-scoped price impact, not user slippage. |
-| `outputAmount` full decomposition | unavailable | The provider output does not reproduce the independently calculated raw CP-curve output. Both tested mints are classic SPL Token/Tokenkeg, so Token-2022 transfer fees do not explain the difference. The remaining adjustment must stay unnamed until authoritative or independently reproducible evidence exists. |
-| All-in fee decomposition | unavailable | The 0.28% AMM trade fee is verified, but no accepted evidence proves whether additional router/platform/protocol/safety adjustments exist or how they enter `outputAmount`. |
-| Slippage / minimum received | unavailable | No accepted contract proves a slippage-tolerance parameter, minimum-received formula, or that `outputAmount` should be interpreted as minimum received. |
-| Route quality / optimality | unavailable | Matching AMM config is not evidence that XDEX searched all pools, selected an optimal route, or used/avoided multi-hop routing. |
+| Direct XDEX quote semantics, coarse | bounded | Mint/config identity, route-scoped price impact, slippage parameter/default/transform, and tested zero-slippage quote arithmetic are independently reproduced. Business fee decomposition, route optimality, fill quality, and some minimum-output semantics remain unproven. |
+| Input/output mint identity | verified | Exact tested mint identifiers are accepted and preserved by the read-only quote endpoint. |
+| AMM config identity | verified | Provider `amm_config_address` can be matched to independently decoded on-chain config for verified routes. This is not route optimality. |
+| AMM config trade-fee rate | verified | The pinned `2eFP...` config decodes 2800 ppm / 0.28%; the second `ECVm...` config decodes 3000 ppm / 0.30%. A config field is not automatically the complete quote-output deduction. |
+| `priceImpactPct` | verified, scoped | Across the accepted pinned-route tests, XDEX `priceImpactPct` closely reproduces independent CP reserve movement using the decoded config trade fee. It remains unchanged when the accepted `slippage` parameter changes. Price impact and slippage are separate. |
+| `slippage` parameter | verified | GET `/api/xendex/swap/quote` accepts `slippage` in percent units. `0.01` = 1 bp, `0.1` = 10 bps, `0.5` = 50 bps, and `1.0` = 100 bps in the tested live contract. |
+| Default slippage | verified | Omitting `slippage` reproduces explicit `slippage=0.5`; current tested default is 0.5%. |
+| `outputAmount` slippage transform | verified, scoped | For tested exact-in quotes, raw output follows `floor(output_raw(slippage=0) * (1 - slippage_percent / 100))` to raw-token precision. |
+| Effective zero-slippage curve deduction | verified, scoped | Tested direct CP-swap routes use a 3000-ppm / 0.30% effective curve deduction before slippage across the currently observed 2800- and 3000-ppm config set. This is an arithmetic observation, not a fee/business label. |
+| `outputAmount` full decomposition | bounded | The curve + slippage arithmetic is reproducible for tested routes, but the reason a 2800-ppm configured route is quoted using 3000-ppm effective curve deduction remains unlabelled. The user-facing Minimum Received label and on-chain minimum-output binding are also not fully proven. |
+| All-in fee decomposition | unavailable | Do not call the 2800→3000 quote-math difference a router/platform/protocol/fund/affiliate/hidden 0.02% fee without authoritative or independently reproducible semantic evidence. |
+| Slippage / minimum received | bounded | Slippage parameter units, default 0.5%, and output transform are verified. Exact binding of `outputAmount` to the user-facing Minimum Received label and eventual on-chain `minimum_amount_out` remains unproven. |
+| Route quality / optimality | unavailable | Matching config/pool evidence is not proof that XDEX searched all pools, selected the globally best route, or used/avoided multi-hop routing. |
 | Fill quality | unavailable | No accepted quote→actual-execution comparison exists. No execution is required or permitted by this evidence milestone. |
+
+### Slippage proof boundary
+
+The current read-only quote contract behaves as:
+
+```text
+zero_slippage_output_raw = provider quote with slippage=0
+output_raw(s) = floor(zero_slippage_output_raw * (1 - s / 100))
+```
+
+where `s` is the `slippage` request value in percent.
+
+Controlled tests cover explicit `slippage` values `0`, `0.01`, `0.1`, `0.5`, and `1.0`. Omitted slippage is equivalent to `0.5` for the tested current contract. Alternate names `slippage_bps`, `slippageBps`, `slippage_tolerance`, and `slippageTolerance` did not alter the quote and are not accepted semantics.
+
+`priceImpactPct` stayed constant across the controlled slippage set. CMIS must not conflate price impact with user slippage.
+
+### Effective curve-deduction proof boundary
+
+For the pinned 2800-ppm config, `slippage=0` did **not** reproduce the CP output using 2800 ppm. It reproduced the same curve using 3000 ppm exactly across six bidirectional test cases.
+
+The same behavior was independently corroborated for the selected XNT/USDC.X pool under the 2800-ppm config.
+
+For a different live AMM config whose decoded trade fee is already 3000 ppm, `slippage=0` reproduced the config's own 3000-ppm CP output and did **not** show an additional 200-ppm deduction.
+
+A current read-only X1 RPC inventory observed approximately 1,204 637-byte XDEX pool-state candidates and only two distinct AMM configs in that layout family: one at 2800 ppm and one at 3000 ppm. Because no >3000-ppm config is currently available in this inventory, the evidence cannot distinguish between:
+
+```text
+quote service always uses 3000 ppm for this tested route family
+```
+
+and:
+
+```text
+quote service applies a minimum/floor of 3000 ppm while preserving higher configs
+```
+
+That distinction must remain unresolved until a higher-rate config or authoritative implementation evidence exists.
+
+### Oracle localization
+
+For the tested XENCAT/native-XNT route, XDEX Oracle `/api/v1/token/sell-quote` `amount_out_quote` matched the independently reconstructed **no-fee** CP curve output exactly at raw-token precision across multiple sizes.
+
+This makes the Oracle sell quote a useful curve/reference evidence surface for the tested route. It must not be presented as fee-complete, slippage-adjusted, or executable.
 
 ### Price-impact proof boundary
 
-The accepted independent calculation for the pinned route is an exact-in constant-product curve after the verified AMM trade fee:
+The accepted independent price-impact calculation for the pinned route remains an exact-in constant-product reserve movement after the decoded AMM config trade fee:
 
 ```text
 trade_fee = ceil(raw_input * trade_fee_rate / 1_000_000)
@@ -84,14 +134,14 @@ curve_output = amount_after_trade_fee * reserve_out / (reserve_in + amount_after
 curve_impact_pct = amount_after_trade_fee / (reserve_in + amount_after_trade_fee) * 100
 ```
 
-The live semantic gate tests eight amounts/directions and requires the provider `priceImpactPct` to remain within **0.002 percentage points** of the independently reproduced value. The test separately requires the unresolved `outputAmount` mismatch to remain visible so a future contract change cannot silently promote output semantics.
+The live semantic gate tests multiple amounts/directions and requires the provider `priceImpactPct` to remain within the accepted tolerance of the independently reproduced value. The later slippage tests show that `priceImpactPct` is invariant to the user-slippage parameter in the tested contract.
 
 ## Native XNT
 
 | Capability | State | Boundary |
 |---|---|---|
 | Canonical native-XNT translation | verified | CMIS may distinguish canonical native XNT identity from wrapped market representation and use the accepted native network-supply path. |
-| Native-XNT direct-XDEX quote translation | verified, scoped | XDEX accepts and preserves `So11111111111111111111111111111111111111112` for the pinned XENCAT/native-XNT quote contract. This does not make that market representation the canonical native chain identity. |
+| Native-XNT direct-XDEX quote translation | verified, scoped | XDEX accepts and preserves `So11111111111111111111111111111111111111112` for the tested direct quote contract. This does not make that market representation the canonical native chain identity. |
 
 ## Runtime pre-trade scope guard
 
@@ -102,16 +152,17 @@ Generic `pre_trade_check` must continue to report `price_impact`, `fees`, and `s
 1. resolve the exact requested asset and route;
 2. prove the pool/config identity for that route;
 3. read/verify current reserves and fee configuration;
-4. apply the accepted route-specific semantic contract; and
-5. preserve provenance/freshness without guessing.
+4. establish that the accepted direct-quote semantic contract applies to that route;
+5. apply the route/config-scoped calculations; and
+6. preserve provenance/freshness without guessing.
 
-Therefore the XENCAT/native-XNT proof must not leak into an unrelated asset such as AGI.
+Therefore the XENCAT/native-XNT and XNT/USDC.X proofs must not leak into an unrelated asset such as AGI.
 
 ## XDEX Oracle role
 
-`oracle.xdex.xyz` is treated as a separate **provider surface within the XDEX source family**, not an independent source from XDEX itself. It can help localize whether a quote/output adjustment occurs in a common oracle/AMM layer or only in the swap/router surface, but X1 RPC remains the independent on-chain verifier.
+`oracle.xdex.xyz` is treated as a separate **provider surface within the XDEX source family**, not an independent source from XDEX itself. X1 RPC remains the independent on-chain verifier.
 
-Oracle spot/selected-pool/sell-quote fields may be promoted only field-by-field after their semantics are independently corroborated. They must not be used to manufacture the still-unknown `outputAmount` adjustment or slippage semantics.
+For the tested XENCAT/native-XNT route, Oracle `amount_out_quote` now has a verified narrow role as a no-fee CP-curve reference because it reproduced the independent no-fee reserve calculation at raw precision. This does not make it an execution quote or a source of all-in fee/slippage/fill semantics.
 
 ## SSE / live-event evidence
 
