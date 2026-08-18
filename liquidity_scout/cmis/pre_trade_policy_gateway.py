@@ -135,9 +135,6 @@ class PreTradePolicyMixin:
                 if isinstance(risk_asset, Mapping):
                     normalized_trade["asset"] = dict(risk_asset)
 
-        now_fn = getattr(self, "pre_trade_now_fn", None) or time.time
-        evaluated_at = float(now_fn())
-
         runtime_warnings = []
         if params.get("route_evidence") is not None:
             runtime_warnings.append({
@@ -185,6 +182,12 @@ class PreTradePolicyMixin:
                         "route execution estimates remain unavailable."
                     ),
                 })
+
+        # Evaluation occurs after any read-only route collection so a newly
+        # observed quote cannot be rejected merely because its timestamp is a
+        # few milliseconds later than the pre-collection runtime clock.
+        now_fn = getattr(self, "pre_trade_now_fn", None) or time.time
+        evaluated_at = float(now_fn())
 
         response = build_pre_trade_check_response(
             risk,
