@@ -17,7 +17,7 @@ from .pre_trade_liquidity import (
     DEFAULT_PRE_TRADE_POLICY,
     assess_trade_size_liquidity,
 )
-from .pre_trade_route_evidence import normalize_trade_route
+from .pre_trade_route_evidence import normalize_token_in_amount, normalize_trade_route
 from .risk import BLOCK, PASS, WARN
 
 
@@ -93,7 +93,7 @@ def _normalize_trade(trade: Mapping[str, Any]) -> Dict[str, Any]:
         asset_mint=asset_mint,
         side=side,
     )
-    return {
+    normalized = {
         "side": side,
         "chain": (_text(trade.get("chain")) or "").lower() or None,
         "asset": {
@@ -103,6 +103,9 @@ def _normalize_trade(trade: Mapping[str, Any]) -> Dict[str, Any]:
         "notional_usd": notional,
         "route": route,
     }
+    if "token_in_amount" in trade and trade.get("token_in_amount") is not None:
+        normalized["token_in_amount"] = normalize_token_in_amount(trade.get("token_in_amount"))
+    return normalized
 
 
 def _assess_identity(risk_result: Mapping[str, Any], trade: Mapping[str, Any], target_chain: str) -> Dict[str, Any]:
@@ -237,6 +240,7 @@ def build_pre_trade_check(
         route_evidence=route_evidence,
         target_chain=chain_name,
         trade_route=normalized_trade.get("route"),
+        trade_token_in_amount=normalized_trade.get("token_in_amount"),
         evaluated_at=evaluated_at,
         route_evidence_max_age_seconds=route_evidence_max_age_seconds,
     )
