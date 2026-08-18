@@ -30,6 +30,9 @@ from liquidity_scout.cmis.verification_gateway import (
     CMISGateway as VerificationCMISGateway,
     SERVICE as VERIFICATION_EVIDENCE_SERVICE,
 )
+from liquidity_scout.cmis.verified_xdex_program_scope_gateway import (
+    VerifiedXDEXProgramScopeMixin,
+)
 
 
 DEFAULT_VERIFICATION_EVIDENCE_DB = os.path.join(
@@ -54,6 +57,7 @@ class RuntimeCMISGateway(
     SolanaMarketReportMixin,
     SolanaTokenomicsMixin,
     SolanaAssetLookupMixin,
+    VerifiedXDEXProgramScopeMixin,
     TradeAwareCMISGateway,
     VerificationCMISGateway,
 ):
