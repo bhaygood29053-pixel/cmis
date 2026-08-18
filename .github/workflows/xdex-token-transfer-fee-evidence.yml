@@ -1,0 +1,88 @@
+name: XDEX Token Transfer-Fee Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  token-fee-probe:
+    name: Read-only XENCAT mint and pool token-program evidence
+    if: github.head_ref == 'agent/issue28-xdex-quote-semantics'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Read mint extensions and pool token programs
+        run: |
+          python - <<'PY'
+          import json
+          import requests
+
+          from liquidity_scout.providers.x1.candidate_pool_role import encode_base58_pubkey
+          from liquidity_scout.providers.x1.pool_state_fingerprint import fetch_account_state
+
+          RPC = 'https://rpc.mainnet.x1.xyz'
+          XENCAT = 'DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb'
+          XNT = 'So11111111111111111111111111111111111111112'
+          POOL = '6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry'
+
+          def rpc(method, params):
+              response = requests.post(
+                  RPC,
+                  json={'jsonrpc':'2.0','id':1,'method':method,'params':params},
+                  timeout=20,
+              )
+              response.raise_for_status()
+              body = response.json()
+              if body.get('error'):
+                  raise RuntimeError(body['error'])
+              return body.get('result')
+
+          pool_state = fetch_account_state(POOL)
+          data = pool_state['data']
+          evidence = {
+              'pool_owner': pool_state['owner'],
+              'pool_space': pool_state['space'],
+              'token_0_mint': encode_base58_pubkey(data[168:200]),
+              'token_1_mint': encode_base58_pubkey(data[200:232]),
+              'token_0_program': encode_base58_pubkey(data[232:264]),
+              'token_1_program': encode_base58_pubkey(data[264:296]),
+          }
+          print('[XDEX pool token-program evidence] ' + json.dumps(evidence, sort_keys=True))
+
+          epoch_info = rpc('getEpochInfo', [{'commitment':'confirmed'}])
+          print('[X1 current epoch evidence] ' + json.dumps(epoch_info, sort_keys=True))
+
+          for mint in (XENCAT, XNT):
+              result = rpc('getAccountInfo', [mint, {'encoding':'jsonParsed','commitment':'confirmed'}])
+              value = (result or {}).get('value')
+              if value is None:
+                  raise RuntimeError(f'mint not found: {mint}')
+              public = {
+                  'mint': mint,
+                  'owner': value.get('owner'),
+                  'space': value.get('space'),
+                  'data': value.get('data'),
+              }
+              print('[X1 mint jsonParsed evidence] ' + json.dumps(public, sort_keys=True, default=str))
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo 'Read-only getAccountInfo/getEpochInfo and existing GET quote evidence only.'
+          echo 'No transaction construction, signing, broadcasting, custody, or value movement.'

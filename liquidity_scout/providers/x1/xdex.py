@@ -100,6 +100,35 @@ def _parse_success_data(
     return data
 
 
+def _parse_price_history_data(body: Any) -> list[Any]:
+    """Return the raw history list from either observed XDEX envelope shape.
+
+    Historical XDEX evidence initially showed the common ``success/data``
+    envelope. A live read-only probe on 2026-08-18 also observed a top-level
+    ``bars`` list. This function accepts only those two explicit shapes and
+    preserves every provider bar key unchanged. In particular, compact keys
+    such as ``o/h/l/c/v/t`` are *not* relabeled as semantic price/time fields
+    here; their meaning, units, interval, and completeness remain unverified.
+    """
+
+    if not isinstance(body, Mapping):
+        raise XDEXAPIError("price history response must be a JSON object.")
+
+    if body.get("success") is True:
+        data = body.get("data")
+        if not isinstance(data, list):
+            raise XDEXAPIError("price history response data must be list.")
+        return data
+
+    if "bars" in body:
+        bars = body.get("bars")
+        if not isinstance(bars, list):
+            raise XDEXAPIError("price history response bars must be list.")
+        return bars
+
+    raise XDEXAPIError(f"price history failed: {_error_message(body)}")
+
+
 def _bounded_response_text(response: Any, *, limit: int = 500) -> str:
     text = str(getattr(response, "text", "") or "").strip()
     if not text:
@@ -198,11 +227,13 @@ def fetch_price_history(
     session=requests,
     timeout: int = 15,
 ) -> list[dict[str, Any]]:
-    """Fetch raw pair price-history points for an explicit time window.
+    """Fetch raw pair price-history observations for an explicit time window.
 
-    XDEX live error evidence confirms the required parameter names. The time
-    unit is intentionally not interpreted here; the opt-in live probe currently
-    tests Unix seconds and must verify the returned contract before CMIS use.
+    XDEX live evidence confirms the required parameter names and currently
+    exposes at least two response-envelope shapes. Returned bar keys are kept
+    verbatim. The transport does not infer OHLC meaning, timestamp units,
+    interval, completeness, or a canonical CMIS price from compact provider
+    fields such as ``o/h/l/c/v/t``.
     """
 
     from_token_text = _nonempty_text("from_token", from_token)
@@ -228,11 +259,7 @@ def fetch_price_history(
         session=session,
         timeout=timeout,
     )
-    data = _parse_success_data(
-        body,
-        expected_type=list,
-        operation="price history",
-    )
+    data = _parse_price_history_data(body)
 
     points: list[dict[str, Any]] = []
     for index, point in enumerate(data):
