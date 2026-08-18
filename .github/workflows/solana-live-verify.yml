@@ -13,6 +13,12 @@ on:
         required: true
         default: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
         type: string
+  pull_request:
+    paths:
+      - "liquidity_scout/providers/solana/**"
+      - "liquidity_scout/cmis/solana_*.py"
+      - "tests/test_solana_rpc_live_contract.py"
+      - ".github/workflows/solana-live-verify.yml"
 
 permissions:
   contents: read
@@ -26,6 +32,9 @@ jobs:
       # Optional repository secret for a production RPC provider. When absent,
       # the step below uses Solana's public mainnet RPC. Never print this value.
       SOLANA_RPC_URL_SECRET: ${{ secrets.SOLANA_RPC_URL }}
+      # Pull-request acceptance always uses the fixed known USDC mint. Manual
+      # dispatch may override it with another exact mint.
+      SOLANA_LIVE_TEST_MINT: ${{ github.event_name == 'workflow_dispatch' && inputs.mint || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' }}
 
     steps:
       - name: Check out repository
@@ -43,10 +52,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Validate probe mint
-        if: ${{ inputs.run_rpc_contract }}
+        if: ${{ github.event_name == 'pull_request' || inputs.run_rpc_contract }}
         shell: bash
-        env:
-          SOLANA_LIVE_TEST_MINT: ${{ inputs.mint }}
         run: |
           set -euo pipefail
           if [ -z "${SOLANA_LIVE_TEST_MINT:-}" ]; then
@@ -56,11 +63,10 @@ jobs:
           echo "Read-only token RPC contract probe configured."
 
       - name: Run canonical Solana token RPC contract probe
-        if: ${{ inputs.run_rpc_contract }}
+        if: ${{ github.event_name == 'pull_request' || inputs.run_rpc_contract }}
         shell: bash
         env:
           RUN_SOLANA_LIVE_TESTS: "1"
-          SOLANA_LIVE_TEST_MINT: ${{ inputs.mint }}
         run: |
           set -euo pipefail
           export SOLANA_RPC_URL="${SOLANA_RPC_URL_SECRET:-https://api.mainnet-beta.solana.com}"
