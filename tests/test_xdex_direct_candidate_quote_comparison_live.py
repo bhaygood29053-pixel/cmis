@@ -73,6 +73,18 @@ def _compare_live_pair(token_in, token_out, amount):
     )
 
 
+def _print_live_comparison_diagnostics(pair, result):
+    print({
+        "pair": pair,
+        "status": result.get("status"),
+        "comparison_complete": result.get("comparison_complete"),
+        "candidate_count": result.get("candidate_count"),
+        "quoted_candidate_count": result.get("quoted_candidate_count"),
+        "quote_failures": result.get("quote_failures"),
+        "quotes": result.get("quotes"),
+    })
+
+
 def _assert_live_comparison_boundary(testcase, result):
     testcase.assertTrue(result["comparison_complete"])
     testcase.assertGreaterEqual(result["candidate_count"], 2)
@@ -105,6 +117,7 @@ def _assert_live_comparison_boundary(testcase, result):
 class XDEXDirectCandidateQuoteComparisonLiveTests(unittest.TestCase):
     def test_xencat_xnt_all_verified_direct_candidates_are_compared(self):
         result = _compare_live_pair(XENCAT_MINT, XNT_MINT, "1000")
+        _print_live_comparison_diagnostics("XENCAT/XNT", result)
         _assert_live_comparison_boundary(self, result)
         print({
             "pair": "XENCAT/XNT",
@@ -117,6 +130,7 @@ class XDEXDirectCandidateQuoteComparisonLiveTests(unittest.TestCase):
 
     def test_xnt_usdcx_all_verified_direct_candidates_are_compared(self):
         result = _compare_live_pair(XNT_MINT, USDC_X_MINT, "1")
+        _print_live_comparison_diagnostics("XNT/USDC.X", result)
         _assert_live_comparison_boundary(self, result)
         print({
             "pair": "XNT/USDC.X",
