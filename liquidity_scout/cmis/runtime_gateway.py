@@ -8,6 +8,11 @@ class. These layers compose without duplicating their dispatch logic.
 Verification evidence persistence is an internal runtime dependency. Callers
 can select evidence only by the public service contract; they cannot choose a
 SQLite path or inject a ledger through an HTTP request.
+
+Solana service code remains provider-injected, but the production runtime can
+now construct the accepted read-only providers from deployment environment
+configuration.  This path is disabled by default and cannot be selected or
+modified through an HTTP request.
 """
 
 from __future__ import annotations
@@ -21,6 +26,9 @@ from liquidity_scout.cmis.solana_gateway import SolanaAssetLookupMixin
 from liquidity_scout.cmis.solana_historical_gateway import SolanaHistoricalCompareMixin
 from liquidity_scout.cmis.solana_market_gateway import SolanaMarketReportMixin
 from liquidity_scout.cmis.solana_risk_gateway import SolanaRiskCheckMixin
+from liquidity_scout.cmis.solana_runtime_config import (
+    build_solana_runtime_dependencies,
+)
 from liquidity_scout.cmis.solana_tokenomics_gateway import SolanaTokenomicsMixin
 from liquidity_scout.cmis.trade_gateway import (
     SUPPORTED_SERVICES as TRADE_SUPPORTED_SERVICES,
@@ -68,6 +76,7 @@ class RuntimeCMISGateway(
         *,
         verification_evidence_ledger: Any = None,
         verification_evidence_db_path: str | None = None,
+        solana_runtime_env: Any = None,
         **kwargs: Any,
     ):
         ledger = verification_evidence_ledger
@@ -90,6 +99,16 @@ class RuntimeCMISGateway(
                 if parent:
                     os.makedirs(parent, exist_ok=True)
             ledger = VerificationEvidenceLedger(path)
+
+        solana_dependencies, solana_status = build_solana_runtime_dependencies(
+            solana_runtime_env
+        )
+        # Explicit constructor dependencies remain authoritative.  This keeps
+        # deterministic tests and specialized deployments compatible while the
+        # normal HTTP runtime gains environment-owned automatic composition.
+        for name, dependency in solana_dependencies.items():
+            kwargs.setdefault(name, dependency)
+        self.solana_runtime_configuration = solana_status
 
         super().__init__(verification_evidence_ledger=ledger, **kwargs)
 
