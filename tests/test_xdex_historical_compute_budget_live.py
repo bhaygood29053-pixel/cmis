@@ -12,6 +12,15 @@ COMPUTE_BUDGET_PROGRAM = "ComputeBudget111111111111111111111111111111"
 TARGET_SAMPLE_COUNT = 5
 MAX_SIGNATURE_ATTEMPTS = 12
 
+# Current X1 Tachyon v3.1 source defines:
+#   Base fee = derived compute units * 10
+#   Total fee = base fee + prioritization fee
+# and its tests compute prioritization fee as ceil(limit * price / 1_000_000).
+# The live probe below independently checks whether completed XDEX transactions
+# are arithmetically consistent with that current X1 fee implementation.
+X1_BASE_FEE_MULTIPLIER = 10
+MICRO_LAMPORTS_PER_LAMPORT = 1_000_000
+
 _B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 _B58_INDEX = {char: index for index, char in enumerate(_B58_ALPHABET)}
 
@@ -117,6 +126,17 @@ def _compute_budget_rows(tx):
     return rows
 
 
+def _outer_program_ids(tx):
+    message = ((tx or {}).get("transaction") or {}).get("message") or {}
+    account_keys = _account_keys(tx)
+    result = []
+    for ix in message.get("instructions") or []:
+        if not isinstance(ix, dict):
+            continue
+        result.append(_program_id(ix, account_keys))
+    return result
+
+
 def _get_transaction(signature):
     return rpc_request(
         "getTransaction",
@@ -142,6 +162,52 @@ def _extract_budget_summary(rows):
         elif row.get("kind") == "set_compute_unit_price":
             price = row.get("compute_unit_price_raw")
     return limit, price
+
+
+def _x1_priority_fee(compute_unit_limit, compute_unit_price):
+    if not isinstance(compute_unit_limit, int) or not isinstance(compute_unit_price, int):
+        return None
+    return (
+        compute_unit_limit * compute_unit_price + MICRO_LAMPORTS_PER_LAMPORT - 1
+    ) // MICRO_LAMPORTS_PER_LAMPORT
+
+
+def _x1_fee_reconstruction(network_fee, compute_unit_limit, compute_unit_price):
+    priority_fee = _x1_priority_fee(compute_unit_limit, compute_unit_price)
+    if priority_fee is None or not isinstance(network_fee, int) or network_fee < priority_fee:
+        return {
+            "x1_priority_fee_raw": priority_fee,
+            "x1_inferred_base_fee_raw": None,
+            "x1_inferred_derived_compute_units": None,
+            "x1_inferred_builtin_overhead_cu": None,
+            "x1_dynamic_fee_formula_exactly_consistent": False,
+        }
+
+    base_fee = network_fee - priority_fee
+    if base_fee % X1_BASE_FEE_MULTIPLIER != 0:
+        return {
+            "x1_priority_fee_raw": priority_fee,
+            "x1_inferred_base_fee_raw": base_fee,
+            "x1_inferred_derived_compute_units": None,
+            "x1_inferred_builtin_overhead_cu": None,
+            "x1_dynamic_fee_formula_exactly_consistent": False,
+        }
+
+    derived_cu = base_fee // X1_BASE_FEE_MULTIPLIER
+    builtin_overhead = (
+        derived_cu - compute_unit_limit
+        if isinstance(compute_unit_limit, int)
+        else None
+    )
+    return {
+        "x1_priority_fee_raw": priority_fee,
+        "x1_inferred_base_fee_raw": base_fee,
+        "x1_inferred_derived_compute_units": derived_cu,
+        "x1_inferred_builtin_overhead_cu": builtin_overhead,
+        "x1_dynamic_fee_formula_exactly_consistent": (
+            isinstance(builtin_overhead, int) and builtin_overhead >= 0
+        ),
+    }
 
 
 @unittest.skipUnless(
@@ -189,13 +255,7 @@ class XDEXHistoricalComputeBudgetLiveTests(unittest.TestCase):
             transaction = tx.get("transaction") or {}
             signatures = transaction.get("signatures") or []
             account_keys = _account_keys(tx)
-
-            # Diagnostic only. X1 documents dynamic base fees, so Solana's
-            # priority-fee arithmetic is not promoted as X1's exact all-in fee
-            # formula without X1-specific corroboration.
-            solana_style_priority_candidate = None
-            if isinstance(limit, int) and isinstance(price, int):
-                solana_style_priority_candidate = (limit * price + 999_999) // 1_000_000
+            reconstruction = _x1_fee_reconstruction(fee_raw, limit, price)
 
             diagnostics.append(
                 {
@@ -208,7 +268,8 @@ class XDEXHistoricalComputeBudgetLiveTests(unittest.TestCase):
                     "compute_units_consumed": consumed,
                     "compute_unit_limit": limit,
                     "compute_unit_price_raw": price,
-                    "solana_style_priority_fee_candidate_raw": solana_style_priority_candidate,
+                    "outer_program_ids": _outer_program_ids(tx),
+                    **reconstruction,
                     "compute_budget_instructions": rows,
                 }
             )
@@ -222,9 +283,9 @@ class XDEXHistoricalComputeBudgetLiveTests(unittest.TestCase):
         for row in rpc_failures:
             print(row)
         print(
-            "Interpretation boundary: meta.fee is transaction-layer network-fee evidence and ComputeBudget instructions are transaction resource/prioritization evidence. "
-            "Neither field is used to relabel the independently observed 2800->3000 XDEX quote-engine curve difference. "
-            "The Solana-style priority-fee candidate is diagnostic only because X1 documents congestion-reflective dynamic base fees."
+            "Interpretation boundary: X1 Tachyon v3.1 source defines base fee as derived compute units times 10 and total fee as base plus prioritization fee. "
+            "This live test independently checks completed XDEX transaction metadata against that formula. "
+            "Transaction-layer network/CU fees remain separate from the independently observed 2800->3000 XDEX quote-engine curve difference."
         )
 
         if len(diagnostics) < 3 and rpc_failures:
@@ -240,6 +301,7 @@ class XDEXHistoricalComputeBudgetLiveTests(unittest.TestCase):
         )
         for row in diagnostics:
             self.assertGreater(row["network_fee_raw"], 0, row)
+            self.assertTrue(row["x1_dynamic_fee_formula_exactly_consistent"], row)
             limit = row["compute_unit_limit"]
             consumed = row["compute_units_consumed"]
             if isinstance(limit, int) and isinstance(consumed, int):
