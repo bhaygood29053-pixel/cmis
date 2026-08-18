@@ -299,12 +299,11 @@ jobs:
           # suppress the downstream read-only response-contract probe.
           PY
 
-      - name: Probe live read-only XDEX contract
+      - name: Probe live structurally verified XDEX native-pair contract
         env:
           RUN_XDEX_LIVE_TESTS: "1"
-          XDEX_LIVE_REQUIRE_QUOTE_PAIR: "1"
         run: |
-          python -m unittest tests.test_xdex_live_contract -v
+          python -m unittest tests.test_xdex_verified_native_pair_live -v
 
       - name: Safety boundary
         if: always()
