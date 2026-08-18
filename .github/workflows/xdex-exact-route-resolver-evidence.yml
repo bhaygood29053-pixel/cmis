@@ -13,12 +13,14 @@ jobs:
     name: Read-only exact-route resolver
     if: >-
       github.head_ref == 'agent/xdex-exact-route-resolver' ||
-      github.head_ref == 'agent/xdex-route-evidence-amount-scope'
+      github.head_ref == 'agent/xdex-route-evidence-amount-scope' ||
+      github.head_ref == 'agent/runtime-xdex-route-evidence'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
       RUN_XDEX_EXACT_ROUTE_LIVE: "1"
+      RUN_XDEX_RUNTIME_ROUTE_EVIDENCE_LIVE: "1"
 
     steps:
       - name: Check out repository
@@ -37,7 +39,10 @@ jobs:
 
       - name: Resolve pinned XENCAT/XNT route into pre-trade evidence
         run: |
-          python -m unittest tests.test_xdex_exact_route_resolver_live -v
+          python -m unittest \
+            tests.test_xdex_exact_route_resolver_live \
+            tests.test_cmis_runtime_xdex_route_evidence_live \
+            -v
 
       - name: Safety boundary
         if: always()
