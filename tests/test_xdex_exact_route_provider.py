@@ -21,6 +21,8 @@ VAULT0_RAW, VAULT0 = key(3)
 VAULT1_RAW, VAULT1 = key(4)
 MINT0_RAW, MINT0 = key(5)
 MINT1_RAW, MINT1 = key(6)
+AUTHORITY_RAW, AUTHORITY = key(7)
+OTHER_AUTHORITY_RAW, OTHER_AUTHORITY = key(8)
 POOL = "TEST_POOL"
 
 
@@ -84,17 +86,35 @@ class FakeSession:
 class XDEXExactRouteProviderTests(unittest.TestCase):
     def account_state(self, address):
         if address == POOL:
-            return {"owner": X1_PROGRAM, "data": pool_bytes()}
-        if address == CONFIG:
-            return {"owner": X1_PROGRAM, "data": config_bytes()}
-        raise AssertionError(address)
+            data = pool_bytes()
+        elif address == CONFIG:
+            data = config_bytes()
+        else:
+            raise AssertionError(address)
+        return {
+            "account": address,
+            "account_exists": True,
+            "response_integrity_verified": True,
+            "owner": X1_PROGRAM,
+            "data": data,
+        }
 
     def token_account(self, address):
         if address == VAULT0:
-            return {"identity_verified": True, "mint": MINT0, "raw_amount": 5_000_000_000}
-        if address == VAULT1:
-            return {"identity_verified": True, "mint": MINT1, "raw_amount": 9_000_000_000}
-        raise AssertionError(address)
+            mint, decimals, raw = MINT0, 6, "5000000000"
+        elif address == VAULT1:
+            mint, decimals, raw = MINT1, 9, "9000000000"
+        else:
+            raise AssertionError(address)
+        return {
+            "account": address,
+            "account_exists": True,
+            "identity_verified": True,
+            "mint": mint,
+            "decimals": decimals,
+            "raw_amount": raw,
+            "token_authority": AUTHORITY,
+        }
 
     def quote(self, token_in, token_out, amount, config):
         self.assertEqual((token_in, token_out, config), (MINT0, MINT1, CONFIG))
@@ -108,15 +128,20 @@ class XDEXExactRouteProviderTests(unittest.TestCase):
             "priceImpactPct": "16.6249721754",
         }
 
+    def collect(self, **overrides):
+        kwargs = {
+            "route": ROUTE,
+            "token_in_amount": "1000",
+            "account_state_fetcher": self.account_state,
+            "token_account_fetcher": self.token_account,
+            "quote_fetcher": self.quote,
+            "clock": lambda: datetime(2026, 8, 18, 22, 0, tzinfo=timezone.utc),
+        }
+        kwargs.update(overrides)
+        return collect_exact_route_snapshot(**kwargs)
+
     def test_collects_exact_verified_route_snapshot_read_only(self):
-        snapshot = collect_exact_route_snapshot(
-            ROUTE,
-            "1000",
-            account_state_fetcher=self.account_state,
-            token_account_fetcher=self.token_account,
-            quote_fetcher=self.quote,
-            clock=lambda: datetime(2026, 8, 18, 22, 0, tzinfo=timezone.utc),
-        )
+        snapshot = self.collect()
 
         self.assertEqual(snapshot["schema"], "xdex_exact_route_snapshot.v1")
         self.assertEqual(snapshot["route"], ROUTE)
@@ -130,6 +155,36 @@ class XDEXExactRouteProviderTests(unittest.TestCase):
         self.assertTrue(snapshot["read_only"])
         self.assertFalse(snapshot["execution_authorized"])
 
+    def test_pool_account_identity_mismatch_fails_closed(self):
+        def wrong_account(address):
+            record = dict(self.account_state(address))
+            if address == POOL:
+                record["account"] = "OTHER_POOL"
+            return record
+
+        with self.assertRaisesRegex(XDEXExactRouteError, "account identity"):
+            self.collect(account_state_fetcher=wrong_account)
+
+    def test_pool_response_integrity_must_be_verified(self):
+        def wrong_account(address):
+            record = dict(self.account_state(address))
+            if address == POOL:
+                record["response_integrity_verified"] = False
+            return record
+
+        with self.assertRaisesRegex(XDEXExactRouteError, "response integrity"):
+            self.collect(account_state_fetcher=wrong_account)
+
+    def test_config_response_integrity_must_be_verified(self):
+        def wrong_account(address):
+            record = dict(self.account_state(address))
+            if address == CONFIG:
+                record["response_integrity_verified"] = False
+            return record
+
+        with self.assertRaisesRegex(XDEXExactRouteError, "response integrity"):
+            self.collect(account_state_fetcher=wrong_account)
+
     def test_quote_config_identity_mismatch_fails_closed(self):
         def wrong_quote(token_in, token_out, amount, config):
             result = self.quote(token_in, token_out, amount, config)
@@ -137,13 +192,7 @@ class XDEXExactRouteProviderTests(unittest.TestCase):
             return result
 
         with self.assertRaisesRegex(XDEXExactRouteError, "quote AMM config"):
-            collect_exact_route_snapshot(
-                ROUTE,
-                "1000",
-                account_state_fetcher=self.account_state,
-                token_account_fetcher=self.token_account,
-                quote_fetcher=wrong_quote,
-            )
+            self.collect(quote_fetcher=wrong_quote)
 
     def test_pool_route_pair_mismatch_fails_closed(self):
         wrong = dict(ROUTE)
@@ -165,13 +214,47 @@ class XDEXExactRouteProviderTests(unittest.TestCase):
             return record
 
         with self.assertRaisesRegex(XDEXExactRouteError, "vault mint identity"):
-            collect_exact_route_snapshot(
-                ROUTE,
-                "1000",
-                account_state_fetcher=self.account_state,
-                token_account_fetcher=wrong_vault,
-                quote_fetcher=self.quote,
-            )
+            self.collect(token_account_fetcher=wrong_vault)
+
+    def test_vault_account_identity_mismatch_fails_closed(self):
+        def wrong_vault(address):
+            record = dict(self.token_account(address))
+            if address == VAULT0:
+                record["account"] = VAULT1
+            return record
+
+        with self.assertRaisesRegex(XDEXExactRouteError, "vault account identity"):
+            self.collect(token_account_fetcher=wrong_vault)
+
+    def test_vault_decimals_mismatch_fails_closed(self):
+        def wrong_vault(address):
+            record = dict(self.token_account(address))
+            if address == VAULT0:
+                record["decimals"] = 9
+            return record
+
+        with self.assertRaisesRegex(XDEXExactRouteError, "vault decimals"):
+            self.collect(token_account_fetcher=wrong_vault)
+
+    def test_noncanonical_vault_raw_amount_fails_closed(self):
+        def wrong_vault(address):
+            record = dict(self.token_account(address))
+            if address == VAULT0:
+                record["raw_amount"] = "05000000000"
+            return record
+
+        with self.assertRaisesRegex(XDEXExactRouteError, "canonical non-negative integer string"):
+            self.collect(token_account_fetcher=wrong_vault)
+
+    def test_vaults_must_share_verified_authority(self):
+        def wrong_vault(address):
+            record = dict(self.token_account(address))
+            if address == VAULT1:
+                record["token_authority"] = OTHER_AUTHORITY
+            return record
+
+        with self.assertRaisesRegex(XDEXExactRouteError, "same token authority"):
+            self.collect(token_account_fetcher=wrong_vault)
 
     def test_explicit_config_quote_transport_sets_zero_slippage_and_config(self):
         session = FakeSession(
