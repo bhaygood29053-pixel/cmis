@@ -20,6 +20,7 @@ USDC_X_MINT = "B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq"
 class XDEXDirectCandidateComparisonLiveTests(unittest.TestCase):
     def _assert_live_pair(self, token_in, token_out, amount):
         result = compare_verified_direct_xdex_candidates(token_in, token_out, amount)
+        print("live direct candidate comparison:", result, flush=True)
 
         self.assertEqual(result["service"], "cmis_xdex_verified_direct_candidate_comparison")
         self.assertTrue(result["read_only"])
@@ -46,8 +47,6 @@ class XDEXDirectCandidateComparisonLiveTests(unittest.TestCase):
         else:
             self.assertIsNone(result["preferred_candidate"])
             self.assertIsNone(result["selection_claim"])
-
-        print("live direct candidate comparison:", result)
 
     def test_xencat_to_xnt_current_multi_pool_comparison(self):
         self._assert_live_pair(XENCAT_MINT, XNT_MINT, "1000")
