@@ -40,6 +40,7 @@ jobs:
       - name: Safety boundary
         if: always()
         run: |
-          echo "XDEX pool-list GET plus X1 RPC account reads only."
+          echo "X1 RPC getProgramAccounts exact-pair filters plus read-only account/token-account reads only."
+          echo "Enumeration completeness is scoped to the accepted XDEX program/account family, not all X1 DEXs."
           echo "No quote is required for discovery."
           echo "No best-route ranking, multi-hop routing, /swap/prepare, transaction construction, signing, broadcasting, custody, simulation, execution, or value movement."
