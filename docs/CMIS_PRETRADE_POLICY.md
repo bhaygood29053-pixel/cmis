@@ -8,15 +8,22 @@ signing, simulation, broadcasting, custody, swaps, or autonomous value movement.
 ## Policy identity
 
 - Policy contract: `pre_trade_liquidity` v2.0
-- Operating policy: `cmis_x1_trade_size_conservative` v1.0
+- Production X1 operating policy: `cmis_x1_trade_size_conservative` v1.0
+- Generic service-core policy: `cmis_pre_trade_unconfigured` v1.0
 - Input ratio: `verified requested USD notional / verified asset-wide USD liquidity`
 
-The operating thresholds are deliberately conservative CMIS policy choices. They
-are **not represented as universal market truth**. Every result returns the exact
-policy name, version, thresholds, verified liquidity, notional, and calculated
-ratio used so a caller can audit the classification.
+The reusable service core remains uncalibrated: it can calculate a verified
+notional/liquidity ratio without silently converting that ratio into a warning or
+block. At the production X1 CMIS gateway, an omitted `params.pre_trade_policy`
+selects the named conservative X1 profile. An explicitly supplied policy remains
+authoritative and does not silently inherit the production thresholds.
 
-## Default X1 classification bands
+The X1 operating thresholds are deliberately conservative CMIS policy choices.
+They are **not represented as universal market truth**. Every evaluated result
+returns the exact policy name, version, thresholds, verified liquidity, notional,
+and calculated ratio used so a caller can audit the classification.
+
+## Default production X1 classification bands
 
 | Ratio to verified asset-wide liquidity | Classification | Analytical action |
 | --- | --- | --- |
@@ -35,7 +42,7 @@ gates by manufacturing liquidity or execution estimates.
 A sized trade is not classified from a provider number merely because the number
 exists. The upstream CMIS risk result must mark liquidity as verified. If
 liquidity is missing, conflicting, or otherwise not verified, the ratio and
-classification remain `null` and the default policy returns `BLOCK`.
+classification remain `null` and the production X1 policy returns `BLOCK`.
 
 A zero verified-liquidity result also returns `BLOCK`; CMIS never substitutes a
 small denominator or fake non-zero value.
@@ -52,6 +59,11 @@ semantic manifest is only an externally backed assertion and is not CMIS
 promotable by itself. Reserve field identity therefore does **not** prove an AMM
 curve, fee schedule, viable route, executable quote, expected output, or
 slippage model.
+
+The XDEX provider also has a read-only swap-quote transport, but its returned
+field units/semantics remain unpromoted under the current X1 evidence contract.
+A transport response is therefore not enough to turn quote fields into verified
+price-impact, slippage, fee, or route-quality facts.
 
 Until a separately verified route/quote or pool-depth execution contract is
 accepted, CMIS returns these fields as `unavailable` with `null` values:
@@ -80,6 +92,25 @@ With verified asset-wide liquidity of `$3,380`:
 These classifications apply only when the `$3,380` liquidity observation is
 verified under the CMIS evidence contract. If that liquidity becomes stale,
 conflicting, unavailable, or unverified, the numeric classification is withheld.
+
+## Structured output for Roberta / Signal
+
+`pre_trade_check.data.trade_size` exposes the already-computed decision basis:
+
+- `assessment`;
+- `classification`;
+- `evidence_status`;
+- `notional_usd`;
+- `notional_to_liquidity_ratio`;
+- threshold notionals;
+- policy contract version;
+- policy name/version;
+- classification bands;
+- warning/block ratios.
+
+Roberta may explain these fields but must not recompute or override them.
+Unsupported execution estimates remain under `route_analysis` and
+`execution_capabilities` as explicit unavailable/null values.
 
 ## Provenance requirement
 
