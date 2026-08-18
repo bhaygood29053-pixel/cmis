@@ -161,12 +161,12 @@ def build_solana_runtime_dependencies(
         status["supply_crosscheck_policy_configured"] = True
 
     configured_db = _text(source, "CMIS_SOLANA_OBSERVATION_DB")
-    db_path = configured_db or DEFAULT_SOLANA_OBSERVATION_DB
+    raw_db_path = configured_db or DEFAULT_SOLANA_OBSERVATION_DB
+    db_path = raw_db_path if raw_db_path == ":memory:" else str(
+        Path(raw_db_path).expanduser().resolve()
+    )
     if db_path != ":memory:":
-        Path(db_path).expanduser().resolve().parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     dependencies["solana_observation_ledger"] = SolanaObservationLedger(db_path)
     status["observation_ledger_configured"] = True
 
