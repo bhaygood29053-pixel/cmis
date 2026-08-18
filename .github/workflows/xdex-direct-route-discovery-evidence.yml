@@ -11,7 +11,9 @@ permissions:
 jobs:
   xdex-direct-route-discovery-evidence:
     name: Read-only direct-route discovery
-    if: github.head_ref == 'agent/xdex-direct-route-discovery'
+    if: >-
+      github.head_ref == 'agent/xdex-direct-route-discovery' ||
+      github.head_ref == 'agent/xdex-discovery-verification-complete'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -42,5 +44,6 @@ jobs:
         run: |
           echo "X1 RPC getProgramAccounts exact-pair filters plus read-only account/token-account reads only."
           echo "Enumeration completeness is scoped to the accepted XDEX program/account family, not all X1 DEXs."
+          echo "Every enumerated candidate must be re-verified before uniqueness or ambiguity is trusted."
           echo "No quote is required for discovery."
           echo "No best-route ranking, multi-hop routing, /swap/prepare, transaction construction, signing, broadcasting, custody, simulation, execution, or value movement."

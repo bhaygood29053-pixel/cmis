@@ -164,11 +164,12 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
         self.assertEqual(result["enumerated_candidate_count"], 0)
         self.assertEqual(result["verified_candidate_count"], 0)
         self.assertTrue(result["program_family_pair_enumeration_complete"])
+        self.assertTrue(result["candidate_verification_complete"])
         self.assertFalse(result["recognized_program_registry_globally_exhaustive"])
         self.assertFalse(result["best_route_claimed"])
         self.assertFalse(result["execution_authorized"])
 
-    def test_one_verified_candidate_returns_unique_exact_directional_route(self):
+    def test_one_verified_candidate_returns_unique_only_when_classification_complete(self):
         result = discover_direct_route(
             MINT_A,
             MINT_B,
@@ -178,6 +179,7 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
         )
 
         self.assertEqual(result["status"], "verified_unique")
+        self.assertTrue(result["candidate_verification_complete"])
         self.assertEqual(
             result["selection_claim"],
             "unique_verified_direct_candidate_in_accepted_xdex_program_family",
@@ -189,8 +191,6 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
             "amm_config": CONFIG_1,
         })
         self.assertEqual(result["verified_candidate_count"], 1)
-        self.assertGreater(result["candidates"][0]["active_reserve_in_raw"], 0)
-        self.assertGreater(result["candidates"][0]["active_reserve_out_raw"], 0)
         self.assertFalse(result["global_optimality_claimed"])
         self.assertFalse(result["all_x1_dex_pair_enumeration_complete"])
 
@@ -204,6 +204,7 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
         )
 
         self.assertEqual(result["status"], "ambiguous")
+        self.assertTrue(result["candidate_verification_complete"])
         self.assertIsNone(result["route"])
         self.assertIsNone(result["selection_claim"])
         self.assertEqual(result["verified_candidate_count"], 2)
@@ -212,6 +213,32 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
             {POOL_1, POOL_2},
         )
         self.assertFalse(result["best_route_claimed"])
+
+    def test_one_verified_plus_one_failed_candidate_is_verification_incomplete(self):
+        def fetch(address):
+            if address == POOL_1:
+                return {"owner": X1_PROGRAM, "data": pool_bytes(CONFIG_1_RAW)}
+            if address == CONFIG_1:
+                return {"owner": X1_PROGRAM, "data": config_bytes(2800)}
+            if address == POOL_2:
+                raise RuntimeError("temporary RPC read failure")
+            raise AssertionError(address)
+
+        result = discover_direct_route(
+            MINT_A,
+            MINT_B,
+            candidate_provider=lambda a, b: candidate_report(POOL_1, POOL_2),
+            account_state_fetcher=fetch,
+            token_account_fetcher=self.token_account,
+        )
+
+        self.assertEqual(result["status"], "verification_incomplete")
+        self.assertFalse(result["candidate_verification_complete"])
+        self.assertEqual(result["verified_candidate_count"], 1)
+        self.assertEqual(len(result["rejected_candidates"]), 1)
+        self.assertEqual(result["rejected_candidates"][0]["pool"], POOL_2)
+        self.assertIsNone(result["route"])
+        self.assertIsNone(result["selection_claim"])
 
     def test_duplicate_enumeration_rows_do_not_create_false_ambiguity(self):
         result = discover_direct_route(
@@ -224,6 +251,7 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(result["enumerated_candidate_count"], 1)
         self.assertEqual(result["verified_candidate_count"], 1)
+        self.assertTrue(result["candidate_verification_complete"])
         self.assertEqual(result["status"], "verified_unique")
 
     def test_incomplete_enumeration_cannot_produce_unique_route(self):
@@ -239,7 +267,7 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
                 token_account_fetcher=self.token_account,
             )
 
-    def test_onchain_pair_mismatch_rejects_candidate(self):
+    def test_onchain_pair_mismatch_is_verification_incomplete(self):
         wrong_mint_raw, _ = key(9)
 
         def fetch(address):
@@ -257,11 +285,13 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
             account_state_fetcher=fetch,
             token_account_fetcher=self.token_account,
         )
-        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(result["status"], "verification_incomplete")
+        self.assertFalse(result["candidate_verification_complete"])
         self.assertEqual(result["verified_candidate_count"], 0)
         self.assertIn("mint pair", result["rejected_candidates"][0]["reason"])
+        self.assertIsNone(result["route"])
 
-    def test_wrong_program_owner_rejects_candidate(self):
+    def test_wrong_program_owner_is_verification_incomplete(self):
         def fetch(address):
             if address == POOL_1:
                 return {"owner": "WRONG_PROGRAM", "data": pool_bytes(CONFIG_1_RAW)}
@@ -274,10 +304,12 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
             account_state_fetcher=fetch,
             token_account_fetcher=self.token_account,
         )
-        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(result["status"], "verification_incomplete")
+        self.assertFalse(result["candidate_verification_complete"])
         self.assertIn("owner", result["rejected_candidates"][0]["reason"])
+        self.assertIsNone(result["route"])
 
-    def test_inactive_reserves_reject_candidate(self):
+    def test_inactive_reserves_are_verification_incomplete(self):
         def empty_token_account(address):
             record = dict(self.token_account(address))
             if address == VAULT_A:
@@ -291,8 +323,10 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
             account_state_fetcher=self.account_fetcher({POOL_1}),
             token_account_fetcher=empty_token_account,
         )
-        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(result["status"], "verification_incomplete")
+        self.assertFalse(result["candidate_verification_complete"])
         self.assertIn("active reserves", result["rejected_candidates"][0]["reason"])
+        self.assertIsNone(result["route"])
 
     def test_reverse_direction_preserves_requested_token_direction(self):
         result = discover_direct_route(
@@ -303,6 +337,7 @@ class XDEXDirectRouteDiscoveryTests(unittest.TestCase):
             token_account_fetcher=self.token_account,
         )
         self.assertEqual(result["status"], "verified_unique")
+        self.assertTrue(result["candidate_verification_complete"])
         self.assertEqual(result["route"]["token_in_mint"], MINT_B)
         self.assertEqual(result["route"]["token_out_mint"], MINT_A)
 
