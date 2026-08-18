@@ -1,46 +1,8 @@
 # X1 Evidence Capability Boundary
 
-Status date: **2026-08-18**
+This file records what the X1 evidence layer can safely claim today. It is intentionally conservative: provider availability, observed fields, and independently verified financial semantics are separate things.
 
-This document records the accepted CMIS decision for the remaining X1 evidence gaps. The machine-readable source of truth is `liquidity_scout/cmis/x1_evidence_capabilities.py` and the same records are exposed under `GET /v1/cmis/capabilities` → `chains.x1.evidence_capabilities`.
-
-The rule is deliberately fail-closed:
-
-- **verified** — usable as a verified fact only for the exact named scope;
-- **bounded** — a deterministic evidence primitive exists, but broader semantics/coverage remain unproven;
-- **unavailable** — current accepted provider contracts do not prove the fact, so CMIS must not promote it.
-
-An unavailable capability may be reconsidered only after a new accepted evidence contract and tests. UI text, provider advertising, conventional field names, or numerical resemblance alone are not enough.
-
-## Holder / concentration
-
-| Capability | State | Boundary |
-|---|---|---|
-| Wallet / beneficial-owner holder total | unavailable | Provider counted-entity semantics and total coverage are not proven; token accounts are not equivalent to wallets or beneficial owners. |
-| Token-account concentration | bounded | May describe the observed largest token accounts as a share of mint supply; must not be called holder/wallet concentration or a total holder count. |
-
-## Historical / archival
-
-| Capability | State | Boundary |
-|---|---|---|
-| Explicit requested-slot same-fact comparison | bounded | Deterministic comparison exists when source independence is explicitly established. |
-| Archival history completeness | unavailable | Sparse samples do not prove continuous coverage, retention depth, finality equivalence, reconnect, or backfill. |
-| Provider trade-range exhaustiveness | unavailable | Provider pagination/range completeness and full ordering/staleness semantics remain unproven. |
-
-## XDEX history semantics
-
-The accepted history evidence is deliberately scoped to the structurally verified **XENCAT/native-XNT** market. It does not make every compact XDEX history field globally verified.
-
-| Capability | State | Boundary |
-|---|---|---|
-| Direct XDEX history semantics, coarse | bounded | Some field semantics are independently corroborated; `v`, range completeness, and gap behavior are not. |
-| `t` timestamp / interval / ordering | verified | For the pinned XENCAT/native-XNT contract, `t` behaves as Unix seconds; returned bars form a continuous 60-second timeline in oldest→newest order for the tested window. This does not prove other pairs, intervals, or archival completeness. |
-| Latest `c` native-XNT close price | verified | The latest XDEX `c` independently matched X1.Ninja `currentPriceNative` for the same verified pool. |
-| Native-XNT OHLC semantics | bounded | OHLC values satisfy candle invariants and independently indexed `priceNative` trade evidence falls inside aligned `[l,h]`; not every historical bar has been reconstructed trade-by-trade. |
-| `v` semantics | unavailable | `v` did not match X1.Ninja candle volume in the aligned live sample. Token/native/USD/cumulative/rolling meaning remains unproven. |
-| Requested-range completeness / gap behavior | unavailable | The live response can be bounded to the requested seconds window, but full range exhaustiveness, retention, and forward-fill/no-trade behavior remain unproven. |
-
-### History proof basis
+## X1.Ninja and XDEX history
 
 The live evidence uses two different provider surfaces plus chain-aware trade semantics:
 
@@ -117,6 +79,47 @@ quote service applies a minimum/floor of 3000 ppm while preserving higher config
 
 That distinction must remain unresolved until a higher-rate config or authoritative implementation evidence exists.
 
+### X1 transaction-fee / compute-budget separation
+
+Completed XDEX transactions now provide direct evidence that the X1/SVM transaction-fee layer is separate from the XDEX quote-output arithmetic.
+
+Current X1 Tachyon `v3.1` source defines the non-vote transaction fee model as:
+
+```text
+derived_compute_units = builtin_instruction_costs + bpf_costs
+
+if a custom SetComputeUnitLimit is present and the transaction has BPF cost:
+    bpf_costs = requested_compute_unit_limit
+
+base_fee = derived_compute_units * 10
+priority_fee = ceil(compute_unit_limit * compute_unit_price / 1_000_000)
+total_transaction_fee = base_fee + priority_fee
+```
+
+The current source also keeps `lamports_per_signature` only for API compatibility in this dynamic-fee path; it is not added as the legacy Solana fixed-signature base fee.
+
+A bounded read-only sample of five successful completed XDEX swaps independently reproduced this structure from X1 RPC transaction metadata:
+
+| Requested CU limit | Actual CU consumed | CU price | RPC `meta.fee` | Priority component | Inferred derived CU | Builtin CU above requested BPF limit |
+|---:|---:|---:|---:|---:|---:|---:|
+| 120,000 | 36,291 | 13,000 | 1,206,060 | 1,560 | 120,450 | 450 |
+| 165,000 | 62,627 | 14,000 | 1,656,810 | 2,310 | 165,450 | 450 |
+| 110,000 | 98,147 | 1 | 1,103,001 | 1 | 110,300 | 300 |
+| 180,000 | 57,044 | 15,000 | 1,807,200 | 2,700 | 180,450 | 450 |
+| 110,000 | 98,159 | 1 | 1,103,001 | 1 | 110,300 | 300 |
+
+For every sampled transaction:
+
+```text
+meta.fee - priority_fee = inferred_derived_compute_units * 10
+```
+
+and the explicit requested CU limit was greater than actual execution consumption. This is consistent with X1 charging the BPF portion of its dynamic base fee from the requested compute-unit limit when a custom limit is present, plus builtin instruction costs.
+
+**Classification:** verified for the bounded completed-swap sample and independently consistent with current X1 Tachyon source. These transaction fees are paid at the X1 network layer and are not a valid explanation for the XDEX backend changing a 2800-ppm AMM quote calculation into an effective 3000-ppm zero-slippage curve calculation. The 2800→3000 quote-engine reason remains unresolved and must stay separately classified.
+
+This does **not** yet make network-fee estimation generically available for an arbitrary prospective trade. A pre-trade estimator must inspect the actual prepared transaction or otherwise prove its instruction set, compute budget, and current fee semantics before presenting an execution fee estimate.
+
 ### Oracle localization
 
 For the tested XENCAT/native-XNT route, XDEX Oracle `/api/v1/token/sell-quote` `amount_out_quote` matched the independently reconstructed **no-fee** CP curve output exactly at raw-token precision across multiple sizes.
@@ -178,10 +181,10 @@ For the tested XENCAT/native-XNT route, Oracle `amount_out_quote` now has a veri
 | Exact candidate URL provenance gate | bounded | Can decide whether a candidate read URL has acceptable provenance; it does not discover an endpoint or validate semantics. |
 | Operational state | unavailable | No provenance-approved, contract-tested machine-readable read source is accepted. |
 | Supported asset/route state | unavailable | Canonical representation modeling is not proof of current bridge route support. |
-| Fee/capacity | unavailable | No accepted machine-readable fee/capacity contract. |
-| Transfer lifecycle/history | unavailable | No authoritative contract-tested lifecycle source. |
-| Guardian state | unavailable | UI observation is not accepted machine-readable guardian/quorum/health evidence. |
+| Fee and capacity | unavailable | No provenance-approved, contract-tested machine-readable read source is accepted. |
+| Transfer lifecycle | unavailable | No authoritative contract-tested lifecycle source is accepted. |
+| Guardian state | unavailable | UI observation is not machine-readable verified fact. |
 
 ## Safety boundary
 
-This work is read-only evidence classification. It adds no transaction construction, signing, broadcasting, custody, bridge transfer, trading, autonomous execution, or value movement.
+Read-only only: GET requests and X1 RPC reads. `/swap/prepare` was not invoked. No transaction construction, signing, broadcasting, custody, execution, or value movement was performed.
