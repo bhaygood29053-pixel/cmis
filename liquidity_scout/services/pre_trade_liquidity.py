@@ -1,8 +1,12 @@
 """Deterministic trade-size-to-liquidity analysis for CMIS pre-trade checks.
 
-This module also owns the shared explicit pre-trade policy schema. The policy
-contains no calibrated defaults for market-size or freshness thresholds; callers
-must provide those values explicitly when they want numeric gates applied.
+The generic service core intentionally has no calibrated market-size thresholds.
+A production runtime may select an explicit named operating profile.  The X1
+runtime uses ``CMIS_X1_CONSERVATIVE_PRE_TRADE_POLICY`` when the caller does not
+supply a separate policy.
+
+Thresholds are operating policy, not universal market truth.  Every evaluated
+result exposes the exact policy identity and configured thresholds used.
 """
 
 from __future__ import annotations
@@ -14,8 +18,17 @@ from .pre_trade_capabilities import normalize_required_capabilities
 from .risk import BLOCK, PASS, WARN
 
 
-VERSION = "1.2"
+VERSION = "2.0"
+
+# Generic deterministic core: calculate verified ratios, but do not invent a
+# calibrated decision threshold.  This preserves the reusable service contract
+# for future chains and for explicit-policy callers.
 DEFAULT_PRE_TRADE_POLICY = {
+    "policy_name": "cmis_pre_trade_unconfigured",
+    "policy_version": "1.0",
+    "low_max_notional_to_liquidity_ratio": None,
+    "moderate_max_notional_to_liquidity_ratio": None,
+    "high_max_notional_to_liquidity_ratio": None,
     "warn_notional_to_liquidity_ratio": None,
     "block_notional_to_liquidity_ratio": None,
     "warn_on_missing_notional": True,
@@ -23,9 +36,20 @@ DEFAULT_PRE_TRADE_POLICY = {
     "warn_risk_age_seconds": None,
     "block_risk_age_seconds": None,
     "block_on_unverified_timestamp_when_age_policy_set": True,
-    # Execution estimates remain optional unless the caller explicitly requires
-    # one or more named capabilities.
     "required_capabilities": [],
+}
+
+# Accepted production X1 operating profile for Issue #99.  These are explicit,
+# conservative policy bands, not inferred AMM execution physics.
+CMIS_X1_CONSERVATIVE_PRE_TRADE_POLICY = {
+    **DEFAULT_PRE_TRADE_POLICY,
+    "policy_name": "cmis_x1_trade_size_conservative",
+    "policy_version": "1.0",
+    "low_max_notional_to_liquidity_ratio": 0.02,
+    "moderate_max_notional_to_liquidity_ratio": 0.05,
+    "high_max_notional_to_liquidity_ratio": 0.10,
+    "warn_notional_to_liquidity_ratio": 0.05,
+    "block_notional_to_liquidity_ratio": 0.10,
 }
 
 
@@ -50,36 +74,77 @@ def _positive_policy_number(name: str, value: Any) -> Optional[float]:
     return number
 
 
+def _policy_text(name: str, value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError(f"{name} must be a non-empty string")
+    return text
+
+
 def normalize_pre_trade_policy(policy: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Validate one explicit pre-trade policy without adding hidden thresholds."""
+
     result = dict(DEFAULT_PRE_TRADE_POLICY)
     result["required_capabilities"] = []
-    if policy is None:
-        return result
-    if not isinstance(policy, Mapping):
-        raise ValueError("pre_trade policy must be a mapping or None")
+    if policy is not None:
+        if not isinstance(policy, Mapping):
+            raise ValueError("pre_trade policy must be a mapping or None")
+        unknown = sorted(set(policy) - set(DEFAULT_PRE_TRADE_POLICY))
+        if unknown:
+            raise ValueError(f"unknown pre_trade policy fields: {', '.join(unknown)}")
+        result.update(policy)
 
-    unknown = sorted(set(policy) - set(DEFAULT_PRE_TRADE_POLICY))
-    if unknown:
-        raise ValueError(f"unknown pre_trade policy fields: {', '.join(unknown)}")
-
-    result.update(policy)
+    result["policy_name"] = _policy_text("policy_name", result.get("policy_name"))
+    result["policy_version"] = _policy_text("policy_version", result.get("policy_version"))
     result["required_capabilities"] = normalize_required_capabilities(
         result.get("required_capabilities")
     )
-    for key in (
+
+    numeric_keys = (
+        "low_max_notional_to_liquidity_ratio",
+        "moderate_max_notional_to_liquidity_ratio",
+        "high_max_notional_to_liquidity_ratio",
         "warn_notional_to_liquidity_ratio",
         "block_notional_to_liquidity_ratio",
         "warn_risk_age_seconds",
         "block_risk_age_seconds",
-    ):
+    )
+    for key in numeric_keys:
         result[key] = _positive_policy_number(key, result.get(key))
+
+    classification_values = tuple(
+        result[key]
+        for key in (
+            "low_max_notional_to_liquidity_ratio",
+            "moderate_max_notional_to_liquidity_ratio",
+            "high_max_notional_to_liquidity_ratio",
+        )
+    )
+    configured_classification_values = [
+        value for value in classification_values if value is not None
+    ]
+    if configured_classification_values and len(configured_classification_values) != 3:
+        raise ValueError(
+            "low_max_notional_to_liquidity_ratio, "
+            "moderate_max_notional_to_liquidity_ratio, and "
+            "high_max_notional_to_liquidity_ratio must be configured together"
+        )
+    if len(configured_classification_values) == 3:
+        low, moderate, high = classification_values
+        if not (low <= moderate <= high):
+            raise ValueError(
+                "trade-size classification thresholds must be ordered: "
+                "low_max_notional_to_liquidity_ratio <= "
+                "moderate_max_notional_to_liquidity_ratio <= "
+                "high_max_notional_to_liquidity_ratio"
+            )
 
     warn_ratio = result["warn_notional_to_liquidity_ratio"]
     block_ratio = result["block_notional_to_liquidity_ratio"]
     if warn_ratio is not None and block_ratio is not None and block_ratio < warn_ratio:
         raise ValueError(
-            "block_notional_to_liquidity_ratio must be greater than or equal "
-            "to warn_notional_to_liquidity_ratio"
+            "block_notional_to_liquidity_ratio must be greater than or equal to "
+            "warn_notional_to_liquidity_ratio"
         )
 
     warn_age = result["warn_risk_age_seconds"]
@@ -122,6 +187,38 @@ def _risk_liquidity(risk_result: Mapping[str, Any]) -> tuple[Optional[float], bo
     return liquidity_usd, verified
 
 
+def _classification(ratio: float, policy: Mapping[str, Any]) -> Optional[str]:
+    low = policy.get("low_max_notional_to_liquidity_ratio")
+    moderate = policy.get("moderate_max_notional_to_liquidity_ratio")
+    high = policy.get("high_max_notional_to_liquidity_ratio")
+    if None in (low, moderate, high):
+        return None
+    if ratio < low:
+        return "LOW"
+    if ratio < moderate:
+        return "MODERATE"
+    if ratio < high:
+        return "HIGH"
+    return "VERY_HIGH"
+
+
+def _threshold_reason(
+    *,
+    classification: Optional[str],
+    policy: Mapping[str, Any],
+    threshold_name: str,
+) -> str:
+    if classification:
+        return (
+            f"The proposed notional is {classification} under the explicit "
+            f"{policy['policy_name']} v{policy['policy_version']} policy."
+        )
+    return (
+        "The proposed notional meets or exceeds the explicit "
+        f"{threshold_name} policy threshold."
+    )
+
+
 def assess_trade_size_liquidity(
     risk_result: Mapping[str, Any],
     trade: Mapping[str, Any],
@@ -140,11 +237,30 @@ def assess_trade_size_liquidity(
 
     warn_ratio = normalized_policy["warn_notional_to_liquidity_ratio"]
     block_ratio = normalized_policy["block_notional_to_liquidity_ratio"]
+    classification_configured = all(
+        normalized_policy[key] is not None
+        for key in (
+            "low_max_notional_to_liquidity_ratio",
+            "moderate_max_notional_to_liquidity_ratio",
+            "high_max_notional_to_liquidity_ratio",
+        )
+    )
     evidence = {
+        "policy_contract_version": VERSION,
+        "policy_name": normalized_policy["policy_name"],
+        "policy_version": normalized_policy["policy_version"],
         "notional_usd": notional_usd,
         "liquidity_usd": liquidity_usd,
         "liquidity_verified": liquidity_verified,
         "notional_to_liquidity_ratio": None,
+        "trade_size_classification": None,
+        "evidence_status": "insufficient",
+        "classification_thresholds_configured": classification_configured,
+        "classification_thresholds": {
+            "low_max_ratio": normalized_policy["low_max_notional_to_liquidity_ratio"],
+            "moderate_max_ratio": normalized_policy["moderate_max_notional_to_liquidity_ratio"],
+            "high_max_ratio": normalized_policy["high_max_notional_to_liquidity_ratio"],
+        },
         "warn_notional_to_liquidity_ratio": warn_ratio,
         "block_notional_to_liquidity_ratio": block_ratio,
         "warn_threshold_notional_usd": (
@@ -188,6 +304,10 @@ def assess_trade_size_liquidity(
 
     if liquidity_usd == 0:
         evidence["size_assessment_complete"] = True
+        evidence["trade_size_classification"] = (
+            "VERY_HIGH" if classification_configured else None
+        )
+        evidence["evidence_status"] = "verified"
         return {
             "status": BLOCK,
             "flags": ["zero_verified_liquidity_for_sized_trade"],
@@ -197,7 +317,10 @@ def assess_trade_size_liquidity(
         }
 
     ratio = notional_usd / liquidity_usd
+    classification = _classification(ratio, normalized_policy)
     evidence["notional_to_liquidity_ratio"] = ratio
+    evidence["trade_size_classification"] = classification
+    evidence["evidence_status"] = "verified"
     evidence["size_assessment_complete"] = True
 
     if block_ratio is not None and ratio >= block_ratio:
@@ -205,7 +328,11 @@ def assess_trade_size_liquidity(
             "status": BLOCK,
             "flags": ["trade_size_exceeds_liquidity_block_ratio"],
             "reasons": [
-                "The proposed notional meets or exceeds the explicit pre-trade policy block ratio of verified asset-wide liquidity."
+                _threshold_reason(
+                    classification=classification,
+                    policy=normalized_policy,
+                    threshold_name="block_notional_to_liquidity_ratio",
+                )
             ],
             "evidence": evidence,
             "policy": normalized_policy,
@@ -216,7 +343,11 @@ def assess_trade_size_liquidity(
             "status": WARN,
             "flags": ["trade_size_exceeds_liquidity_warn_ratio"],
             "reasons": [
-                "The proposed notional meets or exceeds the explicit pre-trade policy warning ratio of verified asset-wide liquidity."
+                _threshold_reason(
+                    classification=classification,
+                    policy=normalized_policy,
+                    threshold_name="warn_notional_to_liquidity_ratio",
+                )
             ],
             "evidence": evidence,
             "policy": normalized_policy,
@@ -232,6 +363,7 @@ def assess_trade_size_liquidity(
 
 
 __all__ = [
+    "CMIS_X1_CONSERVATIVE_PRE_TRADE_POLICY",
     "DEFAULT_PRE_TRADE_POLICY",
     "VERSION",
     "assess_trade_size_liquidity",

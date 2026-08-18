@@ -1,9 +1,13 @@
 """Narrow CMIS runtime wiring for explicit pre-trade policy.
 
-The stable gateway already composes ``risk_check`` before ``pre_trade_check``.
-This mixin changes only the pre-trade composition point so callers can supply a
-separate ``params.pre_trade_policy`` mapping. ``params.policy`` remains the risk
-policy and is never reinterpreted as a trade-size or freshness policy.
+The generic pre-trade service remains policy-neutral unless a policy is supplied.
+At the production X1 composition boundary, an omitted ``params.pre_trade_policy``
+selects the versioned conservative X1 operating profile accepted for Issue #99.
+An explicitly supplied mapping remains authoritative and does not inherit hidden
+thresholds from that profile.
+
+``params.policy`` remains the risk policy and is never reinterpreted as a
+trade-size or freshness policy.
 
 No raw market report, liquidity value, quote, route, current-time override, or
 execution object may be injected through this boundary. The deterministic
@@ -18,6 +22,9 @@ import time
 from typing import Any, Dict
 
 from liquidity_scout.services.cmis_pre_trade import build_pre_trade_check_response
+from liquidity_scout.services.pre_trade_liquidity import (
+    CMIS_X1_CONSERVATIVE_PRE_TRADE_POLICY,
+)
 
 
 class PreTradePolicyMixin:
@@ -33,14 +40,26 @@ class PreTradePolicyMixin:
                 "params.trade must be a mapping.",
             )
 
-        pre_trade_policy = params.get("pre_trade_policy")
-        if pre_trade_policy is not None and not isinstance(pre_trade_policy, Mapping):
+        supplied_pre_trade_policy = params.get("pre_trade_policy")
+        if supplied_pre_trade_policy is not None and not isinstance(
+            supplied_pre_trade_policy, Mapping
+        ):
             return self._gateway_error(
                 "pre_trade_check",
                 "x1",
                 "invalid_pre_trade_policy",
                 "params.pre_trade_policy must be a mapping when supplied.",
             )
+
+        # Issue #99: the production X1 runtime has one explicit named policy
+        # when the caller does not provide another policy.  The generic service
+        # core itself remains uncalibrated and therefore reusable by other
+        # chains without inheriting X1 thresholds.
+        pre_trade_policy = (
+            dict(supplied_pre_trade_policy)
+            if supplied_pre_trade_policy is not None
+            else dict(CMIS_X1_CONSERVATIVE_PRE_TRADE_POLICY)
+        )
 
         definition = self._canonical_definition(asset)
         risk_params = {
