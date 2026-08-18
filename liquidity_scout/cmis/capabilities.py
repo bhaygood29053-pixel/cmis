@@ -1,8 +1,9 @@
 """Machine-readable CMIS capability contract for external Chain Scouts.
 
 This module is the CMIS-side source of truth for service eligibility and for the
-accepted X1 evidence boundary. Runtime capability does not imply provider
-health, universal asset coverage, or proof beyond the scope explicitly named.
+accepted evidence boundaries. Runtime capability does not imply provider health,
+universal asset coverage, public-service promotion, or proof beyond the scope
+explicitly named.
 """
 
 from __future__ import annotations
@@ -16,9 +17,11 @@ from liquidity_scout.cmis.x1_evidence_capabilities import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.7.1"
+CMIS_CONTRACT_VERSION = "1.8.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
+INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
+INTELLIGENCE_EVIDENCE_SCHEMA_VERSION = 1
 CAPABILITY_STATES = frozenset({"supported", "bounded", "partial", "unavailable"})
 
 
@@ -33,6 +36,22 @@ def _capability(
     return {
         "state": state,
         "callable": state != "unavailable",
+        "requirements": list(requirements),
+        "limitations": list(limitations),
+    }
+
+
+def _intelligence_capability(
+    *,
+    requirements: Iterable[str] = (),
+    limitations: Iterable[str] = (),
+) -> dict[str, Any]:
+    """Describe a read-only foundation primitive without promoting an API service."""
+    return {
+        "state": "bounded",
+        "read_only": True,
+        "public_service_promoted": False,
+        "scout_reliance_promoted": False,
         "requirements": list(requirements),
         "limitations": list(limitations),
     }
@@ -155,6 +174,65 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
 }
 
 
+_INTELLIGENCE_FOUNDATION_CAPABILITIES: dict[str, dict[str, Any]] = {
+    "top_account_concentration": _intelligence_capability(
+        requirements=(
+            "explicit_observed_top_token_account_set",
+            "independently_supplied_total_supply",
+            "verified_asset_and_account_identity",
+            "explicit_requested_top_n_scope",
+        ),
+        limitations=(
+            "token_accounts_are_not_unique_holders",
+            "beneficial_owner_identity_unverified",
+            "complete_holder_coverage_unproven",
+            "behavioral_interpretation_not_authorized",
+        ),
+    ),
+    "wallet_activity_facts": _intelligence_capability(
+        requirements=(
+            "verified_wallet_asset_transaction_identity",
+            "explicit_source_provenance",
+            "activity_specific_direction_or_semantic_proof",
+        ),
+        limitations=(
+            "behavioral_identity_labels_not_authorized",
+            "complete_wallet_history_unproven",
+            "missing_amounts_remain_unknown",
+        ),
+    ),
+    "sanitized_intelligence_history": _intelligence_capability(
+        requirements=(
+            "content_addressed_normalized_observation",
+            "verified_identity_and_metric_semantics",
+            "explicit_source_scope_unit_and_observation_time",
+        ),
+        limitations=(
+            "sparse_observation_history_only",
+            "continuous_coverage_unproven",
+            "archival_completeness_unproven",
+            "no_interpolation_or_zero_fill",
+            "no_cross_source_scope_or_unit_reconciliation",
+        ),
+    ),
+    "evidence_bound_conclusions": _intelligence_capability(
+        requirements=(
+            "valid_content_addressed_evidence_receipt",
+            "exact_recomputed_proof_score",
+            "receipt_chain_source_and_asset_coverage",
+            "deterministically_revalidated_conclusion",
+        ),
+        limitations=(
+            "proof_strength_separate_from_risk",
+            "provider_assertions_not_promoted",
+            "scout_reliance_not_promoted",
+            "public_service_not_promoted",
+            "execution_authorized_false",
+        ),
+    ),
+}
+
+
 def _normalized(values: Iterable[object]) -> tuple[str, ...]:
     result: list[str] = []
     for value in values:
@@ -169,7 +247,7 @@ def validate_capability_contract(
     runtime_services: Iterable[object],
     known_chains: Iterable[object],
 ) -> None:
-    """Fail loudly when runtime services/chains drift from the manifest."""
+    """Fail loudly when runtime services/chains drift from the public manifest."""
     services = set(_normalized(runtime_services))
     chains = set(_normalized(known_chains))
     manifest_chains = set(_CHAIN_SERVICE_CAPABILITIES)
@@ -251,6 +329,16 @@ def build_capability_manifest(
             "risk_separate_from_proof": True,
             "missing_evidence_is_unknown": True,
         },
+        "intelligence_foundation": {
+            "schema_version": INTELLIGENCE_FOUNDATION_SCHEMA_VERSION,
+            "phase": "phase_11_verified_intelligence_foundation",
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "promotion_rule": "new_accepted_public_service_contract_required",
+            "intelligence_evidence_schema_version": INTELLIGENCE_EVIDENCE_SCHEMA_VERSION,
+            "capabilities": deepcopy(_INTELLIGENCE_FOUNDATION_CAPABILITIES),
+        },
         "supported_services": list(runtime_services),
         "supported_chains": list(legacy_supported_chains),
         "known_chains": list(known_chains),
@@ -264,7 +352,7 @@ def service_capability(
     chain: str,
     service: str,
 ) -> Mapping[str, Any] | None:
-    """Read one capability record from a manifest without guessing defaults."""
+    """Read one public-service capability record without guessing defaults."""
     chains = manifest.get("chains")
     if not isinstance(chains, Mapping):
         return None
@@ -283,6 +371,8 @@ __all__ = [
     "CAPABILITY_STATES",
     "CMIS_CONTRACT_VERSION",
     "EVIDENCE_RECEIPT_SCHEMA_VERSION",
+    "INTELLIGENCE_EVIDENCE_SCHEMA_VERSION",
+    "INTELLIGENCE_FOUNDATION_SCHEMA_VERSION",
     "PROOF_SCORE_SCHEMA_VERSION",
     "build_capability_manifest",
     "service_capability",
