@@ -7,6 +7,7 @@ from liquidity_scout.cmis.xdex_route_resolver import (
 from liquidity_scout.providers.x1.xdex_execution_fee_evidence import (
     AMM_CONFIG,
     POOL,
+    X1_PROGRAM,
     XENCAT_MINT,
     XNT_MINT,
 )
@@ -21,13 +22,48 @@ ROUTE = {
 }
 
 
+def execution_fee_observation(**overrides):
+    observation = {
+        "chain": "x1",
+        "program": X1_PROGRAM,
+        "pool": POOL,
+        "amm_config": AMM_CONFIG,
+        "asset_a_mint": XENCAT_MINT,
+        "asset_b_mint": XNT_MINT,
+        "configured_fee_ppm": 2800,
+        "supported_candidate_ppm": 2800,
+        "rejected_candidate_ppm": 3000,
+        "swap_count": 23,
+        "seed_swap_count": 2,
+        "holdout_swap_count": 21,
+        "first_slot": 66617613,
+        "last_slot": 72301970,
+        "gross_vault_balances_observed": True,
+        "state_contiguous": True,
+        "both_directions_observed": True,
+        "opposite_direction_seed_verified": True,
+        "holdout_validation_performed": True,
+        "fee_accounting_model_corroborated": True,
+        "initial_fee_counters_inferred": True,
+        "initial_fee_counters_observed": False,
+        "supported_max_abs_error_raw": 406,
+        "supported_sum_abs_error_raw": 1115,
+        "rejected_max_abs_error_raw": 1557603301,
+        "rejected_sum_abs_error_raw": 2513561183,
+        "quote_baseline_ppm": 3000,
+        "quote_baseline_verified": True,
+    }
+    observation.update(overrides)
+    return observation
+
+
 def snapshot_for(route=None, **overrides):
     route = dict(route or ROUTE)
     snapshot = {
         "schema": "xdex_exact_route_snapshot.v1",
         "source": "XDEX exact-route read-only collector",
         "chain": "x1",
-        "program": "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN",
+        "program": X1_PROGRAM,
         "route": route,
         "observed_at": "2026-08-18T21:58:00Z",
         "token_in_amount": "1000",
@@ -40,10 +76,12 @@ def snapshot_for(route=None, **overrides):
         "protocol_fee_rate_ppm_of_trade_fee": 250000,
         "fund_fee_rate_ppm_of_trade_fee": 50000,
         "creator_fee_rate_ppm": 0,
-        "reconstructed_price_impact_percent": "1.955321",
-        "quote_price_impact_percent": "1.9553205",
-        "quote_output_amount": "0.123",
-        "quote_rate": "0.000123",
+        "reconstructed_price_impact_percent": "1.955401473022048269316746802",
+        "quote_price_impact_percent": "1.9554010",
+        # Deliberately nonsensical. These fields must never become proof of
+        # fees, fills, slippage, or execution quality.
+        "quote_output_amount": "999999999999999999999999",
+        "quote_rate": "999999",
         "quote_slippage_percent": 0,
         "quote_identity_verified": True,
         "pool_state_verified": True,
@@ -58,7 +96,7 @@ def snapshot_for(route=None, **overrides):
 
 
 class XDEXRouteResolverTests(unittest.TestCase):
-    def test_exact_bounded_route_emits_amount_scoped_price_impact_and_fee_evidence(self):
+    def test_exact_route_emits_amount_scoped_price_impact_only_without_historical_fee_evidence(self):
         evidence = resolve_xdex_route_evidence(
             ROUTE,
             "1000.000",
@@ -69,22 +107,41 @@ class XDEXRouteResolverTests(unittest.TestCase):
         self.assertEqual(evidence["source"], "cmis_xdex_route_resolver")
         self.assertEqual(evidence["route"], ROUTE)
         self.assertEqual(evidence["token_in_amount"], "1000")
-        self.assertEqual(set(evidence["capabilities"]), {"price_impact", "fees"})
+        self.assertEqual(set(evidence["capabilities"]), {"price_impact"})
         self.assertEqual(
             evidence["capabilities"]["price_impact"]["semantic"],
             "route_price_impact_percent",
         )
-        self.assertAlmostEqual(
-            evidence["capabilities"]["fees"]["value"]["amm_trade_fee_rate_percent"],
-            0.28,
-        )
         self.assertNotIn("slippage", evidence["capabilities"])
+        self.assertNotIn("fees", evidence["capabilities"])
+
+    def test_bounded_fee_requires_explicit_accepted_historical_evidence(self):
+        evidence = resolve_xdex_route_evidence(
+            ROUTE,
+            "1000",
+            collector=lambda route, amount: snapshot_for(route),
+            execution_fee_observation=execution_fee_observation(),
+        )
+
+        self.assertEqual(set(evidence["capabilities"]), {"price_impact", "fees"})
+        self.assertEqual(
+            evidence["capabilities"]["fees"]["value"],
+            {
+                "amm_trade_fee_rate_percent": 0.28,
+                "bounded_historical_execution_model_fee_percent": 0.28,
+            },
+        )
+        self.assertNotIn(
+            "quote_effective_curve_deduction_percent",
+            evidence["capabilities"]["fees"]["value"],
+        )
 
     def test_evidence_is_accepted_only_for_same_trade_amount(self):
         evidence = resolve_xdex_route_evidence(
             ROUTE,
             "1000",
             collector=lambda route, amount: snapshot_for(route),
+            execution_fee_observation=execution_fee_observation(),
         )
         result = evaluate_route_evidence(
             evidence,
@@ -97,6 +154,7 @@ class XDEXRouteResolverTests(unittest.TestCase):
 
         self.assertTrue(result["audit"]["route_match"])
         self.assertTrue(result["audit"]["amount_match"])
+        self.assertTrue(result["audit"]["scope_match"])
         self.assertEqual(
             set(result["audit"]["usable_capabilities"]),
             {"price_impact", "fees"},
@@ -127,7 +185,7 @@ class XDEXRouteResolverTests(unittest.TestCase):
         )
         self.assertFalse(result["overrides"])
 
-    def test_other_verified_route_does_not_inherit_bounded_fee_evidence(self):
+    def test_other_verified_route_does_not_get_fee_without_accepted_observation(self):
         other = {
             "token_in_mint": "AAA",
             "token_out_mint": "BBB",
@@ -140,13 +198,16 @@ class XDEXRouteResolverTests(unittest.TestCase):
             collector=lambda route, amount: snapshot_for(
                 route,
                 token_in_amount="1",
-                trade_fee_rate_ppm=3000,
+                raw_input_amount=1_000_000,
+                active_reserve_in_raw=50_000_000,
+                reconstructed_price_impact_percent="1.955401473022048269316746802",
+                quote_price_impact_percent="1.9554010",
+                trade_fee_rate_ppm=2800,
             ),
         )
 
         self.assertEqual(evidence["token_in_amount"], "1")
         self.assertEqual(set(evidence["capabilities"]), {"price_impact"})
-        self.assertNotIn("fees", evidence["capabilities"])
 
     def test_collector_amount_mismatch_fails_closed(self):
         with self.assertRaisesRegex(XDEXRouteResolverError, "requested exact input amount"):
@@ -157,6 +218,33 @@ class XDEXRouteResolverTests(unittest.TestCase):
                     route,
                     token_in_amount="1",
                 ),
+            )
+
+    def test_explicit_unaccepted_fee_evidence_fails_closed(self):
+        observation = execution_fee_observation(state_contiguous=False)
+        with self.assertRaisesRegex(XDEXRouteResolverError, "not strongly corroborated"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(route),
+                execution_fee_observation=observation,
+            )
+
+    def test_current_config_fee_must_match_historical_bounded_fee(self):
+        with self.assertRaisesRegex(
+            XDEXRouteResolverError,
+            "does not match the current verified config fee",
+        ):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    trade_fee_rate_ppm=3000,
+                    reconstructed_price_impact_percent="1.955016961782065611702649175",
+                    quote_price_impact_percent="1.9550169",
+                ),
+                execution_fee_observation=execution_fee_observation(),
             )
 
     def test_price_impact_disagreement_fails_closed(self):
@@ -173,6 +261,21 @@ class XDEXRouteResolverTests(unittest.TestCase):
                 ),
             )
 
+    def test_forged_reconstructed_price_impact_fails_closed(self):
+        with self.assertRaisesRegex(
+            XDEXRouteResolverError,
+            "does not match deterministic reserve arithmetic",
+        ):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    reconstructed_price_impact_percent="1.0",
+                    quote_price_impact_percent="1.0",
+                ),
+            )
+
     def test_snapshot_route_mismatch_fails_closed(self):
         wrong = dict(ROUTE)
         wrong["pool"] = "WRONG_POOL"
@@ -181,6 +284,61 @@ class XDEXRouteResolverTests(unittest.TestCase):
                 ROUTE,
                 "1000",
                 collector=lambda route, amount: snapshot_for(wrong),
+            )
+
+    def test_snapshot_source_is_revalidated(self):
+        with self.assertRaisesRegex(XDEXRouteResolverError, "source is not accepted"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    source="caller_claim",
+                ),
+            )
+
+    def test_snapshot_program_is_revalidated(self):
+        with self.assertRaisesRegex(XDEXRouteResolverError, "accepted XDEX program"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    program="other-program",
+                ),
+            )
+
+    def test_noncanonical_observed_at_fails_closed(self):
+        with self.assertRaisesRegex(XDEXRouteResolverError, "canonical UTC"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    observed_at="2026-08-18T17:58:00-04:00",
+                ),
+            )
+
+    def test_nonzero_quote_slippage_snapshot_fails_closed(self):
+        with self.assertRaisesRegex(XDEXRouteResolverError, "zero-slippage quote"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    quote_slippage_percent=0.5,
+                ),
+            )
+
+    def test_token_amount_and_raw_amount_must_reconcile(self):
+        with self.assertRaisesRegex(XDEXRouteResolverError, "are inconsistent"):
+            resolve_xdex_route_evidence(
+                ROUTE,
+                "1000",
+                collector=lambda route, amount: snapshot_for(
+                    route,
+                    raw_input_amount=999,
+                ),
             )
 
     def test_unverified_vault_identity_fails_closed(self):
