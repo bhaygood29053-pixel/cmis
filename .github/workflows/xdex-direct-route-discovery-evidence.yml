@@ -1,0 +1,46 @@
+name: XDEX Direct Route Discovery Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-direct-route-discovery-evidence:
+    name: Read-only direct-route discovery
+    if: github.head_ref == 'agent/xdex-direct-route-discovery'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_DIRECT_ROUTE_DISCOVERY_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Discover direct XDEX routes read-only
+        run: |
+          python -m unittest tests.test_xdex_direct_route_discovery_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "X1 RPC getProgramAccounts exact-pair filters plus read-only account/token-account reads only."
+          echo "Enumeration completeness is scoped to the accepted XDEX program/account family, not all X1 DEXs."
+          echo "No quote is required for discovery."
+          echo "No best-route ranking, multi-hop routing, /swap/prepare, transaction construction, signing, broadcasting, custody, simulation, execution, or value movement."
