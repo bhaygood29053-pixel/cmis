@@ -39,6 +39,7 @@ jobs:
             tests.test_xdex_onchain_slippage_semantics_live \
             tests.test_xdex_slippage_layering_pinned_live \
             tests.test_xdex_cross_transaction_half_percent_live \
+            tests.test_xdex_simple_swap_half_percent_live \
             -v
 
       - name: Safety boundary
