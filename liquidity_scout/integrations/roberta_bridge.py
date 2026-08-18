@@ -149,9 +149,10 @@ def moltgrid_plaintext_reply(reply: str) -> str:
         return text
 
     # Remove fenced-code markers and heading syntax without changing content.
-    text = re.sub(r"(?m)^\s*```[^\n]*\n?", "", text)
+    # Horizontal whitespace is matched deliberately so blank lines survive.
+    text = re.sub(r"(?m)^[ \t]*```[^\n]*\n?", "", text)
     text = text.replace("```", "")
-    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
+    text = re.sub(r"(?m)^[ \t]{0,3}#{1,6}[ \t]+", "", text)
 
     # Preserve linked destinations as plain text instead of relying on Markdown.
     text = re.sub(
@@ -166,7 +167,7 @@ def moltgrid_plaintext_reply(reply: str) -> str:
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
 
     # Unicode bullets remain readable even if MoltGrid collapses line breaks.
-    text = re.sub(r"(?m)^\s*[-*+]\s+", "• ", text)
+    text = re.sub(r"(?m)^[ \t]*[-*+][ \t]+", "• ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
