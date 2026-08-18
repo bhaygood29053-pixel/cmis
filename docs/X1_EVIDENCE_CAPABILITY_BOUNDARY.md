@@ -1,8 +1,46 @@
 # X1 Evidence Capability Boundary
 
-This file records what the X1 evidence layer can safely claim today. It is intentionally conservative: provider availability, observed fields, and independently verified financial semantics are separate things.
+Status date: **2026-08-18**
 
-## X1.Ninja and XDEX history
+This document records the accepted CMIS decision for the remaining X1 evidence gaps. The machine-readable source of truth is `liquidity_scout/cmis/x1_evidence_capabilities.py` and the same records are exposed under `GET /v1/cmis/capabilities` → `chains.x1.evidence_capabilities`.
+
+The rule is deliberately fail-closed:
+
+- **verified** — usable as a verified fact only for the exact named scope;
+- **bounded** — a deterministic evidence primitive exists, but broader semantics/coverage remain unproven;
+- **unavailable** — current accepted provider contracts do not prove the fact, so CMIS must not promote it.
+
+An unavailable capability may be reconsidered only after a new accepted evidence contract and tests. UI text, provider advertising, conventional field names, or numerical resemblance alone are not enough.
+
+## Holder / concentration
+
+| Capability | State | Boundary |
+|---|---|---|
+| Wallet / beneficial-owner holder total | unavailable | Provider counted-entity semantics and total coverage are not proven; token accounts are not equivalent to wallets or beneficial owners. |
+| Token-account concentration | bounded | May describe the observed largest token accounts as a share of mint supply; must not be called holder/wallet concentration or a total holder count. |
+
+## Historical / archival
+
+| Capability | State | Boundary |
+|---|---|---|
+| Explicit requested-slot same-fact comparison | bounded | Deterministic comparison exists when source independence is explicitly established. |
+| Archival history completeness | unavailable | Sparse samples do not prove continuous coverage, retention depth, finality equivalence, reconnect, or backfill. |
+| Provider trade-range exhaustiveness | unavailable | Provider pagination/range completeness and full ordering/staleness semantics remain unproven. |
+
+## XDEX history semantics
+
+The accepted history evidence is deliberately scoped to the structurally verified **XENCAT/native-XNT** market. It does not make every compact XDEX history field globally verified.
+
+| Capability | State | Boundary |
+|---|---|---|
+| Direct XDEX history semantics, coarse | bounded | Some field semantics are independently corroborated; `v`, range completeness, and gap behavior are not. |
+| `t` timestamp / interval / ordering | verified | For the pinned XENCAT/native-XNT contract, `t` behaves as Unix seconds; returned bars form a continuous 60-second timeline in oldest→newest order for the tested window. This does not prove other pairs, intervals, or archival completeness. |
+| Latest `c` native-XNT close price | verified | The latest XDEX `c` independently matched X1.Ninja `currentPriceNative` for the same verified pool. |
+| Native-XNT OHLC semantics | bounded | OHLC values satisfy candle invariants and independently indexed `priceNative` trade evidence falls inside aligned `[l,h]`; not every historical bar has been reconstructed trade-by-trade. |
+| `v` semantics | unavailable | `v` did not match X1.Ninja candle volume in the aligned live sample. Token/native/USD/cumulative/rolling meaning remains unproven. |
+| Requested-range completeness / gap behavior | unavailable | The live response can be bounded to the requested seconds window, but full range exhaustiveness, retention, and forward-fill/no-trade behavior remain unproven. |
+
+### History proof basis
 
 The live evidence uses two different provider surfaces plus chain-aware trade semantics:
 
@@ -18,16 +56,18 @@ The quote contract is now classified field-by-field. Some accepted proofs began 
 
 Primary verified identities used in the evidence set include:
 
-- XDEX program: `sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN`
+- XDEX mainnet program: `sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN`
 - XENCAT mint: `DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb`
 - native/wrapped-XNT market identity used by XDEX: `So11111111111111111111111111111111111111112`
 - pinned XENCAT/XNT pool: `6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry`
 - 2800-ppm AMM config: `2eFPWosizV6nSAGeSvi5tRgXLoqhjnSesra23ALA248c`
 - second observed 3000-ppm AMM config: `ECVmujod2RNv98T4JrkNwTTVEiMGDMyGztTaTXsYFL4x`
 
+The supplied `raydium_cp_swap` v0.1.0 IDL metadata address `7EEu...` is independently mapped to **X1 testnet**, while independent X1Pays integration code maps `sEsYH...` to **X1 mainnet**. Historical mainnet swaps carry the matching `swap_base_input` discriminator under `sEsYH...`; the testnet IDL is therefore used as structural/program-family corroboration, not as the mainnet address.
+
 | Capability | State | Boundary |
 |---|---|---|
-| Direct XDEX quote semantics, coarse | bounded | Mint/config identity, route-scoped price impact, slippage parameter/default/transform, and tested zero-slippage quote arithmetic are independently reproduced. Business fee decomposition, route optimality, fill quality, and some minimum-output semantics remain unproven. |
+| Direct XDEX quote semantics, coarse | bounded | Mint/config identity, route-scoped price impact, slippage parameter/default/transform, tested zero-slippage quote arithmetic, and minimum-output structure are independently reproduced or strongly corroborated. Business fee decomposition, route optimality, and fill quality remain unproven. |
 | Input/output mint identity | verified | Exact tested mint identifiers are accepted and preserved by the read-only quote endpoint. |
 | AMM config identity | verified | Provider `amm_config_address` can be matched to independently decoded on-chain config for verified routes. This is not route optimality. |
 | AMM config trade-fee rate | verified | The pinned `2eFP...` config decodes 2800 ppm / 0.28%; the second `ECVm...` config decodes 3000 ppm / 0.30%. A config field is not automatically the complete quote-output deduction. |
@@ -36,11 +76,11 @@ Primary verified identities used in the evidence set include:
 | Default slippage | verified | Omitting `slippage` reproduces explicit `slippage=0.5`; current tested default is 0.5%. |
 | `outputAmount` slippage transform | verified, scoped | For tested exact-in quotes, raw output follows `floor(output_raw(slippage=0) * (1 - slippage_percent / 100))` to raw-token precision. |
 | Effective zero-slippage curve deduction | verified, scoped | Tested direct CP-swap routes use a 3000-ppm / 0.30% effective curve deduction before slippage across the currently observed 2800- and 3000-ppm config set. This is an arithmetic observation, not a fee/business label. |
-| `outputAmount` full decomposition | bounded | The curve + slippage arithmetic is reproducible for tested routes, but the reason a 2800-ppm configured route is quoted using 3000-ppm effective curve deduction remains unlabelled. The user-facing Minimum Received label and on-chain minimum-output binding are also not fully proven. |
+| `outputAmount` full decomposition | bounded | The curve + slippage arithmetic is reproducible for tested routes. `outputAmount` is strongly corroborated as a minimum-received-style quote floor, but the reason a 2800-ppm configured route is quoted using 3000 ppm and the exact quote→prepare serialization remain unavailable. |
 | All-in fee decomposition | unavailable | Do not call the 2800→3000 quote-math difference a router/platform/protocol/fund/affiliate/hidden 0.02% fee without authoritative or independently reproducible semantic evidence. |
-| Slippage / minimum received | bounded | Slippage parameter units, default 0.5%, and output transform are verified. Exact binding of `outputAmount` to the user-facing Minimum Received label and eventual on-chain `minimum_amount_out` remains unproven. |
+| Slippage / minimum received | bounded | Slippage units/default/output transform are verified. XDEX docs, deployed frontend behavior, CP-Swap IDL semantics, and completed mainnet transactions strongly corroborate a transaction-specific `minimum_amount_out` boundary. Exact `/swap/prepare` mapping remains unavailable. |
 | Route quality / optimality | unavailable | Matching config/pool evidence is not proof that XDEX searched all pools, selected the globally best route, or used/avoided multi-hop routing. |
-| Fill quality | unavailable | No accepted quote→actual-execution comparison exists. No execution is required or permitted by this evidence milestone. |
+| Fill quality | unavailable | Historical successful output >= encoded minimum does not establish generic quote→execution fill quality or guarantee future execution. |
 
 ### Slippage proof boundary
 
@@ -56,6 +96,8 @@ where `s` is the `slippage` request value in percent.
 Controlled tests cover explicit `slippage` values `0`, `0.01`, `0.1`, `0.5`, and `1.0`. Omitted slippage is equivalent to `0.5` for the tested current contract. Alternate names `slippage_bps`, `slippageBps`, `slippage_tolerance`, and `slippageTolerance` did not alter the quote and are not accepted semantics.
 
 `priceImpactPct` stayed constant across the controlled slippage set. CMIS must not conflate price impact with user slippage.
+
+The deployed frontend independently sends the stored user slippage to both quote and `/api/xdex/swap/prepare`, defaulting to `0.5` when absent. `/swap/prepare` itself was not invoked by this evidence work.
 
 ### Effective curve-deduction proof boundary
 
@@ -77,11 +119,19 @@ and:
 quote service applies a minimum/floor of 3000 ppm while preserving higher configs
 ```
 
+or another backend convention that reproduces the same observed arithmetic.
+
 That distinction must remain unresolved until a higher-rate config or authoritative implementation evidence exists.
+
+### Minimum-output proof boundary
+
+The supplied CP-Swap IDL defines `swapBaseInput(amountIn, minimumAmountOut)` and describes `minimum_amount_out` as the minimum output token amount that prevents excessive slippage. Historical completed mainnet XDEX transactions decode the matching 24-byte `swap_base_input` instruction as an 8-byte discriminator followed by two `u64` values; the first matches input amount and the second behaves as a transaction-specific minimum-output threshold. Sampled successful outputs were always greater than or equal to that threshold.
+
+This strongly corroborates the on-chain minimum-output boundary while keeping the exact server-side `/swap/prepare` formula unavailable.
 
 ### X1 transaction-fee / compute-budget separation
 
-Completed XDEX transactions now provide direct evidence that the X1/SVM transaction-fee layer is separate from the XDEX quote-output arithmetic.
+Completed XDEX transactions provide direct evidence that the X1/SVM transaction-fee layer is separate from the XDEX quote-output arithmetic.
 
 Current X1 Tachyon `v3.1` source defines the non-vote transaction fee model as:
 
@@ -116,9 +166,9 @@ meta.fee - priority_fee = inferred_derived_compute_units * 10
 
 and the explicit requested CU limit was greater than actual execution consumption. This is consistent with X1 charging the BPF portion of its dynamic base fee from the requested compute-unit limit when a custom limit is present, plus builtin instruction costs.
 
-**Classification:** verified for the bounded completed-swap sample and independently consistent with current X1 Tachyon source. These transaction fees are paid at the X1 network layer and are not a valid explanation for the XDEX backend changing a 2800-ppm AMM quote calculation into an effective 3000-ppm zero-slippage curve calculation. The 2800→3000 quote-engine reason remains unresolved and must stay separately classified.
+**Classification:** verified for the bounded completed-swap sample and independently consistent with current X1 Tachyon source. These transaction fees are paid at the X1 network layer and are not a valid explanation for the XDEX backend changing a 2800-ppm AMM quote calculation into an effective 3000-ppm zero-slippage curve calculation. The 2800→3000 quote-engine reason remains unresolved and separately classified.
 
-This does **not** yet make network-fee estimation generically available for an arbitrary prospective trade. A pre-trade estimator must inspect the actual prepared transaction or otherwise prove its instruction set, compute budget, and current fee semantics before presenting an execution fee estimate.
+This does **not** make network-fee estimation generically available for an arbitrary prospective trade. A pre-trade estimator must inspect the actual prepared transaction or otherwise prove its instruction set, compute budget, and current fee semantics before presenting an execution fee estimate.
 
 ### Oracle localization
 
@@ -181,10 +231,10 @@ For the tested XENCAT/native-XNT route, Oracle `amount_out_quote` now has a veri
 | Exact candidate URL provenance gate | bounded | Can decide whether a candidate read URL has acceptable provenance; it does not discover an endpoint or validate semantics. |
 | Operational state | unavailable | No provenance-approved, contract-tested machine-readable read source is accepted. |
 | Supported asset/route state | unavailable | Canonical representation modeling is not proof of current bridge route support. |
-| Fee and capacity | unavailable | No provenance-approved, contract-tested machine-readable read source is accepted. |
-| Transfer lifecycle | unavailable | No authoritative contract-tested lifecycle source is accepted. |
-| Guardian state | unavailable | UI observation is not machine-readable verified fact. |
+| Fee/capacity | unavailable | No accepted machine-readable fee/capacity contract. |
+| Transfer lifecycle/history | unavailable | No authoritative contract-tested lifecycle source. |
+| Guardian state | unavailable | UI observation is not accepted machine-readable guardian/quorum/health evidence. |
 
 ## Safety boundary
 
-Read-only only: GET requests and X1 RPC reads. `/swap/prepare` was not invoked. No transaction construction, signing, broadcasting, custody, execution, or value movement was performed.
+This work is read-only evidence classification. It adds no transaction construction, signing, broadcasting, custody, bridge transfer, trading, autonomous execution, or value movement.
