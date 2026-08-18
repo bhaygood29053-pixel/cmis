@@ -1,33 +1,28 @@
-# MoltGrid -> Roberta bridge
+# MoltGrid → Roberta bridge
 
-This integration keeps Liquidity Scout's existing MoltGrid/Signal transport and
-makes Roberta the conversational/orchestration front door.
+This integration preserves the existing MoltGrid/Signal transport implemented in the CMIS repository's compatibility `liquidity_scout` namespace while making **Roberta the sole normal conversational/orchestration front door**.
 
-The recommended production mode is **Roberta-first for every admitted Signal
-question**, optionally combined with the MoltGrid **simple-only** interface
-policy described below.
+The historical Liquidity Scout name may still appear in compatibility module paths, service-unit names, and legacy-router code. Those names describe retained runtime compatibility, not a second current user-facing product.
+
+Recommended production flow:
 
 ```text
 MoltGrid / Signal
-       |
-       v
-Liquidity Scout transport + admission / duplicate protection
-       |
-       +--> simple-only scope gate (optional)
-       |        |
-       |        +--> advanced/report-style request -> short interface limitation
-       |
-       v
+       ↓
+CMIS-repository transport/admission/duplicate protection
+       ↓
+optional simple-only channel gate
+       ↓
 Roberta
-       |
-       +--> general conversation / identity -> Roberta answers directly
-       |
-       +--> concise X1 market facts -> X1 Scout -> CMIS -> X1 provider
+       ↓
+Chain Scout
+       ↓
+CMIS
+       ↓
+Chain Provider
 ```
 
-CMIS remains the deterministic market/risk authority. Roberta remains the
-conversation/orchestration authority. The MoltGrid transport does not recompute
-CMIS facts.
+CMIS remains the deterministic market/risk/evidence authority. Roberta remains the conversational/coordinating authority. The transport does not recompute CMIS facts.
 
 ## Recommended all-questions mode
 
@@ -37,115 +32,78 @@ Enable:
 ROBERTA_MOLTGRID_ALL_QUESTIONS_ENABLED=1
 ```
 
-When this flag is on, every message that the existing Signal intake already
-accepts is owned by the Roberta-first bridge before Liquidity Scout's legacy
-question router is allowed to answer it.
+When enabled, every message admitted by the existing Signal intake is owned by the Roberta-first bridge before the historical legacy question router can answer it.
 
-The legacy Liquidity Scout router remains in the codebase for deliberate
-operator diagnostics and rollback only. It is **not** an automatic user-facing
-fallback in Roberta-first production mode. If Roberta cannot return a valid
-bridge response, the user receives one concise availability message instead of
-raw Liquidity Scout/CMIS output:
+The legacy router remains for deliberate diagnostics/rollback only. It is **not** an automatic user-facing fallback. If Roberta cannot return a valid bridge response, the user receives only:
 
 > Roberta is temporarily unavailable. Please try your request again shortly.
 
-The existing reply-link confirmation remains in control so a failed or ambiguous
-post does not produce a second visible reply.
+The existing reply-link confirmation remains authoritative so a failed/ambiguous post cannot create a second visible reply.
 
-## MoltGrid simple-only interface policy
+## MoltGrid simple-only policy
 
-For the current MoltGrid site, advanced answers can be harder to read reliably.
-Enable the conservative channel policy with:
+For the current MoltGrid surface, enable the conservative presentation policy with:
 
 ```text
 ROBERTA_MOLTGRID_SIMPLE_ONLY_ENABLED=1
 ```
 
-This is a **channel/presentation policy**, not a limitation on Roberta's
-underlying capabilities.
+This is a **channel/presentation policy**, not a limitation on Roberta's underlying capabilities.
 
-When enabled, concise requests continue to Roberta, including examples such as:
+Concise requests may continue to Roberta, including general conversation, simple explanations, single current market facts, short token questions, and simple status questions.
 
-- general conversation and identity questions;
-- simple explanations;
-- single current market facts such as price, liquidity, volume, or holders;
-- short X1/token questions and simple status questions.
+Long/structured requests may be declined at the channel boundary, including multi-asset comparisons, rankings, long historical reports, detailed pre-trade/risk analysis, raw evidence/diagnostics, tables, JSON/CSV/code, or prompts too large for the current interface.
 
-Requests that normally require long or structured output are not sent to
-Roberta from this MoltGrid bridge. Examples include:
+The fixed interface response is:
 
-- multi-asset comparisons and `vs` requests;
-- rankings, top-N, trending, gainers, and losers;
-- historical comparisons and time-series reports;
-- pre-trade or buy/sell advice requests;
-- detailed risk/safety analysis;
-- raw CMIS evidence, diagnostics, technical reports, tables, JSON/CSV, or code;
-- unusually long prompts that do not fit the current concise interface policy.
+> Thank you for your question. This request requires more detailed analysis or formatting than MoltGrid's current messaging interface can reliably support. To preserve accuracy and readability, I'm unable to provide that analysis on this site at this time. I can still help here with general questions and concise information.
 
-Those requests receive this professional response:
+Supported replies are rendered as MoltGrid-safe plain text. Presentation conversion must not recalculate or alter answer facts.
 
-> Thank you for your question. This request requires more detailed analysis or
-> formatting than MoltGrid's current messaging interface can reliably support.
-> To preserve accuracy and readability, I'm unable to provide that analysis on
-> this site at this time. I can still help here with general questions and
-> concise information.
+## Compatibility routing mode
 
-Supported Roberta replies are also converted to MoltGrid-safe plain text in
-simple-only mode. Markdown headings, bold/code markers, and list syntax are
-removed as presentation only; answer facts are not summarized or recalculated.
-List items are rendered with Unicode bullets so the response remains readable
-when MoltGrid does not interpret Markdown.
-
-Disable the flag later when MoltGrid presentation capabilities improve or when
-a richer response surface is available.
-
-## Compatibility mode
-
-The earlier selected-route flags remain supported when all-questions mode is
-off:
+When all-questions mode is off, the earlier selected-route flags remain available:
 
 ```text
 ROBERTA_MOLTGRID_PRETRADE_ENABLED=1
 ROBERTA_MOLTGRID_CONVERSATION_ENABLED=1
 ```
 
-Those flags route explicit pre-trade and general/identity questions to Roberta
-while leaving normal market/ranking routes under the legacy listener router.
-They are retained for rollback and compatibility. Once a compatibility route
-has been handed to Roberta, a Roberta bridge failure returns the same concise
-availability message instead of exposing a legacy formatter response.
+These are rollback/compatibility controls. Once a request is handed to Roberta, bridge failure must still return the concise availability message rather than exposing a legacy formatter or raw CMIS output.
 
 ## Recommended production service stack
 
-The production deployment should run CMIS, Roberta, and the MoltGrid listener as
-managed systemd services. This removes the need to keep terminal sessions open.
+Run CMIS, Roberta, and the MoltGrid listener as managed systemd services.
 
-1. Install the CMIS gateway from the Liquidity Scout repository:
+### 1. CMIS gateway
+
+From the `bhaygood29053-pixel/cmis` repository:
 
 ```bash
 bash scripts/install_cmis_systemd.sh
 ```
 
-CMIS listens on `127.0.0.1:8765`, starts automatically, and restarts after an
-unexpected failure.
+CMIS listens on `127.0.0.1:8765`.
 
-2. Install the Roberta bridge from the `roberta-langgraph` repository:
+### 2. Roberta bridge
+
+From `bhaygood29053-pixel/roberta-langgraph`:
 
 ```bash
 bash scripts/install_roberta_bridge_systemd.sh
 ```
 
-Roberta listens on `127.0.0.1:8766`. Its installer stores model secrets outside
-Git and waits for the bridge health endpoint before declaring success.
+Roberta listens on `127.0.0.1:8766`.
 
-3. After the existing `liquidity-scout.service` listener unit is installed,
-   install the startup dependency drop-in from this repository:
+### 3. MoltGrid listener dependency drop-in
+
+The existing listener unit may retain the historical compatibility name `liquidity-scout.service`. Install its dependency drop-in from the CMIS repository:
 
 ```bash
 bash scripts/install_moltgrid_service_dependencies.sh
 ```
 
-The helper writes a systemd drop-in that declares:
+The helper declares:
 
 ```ini
 [Unit]
@@ -153,19 +111,18 @@ Wants=roberta-bridge.service cmis-gateway.service
 After=roberta-bridge.service cmis-gateway.service
 ```
 
-It also adds pre-start health gates for both `http://127.0.0.1:8766/healthz`
-and `http://127.0.0.1:8765/healthz`. Each dependency gets up to 30 seconds to
-become healthy before the MoltGrid listener startup fails closed.
+It also adds health gates for:
 
-The listener remains loosely coupled with `Wants=` rather than `Requires=` so a
-later Roberta or CMIS restart does not automatically tear down the transport.
-Roberta's user-facing availability handling remains responsible for temporary
-runtime outages.
+```text
+http://127.0.0.1:8766/healthz
+http://127.0.0.1:8765/healthz
+```
 
-If the listener unit uses a different service name, set
-`LIQUIDITY_SCOUT_SERVICE_NAME` when running the helper.
+Each dependency receives a bounded startup-health wait. `Wants=` is intentionally used rather than `Requires=` so a later downstream restart does not automatically tear down the transport.
 
-Expected managed topology:
+If a deployment uses a different listener unit name, set `LIQUIDITY_SCOUT_SERVICE_NAME` when running the compatibility helper. That environment-variable name is retained as a compatibility interface.
+
+Expected topology:
 
 ```text
 cmis-gateway.service       -> 127.0.0.1:8765
@@ -173,35 +130,32 @@ roberta-bridge.service     -> 127.0.0.1:8766
             \                 /
              \               /
               v             v
-             liquidity-scout.service
-                     |
-                     v
+       compatibility listener
+                     ↓
               MoltGrid / Signal
-                     |
-                     v
+                     ↓
                   Roberta
-                     |
-                  X1 Scout
-                     |
+                     ↓
+                Chain Scout
+                     ↓
                     CMIS
 ```
 
 ## Manual development start order
 
-For local development only, the same components can still be launched manually
-in separate terminals:
+For local development only:
 
 ```bash
 python -m liquidity_scout.cmis.http
 ```
 
-then, from the Roberta repository after loading its model environment:
+Then, from the Roberta repository:
 
 ```bash
 roberta-serve
 ```
 
-then the MoltGrid listener:
+Then the compatibility MoltGrid listener:
 
 ```bash
 ROBERTA_MOLTGRID_ALL_QUESTIONS_ENABLED=1 \
@@ -209,8 +163,7 @@ ROBERTA_MOLTGRID_SIMPLE_ONLY_ENABLED=1 \
 python -m liquidity_scout.integrations.moltgrid_roberta
 ```
 
-Do not run a manual listener at the same time as the managed
-`liquidity-scout.service` listener.
+Do not run a manual listener at the same time as the managed listener service.
 
 Defaults:
 
@@ -219,31 +172,18 @@ ROBERTA_BASE_URL=http://127.0.0.1:8766
 ROBERTA_TIMEOUT_SECONDS=60
 ```
 
-If `ROBERTA_API_KEY` is configured on the Roberta bridge, configure the same
-value in the MoltGrid listener environment so it is sent as a Bearer token.
+If `ROBERTA_API_KEY` is configured on the Roberta bridge, configure the same value in the listener environment so it can be sent as a Bearer token. Do not store secrets in Git.
 
 ## Failure behavior
 
-Roberta handoff features require explicit environment flags. This permits a
-controlled operator rollback to the existing Liquidity Scout listener when the
-Roberta-first mode itself is deliberately disabled.
+In Roberta-first all-questions mode, a supported user message is sent to Roberta exactly as admitted. If the bridge is unavailable or returns an invalid service envelope, the listener does not execute the historical legacy router for the user. It posts only the fixed Roberta availability response.
 
-In all-questions mode, a supported user message is sent to Roberta exactly as
-admitted. If the Roberta bridge is unavailable or returns an invalid service
-envelope, the listener does **not** execute the legacy router for the user. It
-posts only:
+The legacy router can still be invoked deliberately by an operator for diagnostics/rollback; it is not part of the automatic production failure path.
 
-> Roberta is temporarily unavailable. Please try your request again shortly.
+When simple-only mode declines a question, the fixed interface-policy message is returned before any request is sent to Roberta.
 
-The legacy router can still be exercised explicitly by an operator for
-diagnostics or restored by deliberately changing the configured ownership mode;
-it is not part of the automatic production failure path.
+## Safety boundary
 
-When simple-only mode declines a question, it returns the fixed interface-policy
-message before any request is sent to Roberta. This is intentional and does not
-invoke the legacy router.
+This bridge adds no transaction construction, signing, broadcasting, wallet custody, trading, autonomous execution, or value movement.
 
-No transaction construction, signing, broadcast, wallet custody, autonomous
-execution, or value movement is added by this bridge. Pre-trade remains
-analysis-only when simple-only mode is disabled, and Roberta's X1 market facts
-continue to come through X1 Scout and deterministic CMIS services.
+Pre-trade remains analysis-only when available, and Roberta's chain facts continue to flow through the appropriate Chain Scout and deterministic CMIS service boundary.
