@@ -1,8 +1,46 @@
 # Liquidity Scout v0.12
 
-Liquidity Scout is an X1/XDEX market-intelligence service that monitors MoltGrid Signal, resolves assets across the XDEX catalog, retrieves verified market data, builds rankings and historical comparisons, and uses AI to explain verified facts without inventing market data.
+Liquidity Scout is a deterministic market-intelligence system for X1/XDEX with a shared Cross-Chain Market Intelligence Service (CMIS) foundation. It resolves assets, retrieves and verifies market/on-chain evidence, builds rankings and historical comparisons, performs deterministic risk analysis, and lets Roberta or other integrations explain those facts without inventing live market data.
 
-The project began as a paper-trading prototype and has evolved into a broader X1 market-intelligence service. **Live trading and wallet signing remain disabled.**
+The project began as a paper-trading prototype and has evolved into a broader blockchain-intelligence service. **Live trading, wallet signing, custody, and autonomous value movement remain disabled.**
+
+## Current milestone status
+
+**CMIS Phase 10 — Solana Provider read-only foundation is COMPLETE.**
+
+The Phase 10 tracker was closed after both the full Liquidity Scout/X1 regression suite and a read-only Solana production-runtime live acceptance passed. The final production-composition change was merged in PR #158.
+
+Current chain posture:
+
+- **X1/XDEX:** mature deterministic market, tokenomics, risk, trade-verification, evidence, and pre-trade analysis foundation.
+- **Solana:** read-only CMIS foundation with exact-mint identity, canonical RPC tokenomics, bounded/partial market and risk evidence, provenance-safe observation history, and narrow same-source historical comparison.
+- **Ethereum:** not yet promoted into the accepted runtime contract.
+
+The machine-readable Scout ↔ CMIS eligibility boundary is documented in [`docs/CMIS_CAPABILITY_CONTRACT.md`](./docs/CMIS_CAPABILITY_CONTRACT.md).
+
+Detailed Phase 10 completion notes are in [`docs/PHASE_10_COMPLETION.md`](./docs/PHASE_10_COMPLETION.md).
+
+## Architecture
+
+```text
+User / Signal / Agent
+        |
+        v
+Liquidity Scout / Roberta
+        |
+        v
+       CMIS
+        |
+   +----+-------------------+
+   |                        |
+   v                        v
+X1/XDEX providers      Solana providers
+   |                        |
+   v                        v
+verified evidence      bounded read-only evidence
+```
+
+CMIS is the deterministic evidence authority. Roberta and other AI layers may explain CMIS results, but they do not become the source of truth for price, liquidity, supply, trade direction, risk facts, or chain state.
 
 ## Current capabilities
 
@@ -10,13 +48,14 @@ The project began as a paper-trading prototype and has evolved into a broader X1
 
 Liquidity Scout can:
 
-- search the full XDEX pool catalog from X1.Ninja;
+- search the XDEX pool catalog from X1.Ninja;
 - resolve assets by symbol, token name, mint address, or pool address;
 - reject ambiguous human-facing identifiers instead of silently selecting the wrong mint;
-- aggregate liquidity and volume across multiple pools for the same asset;
-- identify the deepest matching pool for price-oriented metrics;
-- retrieve XNT pricing using X1.Ninja's XNT reference data;
-- answer asset questions without silently falling back to AGI when another asset was requested.
+- aggregate provider-listed liquidity and volume across multiple pools;
+- retrieve XNT reference pricing;
+- independently inspect X1/XDEX on-chain evidence where implemented;
+- distinguish provider coverage from independently verified on-chain coverage;
+- answer asset questions without silently falling back to AGI or another default asset.
 
 Example questions:
 
@@ -30,61 +69,33 @@ What pools does THEO have?
 
 ### XDEX rankings
 
-`xdex_rankings.py` uses the reusable Liquidity Scout market core to aggregate pool data into one record per asset and supports rankings for:
+`xdex_rankings.py` uses the reusable Liquidity Scout market core and supports rankings for:
 
 - 24-hour volume;
 - liquidity;
-- holders;
+- holders where provider semantics support the field;
 - safety score;
 - biggest 24-hour gainers;
 - biggest 24-hour losers;
-- trending activity using 1-hour transaction counts when available, with 1-hour volume as a fallback.
+- trending activity.
 
-Public ranking tables use `#LPs` for liquidity-pool count.
+`build_top50_xdex.py` can generate Top-50 XDEX ranking exports for deeper analysis. Generated CSV/JSON outputs are ignored by Git.
 
-Example questions:
+### X1 trade verification and verified activity
 
-```text
-What are the top 10 tokens on XDEX?
-Top 5 by liquidity.
-What tokens are trending on X1.Ninja?
-Show me the biggest gainers.
-Where does AGI rank by volume?
-Is AGI in the top 50?
-```
+CMIS contains deterministic X1/XDEX verification paths that can independently evaluate provider trade candidates against X1 RPC evidence. Depending on the evidence available, CMIS can verify transaction identity, recognized XDEX program participation, token-account deltas, pool-leg amounts, and BUY/SELL direction.
 
-`build_top50_xdex.py` can also generate Top-50 XDEX ranking exports for deeper analysis. Generated CSV/JSON outputs are intentionally ignored by Git.
+Provider observations remain candidates rather than automatic canonical truth. Missing or contradictory evidence fails closed.
 
-## Historical market intelligence
+CMIS also contains bounded program-scoped XDEX activity coverage logic. Program-scoped completeness must not be relabeled as global all-X1 DEX completeness unless the relevant program registry itself is proven exhaustive.
+
+### Historical market intelligence
 
 Liquidity Scout stores historical XDEX snapshots in SQLite and can compare current metrics with stored observations.
 
-Supported historical periods:
+Supported historical periods include 24 hours, 7 days, and 30 days where enough observations have been collected.
 
-- 24 hours;
-- 7 days;
-- 30 days.
-
-Supported comparison metrics include:
-
-- price;
-- liquidity;
-- 24-hour volume;
-- holders;
-- total supply.
-
-Example questions:
-
-```text
-Has AGI liquidity fallen more than 30% this week?
-Did X1X volume increase 20% in 24 hours?
-Are AGI holders down 5% this month?
-Has AGI price dropped 10% in 7 days?
-```
-
-Historical comparisons only become available after enough snapshots have been collected for the requested period. Liquidity Scout reports when the history window is not yet mature instead of fabricating a comparison.
-
-### Snapshot collector
+Supported X1 comparison metrics include price, liquidity, 24-hour volume, holders, and total supply when the underlying field is available under the current evidence contract.
 
 Run one XDEX history snapshot with:
 
@@ -92,11 +103,11 @@ Run one XDEX history snapshot with:
 python snapshot_xdex_metrics.py
 ```
 
-The snapshot collector consumes the reusable `liquidity_scout.market` core rather than the MoltGrid listener. It is designed to be scheduled periodically, such as hourly, so the local history database grows over time.
+Historical comparisons report insufficient history instead of fabricating a baseline.
 
-## Tokenomics and burn intelligence
+### Tokenomics and burn intelligence
 
-Liquidity Scout includes dedicated tokenomics/burn tooling:
+Liquidity Scout includes tokenomics/burn tooling such as:
 
 ```text
 agi_burn_scan.py
@@ -104,29 +115,66 @@ x1_burn_scan.py
 x1_burn_scan_v2.py
 ```
 
-These scanners inspect successful X1 transactions for standard token burn instructions and cache processed data locally in SQLite databases.
+Core tokenomics rules include:
 
-Current tokenomics principles:
+- total supply must come from accepted evidence;
+- mint and freeze authority status are chain facts where verified;
+- burn totals require verified burn instructions/evidence;
+- circulating supply is not guessed;
+- market cap is not promoted as verified without verified circulating supply;
+- FDV is not promoted as verified without a verified maximum supply;
+- active mint authority requires issuance/mint tracking in addition to burn tracking.
 
-- total supply is retrieved from verified X1 RPC data;
-- mint and freeze authority status are treated as on-chain facts;
-- burn totals are derived from verified burn instructions;
-- circulating supply is not guessed when reliable data is unavailable;
-- market cap is not presented as verified without verified circulating supply;
-- FDV is not presented as verified without a verified maximum supply;
-- tokens with active mint authority require issuance/mint tracking in addition to burn tracking.
+### Deterministic risk and pre-trade analysis
 
-Local runtime databases are ignored by Git.
+CMIS now has a deterministic risk surface and bounded X1 pre-trade analysis. The pre-trade path is **analysis only** and does not authorize execution.
+
+Slippage, route quality, transaction simulation, signing, broadcasting, and value movement remain unavailable unless separately implemented and explicitly promoted in the capability contract.
+
+## Solana read-only foundation
+
+Phase 10 added Solana beneath the same CMIS contract rather than creating a second intelligence stack.
+
+Accepted Solana components include:
+
+- canonical `getAccountInfo(jsonParsed)` mint identity;
+- SPL Token and Token-2022 program identity checks;
+- canonical `getTokenSupply` total supply;
+- mint/freeze authority evidence;
+- optional `getTokenLargestAccounts` concentration evidence that is **not** treated as total holder count;
+- Jupiter Price V3 source evidence when configured;
+- Helius DAS indexed evidence when configured;
+- DEX Screener pair-scoped market evidence;
+- deterministic Jupiter ↔ DEX Screener price cross-check;
+- deterministic RPC ↔ Helius supply cross-check;
+- provenance-safe Solana observation history;
+- narrow Jupiter same-source historical comparison;
+- gated Solana `asset_lookup`, `tokenomics`, `market_report`, `risk_check`, and `historical_compare` behavior.
+
+Solana is disabled by default in production runtime configuration. Enable only through deployment environment configuration:
+
+```text
+CMIS_SOLANA_PROVIDER_ENABLED=1
+SOLANA_RPC_URL=
+JUPITER_API_KEY=
+HELIUS_API_KEY=
+CMIS_SOLANA_PRICE_MAX_RELATIVE_DIFFERENCE=
+CMIS_SOLANA_SUPPLY_MAX_INDEX_SLOT_LAG=
+CMIS_SOLANA_HISTORY_MAX_DISTANCE_SECONDS=
+CMIS_SOLANA_OBSERVATION_DB=
+```
+
+Missing optional providers or policies fail closed at the dependent service. Secrets are never part of request parameters or returned provenance.
 
 ## AI intelligence layer
 
 Liquidity Scout uses a hybrid architecture:
 
-1. **Deterministic data layer** retrieves and calculates XDEX/X1 facts.
-2. **DeepSeek** can provide cloud-based analysis when configured.
-3. **Ollama/Qwen** provides a local fallback reasoning layer.
+1. **Deterministic CMIS/market layer** retrieves, verifies, normalizes, and classifies evidence.
+2. **Roberta / cloud reasoning** can explain and coordinate verified results when configured.
+3. **Ollama/Qwen** can provide a local fallback reasoning layer.
 
-The AI layer is intended to explain and interpret verified data. It is not the source of truth for price, liquidity, supply, rankings, burns, or other live market facts.
+AI-generated text is interpretation, not verified chain truth.
 
 Optional AI environment variables include:
 
@@ -143,56 +191,36 @@ Never commit API keys to the repository. Keep secrets in `.env`.
 
 ## MoltGrid Signal listener
 
-The **canonical Liquidity Scout runtime entrypoint** is the package integration:
+The canonical Liquidity Scout runtime entrypoint is:
 
 ```bash
 python -m liquidity_scout.integrations.moltgrid
 ```
 
-For normal repository operation, use the launcher:
+For normal repository operation:
 
 ```bash
 bash run_liquidity_scout.sh
 ```
 
-`run_liquidity_scout.sh` automatically uses `.venv/bin/python` when present and otherwise falls back to `python3`.
+`run_liquidity_scout.sh` uses `.venv/bin/python` when present and otherwise falls back to `python3`.
 
-The package integration wires MoltGrid to the reusable `liquidity_scout.market` core for:
+The legacy `moltgrid_signal_v12_ollama.py` remains in the repository during the incremental refactor, but it is not the canonical operator entrypoint.
 
-- X1.Ninja/XDEX catalog access;
-- mint-aware asset resolution;
-- multi-asset resolution;
-- ambiguity-safe matching.
+## CMIS runtime
 
-It then delegates the existing MoltGrid transport, formatting, conversation state, and AI-routing behavior to the current v0.12 listener implementation.
+CMIS exposes a structured service contract and a machine-readable capability manifest. The runtime composition includes the accepted X1 services plus gated Solana read-only services.
 
-`moltgrid_signal_v12_ollama.py` remains in the repository as the legacy implementation during the incremental refactor, but it is **not the canonical operator entrypoint**. New deployment configuration should invoke the package integration instead of running that file directly.
-
-An example systemd unit is available at:
+See:
 
 ```text
-deployment/liquidity-scout.service.example
+docs/CMIS_CAPABILITY_CONTRACT.md
+docs/CMIS_SYSTEMD.md
+SCOUT_CMIS_INTEGRATION_CONTRACT.md
+ROBERTA_INTEGRATION_CONTRACT.md
 ```
 
-Copy it to your systemd configuration and replace `/path/to/liquidity-scout` with the real deployment path before enabling it. The repository does not contain or modify a machine's live `/etc/systemd/system/liquidity-scout.service` file.
-
-## Sentinel development tooling
-
-The repository includes lightweight development and diagnostics tools:
-
-```text
-sentinel_diagnostics.sh
-sentinel_issues.py
-development/issues.json
-```
-
-Run diagnostics with:
-
-```bash
-bash sentinel_diagnostics.sh
-```
-
-`liquidity_scout_health.sh` and `liquidity_scout_status.sh` inspect the deployed `liquidity-scout.service` by service name; they do not define its `ExecStart` command.
+The capability contract is authoritative for whether a chain/service combination is supported, bounded, partial, or unavailable.
 
 ## Installation
 
@@ -207,7 +235,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Current Python requirements are intentionally small:
+Current core Python requirements include:
 
 ```text
 requests
@@ -216,7 +244,7 @@ python-dotenv
 
 ## Configuration
 
-At minimum, configure the public AgentID wallet and X1.Ninja API key in `.env`:
+For X1/XDEX operation, configure the public AgentID wallet and X1.Ninja API key in `.env` as needed:
 
 ```text
 AGENT_WALLET=YOUR_PUBLIC_X1_WALLET_ADDRESS
@@ -228,59 +256,43 @@ The wallet address is public. **Never place a seed phrase, private key, or signi
 
 ## Safety boundary
 
-Liquidity Scout v0.12 is currently an intelligence system, not an autonomous execution engine.
+Liquidity Scout is an intelligence system, not an autonomous execution engine.
 
 It does **not**:
 
 - sign wallet transactions;
-- store or request a private key or seed phrase;
+- store or request a private key or seed phrase as part of CMIS intelligence;
 - execute live swaps;
 - autonomously move funds;
-- treat AI-generated text as verified market data.
+- treat AI-generated text as verified market data;
+- silently promote partial/program-scoped evidence into global completeness.
 
-Trading/execution should remain a separate, human-approved capability until the intelligence, risk, and service layers have been fully tested.
+Any future trading/execution capability must remain a separate, explicit, human-approved boundary until separately designed, tested, and promoted.
 
 ## Roberta integration
 
-Roberta is the X1 Oracle and Agent Coordinator. Liquidity Scout remains an independently testable specialist service for current X1/XDEX market, tokenomics, historical, and risk intelligence.
+Roberta is the higher-level Oracle/Agent Coordinator. Liquidity Scout and chain-specific Scouts remain independently testable specialist layers that consume CMIS evidence.
 
-The authoritative integration boundary is documented in [`ROBERTA_INTEGRATION_CONTRACT.md`](./ROBERTA_INTEGRATION_CONTRACT.md).
+The authoritative integration boundary is documented in [`ROBERTA_INTEGRATION_CONTRACT.md`](./ROBERTA_INTEGRATION_CONTRACT.md), with service eligibility documented in [`docs/CMIS_CAPABILITY_CONTRACT.md`](./docs/CMIS_CAPABILITY_CONTRACT.md).
 
-That contract defines:
-
-- ownership and authority boundaries between Roberta and Liquidity Scout;
-- the fresh-data override rule;
-- deterministic data and uncertainty requirements;
-- the target Roberta-callable service surface and current implementation status;
-- target response, status, confidence, and source-traceability semantics;
-- failure rules and execution approval boundaries.
-
-The contract intentionally distinguishes reusable core capabilities that already exist from Roberta-facing wrappers and services that are still planned. In particular, `risk_check`, `pre_trade_check`, and the common Roberta response envelope must not be treated as live interfaces until their roadmap phases are implemented and tested.
-
-Current reusable core capabilities include asset resolution, market reports, rankings, historical comparisons, and tokenomics verification. Circulating supply remains unavailable unless it can be independently verified; total supply alone must not be relabeled as circulating supply.
+Roberta must preserve CMIS status, provenance, confidence, warnings, and unavailable fields. It may translate deterministic evidence into user-friendly language, but it must not rewrite a partial/unavailable fact into a verified one.
 
 ## Repository structure
 
-Key files currently include:
+Key paths include:
 
 ```text
-ROBERTA_INTEGRATION_CONTRACT.md         Roberta ↔ Liquidity Scout service boundary
-liquidity_scout/market/                 Reusable deterministic XDEX market core
+liquidity_scout/cmis/                     Shared deterministic CMIS service layer
+liquidity_scout/providers/x1/             X1/XDEX provider and verification evidence
+liquidity_scout/providers/solana/         Solana read-only provider foundation
 liquidity_scout/integrations/moltgrid.py  Canonical MoltGrid integration entrypoint
-run_liquidity_scout.sh                  Canonical repository launcher
-deployment/liquidity-scout.service.example  Example systemd service
-moltgrid_signal_v12_ollama.py           Legacy listener implementation during refactor
-config.py                               Environment-based configuration
-xdex_rankings.py                        Ranking presentation/routing over market core
-historical_metrics.py                   Historical comparison engine
-snapshot_xdex_metrics.py                XDEX snapshot collector
-build_top50_xdex.py                     Top-50 asset export builder
-agi_burn_scan.py                        AGI burn scanner
-x1_burn_scan.py                         Generic X1 token burn scanner
-x1_burn_scan_v2.py                      Extended period/cached burn scanner
-sentinel_diagnostics.sh                 Service/project diagnostics
-sentinel_issues.py                      Development issue utility
-development/issues.json                 Current development issue backlog
+docs/CMIS_CAPABILITY_CONTRACT.md          Machine-readable service eligibility contract docs
+docs/CMIS_PRODUCT_ROADMAP.md              Long-term CMIS product/premium roadmap
+docs/PHASE_10_COMPLETION.md               Accepted Phase 10 status and boundaries
+ROBERTA_INTEGRATION_CONTRACT.md           Roberta ↔ Liquidity Scout/CMIS boundary
+SCOUT_CMIS_INTEGRATION_CONTRACT.md        Chain Scout ↔ CMIS boundary
+run_liquidity_scout.sh                    Canonical repository launcher
+deployment/                               Example deployment files
 ```
 
 Runtime databases, generated ranking exports, local backups, virtual environments, caches, logs, and `.env` secrets are excluded through `.gitignore`.
@@ -289,36 +301,27 @@ Runtime databases, generated ranking exports, local backups, virtual environment
 
 ### Working now
 
-- reusable XDEX catalog discovery and asset resolution core;
-- multi-LP aggregation and XDEX rankings;
-- live XDEX/X1 market-data retrieval;
-- MoltGrid Signal question/response loop through a package integration bridge;
-- hourly-compatible historical snapshot collection;
-- 24h/7d/30d historical comparison logic;
-- AGI/X1 token burn-scanning tools;
-- verified supply and authority checks;
-- DeepSeek reasoning with local Ollama fallback;
-- development diagnostics and issue tracking.
+- reusable XDEX catalog discovery and asset resolution;
+- XDEX rankings and market reporting;
+- X1 RPC supply/authority verification;
+- deterministic X1 trade verification and bounded verified-activity coverage;
+- deterministic risk and bounded pre-trade analysis;
+- CMIS HTTP/runtime service composition and capability discovery;
+- persisted verification evidence;
+- historical XDEX snapshots/comparisons;
+- MoltGrid/Roberta integration boundaries;
+- Phase 10 Solana read-only provider/runtime foundation;
+- read-only Solana live acceptance in GitHub Actions.
 
-### Current refactor direction
+### Milestone boundary
 
-The project is incrementally moving deterministic intelligence out of `moltgrid_signal_v12_ollama.py` and into reusable Liquidity Scout service modules. The legacy listener stays operational while each responsibility is extracted and tested.
+Phase 10 is complete. This documentation update does **not** begin Phase 11 or enable additional execution authority.
 
-The MoltGrid integration bridge is transitional architecture: it keeps the current listener operational while reusable services replace legacy deterministic logic. The long-term goal is to continue shrinking the legacy listener until integrations consume reusable services directly without runtime rewiring of legacy globals.
-
-### Next major phases
-
-1. Continue shrinking the legacy MoltGrid monolith by moving deterministic market/report logic into reusable modules.
-2. Finish and harden tokenomics services, including mint/net-issuance tracking where required.
-3. Build a deterministic Liquidity Scout Risk Engine and Scout Score.
-4. Expose structured Liquidity Scout data through an API/service layer.
-5. Connect Roberta as the X1 Oracle/coordinator to Liquidity Scout as a specialist service using `ROBERTA_INTEGRATION_CONTRACT.md`.
-6. Add alert automation and threshold monitoring.
-7. Consider controlled trading/execution only after the intelligence and risk layers are proven.
+The long-term product direction remains in [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). Future work should use a new issue/phase tracker so completed Phase 10 boundaries are not silently expanded.
 
 ## Git workflow
 
-Use small, tested milestone commits rather than allowing many unrelated changes to accumulate.
+Use small, tested milestone commits rather than allowing unrelated changes to accumulate.
 
 Before a major refactor or new service:
 
@@ -334,4 +337,4 @@ Do not use `git add .` when runtime databases, generated files, backups, or loca
 
 ---
 
-**Liquidity Scout is being developed as a deterministic X1/XDEX intelligence foundation first, with AI used for explanation and orchestration rather than as a substitute for verified market data.**
+**Liquidity Scout is being developed as a deterministic cross-chain intelligence foundation first, with AI used for explanation and orchestration rather than as a substitute for verified evidence.**
