@@ -17,6 +17,7 @@ class CMISWalletActivityPhase11Tests(unittest.TestCase):
             "transaction_signature": "sig-1",
             "observed_at": "2026-08-18T08:00:00-04:00",
             "block_slot": 123,
+            "source": "x1_rpc",
             "verification_method": "verified_activity_v1",
             "evidence_scope": "transaction_exact",
             "asset_id": "mint-1",
@@ -49,7 +50,7 @@ class CMISWalletActivityPhase11Tests(unittest.TestCase):
     def build(self, activity_type="TRANSFER_IN", **overrides):
         return build_wallet_activity_observation(**self.base(activity_type, **overrides))
 
-    def test_transfer_direction_and_timestamp_are_verified_and_canonical(self):
+    def test_transfer_direction_timestamp_and_source_are_canonical(self):
         record = self.build(
             "TRANSFER_IN",
             asset_amount="2.5000",
@@ -59,9 +60,22 @@ class CMISWalletActivityPhase11Tests(unittest.TestCase):
         self.assertEqual(record["activity_type"], "TRANSFER_IN")
         self.assertEqual(record["asset_amount"], "2.5")
         self.assertEqual(record["observed_at"], "2026-08-18T12:00:00Z")
+        self.assertEqual(record["source"], "x1_rpc")
         self.assertTrue(record["observation_id"].startswith("wa_"))
         self.assertFalse(record["classification_authorized"])
         self.assertEqual(record["classification_labels"], [])
+
+    def test_source_and_identity_fields_require_real_strings(self):
+        with self.assertRaisesRegex(ValueError, "source is required"):
+            self.build("TRANSFER_IN", source=" ")
+        with self.assertRaisesRegex(ValueError, "source must be a string"):
+            self.build("TRANSFER_IN", source=123)
+        with self.assertRaisesRegex(ValueError, "wallet must be a string"):
+            self.build("TRANSFER_IN", wallet=123)
+        with self.assertRaisesRegex(ValueError, "asset_id must be a string"):
+            self.build("TRANSFER_IN", asset_id=123)
+        with self.assertRaisesRegex(ValueError, "transaction_signature must be a string"):
+            self.build("TRANSFER_IN", transaction_signature=123)
 
     def test_transfer_requires_verified_direction_and_asset_identity(self):
         with self.assertRaisesRegex(ValueError, "verified transfer direction"):
@@ -189,6 +203,7 @@ class CMISWalletActivityPhase11Tests(unittest.TestCase):
             chain="x1", wallet="wallet-1", observations=[record]
         )
         self.assertEqual(summary["verified_amounts_by_asset"], {})
+        self.assertEqual(summary["sources"], ["x1_rpc"])
 
     def test_unverified_amount_fields_must_not_be_exposed(self):
         with self.assertRaisesRegex(ValueError, "unverified asset amount/unit"):
@@ -229,11 +244,21 @@ class CMISWalletActivityPhase11Tests(unittest.TestCase):
                 chain="x1", wallet="wallet-1", observations=[tampered]
             )
 
+    def test_source_provenance_is_content_addressed(self):
+        record = self.build("TRANSFER_IN")
+        tampered = deepcopy(record)
+        tampered["source"] = "other_rpc"
+        with self.assertRaisesRegex(ValueError, "content or content-addressed id"):
+            summarize_wallet_activity(
+                chain="x1", wallet="wallet-1", observations=[tampered]
+            )
+
     def test_summary_orders_by_actual_canonical_time_and_deduplicates(self):
         later = self.build(
             "BUY",
             transaction_signature="sig-2",
             observed_at=datetime(2026, 8, 18, 13, 0, tzinfo=timezone.utc),
+            source="x1_rpc",
             asset_amount="2",
             asset_unit="token",
             amount_verified=True,
@@ -245,6 +270,7 @@ class CMISWalletActivityPhase11Tests(unittest.TestCase):
             "SELL",
             transaction_signature="sig-1",
             observed_at="2026-08-18T08:30:00-04:00",
+            source="xdex_verified_activity",
             asset_amount="1",
             asset_unit="token",
             amount_verified=True,
@@ -260,6 +286,7 @@ class CMISWalletActivityPhase11Tests(unittest.TestCase):
         self.assertEqual(summary["unique_transaction_count"], 2)
         self.assertEqual(summary["observation_count"], 2)
         self.assertEqual(summary["verified_trade_volume_by_quote_unit"], {"USD": "30"})
+        self.assertEqual(summary["sources"], ["x1_rpc", "xdex_verified_activity"])
         self.assertFalse(summary["classification_authorized"])
         self.assertFalse(summary["activity_window"]["continuous_coverage_proven"])
         self.assertFalse(summary["complete_wallet_history_proven"])
