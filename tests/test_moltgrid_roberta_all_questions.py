@@ -56,8 +56,8 @@ def _listener(
         save_answered=lambda answered: saved.append(set(answered)),
         post_visible_reply=post_visible_reply,
         s=lambda value: str(value or "").strip(),
-        # Emergency legacy-router surface. The success-path tests ensure these
-        # are never needed when Roberta answers normally.
+        # Emergency legacy-router surface. Success and bridge-failure tests ensure
+        # these are never used automatically in Roberta-first production mode.
         wants_global_xdex_ranking=lambda value: False,
         looks_like_agent_identity_question=lambda value: False,
         explicitly_requests_multiple_assets=lambda value: False,
@@ -113,11 +113,12 @@ class MoltGridRobertaAllQuestionsTests(unittest.TestCase):
                 self.assertEqual(catalog.refresh_calls, 1)
                 old_process.assert_not_called()
 
-    def test_bridge_failure_uses_one_legacy_fallback_without_recursive_roberta_call(self):
+    def test_bridge_failure_returns_service_message_without_legacy_router(self):
         listener, posted, saved, old_process = _listener(
             "What is impermanent loss?"
         )
         ask = Mock(side_effect=RobertaBridgeError("offline"))
+        legacy = Mock(return_value="legacy general")
         with (
             patch.object(
                 moltgrid_roberta,
@@ -125,17 +126,19 @@ class MoltGridRobertaAllQuestionsTests(unittest.TestCase):
                 return_value=True,
             ),
             patch.object(moltgrid_roberta, "ask_roberta", ask),
+            patch.object(moltgrid_roberta, "_legacy_route_answer", legacy),
         ):
             moltgrid_roberta.wire_roberta_all_questions(listener)
             listener.process_cycle(_Catalog(), "implicit-start")
 
         ask.assert_called_once_with("What is impermanent loss?")
-        self.assertEqual(len(posted), 1)
-        self.assertEqual(posted[0][0], "signal-1")
-        self.assertTrue(
-            posted[0][1].startswith("Roberta is temporarily unavailable")
+        legacy.assert_not_called()
+        self.assertEqual(
+            posted,
+            [("signal-1", moltgrid_roberta.ROBERTA_UNAVAILABLE_MESSAGE)],
         )
-        self.assertIn("legacy general", posted[0][1])
+        self.assertNotIn("legacy", posted[0][1].lower())
+        self.assertNotIn("CMIS", posted[0][1])
         self.assertEqual(saved, [{"signal-1"}])
         old_process.assert_not_called()
 

@@ -41,10 +41,16 @@ When this flag is on, every message that the existing Signal intake already
 accepts is owned by the Roberta-first bridge before Liquidity Scout's legacy
 question router is allowed to answer it.
 
-If Roberta cannot return a valid bridge response for one message, that message
-alone falls back to Liquidity Scout's existing router. The fallback does not
-re-enter Roberta, and the existing reply-link confirmation remains in control so
-a failed or ambiguous post does not produce a second visible reply.
+The legacy Liquidity Scout router remains in the codebase for deliberate
+operator diagnostics and rollback only. It is **not** an automatic user-facing
+fallback in Roberta-first production mode. If Roberta cannot return a valid
+bridge response, the user receives one concise availability message instead of
+raw Liquidity Scout/CMIS output:
+
+> Roberta is temporarily unavailable. Please try your request again shortly.
+
+The existing reply-link confirmation remains in control so a failed or ambiguous
+post does not produce a second visible reply.
 
 ## MoltGrid simple-only interface policy
 
@@ -99,7 +105,9 @@ ROBERTA_MOLTGRID_CONVERSATION_ENABLED=1
 
 Those flags route explicit pre-trade and general/identity questions to Roberta
 while leaving normal market/ranking routes under the legacy listener router.
-They are retained for rollback and compatibility.
+They are retained for rollback and compatibility. Once a compatibility route
+has been handed to Roberta, a Roberta bridge failure returns the same concise
+availability message instead of exposing a legacy formatter response.
 
 ## Start order
 
@@ -115,6 +123,10 @@ python -m liquidity_scout.cmis.http
 ```bash
 roberta-serve
 ```
+
+For production, prefer a managed Roberta bridge service with an environment file
+outside the repository rather than keeping a terminal open or storing model
+secrets in source control.
 
 3. Start the MoltGrid listener from the Liquidity Scout environment:
 
@@ -137,13 +149,19 @@ value in the MoltGrid listener environment so it is sent as a Bearer token.
 ## Failure behavior
 
 Roberta handoff features require explicit environment flags. This permits a
-controlled rollback to the existing Liquidity Scout listener.
+controlled operator rollback to the existing Liquidity Scout listener when the
+Roberta-first mode itself is deliberately disabled.
 
 In all-questions mode, a supported user message is sent to Roberta exactly as
 admitted. If the Roberta bridge is unavailable or returns an invalid service
-envelope, the listener preserves service continuity by running the pre-existing
-Liquidity Scout route for that exact message and visibly labels the result as a
-fallback.
+envelope, the listener does **not** execute the legacy router for the user. It
+posts only:
+
+> Roberta is temporarily unavailable. Please try your request again shortly.
+
+The legacy router can still be exercised explicitly by an operator for
+diagnostics or restored by deliberately changing the configured ownership mode;
+it is not part of the automatic production failure path.
 
 When simple-only mode declines a question, it returns the fixed interface-policy
 message before any request is sent to Roberta. This is intentional and does not

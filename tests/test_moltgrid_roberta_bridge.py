@@ -113,7 +113,7 @@ class MoltGridRobertaBridgeTests(unittest.TestCase):
         self.assertNotIn("Liquidity Scout reply:", answer)
         ask.assert_called_once_with(question)
 
-    def test_pretrade_bridge_failure_returns_explicit_deterministic_fallback(self):
+    def test_pretrade_bridge_failure_returns_roberta_availability_message_only(self):
         listener = _listener(
             asset_fallback="Liquidity Scout reply:\nCMIS pre-trade analysis — AGI"
         )
@@ -139,9 +139,9 @@ class MoltGridRobertaBridgeTests(unittest.TestCase):
                 None,
             )
 
-        self.assertTrue(answer.startswith("Roberta is temporarily unavailable"))
-        self.assertIn("Liquidity Scout reply:", answer)
-        self.assertIn("CMIS pre-trade analysis — AGI", answer)
+        self.assertEqual(answer, moltgrid_roberta.ROBERTA_UNAVAILABLE_MESSAGE)
+        self.assertNotIn("Liquidity Scout reply:", answer)
+        self.assertNotIn("CMIS", answer)
         ask.assert_called_once_with("Buy $500 AGI")
 
     def test_general_question_routes_exact_question_to_roberta(self):
@@ -198,7 +198,7 @@ class MoltGridRobertaBridgeTests(unittest.TestCase):
         self.assertEqual(answer, "I am Roberta.")
         ask.assert_called_once_with(question)
 
-    def test_general_bridge_failure_uses_existing_conversational_fallback(self):
+    def test_general_bridge_failure_returns_roberta_availability_message_only(self):
         listener = _listener()
         ask = Mock(side_effect=RobertaBridgeError("unavailable"))
         with (
@@ -212,8 +212,9 @@ class MoltGridRobertaBridgeTests(unittest.TestCase):
             wired = moltgrid_roberta.wire_roberta_pretrade(listener)
             answer = wired.format_general_answer("Tell me about yourself")
 
-        self.assertTrue(answer.startswith("Roberta is temporarily unavailable"))
-        self.assertIn("legacy general reply", answer)
+        self.assertEqual(answer, moltgrid_roberta.ROBERTA_UNAVAILABLE_MESSAGE)
+        self.assertNotIn("legacy general reply", answer)
+        self.assertNotIn("Liquidity Scout reply:", answer)
         ask.assert_called_once_with("Tell me about yourself")
 
     def test_wiring_is_idempotent_and_does_not_stack_wrappers(self):

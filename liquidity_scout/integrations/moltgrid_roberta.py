@@ -7,10 +7,11 @@ modes:
 - selected-route compatibility mode: pre-trade and/or conversation handoffs;
 - all-questions mode: every admitted Signal question goes to Roberta first.
 
-In all-questions mode, Liquidity Scout's existing router remains available only
-as a per-message fallback when the Roberta bridge is unavailable. That fallback
-preserves deterministic XDEX/CMIS behavior without allowing two visible replies
-for one incoming Signal message.
+In all-questions mode, the legacy Liquidity Scout router is retained in the
+codebase for rollback and operator diagnostics, but it is never used as an
+automatic user-facing fallback. If the Roberta bridge is unavailable, MoltGrid
+receives one concise service-unavailable message instead of raw router/CMIS
+output.
 
 Recommended mode::
 
@@ -30,14 +31,9 @@ from liquidity_scout.integrations.roberta_bridge import (
 )
 
 
-def _conversation_fallback(label, fallback_text):
-    text = str(fallback_text or "").strip()
-    if not text:
-        return "Roberta is temporarily unavailable."
-    return (
-        "Roberta is temporarily unavailable; using Liquidity Scout's "
-        f"{label} fallback.\n\n{text}"
-    )
+ROBERTA_UNAVAILABLE_MESSAGE = (
+    "Roberta is temporarily unavailable. Please try your request again shortly."
+)
 
 
 def _legacy_route_answer(
@@ -47,11 +43,11 @@ def _legacy_route_answer(
     pre_term=None,
     pre_matches=None,
 ):
-    """Run the existing per-message router without re-entering Roberta.
+    """Run the legacy router explicitly for rollback/operator diagnostics.
 
-    This mirrors the legacy listener's route ordering so all-questions mode can
-    fail over one message at a time while keeping ``process_cycle`` duplicate
-    protection under the Roberta-first wrapper.
+    Production Roberta-first MoltGrid routing never calls this helper
+    automatically after a Roberta bridge failure. It remains available so an
+    operator can deliberately restore or exercise the former router behavior.
     """
     if listener_module.wants_global_xdex_ranking(question):
         metric = listener_module.xdex_ranking_metric(question)
@@ -184,17 +180,8 @@ def wire_roberta_all_questions(listener_module):
                     "Roberta Bridge unavailable: "
                     f"{type(exc).__name__}"
                 )
-                fallback = _legacy_route_answer(
-                    listener_module,
-                    catalog,
-                    question,
-                    pre_term,
-                    pre_matches,
-                )
-                answer = _conversation_fallback(
-                    "router",
-                    fallback,
-                )
+                print("User-facing legacy router fallback: DISABLED")
+                answer = ROBERTA_UNAVAILABLE_MESSAGE
 
             result = listener_module.post_visible_reply(
                 reply_target_id,
@@ -228,8 +215,8 @@ def wire_roberta_pretrade(listener_module):
 
     The public function name is retained for compatibility with the first
     bridge release. It wires explicit pre-trade plus general/identity routes.
-    All-questions mode is wired separately so its fallback cannot recursively
-    re-enter these selected Roberta wrappers.
+    When a route has been handed to Roberta, a bridge failure never exposes a
+    second conversational voice or raw legacy formatter output.
     """
     existing_asset_formatter = getattr(
         listener_module,
@@ -271,12 +258,8 @@ def wire_roberta_pretrade(listener_module):
             return ask_roberta(question)
         except RobertaBridgeError as exc:
             print(f"Roberta Bridge unavailable: {type(exc).__name__}")
-            fallback = existing_asset_formatter(question, term, matches, catalog)
-            return (
-                "Roberta is temporarily unavailable; using Liquidity Scout's "
-                "deterministic pre-trade fallback.\n\n"
-                f"{fallback}"
-            )
+            print("User-facing legacy pre-trade fallback: DISABLED")
+            return ROBERTA_UNAVAILABLE_MESSAGE
 
     listener_module.format_asset_analysis_answer = routed_format_asset_analysis_answer
 
@@ -290,10 +273,8 @@ def wire_roberta_pretrade(listener_module):
                 return ask_roberta(question)
             except RobertaBridgeError as exc:
                 print(f"Roberta Bridge unavailable: {type(exc).__name__}")
-                return _conversation_fallback(
-                    "conversational",
-                    existing_general_formatter(question),
-                )
+                print("User-facing legacy conversational fallback: DISABLED")
+                return ROBERTA_UNAVAILABLE_MESSAGE
 
         listener_module.format_general_answer = routed_format_general_answer
 
@@ -307,10 +288,8 @@ def wire_roberta_pretrade(listener_module):
                 return ask_roberta(question)
             except RobertaBridgeError as exc:
                 print(f"Roberta Bridge unavailable: {type(exc).__name__}")
-                return _conversation_fallback(
-                    "identity",
-                    existing_identity_formatter(question),
-                )
+                print("User-facing legacy identity fallback: DISABLED")
+                return ROBERTA_UNAVAILABLE_MESSAGE
 
         listener_module.format_hxmp_identity_answer = (
             routed_format_hxmp_identity_answer
@@ -337,6 +316,7 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "ROBERTA_UNAVAILABLE_MESSAGE",
     "load_listener",
     "main",
     "wire_roberta_all_questions",
