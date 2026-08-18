@@ -59,7 +59,7 @@ def risk_envelope(observed_at):
     "set RUN_XDEX_RUNTIME_ROUTE_EVIDENCE_LIVE=1 to run the read-only runtime route probe",
 )
 class CMISRuntimeXDEXRouteEvidenceLiveTests(unittest.TestCase):
-    def test_runtime_derives_real_amount_scoped_xdex_route_evidence(self):
+    def test_runtime_derives_real_amount_scoped_xdex_price_impact_evidence(self):
         gateway = RuntimeCMISGateway(verification_evidence_db_path=":memory:")
         observed_at = time.time()
         with patch.object(
@@ -86,7 +86,10 @@ class CMISRuntimeXDEXRouteEvidenceLiveTests(unittest.TestCase):
         route_analysis = response["data"]["route_analysis"]
         self.assertEqual(route_analysis["route_scope"], ROUTE)
         self.assertIsNotNone(route_analysis["estimated_price_impact_percent"])
-        self.assertIsNotNone(route_analysis["estimated_fees"])
+        # Runtime currently has no separate accepted historical-fee observation
+        # dependency. A live exact-route read must therefore not recreate or
+        # self-attest the 23-swap bounded historical fee proof.
+        self.assertIsNone(route_analysis["estimated_fees"])
         self.assertIsNone(route_analysis["estimated_slippage_percent"])
         evidence = route_analysis["evidence"]
         self.assertEqual(evidence["source"], "cmis_xdex_route_resolver")
@@ -101,7 +104,7 @@ class CMISRuntimeXDEXRouteEvidenceLiveTests(unittest.TestCase):
             "runtime_route_scope": route_analysis["route_scope"],
             "token_in_amount": evidence["token_in_amount"],
             "price_impact_percent": route_analysis["estimated_price_impact_percent"],
-            "fees": route_analysis["estimated_fees"],
+            "bounded_historical_fees_promoted_without_explicit_evidence": False,
             "expected_execution_slippage": route_analysis["estimated_slippage_percent"],
             "execution_authorized": response["data"]["execution_authorized"],
         })

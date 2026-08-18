@@ -26,7 +26,7 @@ TOKEN_IN_AMOUNT = "1000"
     "set RUN_XDEX_EXACT_ROUTE_LIVE=1 to run the read-only exact-route resolver probe",
 )
 class XDEXExactRouteResolverLiveTests(unittest.TestCase):
-    def test_pinned_xencat_xnt_route_resolves_to_amount_scoped_pre_trade_evidence(self):
+    def test_pinned_xencat_xnt_route_resolves_amount_scoped_price_impact_read_only(self):
         evidence = resolve_xdex_route_evidence(ROUTE, TOKEN_IN_AMOUNT)
 
         self.assertEqual(evidence["schema_version"], 2)
@@ -34,7 +34,10 @@ class XDEXExactRouteResolverLiveTests(unittest.TestCase):
         self.assertEqual(evidence["route"], ROUTE)
         self.assertEqual(evidence["token_in_amount"], TOKEN_IN_AMOUNT)
         self.assertIn("price_impact", evidence["capabilities"])
-        self.assertIn("fees", evidence["capabilities"])
+        # A current route/config read does not recreate the separately accepted
+        # 23-swap historical execution-fee proof. Fee promotion therefore
+        # requires explicit classified historical evidence and is absent here.
+        self.assertNotIn("fees", evidence["capabilities"])
         self.assertNotIn("slippage", evidence["capabilities"])
 
         evaluated = evaluate_route_evidence(
@@ -50,10 +53,9 @@ class XDEXExactRouteResolverLiveTests(unittest.TestCase):
         self.assertTrue(evaluated["audit"]["scope_match"])
         self.assertEqual(
             set(evaluated["audit"]["usable_capabilities"]),
-            {"price_impact", "fees"},
+            {"price_impact"},
         )
         self.assertEqual(evaluated["overrides"]["price_impact"]["status"], "ok")
-        self.assertEqual(evaluated["overrides"]["fees"]["status"], "ok")
         self.assertFalse(evaluated["audit"]["rejected_capabilities"])
 
         print(
@@ -62,7 +64,7 @@ class XDEXExactRouteResolverLiveTests(unittest.TestCase):
                 "token_in_amount": evidence["token_in_amount"],
                 "observed_at": evidence["observed_at"],
                 "price_impact_percent": evidence["capabilities"]["price_impact"]["value"],
-                "fee_evidence": evidence["capabilities"]["fees"]["value"],
+                "bounded_historical_fee_promoted_without_explicit_evidence": False,
                 "expected_execution_slippage_promoted": False,
                 "execution_authorized": False,
             }
