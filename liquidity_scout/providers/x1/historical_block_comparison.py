@@ -51,6 +51,13 @@ def _validated_slot(value: Any) -> int:
 def extract_historical_block_fact(
     *, source: str, requested_slot: int, payload: Mapping[str, Any]
 ) -> HistoricalBlockFact:
+    """Extract one block identity from a captured ``getBlock`` request/response.
+
+    ``requested_slot`` is the explicit captured request context. The response
+    body does not echo that slot, so ``parentSlot + 1`` is deliberately not used
+    as a binding rule: skipped slots can make that inference false. We only
+    require the returned parent to precede the requested slot.
+    """
     requested_slot = _validated_slot(requested_slot)
     observation: SecondaryRpcContractObservation = classify_secondary_rpc_response(
         source=source, method="getBlock", payload=payload
@@ -66,8 +73,8 @@ def extract_historical_block_fact(
 
     if isinstance(parent_slot, bool) or not isinstance(parent_slot, int) or parent_slot < 0:
         raise ValueError("parentSlot is missing or invalid")
-    if parent_slot + 1 != requested_slot:
-        raise ValueError("response does not bind to requested_slot")
+    if parent_slot >= requested_slot:
+        raise ValueError("parentSlot must precede requested_slot")
     if not isinstance(blockhash, str) or not blockhash.strip():
         raise ValueError("blockhash is missing or invalid")
     if not isinstance(previous_blockhash, str) or not previous_blockhash.strip():
@@ -91,15 +98,28 @@ def extract_historical_block_fact(
 def compare_historical_block_facts(
     official: HistoricalBlockFact,
     secondary: HistoricalBlockFact,
+    *,
+    source_independence_verified: bool = False,
 ) -> HistoricalBlockComparison:
+    """Compare two captured facts without inferring source independence.
+
+    Distinct source labels are necessary but not sufficient for independence.
+    The caller must explicitly provide an already-verified independence result;
+    otherwise the comparison remains ``INSUFFICIENT_EVIDENCE``.
+    """
     if not isinstance(official, HistoricalBlockFact) or not isinstance(secondary, HistoricalBlockFact):
         raise TypeError("official and secondary must be HistoricalBlockFact values")
+    if not isinstance(source_independence_verified, bool):
+        raise TypeError("source_independence_verified must be a boolean")
 
-    source_independence = official.source.strip() != secondary.source.strip()
+    official_source = official.source.strip()
+    secondary_source = secondary.source.strip()
+    distinct_sources = bool(official_source and secondary_source and official_source != secondary_source)
+    independent = source_independence_verified and distinct_sources
     same_slot = official.requested_slot == secondary.requested_slot
     verified = official.contract_verified and secondary.contract_verified
 
-    if not source_independence or not same_slot or not verified:
+    if not independent or not same_slot or not verified:
         return HistoricalBlockComparison(
             requested_slot=official.requested_slot,
             status="INSUFFICIENT_EVIDENCE",
@@ -108,10 +128,13 @@ def compare_historical_block_facts(
             compared_fields=(),
             conflicts=(),
             same_fact_identity_verified=False,
-            source_independence_verified=source_independence,
+            source_independence_verified=independent,
         )
 
-    fields = ("blockhash", "previous_blockhash", "parent_slot", "block_height")
+    fields: tuple[str, ...] = ("blockhash", "previous_blockhash", "parent_slot")
+    if official.block_height is not None and secondary.block_height is not None:
+        fields += ("block_height",)
+
     conflicts = tuple(field for field in fields if getattr(official, field) != getattr(secondary, field))
     status = "CONFLICT" if conflicts else "AGREEMENT"
 
