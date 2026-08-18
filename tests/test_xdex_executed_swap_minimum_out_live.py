@@ -3,7 +3,6 @@ import os
 import struct
 import unittest
 from decimal import Decimal
-from statistics import median
 
 from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
 from liquidity_scout.providers.x1.rpc import rpc_request
@@ -127,7 +126,7 @@ def _get_transaction(signature):
     "set RUN_XDEX_OUTPUT_SLIPPAGE_LIVE=1 to inspect completed XDEX swaps read-only",
 )
 class XDEXExecutedSwapMinimumOutLiveTests(unittest.TestCase):
-    def test_completed_swap_instruction_exposes_minimum_output_boundary(self):
+    def test_completed_swap_instruction_exposes_transaction_specific_minimum_output(self):
         history = fetch_pool_trades_raw(POOL)
         trades = history["raw_response"]["trades"]
         self.assertTrue(trades, "X1.Ninja returned no recent rows for the pinned XDEX pool")
@@ -209,25 +208,20 @@ class XDEXExecutedSwapMinimumOutLiveTests(unittest.TestCase):
 
         gaps = [Decimal(row["observed_protection_gap_bps"]) for row in rows]
         for row, gap in zip(rows, gaps):
+            self.assertEqual(row["instruction_data_length"], 24)
+            self.assertEqual(row["instruction_discriminator_hex"], _SWAP_BASE_INPUT_DISC.hex())
             self.assertLessEqual(
                 row["minimum_amount_out_raw"],
                 row["indexed_actual_output_raw"],
-                "a successful swap must not receive less than its encoded minimum output",
+                "a successful completed swap must not receive less than its encoded threshold",
             )
             self.assertGreaterEqual(gap, Decimal("0"))
-            self.assertLess(gap, Decimal("500"))
 
-        median_gap = Decimal(str(median([float(gap) for gap in gaps])))
-        print(f"Median encoded-minimum vs indexed-actual gap (bps): {median_gap}")
         print("Anchor discriminator candidate global:swap_base_input:", _SWAP_BASE_INPUT_DISC.hex())
-
-        # This is an evidence gate, not a business-label assertion. A median near
-        # 50 bps would independently corroborate the already verified quote-side
-        # 0.5% default slippage contract and bind it to completed transaction data.
-        self.assertLessEqual(
-            abs(median_gap - Decimal("50")),
-            Decimal("15"),
-            "completed swaps did not show a minimum-output boundary close enough to the verified 50-bps quote-side default to bind the two semantics",
+        print("Observed completed-swap minimum/output gaps (bps):", [str(g) for g in gaps])
+        print(
+            "Interpretation boundary: the second u64 is strongly corroborated as a transaction-specific minimum-output threshold; "
+            "historical thresholds vary and therefore must not be equated with the current quote API's 0.5% default."
         )
 
 
