@@ -3,12 +3,18 @@
 This module is transport-only. It forwards the user's message to Roberta and
 returns Roberta's final reply. It does not call CMIS/provider internals or
 recompute market/risk facts.
+
+MoltGrid can also be placed in a conservative ``simple-only`` presentation
+mode. In that mode, concise conversational and single-fact questions continue
+to Roberta while requests that normally require long structured output receive
+a short professional interface-limitation response instead.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -16,6 +22,68 @@ from collections.abc import Mapping
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8766"
 DEFAULT_TIMEOUT_SECONDS = 60.0
+
+MOLTGRID_SCOPE_LIMITATION_MESSAGE = (
+    "Thank you for your question. This request requires more detailed analysis "
+    "or formatting than MoltGrid's current messaging interface can reliably "
+    "support. To preserve accuracy and readability, I'm unable to provide that "
+    "analysis on this site at this time. I can still help here with general "
+    "questions and concise information."
+)
+
+_MOLTGRID_ADVANCED_PATTERNS = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"\bcompare\b",
+        r"\bcomparison\b",
+        r"\bversus\b",
+        r"\bvs\.?\b",
+        r"\btop\s+\d+\b",
+        r"\brank(?:ing|ed|s)?\b",
+        r"\btrending\b",
+        r"\bgainers?\b",
+        r"\blosers?\b",
+        r"\bhistorical\b",
+        r"\bhistory\b",
+        r"\byesterday\b",
+        r"\blast\s+(?:week|month|year)\b",
+        r"\bover\s+the\s+last\b",
+        r"\bchanged\s+over\b",
+        r"\bpre[- ]?trade\b",
+        r"\bslippage\b",
+        r"\bprice\s+impact\b",
+        r"\broute\s+quality\b",
+        r"\btransaction\s+simulation\b",
+        r"\brisk\s+(?:analysis|assessment|report|check)\b",
+        r"\bsafety\s+(?:analysis|assessment|report)\b",
+        r"\bdetailed\b",
+        r"\bin[- ]depth\b",
+        r"\bdeep\s+dive\b",
+        r"\bfull\s+report\b",
+        r"\bcomplete\s+report\b",
+        r"\braw\s+(?:data|output|cmis|evidence|report)\b",
+        r"\bverification\s+evidence\b",
+        r"\btechnical\s+(?:analysis|diagnostics?|details?|report)\b",
+        r"\bdiagnostic(?:s)?\b",
+        r"\b(?:markdown|ascii)\s+table\b",
+        r"\bcsv\b",
+        r"\bjson\b",
+        r"\bsource\s+code\b",
+        r"\bpython\s+code\b",
+        r"\bwrite\s+(?:me\s+)?code\b",
+    )
+)
+
+_MOLTGRID_TRADE_ADVICE_PATTERN = re.compile(
+    r"\b(?:should\s+i|can\s+i|is\s+it\s+(?:ok|okay|safe)\s+to|would\s+you)\b"
+    r".{0,80}\b(?:buy|purchase|sell|trade)\b",
+    re.IGNORECASE,
+)
+_MOLTGRID_TRADE_AMOUNT_PATTERN = re.compile(
+    r"\b(?:buy|purchase|sell)\b.{0,80}"
+    r"(?:\$\s*\d|\busd\b|\bdollars?\b|\b\d+(?:\.\d+)?\b)",
+    re.IGNORECASE,
+)
 
 
 class RobertaBridgeError(RuntimeError):
@@ -42,6 +110,29 @@ def roberta_conversation_enabled() -> bool:
 def roberta_all_questions_enabled() -> bool:
     """Return whether every admitted MoltGrid question must go to Roberta first."""
     return _env_flag("ROBERTA_MOLTGRID_ALL_QUESTIONS_ENABLED", default=False)
+
+
+def moltgrid_simple_only_enabled() -> bool:
+    """Return whether MoltGrid should restrict replies to concise question types."""
+    return _env_flag("ROBERTA_MOLTGRID_SIMPLE_ONLY_ENABLED", default=False)
+
+
+def moltgrid_question_supported(message: str) -> bool:
+    """Return whether a message fits the current concise MoltGrid interface scope.
+
+    This is intentionally conservative. It is a presentation/channel policy,
+    not a statement about Roberta's underlying capabilities.
+    """
+    text = " ".join(str(message or "").strip().split())
+    if not text:
+        return False
+    if len(text) > 360:
+        return False
+    if _MOLTGRID_TRADE_ADVICE_PATTERN.search(text):
+        return False
+    if _MOLTGRID_TRADE_AMOUNT_PATTERN.search(text):
+        return False
+    return not any(pattern.search(text) for pattern in _MOLTGRID_ADVANCED_PATTERNS)
 
 
 def _base_url(value: str | None = None) -> str:
@@ -80,6 +171,9 @@ def ask_roberta(
     user_text = str(message or "").strip()
     if not user_text:
         raise RobertaBridgeError("A non-empty user message is required.")
+
+    if moltgrid_simple_only_enabled() and not moltgrid_question_supported(user_text):
+        return MOLTGRID_SCOPE_LIMITATION_MESSAGE
 
     url = f"{_base_url(base_url)}/v1/roberta"
     body = json.dumps(
@@ -127,8 +221,11 @@ def ask_roberta(
 __all__ = [
     "DEFAULT_BASE_URL",
     "DEFAULT_TIMEOUT_SECONDS",
+    "MOLTGRID_SCOPE_LIMITATION_MESSAGE",
     "RobertaBridgeError",
     "ask_roberta",
+    "moltgrid_question_supported",
+    "moltgrid_simple_only_enabled",
     "roberta_all_questions_enabled",
     "roberta_conversation_enabled",
     "roberta_pretrade_enabled",
