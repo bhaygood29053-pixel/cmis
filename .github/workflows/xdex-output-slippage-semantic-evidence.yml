@@ -31,6 +31,11 @@ jobs:
           RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
         run: python -m unittest tests.test_xdex_output_slippage_semantics_live -v
 
+      - name: Probe common quote slippage parameter names
+        env:
+          RUN_XDEX_OUTPUT_SLIPPAGE_LIVE: '1'
+        run: python -m unittest tests.test_xdex_quote_slippage_parameter_live -v
+
       - name: Safety boundary
         if: always()
         run: |
