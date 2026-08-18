@@ -2,6 +2,7 @@ import base64
 import os
 import struct
 import unittest
+from collections import Counter
 from decimal import Decimal
 
 import requests
@@ -19,7 +20,7 @@ USDC_X = "B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq"
 KNOWN_CONFIG = "2eFPWosizV6nSAGeSvi5tRgXLoqhjnSesra23ALA248c"
 POOL_SIZE = 637
 FEE_DENOM = 1_000_000
-EXTRA_CANDIDATE_RATE = 200  # 2 bps; arithmetic behavior, not a semantic label.
+OBSERVED_QUOTE_BASELINE_RATE = 3_000  # arithmetic behavior, not a fee label.
 MAX_DIFFERENT_CONFIG_TOKEN_PROBES = 12
 
 
@@ -126,6 +127,15 @@ def _discover_xnt_pools():
     return list(discovered.values())
 
 
+def _discover_all_637_pool_candidates():
+    discovered = {}
+    for row in _program_rows([{"dataSize": POOL_SIZE}]):
+        decoded = _decode_program_row(row)
+        if decoded:
+            discovered[decoded["pool"]] = decoded
+    return list(discovered.values())
+
+
 def _decode_pool(pool_address):
     state = fetch_account_state(pool_address)
     data = state["data"]
@@ -210,11 +220,11 @@ def _evaluate_pool_quote(pool, config, quote, token_in, token_out, amount):
     reserve_out, decimals_out = by_mint[token_out]
     raw_input = _raw_amount(amount, decimals_in)
     cp_config = _curve_exact_in(raw_input, reserve_in, reserve_out, config["trade_fee_rate"])
-    cp_plus_200 = _curve_exact_in(
+    cp_baseline = _curve_exact_in(
         raw_input,
         reserve_in,
         reserve_out,
-        config["trade_fee_rate"] + EXTRA_CANDIDATE_RATE,
+        max(config["trade_fee_rate"], OBSERVED_QUOTE_BASELINE_RATE),
     )
     observed_dec = Decimal(str(quote["outputAmount"])) * (Decimal(10) ** decimals_out)
     if observed_dec != observed_dec.to_integral_value():
@@ -231,9 +241,9 @@ def _evaluate_pool_quote(pool, config, quote, token_in, token_out, amount):
         "creator_fee_rate_raw": config["creator_fee_rate"],
         "observed_zero_slippage_raw": observed,
         "cp_config_fee_raw": cp_config,
-        "cp_config_plus_200_raw": cp_plus_200,
+        "cp_tested_3000_baseline_raw": cp_baseline,
         "delta_config_raw": observed - cp_config,
-        "delta_config_plus_200_raw": observed - cp_plus_200,
+        "delta_tested_3000_baseline_raw": observed - cp_baseline,
     }
 
 
@@ -242,7 +252,7 @@ def _evaluate_pool_quote(pool, config, quote, token_in, token_out, amount):
     "set RUN_XDEX_OUTPUT_SLIPPAGE_LIVE=1 for second-pool effective-fee evidence",
 )
 class XDEXSecondPoolEffectiveFeeLiveTests(unittest.TestCase):
-    def test_xnt_usdc_pool_localizes_two_basis_point_effective_deduction(self):
+    def test_xnt_usdc_pool_localizes_3000_ppm_quote_baseline(self):
         candidates = _discover_pair_pools()
         self.assertTrue(candidates, "X1 RPC found no 637-byte XDEX XNT/USDC.X pool")
         print("XDEX XNT/USDC.X discovered pool candidates", candidates)
@@ -252,7 +262,6 @@ class XDEXSecondPoolEffectiveFeeLiveTests(unittest.TestCase):
             (XNT, USDC_X, Decimal("0.1")),
         )
         evidence = []
-        exact_plus_200_matches = 0
 
         for token_in, token_out, amount in quote_cases:
             quote = _quote(token_in, token_out, amount)
@@ -268,27 +277,22 @@ class XDEXSecondPoolEffectiveFeeLiveTests(unittest.TestCase):
                 row = _evaluate_pool_quote(pool, config, quote, token_in, token_out, amount)
                 if row:
                     evidence.append(row)
-                    if row["delta_config_plus_200_raw"] == 0:
-                        exact_plus_200_matches += 1
 
         print("XDEX second-pool effective-fee evidence")
         for row in evidence:
             print(row)
 
         self.assertTrue(evidence, "No discovered XNT/USDC.X pool matched quote AMM config")
-        self.assertGreaterEqual(
-            exact_plus_200_matches,
-            1,
-            "No XNT/USDC.X quote exactly matched config trade fee + 200 ppm",
+        self.assertTrue(
+            all(row["delta_tested_3000_baseline_raw"] == 0 for row in evidence),
+            "XNT/USDC.X zero-slippage quote stopped matching the tested 3000-ppm baseline",
         )
 
-    def test_find_quote_using_different_amm_config_and_compare_extra_200_ppm(self):
+    def test_different_3000_ppm_config_uses_its_config_rate_without_extra_200_ppm(self):
         pools = _discover_xnt_pools()
         different = [p for p in pools if p["amm_config"] != KNOWN_CONFIG]
         self.assertTrue(different, "No XNT pool with a different AMM config was discovered")
 
-        # Group candidates by their non-XNT token so multiple pools for one pair
-        # can be evaluated after the quote tells us which AMM config it selected.
         by_other_mint = {}
         for candidate in different:
             other = candidate["mint_1"] if candidate["mint_0"] == XNT else candidate["mint_0"]
@@ -337,9 +341,9 @@ class XDEXSecondPoolEffectiveFeeLiveTests(unittest.TestCase):
                     continue
                 if row:
                     corroborated.append(row)
-                    if row["delta_config_plus_200_raw"] == 0:
+                    if row["delta_config_raw"] == 0:
                         break
-            if any(row["delta_config_plus_200_raw"] == 0 for row in corroborated):
+            if any(row["delta_config_raw"] == 0 for row in corroborated):
                 break
 
         print("XDEX different-config discovery diagnostics")
@@ -354,9 +358,34 @@ class XDEXSecondPoolEffectiveFeeLiveTests(unittest.TestCase):
             "No live XNT quote selected a structurally discovered pool under a different AMM config",
         )
         self.assertTrue(
-            any(row["delta_config_plus_200_raw"] == 0 for row in corroborated),
-            "A different-config XDEX quote did not reproduce config trade fee + 200 ppm exactly",
+            any(
+                row["trade_fee_rate_ppm"] == OBSERVED_QUOTE_BASELINE_RATE
+                and abs(row["delta_config_raw"]) <= 1
+                for row in corroborated
+            ),
+            "A different 3000-ppm AMM config did not reproduce the zero-slippage quote at its own config rate",
         )
+
+    def test_inventory_current_637_pool_config_trade_fee_rates(self):
+        pools = _discover_all_637_pool_candidates()
+        self.assertTrue(pools, "No 637-byte XDEX pool candidates discovered")
+        config_addresses = sorted({pool["amm_config"] for pool in pools})
+        config_rows = []
+        rate_counts = Counter()
+        for address in config_addresses:
+            config = _decode_config(address)
+            rate_counts[config["trade_fee_rate"]] += 1
+            config_rows.append({"amm_config": address, **config})
+
+        print("XDEX current 637-byte pool AMM config fee inventory")
+        print({"pool_count": len(pools), "config_count": len(config_rows), "trade_fee_rate_counts": dict(rate_counts)})
+        for row in config_rows:
+            print(row)
+
+        # These rates are part of today's observed inventory, not a claim that
+        # future XDEX configs are limited to this set.
+        self.assertIn(2_800, rate_counts)
+        self.assertIn(3_000, rate_counts)
 
 
 if __name__ == "__main__":
