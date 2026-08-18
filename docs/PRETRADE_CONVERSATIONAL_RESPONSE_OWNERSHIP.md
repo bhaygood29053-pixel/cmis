@@ -1,25 +1,18 @@
 # Roberta–CMIS Pre-Trade UX Ownership Contract
 
-## Problem
+## Purpose
 
-A user asked Roberta on MoltGrid:
+This document records the ownership split created after an early prototype response to:
 
 > Is it ok to purchase $500 of AGI?
 
-The response exposed an internal CMIS-style diagnostic report directly to the user, including service statuses, verified-check counts, missing evidence, and execution-authorization language. The result was technically informative but sounded like a debug console rather than a normal assistant.
+The early response exposed internal CMIS-style diagnostics directly and, at that time, carried the requested notional mostly as context rather than evaluating trade size against verified liquidity.
 
-The response also revealed a separate analytical gap: CMIS carried the `$500` notional as context but did not yet evaluate whether that trade size was appropriate relative to verified liquidity, expected slippage, price impact, route quality, fees, or transaction simulation.
-
-This issue therefore has **two owners**:
+Both gaps have since been addressed in the accepted architecture. The historical **Liquidity Scout** name refers to the prototype/repository history; current ownership is:
 
 1. **Roberta owns the user-facing conversational experience.**
-2. **CMIS/Liquidity Scout owns deterministic pre-trade calculations and evidence.**
-
-Neither project should take over the other's responsibility.
-
----
-
-## Architecture Rule
+2. **CMIS owns deterministic pre-trade calculations, evidence, proof, and fail-closed capability state.**
+3. **The relevant Chain Scout requests/interprets CMIS work without reproducing provider calculations.**
 
 ```text
 User
@@ -32,190 +25,130 @@ CMIS
   ↓
 Structured deterministic evidence
   ↓
-Roberta conversational synthesis
+Chain Scout interpretation
   ↓
-Normal human answer
+Roberta conversational synthesis
 ```
 
-### CMIS answers
+CMIS answers:
 
-> What do the verified numbers and deterministic policies say?
+> What do the verified numbers, evidence contracts, and deterministic policies support?
 
-### Roberta answers
+Roberta answers:
 
 > What does that mean for the person who asked the question?
 
-Roberta must not become a second risk engine. CMIS must not become a conversational assistant.
+Roberta must not become a second risk/market engine. CMIS must not become the conversational voice.
 
 ---
 
-# Roberta Responsibilities
+## Roberta responsibilities
 
-## R1 — Add a conversational response synthesis layer
+### Conversational synthesis
 
-Roberta must translate Scout/CMIS structured results into a natural answer before sending a MoltGrid/Signal response.
+Roberta should lead with the useful conclusion/caution, explain the most important evidence in plain language, distinguish risk from evidence quality, identify material uncertainty, and provide practical next steps without dumping raw service envelopes by default.
 
-For a question such as:
+### Truth preservation
 
-> Is it ok to purchase $500 of AGI?
-
-Roberta should lead with a direct answer, explain the most important evidence in plain language, identify material uncertainty, and give a practical next step.
-
-Example target style:
-
-> I'd be cautious about buying the full $500 of AGI at once. AGI currently has about $3,380 in reported liquidity and only about $124 in 24-hour volume, so a $500 order is large relative to the current market. The token did not trigger a major safety failure in the checks I could verify, but I still need trade-impact and slippage analysis before I'd call the full $500 purchase low-risk. A smaller or staged purchase would be safer until that is checked.
-
-The wording may vary, but it must sound like Roberta speaking to a person rather than returning an internal service report.
-
-## R2 — Preserve CMIS truth without recomputation
-
-Roberta may:
-
-- summarize deterministic results;
-- prioritize the most relevant facts;
-- translate statuses such as `WARN`, `PARTIAL`, or `INSUFFICIENT_EVIDENCE` into normal language;
-- explain uncertainty;
-- request additional Scout/CMIS analysis;
-- provide practical next steps that are explicitly grounded in CMIS results.
+Roberta may summarize, prioritize, explain, and request additional Scout/CMIS analysis.
 
 Roberta must not:
 
-- invent slippage, price impact, route quality, or fees;
-- recalculate or strengthen CMIS confidence;
-- convert `WARN` or insufficient evidence into `PASS`;
-- average conflicting providers;
+- invent or recompute price, liquidity, slippage, price impact, route, fees, proof strength, or deterministic risk;
+- strengthen incomplete evidence;
+- convert `WARN`, `BLOCK`, conflict, or insufficient evidence into a stronger result;
+- average incompatible providers;
 - manufacture verified facts;
-- treat a provider marketing label as deterministic truth.
+- treat a provider label as CMIS-verified truth.
 
-## R3 — Hide internal diagnostics by default
+### Progressive disclosure
 
-The default user response should not expose terms such as:
+Default mode should be conversational. Technical details, evidence receipts, proof categories, source diagnostics, and structured fields should be exposed only when requested or necessary to explain a material limitation.
 
-- `CMIS pre-trade analysis`;
-- `Market service: OK`;
-- `Risk evidence verified: 6/8`;
-- `risk core`;
-- `cmis_promotable`;
-- service envelopes;
-- execution internals that are not directly relevant to the user's question.
+### Final voice
 
-Roberta may expose those details only when the user explicitly asks for technical details, diagnostics, evidence, or a full report.
-
-## R4 — Support two presentation modes
-
-### Default: Conversational Mode
-
-Short, clear, natural, decision-oriented.
-
-### Optional: Technical Mode
-
-When requested, show the underlying market, tokenomics, risk, verification, trade-size, slippage, price-impact, route, and missing-evidence details without changing CMIS semantics.
-
-## R5 — Keep the final voice as Roberta
-
-Do not prefix normal responses with `Liquidity Scout reply:`. Roberta may say that she checked Liquidity Scout when useful, but the final response should remain in Roberta's voice.
-
-## Roberta acceptance criteria
-
-Roberta's task is complete when all of the following are true:
-
-- The AGI `$500` test question returns a normal conversational answer by default.
-- The answer leads with a direct recommendation or caution statement rather than a service report.
-- All numerical facts used in the answer match the Scout/CMIS response exactly.
-- Missing evidence remains explicit and is never silently converted into confidence.
-- Internal CMIS diagnostic terminology is hidden by default.
-- A technical-detail request can still expose the structured analysis.
-- Existing X1 Scout/CMIS trust boundaries remain intact.
-- Automated tests cover conversational and technical modes.
+Roberta is the normal user-facing voice. Do not prefix current production answers with `Liquidity Scout reply:`. That is historical prototype wording.
 
 ---
 
-# CMIS / Liquidity Scout Responsibilities
+## CMIS responsibilities
 
-## C1 — Make the proposed trade amount analytically meaningful
+### Trade-size analysis — COMPLETE
 
-CMIS must stop merely carrying `notional_usd` as context. It should deterministically compare the requested trade size with verified market liquidity when the necessary evidence exists.
-
-At minimum, add a deterministic field equivalent to:
+CMIS evaluates requested notional against verified liquidity where the evidence contract permits:
 
 ```text
 notional_to_liquidity_ratio = requested_notional_usd / verified_liquidity_usd
 ```
 
-For the observed example:
+The ratio is calculated by CMIS and returned as structured evidence; Roberta may explain it but does not recalculate it.
 
-```text
-$500 / $3,380 ≈ 14.8%
-```
+### Explicit trade-size policy — COMPLETE
 
-The exact ratio should be returned as structured CMIS evidence. Roberta may explain it but must not be the component that calculates or classifies it.
+The production X1 path has a documented/versioned deterministic trade-size policy with explicit classification bands. Missing or conflicting liquidity fails closed. Policy thresholds are policy choices, not universal market truth.
 
-## C2 — Add an explicit trade-size policy
+See [`CMIS_PRETRADE_POLICY.md`](./CMIS_PRETRADE_POLICY.md).
 
-CMIS should classify trade-size risk using documented, configurable, deterministic thresholds.
+### Route-scoped price impact and fee evidence — BOUNDED / AVAILABLE WHERE EXACT GATES PASS
 
-The policy must:
+CMIS now has a hardened internal route-evidence seam. Selected route-scoped price-impact and fee facts may become usable only when exact route identity, accepted source, freshness, semantic, unit, value-shape, and proof-basis gates all pass.
 
-- have explicit thresholds;
-- have no hidden defaults masquerading as universal market truth;
-- fail closed when required liquidity evidence is unavailable or unverified;
-- preserve the exact policy version/thresholds used in the result.
+The route must explicitly bind:
 
-Possible labels may include `LOW`, `MODERATE`, `HIGH`, and `VERY_HIGH`, but the final thresholds must be deliberately defined and tested before production use.
+- token-in mint;
+- token-out mint;
+- pool;
+- AMM config.
 
-## C3 — Add pool/route-level price-impact analysis
+One pool/route cannot silently become asset-wide route quality.
 
-When sufficient verified pool/reserve evidence exists, CMIS should evaluate the proposed trade against viable pools/routes and return deterministic estimates for:
+For the accepted pinned XENCAT/native-XNT historical scope, completed-swap evidence strongly corroborates the 2800-ppm / 0.28% execution model. The separate 3000-ppm quote baseline is not presented as a hidden execution fee.
 
-- available route(s);
-- relevant reserves/depth;
-- expected execution price;
-- expected amount received;
-- price impact;
-- DEX/pool fees;
-- route quality or explicit route insufficiency.
+### Slippage — STILL DISTINCT / FAIL-CLOSED
 
-CMIS must not claim asset-wide route quality from one pool unless the scope is explicitly limited to that pool/venue.
+XDEX quote slippage tolerance/minimum-received semantics have bounded verified/corroborated behavior, but quote slippage tolerance is **not** an expected execution-slippage estimate.
 
-## C4 — Add slippage analysis
+Expected execution slippage remains unavailable until a separately accepted execution-observation contract proves it.
 
-CMIS should estimate or bound expected slippage only when the required route/reserve/quote evidence is available and its semantics are verified.
+### Still unavailable unless separately proven
 
-Missing quote or reserve semantics must remain `unavailable` / insufficient evidence, not zero.
+- route quality / optimality;
+- fill quality;
+- bridge dependency where route representation is not proven;
+- transaction simulation;
+- generic execution quality;
+- universal execution semantics.
 
-## C5 — Keep execution separate
+Missing evidence remains unavailable/null, never zero-filled or guessed.
 
-This work is analysis only. It must not enable:
+### Execution remains separate
 
+Current pre-trade work does not enable:
+
+- transaction preparation for execution;
 - signing;
 - broadcasting;
-- wallet custody;
-- autonomous execution;
+- custody;
+- autonomous trading;
+- bridge transfer;
 - value movement.
 
-Existing human-approval and future controlled-execution boundaries remain separate.
+Every current result preserves:
 
-## CMIS acceptance criteria
+```text
+analysis_only = true
+execution_authorized = false
+```
 
-CMIS's task is complete when all of the following are true:
-
-- `pre_trade_check` uses the requested trade amount as an evaluated input rather than context only.
-- A verified notional-to-liquidity ratio is returned when verified liquidity is available.
-- Trade-size classification is deterministic, policy-backed, and versioned.
-- Missing liquidity evidence fails closed.
-- Price-impact and slippage fields are either deterministically evaluated from verified route/pool evidence or explicitly unavailable.
-- Route/fee evidence preserves provider, pool, venue, observation time, and scope.
-- No fake zeros or inferred totals are introduced.
-- No execution authority is added.
-- Automated tests cover small, medium, and market-large trade sizes plus missing/conflicting evidence.
+A `PASS` means only that the checks actually performed did not produce a warning/block. It is not a statement that a trade is safe and is never authorization to trade.
 
 ---
 
-# Shared Interface Contract
+## Shared interface principle
 
-CMIS should return machine-readable evidence. Roberta should consume it without recomputing trust.
+CMIS returns machine-readable deterministic evidence. The Chain Scout preserves/interprets the chain-specific result. Roberta explains it without recomputing trust.
 
-A future structured pre-trade result should be able to expose fields conceptually similar to:
+Conceptual pre-trade output may include:
 
 ```text
 trade:
@@ -226,71 +159,54 @@ market:
   verified_price_usd
   verified_liquidity_usd
   verified_volume_24h_usd
-  lp_count
 
 trade_size:
   notional_to_liquidity_ratio
+  policy_name
   policy_version
-  assessment
+  classification
   evidence_status
 
 route_analysis:
   status
   route_scope
-  estimated_execution_price
-  estimated_price_impact_percent
-  estimated_slippage_percent
-  estimated_fees
+  estimated_price_impact_percent     # only when accepted proof gates pass
+  estimated_slippage_percent         # unavailable unless separately proven
+  estimated_fees                     # only accepted bounded fee fields
 
 risk:
   recommendation
-  verified_evidence
+  evidence_quality
   missing_evidence
 ```
 
-The exact schema may evolve, but ownership must not:
+The exact schema may evolve, but ownership does not:
 
-- CMIS determines and verifies these facts.
-- Roberta explains them.
+- **CMIS determines/verifies deterministic facts.**
+- **Chain Scouts preserve chain-specific evidence and meaning.**
+- **Roberta explains the result to the user.**
 
 ---
 
-# Required Regression Questions
+## Regression questions
 
-Both projects should use at least these user-facing scenarios:
+Keep user-facing coverage for scenarios such as:
 
 1. `Is it ok to purchase $50 of AGI?`
 2. `Is it ok to purchase $500 of AGI?`
 3. `Would $2,000 move the AGI market too much?`
 4. `Should I sell $1,000 of AGI?`
 5. `Show me the technical analysis for that trade.`
-6. Same questions with missing liquidity evidence.
-7. Same questions with conflicting market evidence.
+6. The same questions with missing liquidity evidence.
+7. The same questions with conflicting evidence.
+8. Exact route evidence present versus stale/mismatched route evidence.
+9. Quote slippage tolerance supplied as if it were expected execution slippage—the system must reject that semantic substitution.
+10. Fee evidence containing quote-layer deductions as if they were executed fees—the system must fail closed.
 
-Roberta tests should evaluate **presentation and truth preservation**.
-
-CMIS tests should evaluate **deterministic calculations, evidence scope, and fail-closed behavior**.
-
----
-
-# Completion and Handoff
-
-## Roberta is done when
-
-The conversational synthesis and technical-detail modes meet the Roberta acceptance criteria and are merged into the accepted Roberta runtime.
-
-## CMIS is done when
-
-Trade-size evaluation and the agreed pre-trade intelligence fields meet the CMIS acceptance criteria and are merged into the accepted Liquidity Scout/CMIS runtime.
-
-## Cross-project final integration is done when
-
-Roberta consumes the new CMIS pre-trade fields without recomputing them and the `$500 AGI` regression scenario produces a natural answer grounded in the deterministic trade-size/impact evidence.
+Roberta tests evaluate presentation and truth preservation. CMIS tests evaluate deterministic calculations, proof/scope/freshness boundaries, and fail-closed behavior.
 
 ---
 
-## Non-goal
+## Core principle
 
-Do not solve this problem by making CMIS write conversational prose or by allowing Roberta to independently invent market-risk calculations. The purpose of this contract is to preserve the architecture:
-
-**CMIS owns deterministic truth. Roberta owns the human conversation.**
+**CMIS owns deterministic truth. Chain Scouts preserve chain-specific evidence. Roberta owns the human conversation.**
