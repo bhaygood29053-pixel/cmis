@@ -4,7 +4,7 @@ This probe exists because the public XDEX pool-list can legitimately be empty wh
 read-only quote/history endpoints still accept exact mint identifiers. The pair is
 therefore established from the already verified XDEX program pool state, then the
 live provider response is checked only for observable identity/schema properties.
-No quote, impact, fee, route-quality, or fill semantic is promoted by this test.
+No quote, impact, fee, route-quality, history-field, or fill semantic is promoted.
 """
 
 import json
@@ -23,6 +23,7 @@ _XDEX_PROGRAM_ID = "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN"
 _XENCAT_MINT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
 _XENCAT_POOL_ADDRESS = "6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry"
 _NATIVE_XNT_MINT = "So11111111111111111111111111111111111111112"
+_HISTORY_BAR_KEYS = {"o", "h", "l", "c", "v", "t"}
 _REDACTED_KEY_FRAGMENTS = (
     "transaction",
     "serialized",
@@ -80,7 +81,6 @@ class XDEXVerifiedNativePairLiveTests(unittest.TestCase):
             program_id=_XDEX_PROGRAM_ID,
             signature_limit=1,
         )
-        cls.assertTrue = staticmethod(unittest.TestCase().assertTrue)
         if report.get("summary", {}).get("pool_state_structural_role_verified") is not True:
             raise RuntimeError("Pinned XENCAT pool failed structural re-verification.")
         counter = _counter_mint(report)
@@ -132,7 +132,7 @@ class XDEXVerifiedNativePairLiveTests(unittest.TestCase):
             + json.dumps(_public_evidence(data), sort_keys=True, default=str)
         )
 
-    def test_live_history_exposes_candidate_time_and_price_fields(self):
+    def test_live_history_preserves_observed_raw_bar_fields(self):
         time_to = int(time.time())
         time_from = time_to - (7 * 24 * 60 * 60)
         points = self.provider.price_history(
@@ -145,12 +145,18 @@ class XDEXVerifiedNativePairLiveTests(unittest.TestCase):
         self.assertTrue(points, "XDEX returned no history points for the verified pair.")
         for point in points[:10]:
             self.assertIsInstance(point, Mapping)
-            self.assertTrue("timestamp" in point or "time" in point)
-            self.assertIn("price", point)
+            self.assertTrue(
+                _HISTORY_BAR_KEYS.issubset(point.keys()),
+                f"history bar lacks observed raw keys: {point}",
+            )
+            self.assertNotIn("price", point)
+            self.assertNotIn("timestamp", point)
         print(
-            "[XDEX history candidate-field evidence] "
+            "[XDEX history raw-bar evidence] "
             + json.dumps(_public_evidence(points[:3]), sort_keys=True, default=str)
         )
+        # o/h/l/c/v/t meanings, units, interval, ordering, coverage, and canonical
+        # price/timestamp semantics remain intentionally unverified.
 
     def test_live_quote_preserves_identity_and_candidate_fields(self):
         observations = []
