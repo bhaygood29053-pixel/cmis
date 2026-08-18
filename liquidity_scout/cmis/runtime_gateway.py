@@ -1,18 +1,22 @@
 """Production CMIS runtime composition.
 
 The HTTP runtime needs the accepted risk/trade extensions, persisted
-``verification_evidence`` lookup, and narrowly eligible Solana identity,
-tokenomics, market-evidence, history, and risk layers on one cooperative gateway
-class. These layers compose without duplicating their dispatch logic.
+``verification_evidence`` lookup, narrowly eligible Solana identity/tokenomics/
+market/history/risk layers, and deterministic evidence-quality metadata on one
+cooperative gateway class.
 
 Verification evidence persistence is an internal runtime dependency. Callers
 can select evidence only by the public service contract; they cannot choose a
 SQLite path or inject a ledger through an HTTP request.
 
 Solana service code remains provider-injected, but the production runtime can
-now construct the accepted read-only providers from deployment environment
-configuration.  This path is disabled by default and cannot be selected or
+construct accepted read-only providers from deployment environment
+configuration. This path is disabled by default and cannot be selected or
 modified through an HTTP request.
+
+Evidence receipts/proof scores are post-processing only. They summarize proof
+already present in the service envelope and cannot rewrite provider facts,
+risk, service status, or execution policy.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ import os
 from typing import Any
 
 from liquidity_scout.cmis.evidence_ledger import VerificationEvidenceLedger
+from liquidity_scout.cmis.evidence_quality_gateway import EvidenceQualityMixin
 from liquidity_scout.cmis.pre_trade_policy_gateway import PreTradePolicyMixin
 from liquidity_scout.cmis.solana_gateway import SolanaAssetLookupMixin
 from liquidity_scout.cmis.solana_historical_gateway import SolanaHistoricalCompareMixin
@@ -59,6 +64,7 @@ SUPPORTED_SERVICES = (
 
 
 class RuntimeCMISGateway(
+    EvidenceQualityMixin,
     PreTradePolicyMixin,
     SolanaHistoricalCompareMixin,
     SolanaRiskCheckMixin,
@@ -69,7 +75,7 @@ class RuntimeCMISGateway(
     TradeAwareCMISGateway,
     VerificationCMISGateway,
 ):
-    """HTTP/runtime gateway with X1 services and gated Solana read-only facts."""
+    """HTTP/runtime gateway with read-only evidence-quality metadata."""
 
     def __init__(
         self,
@@ -103,7 +109,7 @@ class RuntimeCMISGateway(
         solana_dependencies, solana_status = build_solana_runtime_dependencies(
             solana_runtime_env
         )
-        # Explicit constructor dependencies remain authoritative.  This keeps
+        # Explicit constructor dependencies remain authoritative. This keeps
         # deterministic tests and specialized deployments compatible while the
         # normal HTTP runtime gains environment-owned automatic composition.
         for name, dependency in solana_dependencies.items():
