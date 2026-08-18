@@ -3,7 +3,7 @@
 This module performs no RPC, DEX, routing, simulation, wallet, signing, or
 transaction work. It consumes an already-computed deterministic ``risk_check``
 result plus proposed trade context and applies fail-closed identity, chain,
-trade-size/liquidity, and explicit evidence-freshness gates.
+trade-size/liquidity, explicit evidence-freshness, and route-evidence gates.
 
 Unsupported execution estimates are represented through a machine-readable
 capability contract. The core never fills those fields with guessed values.
@@ -17,6 +17,7 @@ from .pre_trade_liquidity import (
     DEFAULT_PRE_TRADE_POLICY,
     assess_trade_size_liquidity,
 )
+from .pre_trade_route_evidence import normalize_trade_route
 from .risk import BLOCK, PASS, WARN
 
 
@@ -81,19 +82,26 @@ def _normalize_trade(trade: Mapping[str, Any]) -> Dict[str, Any]:
     asset = trade.get("asset")
     if not isinstance(asset, Mapping):
         raise ValueError("trade asset must be a mapping")
+    asset_mint = _text(asset.get("mint") or asset.get("address"))
     notional = None
     if "notional_usd" in trade and trade.get("notional_usd") is not None:
         notional = _number(trade.get("notional_usd"))
         if notional is None or notional <= 0:
             raise ValueError("trade notional_usd must be a positive finite number when supplied")
+    route = normalize_trade_route(
+        trade.get("route"),
+        asset_mint=asset_mint,
+        side=side,
+    )
     return {
         "side": side,
         "chain": (_text(trade.get("chain")) or "").lower() or None,
         "asset": {
             "symbol": _text(asset.get("symbol")),
-            "mint": _text(asset.get("mint") or asset.get("address")),
+            "mint": asset_mint,
         },
         "notional_usd": notional,
+        "route": route,
     }
 
 
@@ -208,6 +216,8 @@ def build_pre_trade_check(
     policy: Optional[Mapping[str, Any]] = None,
     risk_observed_at: Any = None,
     evaluated_at: Any = None,
+    route_evidence: Any = None,
+    route_evidence_max_age_seconds: Any = None,
 ) -> Dict[str, Any]:
     if not isinstance(risk_result, Mapping):
         raise ValueError("risk_result must be a mapping")
@@ -222,7 +232,14 @@ def build_pre_trade_check(
     trade_size_liquidity = assess_trade_size_liquidity(risk_result, normalized_trade, policy=policy)
     normalized_policy = dict(trade_size_liquidity.get("policy") or DEFAULT_PRE_TRADE_POLICY)
     freshness = assess_risk_freshness(risk_observed_at=risk_observed_at, evaluated_at=evaluated_at, policy=normalized_policy)
-    execution_capabilities = build_execution_capability_report(normalized_policy.get("required_capabilities"))
+    execution_capabilities = build_execution_capability_report(
+        normalized_policy.get("required_capabilities"),
+        route_evidence=route_evidence,
+        target_chain=chain_name,
+        trade_route=normalized_trade.get("route"),
+        evaluated_at=evaluated_at,
+        route_evidence_max_age_seconds=route_evidence_max_age_seconds,
+    )
     components = {
         "identity": identity,
         "risk_gate": risk_gate,
@@ -239,6 +256,41 @@ def build_pre_trade_check(
     risk_asset = risk_result.get("asset")
     risk_asset = risk_asset if isinstance(risk_asset, Mapping) else {}
     capability_evidence = execution_capabilities["evidence"]
+    capabilities = capability_evidence.get("capabilities") or {}
+    available_capabilities = [
+        name
+        for name, record in capabilities.items()
+        if isinstance(record, Mapping) and record.get("status") == "ok"
+    ]
+    included_scope = [
+        "chain_consistency",
+        "asset_identity_consistency",
+        "risk_check_severity_propagation",
+        "risk_evidence_completeness",
+        "trade_size_to_verified_asset_wide_liquidity",
+        "explicit_trade_size_policy_thresholds",
+        "deterministic_policy_notional_thresholds",
+        "explicit_risk_evidence_freshness_policy",
+        "execution_estimate_capability_availability",
+    ]
+    included_scope.extend(
+        f"verified_route_{name}" for name in available_capabilities
+    )
+    not_yet_included = [
+        name for name in (
+            "slippage",
+            "price_impact",
+            "route_quality",
+            "bridge_dependency",
+            "transaction_simulation",
+            "fees",
+        )
+        if name not in available_capabilities
+    ]
+    not_yet_included.extend([
+        "pool_depth_curve_simulation",
+        "execution_authorization",
+    ])
     return {
         "chain": chain_name,
         "asset": {
@@ -248,7 +300,8 @@ def build_pre_trade_check(
         "trade": normalized_trade,
         "recommendation": recommendation,
         "components": components,
-        "execution_capabilities": capability_evidence.get("capabilities") or {},
+        "execution_capabilities": capabilities,
+        "route_evidence": capability_evidence.get("route_evidence") or {},
         "confidence": _confidence(identity, risk_gate, trade_size_liquidity, freshness, execution_capabilities),
         "flags": flags,
         "reasons": reasons,
@@ -259,27 +312,8 @@ def build_pre_trade_check(
         "execution_authorized": False,
         "authorization_reason": "pre_trade_check_analysis_only",
         "assessment_scope": {
-            "included": [
-                "chain_consistency",
-                "asset_identity_consistency",
-                "risk_check_severity_propagation",
-                "risk_evidence_completeness",
-                "trade_size_to_verified_asset_wide_liquidity",
-                "explicit_trade_size_policy_thresholds",
-                "deterministic_policy_notional_thresholds",
-                "explicit_risk_evidence_freshness_policy",
-                "execution_estimate_capability_availability",
-            ],
-            "not_yet_included": [
-                "slippage",
-                "price_impact",
-                "pool_depth_curve_simulation",
-                "route_quality",
-                "bridge_dependency",
-                "transaction_simulation",
-                "fees",
-                "execution_authorization",
-            ],
+            "included": included_scope,
+            "not_yet_included": not_yet_included,
         },
     }
 
