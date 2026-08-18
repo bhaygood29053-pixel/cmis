@@ -50,7 +50,9 @@ def _text(name: str, value: Any, *, required: bool = False) -> str | None:
         if required:
             raise ValueError(f"{name} is required")
         return None
-    text = str(value).strip()
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be a string")
+    text = value.strip()
     if not text:
         if required:
             raise ValueError(f"{name} is required")
@@ -168,6 +170,7 @@ def build_wallet_activity_observation(
     activity_type: Any,
     transaction_signature: Any,
     observed_at: Any,
+    source: Any,
     verification_method: Any,
     evidence_scope: Any,
     asset_id: Any,
@@ -222,6 +225,7 @@ def build_wallet_activity_observation(
     wallet_text = _text("wallet", wallet, required=True)
     activity = (_text("activity_type", activity_type, required=True) or "").upper()
     signature = _text("transaction_signature", transaction_signature, required=True)
+    source_text = _text("source", source, required=True)
     method = _text("verification_method", verification_method, required=True)
     scope = _text("evidence_scope", evidence_scope, required=True)
     asset = _text("asset_id", asset_id, required=True)
@@ -338,6 +342,7 @@ def build_wallet_activity_observation(
         "transaction_signature": signature,
         "observed_at": timestamp,
         "block_slot": slot,
+        "source": source_text,
         "verification_method": method,
         "evidence_scope": scope,
         "asset_id": asset,
@@ -379,6 +384,7 @@ def _validated_observation(observation: Mapping[str, Any]) -> dict[str, Any]:
         activity_type=activity,
         transaction_signature=record.get("transaction_signature"),
         observed_at=record.get("observed_at"),
+        source=record.get("source"),
         verification_method=record.get("verification_method"),
         evidence_scope=record.get("evidence_scope"),
         asset_id=record.get("asset_id"),
@@ -440,12 +446,14 @@ def summarize_wallet_activity(
     type_counts = {activity: 0 for activity in sorted(ACTIVITY_TYPES)}
     amount_totals: dict[tuple[str, str, str], Decimal] = defaultdict(Decimal)
     trade_volume_totals: dict[str, Decimal] = defaultdict(Decimal)
+    sources: set[str] = set()
     scopes: set[str] = set()
     methods: set[str] = set()
 
     for item in records:
         activity = item["activity_type"]
         type_counts[activity] += 1
+        sources.add(item["source"])
         scopes.add(item["evidence_scope"])
         methods.add(item["verification_method"])
 
@@ -488,6 +496,7 @@ def summarize_wallet_activity(
         "activity_counts": type_counts,
         "verified_amounts_by_asset": by_asset,
         "verified_trade_volume_by_quote_unit": verified_volume,
+        "sources": sorted(sources),
         "evidence_scopes": sorted(scopes),
         "verification_methods": sorted(methods),
         "observations": records,
