@@ -77,6 +77,182 @@ jobs:
                       )
           PY
 
+      - name: Cross-check live quote against CP-swap state and fee math
+        run: |
+          python - <<'PY'
+          import json
+          import struct
+          from decimal import Decimal
+
+          from liquidity_scout.providers.x1 import XDEXReadOnlyProvider
+          from liquidity_scout.providers.x1.candidate_pool_role import (
+              encode_base58_pubkey,
+              verify_candidate_pool_role,
+          )
+          from liquidity_scout.providers.x1.pool_state_fingerprint import fetch_account_state
+          from liquidity_scout.providers.x1.rpc import get_token_account_info
+
+          PROGRAM = "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN"
+          POOL = "6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry"
+          XENCAT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
+          XNT = "So11111111111111111111111111111111111111112"
+          FEE_DENOM = 1_000_000
+
+          def u64(data, offset):
+              return struct.unpack_from("<Q", data, offset)[0]
+
+          def u16(data, offset):
+              return struct.unpack_from("<H", data, offset)[0]
+
+          def pubkey(data, offset):
+              return encode_base58_pubkey(data[offset:offset + 32])
+
+          def ceil_fee(amount, rate):
+              if rate == 0:
+                  return 0
+              return (amount * rate + FEE_DENOM - 1) // FEE_DENOM
+
+          def floor_fee(amount, rate):
+              return amount * rate // FEE_DENOM
+
+          role = verify_candidate_pool_role(
+              account=POOL,
+              target_mint=XENCAT,
+              program_id=PROGRAM,
+              signature_limit=1,
+          )
+          assert role["summary"]["pool_state_structural_role_verified"] is True
+
+          pool_state = fetch_account_state(POOL)
+          pool_data = pool_state["data"]
+          assert len(pool_data) == 637
+          amm_config = pubkey(pool_data, 8)
+          assert amm_config == "2eFPWosizV6nSAGeSvi5tRgXLoqhjnSesra23ALA248c"
+
+          pool = {
+              "amm_config": amm_config,
+              "vault_0": pubkey(pool_data, 72),
+              "vault_1": pubkey(pool_data, 104),
+              "mint_0": pubkey(pool_data, 168),
+              "mint_1": pubkey(pool_data, 200),
+              "mint_0_decimals": pool_data[331],
+              "mint_1_decimals": pool_data[332],
+              "protocol_fees_0": u64(pool_data, 341),
+              "protocol_fees_1": u64(pool_data, 349),
+              "fund_fees_0": u64(pool_data, 357),
+              "fund_fees_1": u64(pool_data, 365),
+              "creator_fee_on": pool_data[389],
+              "enable_creator_fee": bool(pool_data[390]),
+              "creator_fees_0": u64(pool_data, 397),
+              "creator_fees_1": u64(pool_data, 405),
+          }
+          assert pool["mint_0"] == XNT
+          assert pool["mint_1"] == XENCAT
+
+          vault0 = get_token_account_info(pool["vault_0"])
+          vault1 = get_token_account_info(pool["vault_1"])
+          assert vault0["identity_verified"] and vault1["identity_verified"]
+          assert vault0["mint"] == pool["mint_0"]
+          assert vault1["mint"] == pool["mint_1"]
+
+          reserve0 = int(vault0["raw_amount"]) - pool["protocol_fees_0"] - pool["fund_fees_0"] - pool["creator_fees_0"]
+          reserve1 = int(vault1["raw_amount"]) - pool["protocol_fees_1"] - pool["fund_fees_1"] - pool["creator_fees_1"]
+          assert reserve0 > 0 and reserve1 > 0
+
+          config_state = fetch_account_state(amm_config)
+          config_data = config_state["data"]
+          config = {
+              "owner": config_state["owner"],
+              "space": config_state["space"],
+              "bump": config_data[8],
+              "disable_create_pool": bool(config_data[9]),
+              "index": u16(config_data, 10),
+              "trade_fee_rate": u64(config_data, 12),
+              "protocol_fee_rate": u64(config_data, 20),
+              "fund_fee_rate": u64(config_data, 28),
+              "create_pool_fee": u64(config_data, 36),
+          }
+          # Newer CP-swap configs include creator_fee_rate at offset 108.
+          config["creator_fee_rate"] = u64(config_data, 108) if len(config_data) >= 116 else 0
+          assert config["owner"] == PROGRAM
+
+          print("[XDEX live pool semantics] " + json.dumps({
+              "pool": pool,
+              "vault_0": {k: vault0[k] for k in ("mint", "raw_amount", "decimals", "ui_amount_string")},
+              "vault_1": {k: vault1[k] for k in ("mint", "raw_amount", "decimals", "ui_amount_string")},
+              "reserve_0_raw_without_accrued_fees": reserve0,
+              "reserve_1_raw_without_accrued_fees": reserve1,
+              "config": config,
+          }, sort_keys=True, default=str))
+
+          provider = XDEXReadOnlyProvider(timeout=20)
+
+          def creator_fee_on_input(direction):
+              if not pool["enable_creator_fee"] or config["creator_fee_rate"] == 0:
+                  return False, 0
+              mode = pool["creator_fee_on"]
+              if mode == 0:
+                  return True, config["creator_fee_rate"]
+              if mode == 1 and direction == "0to1":
+                  return True, config["creator_fee_rate"]
+              if mode == 2 and direction == "1to0":
+                  return True, config["creator_fee_rate"]
+              return False, config["creator_fee_rate"]
+
+          def cp_exact_in(raw_input, input_reserve, output_reserve, direction):
+              creator_on_input, creator_rate = creator_fee_on_input(direction)
+              trade_rate = config["trade_fee_rate"]
+              if creator_on_input:
+                  total_fee = ceil_fee(raw_input, trade_rate + creator_rate)
+                  creator_fee = floor_fee(total_fee, creator_rate * FEE_DENOM // (trade_rate + creator_rate)) if creator_rate else 0
+                  trade_fee = total_fee - creator_fee
+                  less_fees = raw_input - total_fee
+              else:
+                  trade_fee = ceil_fee(raw_input, trade_rate)
+                  creator_fee = 0
+                  less_fees = raw_input - trade_fee
+
+              swapped = less_fees * output_reserve // (input_reserve + less_fees)
+              if not creator_on_input and creator_rate:
+                  creator_fee = ceil_fee(swapped, creator_rate)
+                  output = swapped - creator_fee
+              else:
+                  output = swapped
+              return output, trade_fee, creator_fee
+
+          cases = [
+              (XNT, XENCAT, Decimal("1"), "0to1", reserve0, reserve1, pool["mint_0_decimals"], pool["mint_1_decimals"]),
+              (XNT, XENCAT, Decimal("2"), "0to1", reserve0, reserve1, pool["mint_0_decimals"], pool["mint_1_decimals"]),
+              (XENCAT, XNT, Decimal("1"), "1to0", reserve1, reserve0, pool["mint_1_decimals"], pool["mint_0_decimals"]),
+              (XENCAT, XNT, Decimal("2"), "1to0", reserve1, reserve0, pool["mint_1_decimals"], pool["mint_0_decimals"]),
+          ]
+
+          results = []
+          for token_in, token_out, human_input, direction, rin, rout, din, dout in cases:
+              quote = provider.swap_quote(token_in, token_out, human_input, is_exact_amount_in=True)
+              raw_input = int(human_input * (Decimal(10) ** din))
+              expected_raw, trade_fee_raw, creator_fee_raw = cp_exact_in(raw_input, rin, rout, direction)
+              expected_human = Decimal(expected_raw) / (Decimal(10) ** dout)
+              quoted_human = Decimal(str(quote["outputAmount"]))
+              raw_delta = int((quoted_human - expected_human) * (Decimal(10) ** dout))
+              results.append({
+                  "direction": direction,
+                  "input": str(human_input),
+                  "quoted_output": str(quoted_human),
+                  "reproduced_output": str(expected_human),
+                  "raw_output_delta": raw_delta,
+                  "trade_fee_raw": trade_fee_raw,
+                  "creator_fee_raw": creator_fee_raw,
+                  "provider_price_impact_pct": quote.get("priceImpactPct"),
+                  "provider_rate": quote.get("rate"),
+                  "amm_config_address": quote.get("amm_config_address"),
+              })
+              assert abs(raw_delta) <= 2, results[-1]
+              assert quote.get("amm_config_address") == amm_config
+
+          print("[XDEX CP-swap reproduction evidence] " + json.dumps(results, sort_keys=True, default=str))
+          PY
+
       - name: Probe live read-only XDEX contract
         env:
           RUN_XDEX_LIVE_TESTS: "1"
