@@ -82,6 +82,8 @@ This is independently reproduced live rather than inferred from UI wording.
 
 `priceImpactPct` did not change when slippage changed across the controlled request set. Price impact and slippage are therefore separate quote semantics.
 
+The current deployed XDEX frontend independently supports this contract: it sends the user's stored `slippage` value to the quote service and falls back to `0.5` when no value is stored. The frontend consumes the backend-returned `outputAmount`; it does not apply the observed 3000-ppm curve deduction locally at the displayed quote call site.
+
 ## Evidence result 4 — the old ~0.52% discrepancy is mathematically decomposed
 
 The previous default-output discrepancy is no longer a single unexplained haircut.
@@ -119,11 +121,11 @@ Thus the old approximate ~0.52% difference can be separated mathematically into:
 1. a quote curve output behaving as if the effective deduction were 0.30% rather than the pinned config's 0.28%; then
 2. the verified default 0.5% slippage adjustment.
 
-The first item is an **observed quote-math rule**, not yet a business/fee label.
+The first item is an **observed quote-math rule**, not a business/fee label.
 
 ## Evidence result 5 — not a universal extra 2-bps fee
 
-A second XDEX market, XNT/USDC.X, was independently discovered from X1 RPC. The selected live pool under the same `2eFP...` 2800-ppm config again reproduced a 3000-ppm effective zero-slippage curve output exactly in both directions.
+A second XDEX market, XNT/USDC.X, was independently discovered from X1 RPC. The selected live pool under the same `2eFP...` 2800-ppm config again reproduced a 3000-ppm effective zero-slippage curve output in both directions within the live-probe raw-unit tolerance.
 
 A second live AMM config was also discovered:
 
@@ -137,13 +139,15 @@ Its decoded on-chain trade-fee rate is already:
 3000 ppm = 0.30%
 ```
 
-For live routes selecting this config, `slippage=0` matched the config's own 3000-ppm curve output at raw precision (or within one raw unit in one observed case). Applying another 200 ppm was wrong.
+For live routes selecting this config, `slippage=0` matched the config's own 3000-ppm curve output at raw precision (or within the bounded live-probe tolerance). Applying another 200 ppm was wrong.
 
 Therefore the evidence does **not** support saying:
 
 ```text
 XDEX adds a universal 0.02% fee on top of every AMM fee.
 ```
+
+A read-only historical transfer probe also inspected five completed XENCAT/XNT swaps and found no separate parsed SPL-token transfer approximately equal to 2 bps of the observed asset amount. This does not prove that no separate fee mechanism can ever exist, but it further prevents promotion of the fixed-2-bps integrator-fee label.
 
 The safer observed rule is:
 
@@ -152,7 +156,7 @@ The tested XDEX exact-in quote routes use an effective 3000-ppm
 (0.30%) curve deduction before the slippage transform.
 ```
 
-For the 2800-ppm config, the reason XDEX quote math uses 3000 ppm remains unlabelled.
+For the 2800-ppm config, the reason XDEX quote math uses 3000 ppm remains unavailable.
 
 ## Current config inventory boundary
 
@@ -166,24 +170,62 @@ A read-only X1 RPC inventory observed approximately 1,204 current 637-byte XDEX 
 No currently observed config above 3000 ppm exists in this inventory, so the evidence cannot distinguish whether the quote service:
 
 - always uses 3000 ppm for this route family; or
-- applies a 3000-ppm minimum/floor while preserving higher future configs.
+- applies a 3000-ppm minimum/floor while preserving higher future configs; or
+- implements another backend convention that happens to reproduce the same observed arithmetic.
 
 Do not generalize beyond the observed config set.
 
-## Minimum received boundary
+## XDEX CP-Swap program-family boundary
 
-The quote `outputAmount` is now proven to be **slippage-adjusted** according to the accepted `slippage` parameter and its 0.5% default.
+The supplied XDEX IDL identifies `raydium_cp_swap` version `0.1.0`. It documents:
 
-That makes it strongly consistent with a minimum-received style value. However, no accepted production backend/frontend source has yet bound the field name `outputAmount` to XDEX's user-facing label **Minimum Received**, nor has this work invoked or decoded a transaction-preparation path to prove the eventual on-chain `minimum_amount_out` argument.
+- configurable `tradeFeeRate` in `10^-6` units;
+- `protocolFeeRate` and `fundFeeRate` as rates within the trade fee;
+- `swapBaseInput(amountIn, minimumAmountOut)`;
+- `minimum_amount_out` as the minimum output token amount that prevents excessive slippage; and
+- an `ExceededSlippage` program error.
+
+Its metadata address is:
+
+```text
+7EEuq61z9VKdkUzj7G36xGd7ncyz8KBtUwAWVjypYQHf
+```
+
+Independent X1Pays xDEX integration code maps that address to **X1 testnet** and maps:
+
+```text
+sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN
+```
+
+to **X1 mainnet**. Historical completed XDEX swaps on mainnet contain the matching Anchor `swap_base_input` discriminator under `sEsYH...`.
+
+Therefore the IDL is used as strong structural/program-family corroboration, not as proof that the testnet metadata address is the active mainnet program address.
+
+The older IDL `SwapEvent` layout contains pool/vault/input/output/transfer-fee fields but no explicit AMM `trade_fee` field. Failure to extract an executed 2800-vs-3000 AMM fee directly from those historical events therefore cannot be treated as evidence that the quote-side 3000-ppm behavior is executed on-chain.
+
+## Minimum received / prepare boundary
+
+The quote `outputAmount` is proven to be **slippage-adjusted** according to the accepted `slippage` parameter and its current 0.5% default.
+
+XDEX user documentation defines **Minimum Received** as the minimum token amount a user receives for slippage protection. The deployed frontend sends the same user slippage value to both quote and `/api/xdex/swap/prepare`, and the XDEX CP-Swap IDL defines `swapBaseInput(amountIn, minimumAmountOut)` with the minimum-output argument explicitly serving as the excessive-slippage boundary.
+
+Read-only historical mainnet transactions further decode the 24-byte `swap_base_input` instruction as:
+
+- 8-byte Anchor discriminator;
+- first `u64`: `amount_in`;
+- second `u64`: transaction-specific minimum-output threshold.
+
+Across sampled successful swaps, the observed actual output was greater than or equal to that second `u64`. Historical gaps varied materially, showing that the current 0.5% UI/API default is not a universal historical/on-chain slippage rule.
 
 Therefore:
 
 - slippage parameter semantics: **VERIFIED**;
-- default 0.5% slippage: **VERIFIED**;
+- current default 0.5% slippage: **VERIFIED**;
 - `outputAmount` slippage transform: **VERIFIED for tested exact-in routes**;
-- `outputAmount` = user-facing Minimum Received: **BOUNDED / not fully verified**;
-- eventual on-chain minimum-output instruction binding: **UNAVAILABLE**;
-- fill quality: **UNAVAILABLE**.
+- `outputAmount` as minimum-received-style quote floor: **STRONGLY CORROBORATED**;
+- `swap_base_input` second `u64` as transaction-specific on-chain minimum-output boundary: **STRONGLY CORROBORATED**;
+- exact server-side `/swap/prepare` formula mapping the supplied `slippage`/quote state into that `minimum_amount_out`: **UNAVAILABLE** because prepare was not invoked;
+- quote-to-execution fill quality: **UNAVAILABLE**.
 
 ## Fee/decomposition boundary
 
@@ -199,6 +241,8 @@ The following statements remain unsafe:
 
 The arithmetic behavior is reproducible; the business/source label is not.
 
+A numerical hypothesis such as `max(config_trade_fee_rate, 3000 ppm)` fits the currently observed 2800/3000 config set, but it remains an inference only. The public evidence cannot distinguish that hypothesis from a hard-coded 3000 baseline, legacy compatibility rule, conservative quote convention, or other backend behavior.
+
 ## CMIS promotion recommendation
 
 Safe field-level capabilities from this follow-up:
@@ -210,16 +254,17 @@ outputAmount raw-unit slippage transform                 VERIFIED, tested scope
 priceImpactPct independence from slippage                VERIFIED, tested scope
 Oracle amount_out_quote as no-fee CP curve reference     VERIFIED, tested scope
 3000-ppm effective zero-slippage curve behavior          VERIFIED, tested configs/routes
-outputAmount full business/fee decomposition              BOUNDED
-outputAmount == user-facing Minimum Received              BOUNDED
-all-in fee decomposition                                  UNAVAILABLE
-on-chain minimum_amount_out binding                       UNAVAILABLE
-route optimality/multi-hop semantics                      UNAVAILABLE
-fill quality                                               UNAVAILABLE
+native AMM config trade fee 2800 ppm / 0.28%             VERIFIED/DOCUMENTED, pinned scope
+outputAmount minimum-received-style semantics            STRONGLY CORROBORATED
+on-chain transaction-specific minimum_amount_out         STRONGLY CORROBORATED
+quote -> prepare minimum-output formula                  UNAVAILABLE
+all-in fee/business decomposition                        UNAVAILABLE
+route optimality/multi-hop semantics                     UNAVAILABLE
+fill quality                                             UNAVAILABLE
 ```
 
 These route/config proofs must not leak into generic pre-trade analysis for an unrelated asset such as AGI until that asset's exact route, pool, config, reserves, and quote contract are independently resolved and re-verified.
 
 ## Safety boundary
 
-Read-only only: GET requests and X1 RPC reads. `/swap/prepare` was not invoked. No transaction construction, signing, broadcasting, custody, execution, or value movement was performed.
+Read-only public frontend inspection, GET requests, historical transaction inspection, and X1 RPC reads only. `/swap/prepare` was not invoked. No transaction construction, signing, broadcasting, custody, execution, or value movement was performed.
