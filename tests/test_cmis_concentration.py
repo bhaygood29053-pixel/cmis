@@ -42,6 +42,19 @@ class CMISTopAccountConcentrationTests(unittest.TestCase):
         )
         self.assertFalse(result["identity_verified"])
 
+    def test_rejects_non_boolean_identity_flags(self):
+        with self.assertRaisesRegex(ValueError, "supply_identity_verified"):
+            build_top_account_concentration(
+                chain="x1",
+                asset_id="mint-1",
+                source="X1 RPC",
+                supply_raw=100,
+                supply_decimals=0,
+                accounts=[],
+                supply_identity_verified="false",
+                account_identity_verified=True,
+            )
+
     def test_zero_supply_with_no_accounts_has_no_ratio(self):
         result = build_top_account_concentration(
             chain="solana",
