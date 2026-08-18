@@ -16,9 +16,11 @@ RUN_LIVE = os.getenv("RUN_XDEX_OUTPUT_SLIPPAGE_LIVE") == "1"
 PROGRAM = "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN"
 XNT = "So11111111111111111111111111111111111111112"
 USDC_X = "B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq"
+KNOWN_CONFIG = "2eFPWosizV6nSAGeSvi5tRgXLoqhjnSesra23ALA248c"
 POOL_SIZE = 637
 FEE_DENOM = 1_000_000
-EXTRA_CANDIDATE_RATE = 200  # 2 bps; arithmetic hypothesis only.
+EXTRA_CANDIDATE_RATE = 200  # 2 bps; arithmetic behavior, not a semantic label.
+MAX_DIFFERENT_CONFIG_TOKEN_PROBES = 12
 
 
 def _u64(data, offset):
@@ -46,7 +48,7 @@ def _raw_amount(ui_amount, decimals):
     return int(scaled)
 
 
-def _rpc_pair_rows(mint_0, mint_1):
+def _program_rows(filters):
     result = rpc_request(
         "getProgramAccounts",
         [
@@ -54,11 +56,7 @@ def _rpc_pair_rows(mint_0, mint_1):
             {
                 "encoding": "base64",
                 "commitment": "confirmed",
-                "filters": [
-                    {"dataSize": POOL_SIZE},
-                    {"memcmp": {"offset": 168, "bytes": mint_0}},
-                    {"memcmp": {"offset": 200, "bytes": mint_1}},
-                ],
+                "filters": filters,
             },
         ],
     )
@@ -66,31 +64,65 @@ def _rpc_pair_rows(mint_0, mint_1):
     return rows if isinstance(rows, list) else []
 
 
+def _decode_program_row(row):
+    if not isinstance(row, dict) or not row.get("pubkey"):
+        return None
+    account = row.get("account") or {}
+    raw = account.get("data")
+    encoded = raw[0] if isinstance(raw, list) and raw else None
+    if not isinstance(encoded, str):
+        return None
+    try:
+        data = base64.b64decode(encoded)
+    except Exception:
+        return None
+    if len(data) != POOL_SIZE:
+        return None
+    return {
+        "pool": str(row["pubkey"]),
+        "mint_0": _pubkey(data, 168),
+        "mint_1": _pubkey(data, 200),
+        "amm_config": _pubkey(data, 8),
+    }
+
+
+def _rpc_pair_rows(mint_0, mint_1):
+    return _program_rows(
+        [
+            {"dataSize": POOL_SIZE},
+            {"memcmp": {"offset": 168, "bytes": mint_0}},
+            {"memcmp": {"offset": 200, "bytes": mint_1}},
+        ]
+    )
+
+
 def _discover_pair_pools():
     discovered = {}
     for mint_0, mint_1 in ((USDC_X, XNT), (XNT, USDC_X)):
         for row in _rpc_pair_rows(mint_0, mint_1):
-            if not isinstance(row, dict) or not row.get("pubkey"):
+            decoded = _decode_program_row(row)
+            if not decoded:
                 continue
-            account = row.get("account") or {}
-            raw = account.get("data")
-            encoded = raw[0] if isinstance(raw, list) and raw else None
-            if not isinstance(encoded, str):
+            if decoded["mint_0"] != mint_0 or decoded["mint_1"] != mint_1:
                 continue
-            try:
-                data = base64.b64decode(encoded)
-            except Exception:
+            discovered[decoded["pool"]] = decoded
+    return list(discovered.values())
+
+
+def _discover_xnt_pools():
+    discovered = {}
+    for offset in (168, 200):
+        rows = _program_rows(
+            [
+                {"dataSize": POOL_SIZE},
+                {"memcmp": {"offset": offset, "bytes": XNT}},
+            ]
+        )
+        for row in rows:
+            decoded = _decode_program_row(row)
+            if not decoded or XNT not in {decoded["mint_0"], decoded["mint_1"]}:
                 continue
-            if len(data) != POOL_SIZE:
-                continue
-            if _pubkey(data, 168) != mint_0 or _pubkey(data, 200) != mint_1:
-                continue
-            discovered[str(row["pubkey"])] = {
-                "pool": str(row["pubkey"]),
-                "mint_0": mint_0,
-                "mint_1": mint_1,
-                "amm_config": _pubkey(data, 8),
-            }
+            discovered[decoded["pool"]] = decoded
     return list(discovered.values())
 
 
@@ -139,6 +171,8 @@ def _active_reserves(pool):
         raise AssertionError(f"vault mint mismatch for {pool['pool']}")
     r0 = int(v0["raw_amount"]) - pool["protocol_fees_0"] - pool["fund_fees_0"] - pool["creator_fees_0"]
     r1 = int(v1["raw_amount"]) - pool["protocol_fees_1"] - pool["fund_fees_1"] - pool["creator_fees_1"]
+    if r0 <= 0 or r1 <= 0:
+        raise AssertionError(f"non-positive active reserves for {pool['pool']}")
     return r0, r1
 
 
@@ -155,11 +189,52 @@ def _quote(token_in, token_out, amount):
         },
         timeout=20,
     )
-    response.raise_for_status()
-    body = response.json()
+    if response.status_code >= 400:
+        return None
+    try:
+        body = response.json()
+    except Exception:
+        return None
     if not isinstance(body, dict) or body.get("success") is not True or not isinstance(body.get("data"), dict):
-        raise AssertionError(f"unexpected XDEX quote response: {body}")
+        return None
     return body["data"]
+
+
+def _evaluate_pool_quote(pool, config, quote, token_in, token_out, amount):
+    r0, r1 = _active_reserves(pool)
+    by_mint = {
+        pool["mint_0"]: (r0, pool["decimals_0"]),
+        pool["mint_1"]: (r1, pool["decimals_1"]),
+    }
+    reserve_in, decimals_in = by_mint[token_in]
+    reserve_out, decimals_out = by_mint[token_out]
+    raw_input = _raw_amount(amount, decimals_in)
+    cp_config = _curve_exact_in(raw_input, reserve_in, reserve_out, config["trade_fee_rate"])
+    cp_plus_200 = _curve_exact_in(
+        raw_input,
+        reserve_in,
+        reserve_out,
+        config["trade_fee_rate"] + EXTRA_CANDIDATE_RATE,
+    )
+    observed_dec = Decimal(str(quote["outputAmount"])) * (Decimal(10) ** decimals_out)
+    if observed_dec != observed_dec.to_integral_value():
+        return None
+    observed = int(observed_dec)
+    return {
+        "pool": pool["pool"],
+        "direction": f"{token_in[:6]}->{token_out[:6]}",
+        "amount": str(amount),
+        "amm_config": pool["amm_config"],
+        "trade_fee_rate_ppm": config["trade_fee_rate"],
+        "protocol_fee_rate_raw": config["protocol_fee_rate"],
+        "fund_fee_rate_raw": config["fund_fee_rate"],
+        "creator_fee_rate_raw": config["creator_fee_rate"],
+        "observed_zero_slippage_raw": observed,
+        "cp_config_fee_raw": cp_config,
+        "cp_config_plus_200_raw": cp_plus_200,
+        "delta_config_raw": observed - cp_config,
+        "delta_config_plus_200_raw": observed - cp_plus_200,
+    }
 
 
 @unittest.skipUnless(
@@ -181,68 +256,106 @@ class XDEXSecondPoolEffectiveFeeLiveTests(unittest.TestCase):
 
         for token_in, token_out, amount in quote_cases:
             quote = _quote(token_in, token_out, amount)
+            self.assertIsNotNone(quote, f"XDEX returned no quote for {token_in}->{token_out}")
             quote_config = str(quote.get("amm_config_address") or "")
             self.assertTrue(quote_config, quote)
 
-            matched_candidates = []
             for candidate in candidates:
                 pool = _decode_pool(candidate["pool"])
                 if pool["amm_config"] != quote_config:
                     continue
                 config = _decode_config(pool["amm_config"])
-                r0, r1 = _active_reserves(pool)
-                by_mint = {
-                    pool["mint_0"]: (r0, pool["decimals_0"]),
-                    pool["mint_1"]: (r1, pool["decimals_1"]),
-                }
-                if token_in not in by_mint or token_out not in by_mint:
-                    continue
-                reserve_in, decimals_in = by_mint[token_in]
-                reserve_out, decimals_out = by_mint[token_out]
-                raw_input = _raw_amount(amount, decimals_in)
-                cp_config = _curve_exact_in(raw_input, reserve_in, reserve_out, config["trade_fee_rate"])
-                cp_plus_200 = _curve_exact_in(
-                    raw_input,
-                    reserve_in,
-                    reserve_out,
-                    config["trade_fee_rate"] + EXTRA_CANDIDATE_RATE,
-                )
-                observed_dec = Decimal(str(quote["outputAmount"])) * (Decimal(10) ** decimals_out)
-                if observed_dec != observed_dec.to_integral_value():
-                    continue
-                observed = int(observed_dec)
-                row = {
-                    "pool": pool["pool"],
-                    "direction": f"{token_in[:6]}->{token_out[:6]}",
-                    "amount": str(amount),
-                    "amm_config": pool["amm_config"],
-                    "trade_fee_rate_ppm": config["trade_fee_rate"],
-                    "protocol_fee_rate_raw": config["protocol_fee_rate"],
-                    "fund_fee_rate_raw": config["fund_fee_rate"],
-                    "creator_fee_rate_raw": config["creator_fee_rate"],
-                    "observed_zero_slippage_raw": observed,
-                    "cp_config_fee_raw": cp_config,
-                    "cp_config_plus_200_raw": cp_plus_200,
-                    "delta_config_raw": observed - cp_config,
-                    "delta_config_plus_200_raw": observed - cp_plus_200,
-                }
-                matched_candidates.append(row)
-                if observed == cp_plus_200:
-                    exact_plus_200_matches += 1
-            evidence.extend(matched_candidates)
+                row = _evaluate_pool_quote(pool, config, quote, token_in, token_out, amount)
+                if row:
+                    evidence.append(row)
+                    if row["delta_config_plus_200_raw"] == 0:
+                        exact_plus_200_matches += 1
 
         print("XDEX second-pool effective-fee evidence")
         for row in evidence:
             print(row)
 
         self.assertTrue(evidence, "No discovered XNT/USDC.X pool matched quote AMM config")
-        # At least one direction/pool must reproduce the live quote exactly under
-        # config trade-fee rate + 200 ppm before we treat the second market as
-        # corroborating evidence. This still does not assign a business label.
         self.assertGreaterEqual(
             exact_plus_200_matches,
             1,
             "No XNT/USDC.X quote exactly matched config trade fee + 200 ppm",
+        )
+
+    def test_find_quote_using_different_amm_config_and_compare_extra_200_ppm(self):
+        pools = _discover_xnt_pools()
+        different = [p for p in pools if p["amm_config"] != KNOWN_CONFIG]
+        self.assertTrue(different, "No XNT pool with a different AMM config was discovered")
+
+        # Group candidates by their non-XNT token so multiple pools for one pair
+        # can be evaluated after the quote tells us which AMM config it selected.
+        by_other_mint = {}
+        for candidate in different:
+            other = candidate["mint_1"] if candidate["mint_0"] == XNT else candidate["mint_0"]
+            by_other_mint.setdefault(other, []).append(candidate)
+
+        diagnostics = []
+        corroborated = []
+        for other_mint, candidates in list(by_other_mint.items())[:MAX_DIFFERENT_CONFIG_TOKEN_PROBES]:
+            quote = _quote(XNT, other_mint, Decimal("0.01"))
+            if not quote:
+                diagnostics.append({"other_mint": other_mint, "quote": "unavailable"})
+                continue
+            selected_config = str(quote.get("amm_config_address") or "")
+            diagnostics.append(
+                {
+                    "other_mint": other_mint,
+                    "selected_config": selected_config,
+                    "candidate_configs": sorted({c["amm_config"] for c in candidates}),
+                }
+            )
+            if not selected_config or selected_config == KNOWN_CONFIG:
+                continue
+
+            for candidate in candidates:
+                if candidate["amm_config"] != selected_config:
+                    continue
+                try:
+                    pool = _decode_pool(candidate["pool"])
+                    config = _decode_config(selected_config)
+                    row = _evaluate_pool_quote(
+                        pool,
+                        config,
+                        quote,
+                        XNT,
+                        other_mint,
+                        Decimal("0.01"),
+                    )
+                except Exception as exc:
+                    diagnostics.append(
+                        {
+                            "pool": candidate["pool"],
+                            "selected_config": selected_config,
+                            "evaluation_error": str(exc),
+                        }
+                    )
+                    continue
+                if row:
+                    corroborated.append(row)
+                    if row["delta_config_plus_200_raw"] == 0:
+                        break
+            if any(row["delta_config_plus_200_raw"] == 0 for row in corroborated):
+                break
+
+        print("XDEX different-config discovery diagnostics")
+        for row in diagnostics:
+            print(row)
+        print("XDEX different-config effective-fee evidence")
+        for row in corroborated:
+            print(row)
+
+        self.assertTrue(
+            corroborated,
+            "No live XNT quote selected a structurally discovered pool under a different AMM config",
+        )
+        self.assertTrue(
+            any(row["delta_config_plus_200_raw"] == 0 for row in corroborated),
+            "A different-config XDEX quote did not reproduce config trade fee + 200 ppm exactly",
         )
 
 
