@@ -47,13 +47,23 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
         needles = (
             "api.xdex.xyz",
             "/api/xendex/swap/quote",
+            "/api/xdex/swap/quote",
             "xendex/swap/quote",
+            "xdex/swap/quote",
             "swap/quote",
+            "/api/xendex/swap/prepare",
+            "/api/xdex/swap/prepare",
+            "xendex/swap/prepare",
+            "xdex/swap/prepare",
+            "swap/prepare",
             "tradeFeeRate",
             "trade_fee_rate",
             "feeRate",
             "fee_rate",
             "slippage",
+            "minimumAmountOut",
+            "minimum_amount_out",
+            "outputAmount",
         )
         numeric_needles = ("3000", "0.003", "0.3")
         strong_rule_patterns = {
@@ -86,9 +96,20 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
             focus_terms = (
                 "api.xdex.xyz",
                 "/api/xendex",
+                "/api/xdex",
                 "/api/xendex/swap/quote",
+                "/api/xdex/swap/quote",
                 "xendex/swap/quote",
+                "xdex/swap/quote",
                 "swap/quote",
+                "/api/xendex/swap/prepare",
+                "/api/xdex/swap/prepare",
+                "xendex/swap/prepare",
+                "xdex/swap/prepare",
+                "swap/prepare",
+                "minimumAmountOut",
+                "minimum_amount_out",
+                "outputAmount",
                 "tradeFeeRate",
                 "trade_fee_rate",
                 "feeRate",
@@ -98,17 +119,17 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
             for term in focus_terms:
                 start = 0
                 hits = 0
-                while hits < 6:
+                while hits < 8:
                     idx = text.find(term, start)
                     if idx < 0:
                         break
-                    left = max(0, idx - 520)
-                    right = min(len(text), idx + len(term) + 760)
+                    left = max(0, idx - 900)
+                    right = min(len(text), idx + len(term) + 1500)
                     contexts.append(
                         {
                             "term": term,
                             "offset": idx,
-                            "context": text[left:right].replace("\n", " ")[:1400],
+                            "context": text[left:right].replace("\n", " ")[:2500],
                         }
                     )
                     hits += 1
@@ -140,18 +161,39 @@ class XDEXFrontendQuoteBundleLiveTests(unittest.TestCase):
         quote_bundles = [
             row
             for row in bundle_findings
-            if "/api/xendex/swap/quote" in row["needles"]
-            or "xendex/swap/quote" in row["needles"]
-            or "swap/quote" in row["needles"]
-            or "api.xdex.xyz" in row["needles"]
+            if any(
+                marker in row["needles"]
+                for marker in (
+                    "/api/xendex/swap/quote",
+                    "/api/xdex/swap/quote",
+                    "xendex/swap/quote",
+                    "xdex/swap/quote",
+                    "swap/quote",
+                    "api.xdex.xyz",
+                )
+            )
+        ]
+        prepare_bundles = [
+            row
+            for row in bundle_findings
+            if any(
+                marker in row["needles"]
+                for marker in (
+                    "/api/xendex/swap/prepare",
+                    "/api/xdex/swap/prepare",
+                    "xendex/swap/prepare",
+                    "xdex/swap/prepare",
+                    "swap/prepare",
+                )
+            )
         ]
         print(
             "Interpretation boundary:",
-            "A literal or expression in a deployed public bundle can localize client-side logic, "
-            "but absence of a 3000-ppm rule does not prove server implementation details. "
-            "This probe performs GET requests only and never calls /swap/prepare.",
+            "A literal or expression in a deployed public bundle can localize client-side quote/prepare logic, "
+            "but absence of a server-side 3000-ppm rule does not prove backend implementation details. "
+            "This probe performs GET requests only and never invokes /swap/prepare.",
         )
-        print({"quote_bundle_count": len(quote_bundles)})
+        print({"quote_bundle_count": len(quote_bundles), "prepare_bundle_count": len(prepare_bundles)})
 
         self.assertGreater(total_bytes, 0)
 
