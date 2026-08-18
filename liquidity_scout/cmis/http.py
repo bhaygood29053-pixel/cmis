@@ -23,6 +23,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
 
+from .capabilities import build_capability_manifest
 from .gateway import KNOWN_CHAINS, SUPPORTED_CHAINS
 from .runtime_gateway import SUPPORTED_SERVICES, RuntimeCMISGateway
 
@@ -32,6 +33,20 @@ from .runtime_gateway import SUPPORTED_SERVICES, RuntimeCMISGateway
 # the evidence ledger are configured inside RuntimeCMISGateway and are never
 # accepted from HTTP request payloads.
 CMISGateway = RuntimeCMISGateway
+
+# Build this at import/startup time so a new runtime service or known chain
+# cannot silently ship without an explicit capability classification.
+CAPABILITY_MANIFEST = build_capability_manifest(
+    runtime_services=SUPPORTED_SERVICES,
+    legacy_supported_chains=SUPPORTED_CHAINS,
+    known_chains=KNOWN_CHAINS,
+)
+# ``version`` is the original HTTP field retained for backward compatibility.
+# New Chain Scouts should use ``schema_version`` + ``contract_version``.
+CAPABILITY_HTTP_PAYLOAD = {
+    "version": CAPABILITY_MANIFEST["schema_version"],
+    **CAPABILITY_MANIFEST,
+}
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -119,17 +134,7 @@ def make_handler(gateway: CMISGateway, *, api_key: str = ""):
             if self.path == "/v1/cmis/capabilities":
                 if not self._require_authorized():
                     return
-                self._send_json(
-                    200,
-                    {
-                        "service": "cmis_gateway",
-                        "version": 1,
-                        "request_path": "/v1/cmis",
-                        "supported_services": list(SUPPORTED_SERVICES),
-                        "supported_chains": list(SUPPORTED_CHAINS),
-                        "known_chains": list(KNOWN_CHAINS),
-                    },
-                )
+                self._send_json(200, CAPABILITY_HTTP_PAYLOAD)
                 return
 
             self._send_json(
@@ -269,6 +274,7 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "CAPABILITY_MANIFEST",
     "DEFAULT_HOST",
     "DEFAULT_PORT",
     "MAX_REQUEST_BYTES",
