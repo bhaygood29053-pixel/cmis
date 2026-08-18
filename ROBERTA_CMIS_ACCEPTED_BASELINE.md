@@ -2,126 +2,160 @@
 
 ## Purpose
 
-This document records which CMIS trust-layer semantics are accepted on `main` and therefore safe for Roberta-facing interface design.
+This document records CMIS trust-layer semantics accepted on `main` and safe for Roberta/Scout interface design.
 
-It does **not** make those CMIS primitives directly callable by Roberta. A capability can be accepted CMIS core while still lacking a supported Roberta service wrapper.
+It does **not** make internal CMIS primitives directly callable by Roberta. Public service eligibility is determined by the live Scout ↔ CMIS capability manifest, and Roberta reaches CMIS through the relevant Chain Scout.
 
-`ROBERTA_INTEGRATION_CONTRACT.md` remains the primary Roberta-facing integration contract. This document is a narrow baseline companion for trust/verification consumption.
+`ROBERTA_INTEGRATION_CONTRACT.md` remains the primary authority-boundary document.
 
-## Accepted CMIS trust semantics on `main`
+## Current contract baseline
 
-Roberta-facing interfaces may preserve the following CMIS-produced meanings when a supported wrapper eventually returns them:
+Accepted CMIS capability contract:
 
-- `AGREEMENT` — two same-identity, same-unit normalized observations agree exactly under the applicable CMIS verifier.
-- `CONFLICT` — evidence disagrees or fails a required identity/unit comparison. Roberta must not average or choose a preferred value unless a fact-specific CMIS rule explicitly says to do so.
-- `INSUFFICIENT_EVIDENCE` — the verifier cannot establish agreement or conflict because required comparable evidence is missing or invalid. Roberta must not reinterpret this as a negative fact.
-- data quality `HIGH`, `MEDIUM`, or `LOW` — a deterministic CMIS assessment based on verified identity, semantics, freshness, source coverage, and verification outcome. Roberta must preserve the level and reasons rather than inventing a more precise score.
+```text
+schema_version = 1
+contract_version >= 1.8.0
+```
 
-Accepted CMIS evidence records may carry provenance such as:
+The accepted manifest includes:
 
-- chain and fact type
-- subject identity
-- source and source role
-- observation time
-- block/slot when available
-- raw fact identifier and raw value
-- normalized value and unit when supplied by a verified adapter
-- calculation/service version
-- identity, semantics, and freshness verification flags
-- warnings
+- public chain/service eligibility;
+- Evidence Receipt schema `1`;
+- Proof Score schema `1`;
+- risk/proof separation;
+- missing-evidence-is-unknown semantics;
+- read-only Phase 11 `intelligence_foundation` with public-service and Scout-reliance promotion false.
 
-Roberta may explain these fields but must not recompute CMIS verification in order to manufacture a different result.
+Roberta does not call capability discovery directly; Scouts validate it before CMIS dispatch.
 
-## Accepted X1 verification building blocks on `main`
+## Accepted evidence semantics
 
-The following are accepted CMIS/core building blocks, not standalone Roberta production services:
+Roberta-facing interfaces may preserve these CMIS meanings when returned by an accepted service:
 
-### X1 RPC token-account balance transport
+- `AGREEMENT` — comparable same-fact observations agree under the applicable verifier;
+- `CONFLICT` — accepted comparison evidence disagrees; do not average or choose a preferred value unless a fact-specific CMIS contract says so;
+- `INSUFFICIENT_EVIDENCE` — required comparable evidence is missing/invalid; do not reinterpret this as a negative fact;
+- deterministic data/proof quality with explicit reasons and unresolved categories;
+- Evidence Receipts preserving source/provenance, scope, freshness, disagreements, limitations, and unresolved fields;
+- Proof Scores that remain separate from market risk.
 
-A read-only `getTokenAccountBalance` transport can collect raw token-account amount, decimals, context slot, commitment, account identity, and raw response.
+Roberta may explain these meanings but must not recompute CMIS verification/proof to manufacture a different result.
 
-The transport itself does not prove that the account is a pool reserve and remains non-promotable without identity and semantic proof.
+## `verification_evidence` — ACCEPTED CALLABLE SERVICE WHERE MANIFEST PERMITS
 
-### X1 pool/vault identity adapter
+The earlier baseline that treated `verification_evidence` as future-only is obsolete.
 
-CMIS can consume an already-proven canonical pool/vault coupling record and expose a compact pool, vault, mint, and owner identity only when the upstream proof is unique and complete.
+Accepted trust path:
 
-This proves identity relationships only. It does not prove provider reserve-field roles, reserve units, freshness, or value agreement.
+```text
+fact-specific verifier
+  ↓
+sanitized verification envelope
+  ↓
+content-addressed evidence ledger
+  ↓
+exact lookup
+  ↓
+CMIS verification_evidence
+  ↓
+Chain Scout
+  ↓
+Roberta
+```
 
-### X1.Ninja pool-detail contract probe
+Only exact accepted selectors and CMIS-promotable verified agreement may expose a promoted fact value/unit. Conflict, stale/non-promotable agreement, and insufficient evidence remain explicit.
 
-CMIS has a read-only X1.Ninja single-pool detail transport that preserves the raw provider response and transport-contract provenance.
+## Accepted X1 building blocks
 
-Observed provider field names or values are not automatically reserve facts. Roberta must not infer reserve semantics from names such as `pooledBase`, `pooledQuote`, `reserve`, or similar labels.
+CMIS includes accepted read-only X1 primitives such as:
 
-### X1 reserve semantic proof gate
+- RPC token-account balance transport;
+- independently proven pool/vault/mint identity adapters;
+- X1.Ninja/XDEX read-only provider transports;
+- fail-closed reserve semantic binding;
+- provider/RPC reserve evidence comparison;
+- deterministic XDEX trade verification;
+- persisted verification evidence;
+- bounded historical evidence and activity primitives.
 
-CMIS has a fail-closed structural gate that can bind explicit provider field paths and units to an already-verified pool/vault/mint identity when an external semantic proof manifest is supplied with evidence references.
+A low-level primitive is not automatically a public Scout service. Scope, identity, semantics, units, freshness, and promotion rules remain explicit.
 
-The manifest is an asserted proof input, not self-authenticating truth. The gate does not establish freshness or cross-source value agreement and does not make the result CMIS-promotable by itself.
+## X1 / XDEX semantic baseline
 
-### X1 reserve evidence adapter
+The original XENCAT/native-XNT reserve proof remains one concrete example rather than a universal provider rule.
 
-CMIS has a fail-closed adapter that can convert an already-verified X1.Ninja semantic binding plus a matching X1 RPC token-account balance into two same-identity CMIS evidence observations.
+Since that proof, accepted XDEX evidence has advanced field-by-field:
 
-The adapter accepts only an explicitly declared `token_base_units` or explicitly declared `token_units` provider contract. It canonicalizes supported values to deterministic `TOKEN_UNITS`, requires the RPC account and decimals to match the already-bound vault identity, preserves provider field path and RPC slot provenance, and rejects unsupported or over-precision values.
+- exact route/config identity can be verified for tested routes;
+- route-scoped price impact can be independently reproduced where accepted reserve/config evidence exists;
+- quote slippage uses percent units in tested scope;
+- quote slippage tolerance/minimum-received semantics are distinct from expected execution slippage;
+- selected 1-minute history timestamp/OHLC semantics have bounded verification/corroboration;
+- the pinned XENCAT/native-XNT 2800-ppm historical execution model is strongly corroborated by a 23-swap state-contiguous sequence and 3000-ppm execution is strongly rejected for that tested sequence;
+- the private backend reason for the separate 3000-ppm quote baseline remains unavailable;
+- hidden/router/platform fee attribution remains unproven;
+- global route optimality, fill quality, route quality, generic execution quality, and universal XDEX execution semantics remain unavailable.
 
-Freshness remains caller-controlled and defaults false. The adapter never marks its own output CMIS-promotable; the generic reserve verifier still owns same-fact agreement/conflict evaluation.
+Roberta must preserve these scope limits.
 
-## Verified XENCAT/XNT live observation
+## Pre-trade baseline
 
-A read-only proof path has established one concrete X1.Ninja reserve-semantic example for pool `6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry`:
+CMIS pre-trade analysis can deterministically evaluate verified trade size against verified liquidity and explicit versioned policy.
 
-- XENCAT mint: `DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb`
-- XENCAT vault: `9ojBC34QUrubQASb1ktqkNn3kdFiUnqaBnLLgSeWbRm7`
-- XNT mint: `So11111111111111111111111111111111111111112`
-- XNT vault: `7khUrkZN7Y6VgoSR8pASMFjHcKwqdh2cd6NRctXyjSZC`
-- shared token-account authority: `9Dpjw2pB5kXJr6ZTHiqzEMfJPic3om9jgNacnwpLCoaU`
+A hardened internal route-evidence seam can additionally expose selected exact-route facts only when accepted source, identity, freshness, semantic, unit, proof-basis, and value-shape gates pass.
 
-Saved on-chain transaction evidence identified the same recurring vault pair with opposite token movement. Direct X1 RPC independently confirmed the expected mints, decimals, shared authority, and live token-account balances. Those RPC token-unit balances exactly matched the X1.Ninja live `pool.pooledBase` and `pool.pooledQuote` values observed in workflow run `32027108070`:
+Current accepted distinctions:
 
-- XENCAT: `1146902.928865` token units, 6 decimals
-- XNT: `49.575383312` token units, 9 decimals
+- route-scoped price impact may be usable where exact proof gates pass;
+- bounded 0.28% AMM/execution-model fee evidence may be usable for exact accepted scope;
+- the 0.30% quote-side curve behavior is not presented as an executed hidden fee;
+- quote slippage tolerance is not expected execution slippage;
+- expected execution slippage remains unavailable without its own accepted execution observation contract;
+- route quality, fill quality, transaction simulation, and execution quality remain unavailable unless separately proven.
 
-This is a proof for that exact pool and observation path. It must not be generalized into a rule that every X1.Ninja pool uses identical field semantics without its own verified identity/unit evidence.
+The public HTTP gateway does not accept arbitrary caller-supplied internal route evidence as a shortcut to verification.
 
-## Not yet Roberta-consumable as production capability
+Every current pre-trade result remains analysis-only with execution authorization false.
 
-Roberta must currently treat the following as unavailable unless and until a supported Roberta-facing wrapper and all required verification gates are accepted:
+## Phase 11 Verified Intelligence baseline
 
-- `verification_evidence` as a callable Roberta service
-- a general Roberta-callable X1 reserve verification service
-- provider/RPC reserve comparisons where provider units, vault identity, decimals, or freshness requirements are unproven
-- automatic generalization of the verified XENCAT/XNT `pooledBase` / `pooledQuote` semantics to other pools
-- direct use of the accepted reserve evidence adapter as if it were a production service or a promotion decision
-- any CMIS capability that exists only in an open or stacked PR
+CMIS has accepted read-only foundations for:
 
-In particular, an accepted low-level CMIS primitive is **not** equivalent to a production Roberta service.
+- exact top-account concentration;
+- numeric concentration changes under compatible scope;
+- neutral wallet activity facts;
+- sanitized sparse historical intelligence;
+- evidence-bound conclusions with content-addressed receipts/proof;
+- deterministic explicit-policy concentration-threshold evaluation.
+
+These foundations do not authorize or prove whale, insider, bot, accumulator, distributor, market-maker, ownership, relationship, manipulation, fraud, or behavioral-intent labels.
+
+The core Phase 11 intelligence primitives remain outside public `supported_services` and outside automatic Scout reliance.
 
 ## Roberta consumption boundary
 
-When a future supported service returns CMIS verification output, Roberta may:
+Roberta may:
 
-- explain the verified fact and its provenance
-- explain why evidence is high, medium, or low quality
-- surface conflicts and insufficient evidence
-- coordinate other specialists based on the returned status
-- use verified facts in higher-level reasoning
+- explain verified facts and provenance;
+- explain proof quality separately from risk;
+- surface conflicts and insufficient evidence;
+- coordinate specialists based on accepted service output;
+- use verified CMIS facts in broader reasoning;
+- provide answer-first conversational synthesis.
 
 Roberta must not:
 
-- infer missing provider semantics or units
-- generalize a pool-specific semantic proof to another pool without CMIS evidence
-- convert `CONFLICT` into agreement
-- convert `INSUFFICIENT_EVIDENCE` into a definitive fact
-- recalculate deterministic CMIS comparisons to obtain a preferred answer
-- treat a raw provider response or semantic-proof manifest as verified on its own
-- treat analysis or verification output as authorization to sign, broadcast, trade, or move value
+- infer missing provider semantics/units;
+- generalize pool/route-specific proof to another scope;
+- convert conflict into agreement;
+- convert insufficient evidence into a definitive fact;
+- recalculate deterministic CMIS comparisons to obtain a preferred answer;
+- treat raw provider responses or asserted proof labels as verified on their own;
+- turn internal intelligence foundations into public services;
+- treat analysis, proof, PASS, or human review as authorization to execute value movement.
 
-Human approval and execution safeguards remain separate from verification.
+## Execution boundary
 
-## Current interface status
+No accepted baseline authorizes transaction construction, signing, broadcasting, custody, trading, bridge transfer, autonomous execution, or autonomous value movement.
 
-The accepted CMIS trust layer is sufficiently stable for Roberta interface **design**, but the final machine-readable Roberta verification wrapper is not yet established on `main`.
-
-Until that wrapper exists, Roberta should continue using the currently accepted callable market/tokenomics capabilities and treat CMIS verification primitives as internal specialist infrastructure rather than a public Roberta service surface.
+Roberta's future Controlled Execution milestone remains separately locked/not started.
