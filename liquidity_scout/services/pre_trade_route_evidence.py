@@ -2,14 +2,14 @@
 
 This module does not collect provider data. It accepts evidence only after an
 internal CMIS producer has resolved one explicit route and passes that evidence
-through exact chain/route, freshness, semantic, value-shape, and proof-basis
-gates.
+through exact chain/route/input-amount, freshness, semantic, value-shape, and
+proof-basis gates.
 
-A symbol or asset mint alone is never enough to bind route evidence. The trade
-must name token-in, token-out, pool, and AMM config explicitly. Missing,
-stale, mismatched, semantically incompatible, or weakly-proven evidence is
-reported as unusable instead of being converted into a guessed execution
-estimate.
+A symbol, asset mint, or route identity alone is never enough to bind
+amount-sensitive route evidence. The trade must name token-in, token-out, pool,
+AMM config, and the exact positive input amount explicitly. Missing, stale,
+mismatched, semantically incompatible, or weakly-proven evidence is reported as
+unusable instead of being converted into a guessed execution estimate.
 """
 
 from __future__ import annotations
@@ -17,11 +17,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Optional
 
 
-VERSION = "1.1"
-SCHEMA_VERSION = 1
+VERSION = "1.2"
+SCHEMA_VERSION = 2
 ROUTE_FIELDS = (
     "token_in_mint",
     "token_out_mint",
@@ -29,7 +30,15 @@ ROUTE_FIELDS = (
     "amm_config",
 )
 _ROUTE_EVIDENCE_FIELDS = frozenset(
-    {"schema_version", "source", "chain", "route", "observed_at", "capabilities"}
+    {
+        "schema_version",
+        "source",
+        "chain",
+        "route",
+        "token_in_amount",
+        "observed_at",
+        "capabilities",
+    }
 )
 _CAPABILITY_FIELDS = frozenset({"status", "semantic", "value", "unit", "proof_basis"})
 _ACCEPTED_SOURCES = frozenset({"cmis_xdex_route_resolver"})
@@ -93,6 +102,35 @@ def _number(value: Any) -> Optional[float]:
     if number != number or number in (float("inf"), float("-inf")):
         return None
     return number
+
+
+def normalize_token_in_amount(value: Any) -> Optional[str]:
+    """Return one canonical positive decimal string without float coercion.
+
+    ``None`` means the amount was not supplied. Any other invalid value raises
+    ``ValueError`` so a malformed amount can never silently become an unscoped
+    route-evidence request.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError("token_in_amount must be a positive finite decimal when supplied")
+    if isinstance(value, str):
+        text = value.strip()
+        if not text or text != value:
+            raise ValueError("token_in_amount must be a normalized positive finite decimal when supplied")
+    else:
+        text = str(value)
+    try:
+        amount = Decimal(text)
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError("token_in_amount must be a positive finite decimal when supplied") from exc
+    if not amount.is_finite() or amount <= 0:
+        raise ValueError("token_in_amount must be a positive finite decimal when supplied")
+    canonical = format(amount.normalize(), "f")
+    if "." in canonical:
+        canonical = canonical.rstrip("0").rstrip(".")
+    return canonical
 
 
 def _epoch(value: Any) -> Optional[float]:
@@ -230,10 +268,16 @@ def evaluate_route_evidence(
     *,
     target_chain: str,
     trade_route: Optional[Mapping[str, Any]],
+    trade_token_in_amount: Any = None,
     evaluated_at: Any,
     max_age_seconds: Any,
 ) -> Dict[str, Any]:
-    """Return route-scoped capability overrides plus a fail-closed audit record."""
+    """Return amount-and-route-scoped overrides plus a fail-closed audit record."""
+    try:
+        normalized_trade_amount = normalize_token_in_amount(trade_token_in_amount)
+    except ValueError:
+        normalized_trade_amount = None
+
     audit: Dict[str, Any] = {
         "contract_version": VERSION,
         "schema_version": SCHEMA_VERSION,
@@ -242,6 +286,10 @@ def evaluate_route_evidence(
         "chain": None,
         "route": None,
         "trade_route": dict(trade_route) if isinstance(trade_route, Mapping) else None,
+        "route_match": False,
+        "token_in_amount": None,
+        "trade_token_in_amount": normalized_trade_amount,
+        "amount_match": False,
         "scope_match": False,
         "observed_at": None,
         "evaluated_at": evaluated_at,
@@ -280,6 +328,11 @@ def evaluate_route_evidence(
 
     evidence_route = _normalize_evidence_route(route_evidence.get("route"))
     audit["route"] = evidence_route
+    evidence_amount = normalize_token_in_amount(route_evidence.get("token_in_amount"))
+    if evidence_amount is None:
+        raise ValueError("route_evidence token_in_amount is required")
+    audit["token_in_amount"] = evidence_amount
+
     observed_at = route_evidence.get("observed_at")
     observed_epoch = _epoch(observed_at)
     audit["observed_at"] = observed_at
@@ -302,7 +355,14 @@ def evaluate_route_evidence(
     elif dict(trade_route) != evidence_route:
         audit["global_rejection_reason"] = "route_evidence_scope_mismatch"
     else:
-        audit["scope_match"] = True
+        audit["route_match"] = True
+        if normalized_trade_amount is None:
+            audit["global_rejection_reason"] = "explicit_trade_input_amount_unavailable"
+        elif normalized_trade_amount != evidence_amount:
+            audit["global_rejection_reason"] = "route_evidence_input_amount_mismatch"
+        else:
+            audit["amount_match"] = True
+            audit["scope_match"] = True
 
     evaluated_epoch = audit["evaluated_at_epoch"]
     if audit["global_rejection_reason"] is None:
@@ -378,6 +438,7 @@ def evaluate_route_evidence(
                 "source": source,
                 "chain": evidence_chain,
                 "route": deepcopy(evidence_route),
+                "token_in_amount": evidence_amount,
                 "observed_at": observed_at,
                 "age_seconds": audit["age_seconds"],
                 "max_age_seconds": max_age,
@@ -395,5 +456,6 @@ __all__ = [
     "SCHEMA_VERSION",
     "VERSION",
     "evaluate_route_evidence",
+    "normalize_token_in_amount",
     "normalize_trade_route",
 ]

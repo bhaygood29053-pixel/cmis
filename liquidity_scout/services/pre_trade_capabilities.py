@@ -6,9 +6,9 @@ exists. This module reports those capabilities explicitly as unavailable and can
 fail closed when a caller explicitly requires one of them.
 
 An internal CMIS producer may supply an explicit route-evidence envelope. Such
-evidence is accepted only after exact route, freshness, semantic, value, and
-proof-basis validation. Generic pre-trade behavior remains unchanged when no
-route evidence is supplied.
+evidence is accepted only after exact route, exact input amount, freshness,
+semantic, value, and proof-basis validation. Generic pre-trade behavior remains
+unchanged when no route evidence is supplied.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from .pre_trade_route_evidence import evaluate_route_evidence
 from .risk import BLOCK, PASS
 
 
-VERSION = "1.1"
+VERSION = "1.2"
 CAPABILITY_NAMES = (
     "slippage",
     "price_impact",
@@ -114,6 +114,7 @@ def build_execution_capability_report(
     route_evidence: Any = None,
     target_chain: str = "x1",
     trade_route: Mapping[str, Any] | None = None,
+    trade_token_in_amount: Any = None,
     evaluated_at: Any = None,
     route_evidence_max_age_seconds: Any = None,
 ) -> Dict[str, Any]:
@@ -127,6 +128,7 @@ def build_execution_capability_report(
         route_evidence,
         target_chain=target_chain,
         trade_route=trade_route,
+        trade_token_in_amount=trade_token_in_amount,
         evaluated_at=evaluated_at,
         max_age_seconds=route_evidence_max_age_seconds,
     )
