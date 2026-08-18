@@ -25,13 +25,16 @@ ROUTE = {
     "set RUN_XDEX_EXACT_ROUTE_LIVE=1 to run the read-only exact-route resolver probe",
 )
 class XDEXExactRouteResolverLiveTests(unittest.TestCase):
-    def test_pinned_xencat_xnt_route_resolves_to_accepted_pre_trade_evidence(self):
+    def test_pinned_xencat_xnt_route_resolves_verified_price_impact_read_only(self):
         evidence = resolve_xdex_route_evidence(ROUTE, "1000")
 
         self.assertEqual(evidence["source"], "cmis_xdex_route_resolver")
         self.assertEqual(evidence["route"], ROUTE)
         self.assertIn("price_impact", evidence["capabilities"])
-        self.assertIn("fees", evidence["capabilities"])
+        # Bounded historical fee evidence must now be supplied explicitly to
+        # the resolver and reclassified through the accepted #198 contract.
+        # A live route read alone cannot manufacture that historical proof.
+        self.assertNotIn("fees", evidence["capabilities"])
         self.assertNotIn("slippage", evidence["capabilities"])
 
         evaluated = evaluate_route_evidence(
@@ -43,10 +46,9 @@ class XDEXExactRouteResolverLiveTests(unittest.TestCase):
         )
         self.assertEqual(
             set(evaluated["audit"]["usable_capabilities"]),
-            {"price_impact", "fees"},
+            {"price_impact"},
         )
         self.assertEqual(evaluated["overrides"]["price_impact"]["status"], "ok")
-        self.assertEqual(evaluated["overrides"]["fees"]["status"], "ok")
         self.assertFalse(evaluated["audit"]["rejected_capabilities"])
 
         print(
@@ -54,7 +56,7 @@ class XDEXExactRouteResolverLiveTests(unittest.TestCase):
                 "route": evidence["route"],
                 "observed_at": evidence["observed_at"],
                 "price_impact_percent": evidence["capabilities"]["price_impact"]["value"],
-                "fee_evidence": evidence["capabilities"]["fees"]["value"],
+                "bounded_historical_fee_promoted_without_explicit_evidence": False,
                 "expected_execution_slippage_promoted": False,
                 "execution_authorized": False,
             }
