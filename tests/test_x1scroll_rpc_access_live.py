@@ -18,7 +18,11 @@ RUN_LIVE = os.getenv("RUN_X1SCROLL_RPC_LIVE_TESTS") == "1"
 class X1ScrollRpcAccessLiveTests(unittest.TestCase):
     def test_published_authenticated_transport_gethealth_and_getslot_access(self):
         api_key = os.getenv("X1SCROLL_API_KEY")
-        self.assertIsInstance(api_key, str, "X1SCROLL_API_KEY repository secret is required")
+        self.assertIsInstance(
+            api_key,
+            str,
+            "X1SCROLL_API_KEY repository secret is required",
+        )
         self.assertTrue(api_key, "X1SCROLL_API_KEY repository secret is required")
 
         observations = []
@@ -35,6 +39,9 @@ class X1ScrollRpcAccessLiveTests(unittest.TestCase):
                 self.assertEqual(result["endpoint"], X1SCROLL_RPC_REDACTED_ENDPOINT)
                 self.assertEqual(result["authentication"], "api_key_path_segment")
                 self.assertEqual(result["method"], method)
+                self.assertEqual(result["request_id"], 1)
+                self.assertFalse(result["redirects_followed"])
+                self.assertTrue(result["transport_environment_auth_disabled"])
                 self.assertIn(result["status"], {"ok", "partial", "unavailable"})
                 self.assertIn(
                     result["access"],
@@ -47,13 +54,23 @@ class X1ScrollRpcAccessLiveTests(unittest.TestCase):
                         "unexpected_http_status",
                         "invalid_json_response",
                         "invalid_jsonrpc_response",
+                        "jsonrpc_id_mismatch",
                         "jsonrpc_error",
                         "jsonrpc_contract_unverified",
                     },
                 )
+                if result["access"] in {
+                    "available_authenticated",
+                    "jsonrpc_error",
+                    "jsonrpc_contract_unverified",
+                }:
+                    self.assertTrue(result["response_id_verified"])
                 self.assertTrue(result["credentials_supplied"])
                 self.assertFalse(result["credentials_retained"])
-                self.assertNotIn(api_key, json.dumps(result, sort_keys=True, default=str))
+                self.assertNotIn(
+                    api_key,
+                    json.dumps(result, sort_keys=True, default=str),
+                )
                 self.assertFalse(result["source_independence_verified"])
                 self.assertFalse(result["archival_completeness_verified"])
                 self.assertFalse(result["retention_verified"])
