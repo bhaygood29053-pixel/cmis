@@ -1,18 +1,18 @@
-"""Bounded, transport-free evidence for X1.Ninja pool trade-history samples.
+"""Bounded X1.Ninja trade-history sample evidence.
 
-This module does not fetch X1.Ninja and does not claim that ``/v1/trades`` is
-complete, paginated, retained for any particular duration, finalized, or
-ordered by contract. It accepts one already-fetched ``ninja_history``
-observation plus independently produced X1 RPC ``VerificationReport`` objects
-and records only what can be established for a bounded prefix of the returned
-rows.
+This module is transport-free. It consumes one already-fetched X1.Ninja
+``/v1/trades/{address}`` observation and independently produced X1 RPC
+``VerificationReport`` objects. It verifies only facts that can be established
+for a bounded prefix of the returned rows.
 
-The strongest positive result is intentionally narrow: every sampled Ninja
-``txHash`` can be bound to a found/successful X1 RPC transaction, every sampled
-row is scoped to the independently verified requested pool, and the sequence
-can be described observationally using RPC slots. Provider amount, timestamp,
-slot, side, pagination/range, finality, retention, and exhaustiveness semantics
-remain separate gates.
+Important boundary: a Ninja row can name an independently verified pool while
+the supplied ``VerificationReport`` still does not prove that the transaction
+invoked that exact pool account. Row pool identity and transaction pool
+membership are therefore separate facts, and transaction pool membership is
+always left unverified here.
+
+No pagination/range, exhaustiveness, retention, finality, timestamp, amount,
+price, stable ordering, or CMIS-promotion claim is made by this module.
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ from liquidity_scout.providers.x1.ninja_history import (
 from liquidity_scout.providers.x1.transaction_semantics import VerificationReport
 
 
-CONTRACT_VERSION = "x1_ninja_trade_history_sample_evidence/v1"
+CONTRACT_VERSION = "x1_ninja_trade_history_sample_evidence/v2"
 EVIDENCE_SOURCE = (
-    "X1.Ninja Developer API + independently verified X1 RPC transactions"
+    "X1.Ninja Developer API + independently produced X1 RPC verification reports"
 )
 WALLET_DIRECTION_BASIS = "SIGNER_OR_ROUTED_BALANCE_DIRECTION"
 CONFIRMED_SIDE_LEVEL = "PROVIDER_SIDE_ONCHAIN_CONFIRMED"
@@ -88,8 +88,8 @@ def _normalize_reports(
         raise TypeError("verification_reports must be a mapping keyed by signature")
 
     normalized: dict[str, VerificationReport] = {}
-    for key, report in verification_reports.items():
-        signature = _required_text("verification_reports key", key)
+    for raw_signature, report in verification_reports.items():
+        signature = _required_text("verification_reports key", raw_signature)
         if not isinstance(report, VerificationReport):
             raise TypeError(
                 "verification_reports values must be VerificationReport objects"
@@ -128,33 +128,11 @@ def _revalidate_observed_shape(
             )
 
 
-def verify_ninja_trade_history_sample(
+def _validate_input_observation(
     *,
     observation: Mapping[str, Any],
-    verification_reports: Mapping[str, VerificationReport],
-    pool_address: str,
-    pool_identity_verified: bool,
-    max_rows: int = 25,
-) -> dict[str, Any]:
-    """Cross-check a bounded returned Ninja trade-history prefix against X1 RPC.
-
-    ``pool_address`` must be independently verified before this evidence can be
-    constructed. ``max_rows`` bounds local analysis only; it is not sent to
-    X1.Ninja and must never be described as provider pagination or range proof.
-    """
-
-    if not isinstance(observation, Mapping):
-        raise TypeError("observation must be a mapping")
-    if isinstance(max_rows, bool) or not isinstance(max_rows, int):
-        raise X1NinjaTradeHistorySampleEvidenceError("max_rows must be an integer")
-    if max_rows < 1 or max_rows > _MAX_SAMPLE_ROWS:
-        raise X1NinjaTradeHistorySampleEvidenceError(
-            f"max_rows must be between 1 and {_MAX_SAMPLE_ROWS}"
-        )
-
-    expected_pool = _required_text("pool_address", pool_address)
-    _strict_true("pool_identity_verified", pool_identity_verified)
-
+    expected_pool: str,
+) -> list[Any]:
     if observation.get("chain") != CHAIN:
         raise X1NinjaTradeHistorySampleEvidenceError("observation chain must be x1")
     if observation.get("source") != X1_NINJA_SOURCE:
@@ -185,7 +163,10 @@ def verify_ninja_trade_history_sample(
     semantics = observation.get("semantics")
     if not isinstance(semantics, Mapping):
         raise X1NinjaTradeHistorySampleEvidenceError("observation semantics are required")
-    _strict_true("semantics.trade_rows_verified", semantics.get("trade_rows_verified"))
+    _strict_true(
+        "semantics.trade_rows_verified",
+        semantics.get("trade_rows_verified"),
+    )
     for semantic_name in _UNVERIFIED_INPUT_SEMANTICS:
         _strict_false(
             f"semantics.{semantic_name}",
@@ -211,18 +192,51 @@ def verify_ninja_trade_history_sample(
         raise X1NinjaTradeHistorySampleEvidenceError(
             "contract.returned_trade_count must exactly match raw_response.trades"
         )
+    return trades
 
+
+def verify_ninja_trade_history_sample(
+    *,
+    observation: Mapping[str, Any],
+    verification_reports: Mapping[str, VerificationReport],
+    pool_address: str,
+    pool_identity_verified: bool,
+    max_rows: int = 25,
+) -> dict[str, Any]:
+    """Cross-check a bounded returned Ninja trade-history prefix against X1 RPC.
+
+    ``max_rows`` is a local verifier bound only. It is never sent to X1.Ninja
+    and is not pagination/range evidence.
+    """
+
+    if not isinstance(observation, Mapping):
+        raise TypeError("observation must be a mapping")
+    if isinstance(max_rows, bool) or not isinstance(max_rows, int):
+        raise X1NinjaTradeHistorySampleEvidenceError("max_rows must be an integer")
+    if max_rows < 1 or max_rows > _MAX_SAMPLE_ROWS:
+        raise X1NinjaTradeHistorySampleEvidenceError(
+            f"max_rows must be between 1 and {_MAX_SAMPLE_ROWS}"
+        )
+
+    expected_pool = _required_text("pool_address", pool_address)
+    _strict_true("pool_identity_verified", pool_identity_verified)
+    trades = _validate_input_observation(
+        observation=observation,
+        expected_pool=expected_pool,
+    )
     reports = _normalize_reports(verification_reports)
+
     selected_rows = trades[:max_rows]
     seen_signatures: set[str] = set()
     row_results: list[dict[str, Any]] = []
     verified_slots: list[int] = []
 
-    binding_complete = True
-    success_complete = True
-    pool_scope_complete = True
+    report_binding_complete = True
+    rpc_success_complete = True
+    row_pool_identity_match_complete = True
     maker_match_complete = True
-    slot_match_complete = True
+    rpc_slot_available_complete = True
+    provider_slot_match_complete = True
     side_match_complete = True
 
     for index, raw_row in enumerate(selected_rows):
@@ -233,11 +247,14 @@ def verify_ninja_trade_history_sample(
             f"trade row {index}.txHash", raw_row.get("txHash")
         )
         maker = _required_text(f"trade row {index}.maker", raw_row.get("maker"))
+
+        # Fail closed: only exact observed BUY/SELL values can participate in the
+        # optional side cross-check. Do not normalize case or other spellings.
         provider_side_raw = raw_row.get("type")
         provider_side = (
-            provider_side_raw.upper()
+            provider_side_raw
             if isinstance(provider_side_raw, str)
-            and provider_side_raw.upper() in _SUPPORTED_SIDES
+            and provider_side_raw in _SUPPORTED_SIDES
             else None
         )
 
@@ -247,39 +264,52 @@ def verify_ninja_trade_history_sample(
             )
         seen_signatures.add(tx_hash)
 
-        pool_matches = row_pool == expected_pool
-        pool_scope_complete = pool_scope_complete and pool_matches
+        row_pool_matches = row_pool == expected_pool
+        row_pool_identity_match_complete = (
+            row_pool_identity_match_complete and row_pool_matches
+        )
 
         report = reports.get(tx_hash)
         rpc_bound = report is not None
-        binding_complete = binding_complete and rpc_bound
+        report_binding_complete = report_binding_complete and rpc_bound
 
         rpc_successful = False
         maker_matches = False
+        rpc_slot_available = False
         provider_slot_matches = False
         wallet_side_matches = False
         rpc_slot: int | None = None
 
-        if report is not None:
+        if report is None:
+            rpc_success_complete = False
+            maker_match_complete = False
+            rpc_slot_available_complete = False
+            provider_slot_match_complete = False
+            side_match_complete = False
+        else:
             rpc_successful = bool(report.found and report.succeeded)
-            success_complete = success_complete and rpc_successful
+            rpc_success_complete = rpc_success_complete and rpc_successful
 
             maker_matches = report.primary_signer == maker
             maker_match_complete = maker_match_complete and maker_matches
 
-            if _valid_slot(report.slot):
+            rpc_slot_available = _valid_slot(report.slot)
+            rpc_slot_available_complete = (
+                rpc_slot_available_complete and rpc_slot_available
+            )
+            if rpc_slot_available:
                 rpc_slot = report.slot
                 verified_slots.append(report.slot)
-            else:
-                binding_complete = False
 
             provider_slot = raw_row.get("slot")
             provider_slot_matches = bool(
-                rpc_slot is not None
+                rpc_slot_available
                 and _valid_slot(provider_slot)
                 and provider_slot == rpc_slot
             )
-            slot_match_complete = slot_match_complete and provider_slot_matches
+            provider_slot_match_complete = (
+                provider_slot_match_complete and provider_slot_matches
+            )
 
             wallet_side_matches = bool(
                 provider_side is not None
@@ -291,28 +321,45 @@ def verify_ninja_trade_history_sample(
                 and maker_matches
             )
             side_match_complete = side_match_complete and wallet_side_matches
-        else:
-            success_complete = False
-            maker_match_complete = False
-            slot_match_complete = False
-            side_match_complete = False
 
         row_results.append(
             {
                 "index": index,
                 "transaction_id": tx_hash,
-                "rpc_bound": rpc_bound,
+                "rpc_report_bound": rpc_bound,
                 "rpc_transaction_found_and_successful": rpc_successful,
-                "pool_matches_verified_scope": pool_matches,
+                "row_pool_matches_verified_pool_identity": row_pool_matches,
+                "transaction_pool_membership_verified": False,
                 "maker_matches_rpc_primary_signer": maker_matches,
+                "rpc_slot_available": rpc_slot_available,
                 "provider_slot_matches_rpc_slot_observation": provider_slot_matches,
                 "provider_side_matches_wallet_level_rpc_evidence": wallet_side_matches,
                 "rpc_slot": rpc_slot,
             }
         )
 
+    sample_size = len(selected_rows)
+    has_sample = sample_size > 0
+
+    sample_report_binding_complete = bool(has_sample and report_binding_complete)
+    sample_rpc_success_complete = bool(has_sample and rpc_success_complete)
+    sample_transaction_identity_binding_complete = bool(
+        has_sample and report_binding_complete and rpc_success_complete
+    )
+    sample_row_pool_identity_match_complete = bool(
+        has_sample and row_pool_identity_match_complete
+    )
+    sample_maker_match_complete = bool(has_sample and maker_match_complete)
+    sample_rpc_slot_available_complete = bool(
+        has_sample and rpc_slot_available_complete
+    )
+    sample_provider_slot_match_complete = bool(
+        has_sample and provider_slot_match_complete
+    )
+    sample_side_match_complete = bool(has_sample and side_match_complete)
+
     order_observation = "unavailable"
-    if selected_rows and binding_complete and len(verified_slots) == len(selected_rows):
+    if sample_rpc_slot_available_complete and len(verified_slots) == sample_size:
         newest_first = all(
             earlier >= later
             for earlier, later in zip(verified_slots, verified_slots[1:])
@@ -323,20 +370,10 @@ def verify_ninja_trade_history_sample(
             else "not_newest_to_oldest_by_verified_rpc_slot_observed"
         )
 
-    sample_size = len(selected_rows)
-    has_sample = sample_size > 0
-    transaction_scope_binding_complete = bool(
-        has_sample and binding_complete and success_complete and pool_scope_complete
-    )
-    sample_rpc_binding_complete = bool(has_sample and binding_complete)
-    sample_rpc_success_complete = bool(has_sample and success_complete)
-    sample_pool_scope_complete = bool(has_sample and pool_scope_complete)
-    sample_maker_match_complete = bool(has_sample and maker_match_complete)
-    sample_slot_match_complete = bool(has_sample and slot_match_complete)
-    sample_side_match_complete = bool(has_sample and side_match_complete)
-
     warnings = [
         "bounded_sample_only",
+        "transaction_pool_membership_not_verified",
+        "rpc_source_independence_not_established_by_this_evidence",
         "provider_pagination_and_range_unverified",
         "provider_exhaustiveness_unverified",
         "provider_retention_unverified",
@@ -351,8 +388,10 @@ def verify_ninja_trade_history_sample(
         warnings.append("local_verifier_sample_truncated")
     if has_sample and not side_match_complete:
         warnings.append("provider_side_not_confirmed_for_every_sampled_row")
-    if has_sample and not slot_match_complete:
+    if has_sample and not provider_slot_match_complete:
         warnings.append("provider_slot_not_confirmed_for_every_sampled_row")
+    if has_sample and not row_pool_identity_match_complete:
+        warnings.append("provider_row_pool_does_not_match_verified_pool_for_every_row")
 
     return {
         "contract_version": CONTRACT_VERSION,
@@ -367,21 +406,32 @@ def verify_ninja_trade_history_sample(
         "distinct_sample_transaction_ids": bool(
             has_sample and len(seen_signatures) == sample_size
         ),
-        "sample_rpc_binding_complete": sample_rpc_binding_complete,
+        "sample_rpc_report_binding_complete": sample_report_binding_complete,
         "sample_rpc_transaction_success_complete": sample_rpc_success_complete,
-        "sample_pool_scope_match_complete": sample_pool_scope_complete,
+        "sample_transaction_identity_binding_complete": (
+            sample_transaction_identity_binding_complete
+        ),
+        "sample_row_pool_identity_match_complete": (
+            sample_row_pool_identity_match_complete
+        ),
+        "sample_transaction_pool_membership_verified": False,
         "sample_maker_primary_signer_match_complete": sample_maker_match_complete,
-        "sample_provider_slot_rpc_match_complete": sample_slot_match_complete,
+        "sample_rpc_slot_available_complete": sample_rpc_slot_available_complete,
+        "sample_provider_slot_rpc_match_complete": sample_provider_slot_match_complete,
         "sample_wallet_side_rpc_match_complete": sample_side_match_complete,
-        "sample_transaction_scope_binding_complete": transaction_scope_binding_complete,
         "returned_order_observation": order_observation,
         "rows": row_results,
         "semantics": {
-            "sample_transaction_identity_and_pool_scope_crosscheck": (
-                transaction_scope_binding_complete
+            "sample_transaction_identity_crosscheck": (
+                sample_transaction_identity_binding_complete
             ),
-            "sample_provider_slot_crosscheck": sample_slot_match_complete,
+            "sample_row_pool_identity_crosscheck": (
+                sample_row_pool_identity_match_complete
+            ),
+            "transaction_pool_membership_verified": False,
+            "sample_provider_slot_crosscheck": sample_provider_slot_match_complete,
             "sample_provider_side_crosscheck": sample_side_match_complete,
+            "rpc_source_independence_verified": False,
             "ordering_contract_verified": False,
             "pagination_or_range_verified": False,
             "history_exhaustive_verified": False,
