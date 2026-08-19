@@ -89,25 +89,43 @@ def _identity(**overrides):
     return value
 
 
-def _occurrences(*, accounts=None, program_id=XDEX_MAINNET_OBSERVED_PROGRAM_ID):
-    return [
-        {
-            "program_id": program_id,
-            "scope": "outer",
-            "group_index": None,
-            "instruction_index": 2,
-            "accounts": accounts or ["Signer111", POOL, ASSET_VAULT, COUNTER_VAULT],
-        }
-    ]
+def _instruction(
+    *,
+    accounts=None,
+    program_id=XDEX_MAINNET_OBSERVED_PROGRAM_ID,
+):
+    return {
+        "programId": program_id,
+        "accounts": accounts
+        or ["Signer111", POOL, ASSET_VAULT, COUNTER_VAULT],
+    }
 
 
-def _prove(*, report=None, identity=None, occurrences=None):
+def _transaction(*, signature="Sig111", instructions=None):
+    return {
+        "transaction": {
+            "signatures": [signature],
+            "message": {
+                "accountKeys": [
+                    "Signer111",
+                    POOL,
+                    ASSET_VAULT,
+                    COUNTER_VAULT,
+                ],
+                "instructions": instructions
+                if instructions is not None
+                else [_instruction()],
+            },
+        },
+        "meta": {"innerInstructions": []},
+    }
+
+
+def _prove(*, report=None, identity=None, transaction=None):
     return prove_transaction_pool_membership(
         verification_report=report or _report(),
         pool_identity=identity or _identity(),
-        instruction_occurrences=(
-            _occurrences() if occurrences is None else occurrences
-        ),
+        transaction=_transaction() if transaction is None else transaction,
     )
 
 
@@ -116,8 +134,11 @@ class TransactionPoolMembershipTests(unittest.TestCase):
         result = _prove()
 
         self.assertTrue(result["transaction_pool_membership_verified"])
+        self.assertTrue(result["transaction_instruction_evidence_bound"])
+        self.assertEqual(result["transaction_signature"], "Sig111")
         self.assertTrue(result["selected_pool_instruction_verified"])
         self.assertEqual(result["selected_pool_instruction_count"], 1)
+        self.assertEqual(result["recognized_amm_instruction_count"], 1)
         self.assertTrue(result["vault_authority_verified"])
         self.assertTrue(result["asset_vault_mutated"])
         self.assertTrue(result["counter_vault_mutated"])
@@ -133,10 +154,42 @@ class TransactionPoolMembershipTests(unittest.TestCase):
         ):
             self.assertIsNone(result[field], field)
 
+    def test_transaction_signature_must_match_verification_report(self):
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError,
+            "transaction signature does not match",
+        ):
+            _prove(transaction=_transaction(signature="OtherSig222"))
+
+    def test_transaction_signature_evidence_is_required(self):
+        missing_signatures = _transaction()
+        del missing_signatures["transaction"]["signatures"]
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError,
+            "transaction.transaction.signatures is required",
+        ):
+            _prove(transaction=missing_signatures)
+
+        missing_transaction = {"meta": {"innerInstructions": []}}
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError,
+            "transaction.transaction object is required",
+        ):
+            _prove(transaction=missing_transaction)
+
     def test_transaction_wide_amm_presence_does_not_prove_selected_pool(self):
         result = _prove(
-            occurrences=_occurrences(
-                accounts=["Signer111", "OtherPool", "OtherVaultA", "OtherVaultB"]
+            transaction=_transaction(
+                instructions=[
+                    _instruction(
+                        accounts=[
+                            "Signer111",
+                            "OtherPool",
+                            "OtherVaultA",
+                            "OtherVaultB",
+                        ]
+                    )
+                ]
             )
         )
 
@@ -150,29 +203,25 @@ class TransactionPoolMembershipTests(unittest.TestCase):
 
     def test_pool_and_vaults_must_cooccur_in_same_instruction(self):
         result = _prove(
-            occurrences=[
-                {
-                    "program_id": XDEX_MAINNET_OBSERVED_PROGRAM_ID,
-                    "scope": "outer",
-                    "group_index": None,
-                    "instruction_index": 1,
-                    "accounts": [POOL, ASSET_VAULT],
-                },
-                {
-                    "program_id": XDEX_MAINNET_OBSERVED_PROGRAM_ID,
-                    "scope": "outer",
-                    "group_index": None,
-                    "instruction_index": 2,
-                    "accounts": [POOL, COUNTER_VAULT],
-                },
-            ]
+            transaction=_transaction(
+                instructions=[
+                    _instruction(accounts=[POOL, ASSET_VAULT]),
+                    _instruction(accounts=[POOL, COUNTER_VAULT]),
+                ]
+            )
         )
 
+        self.assertEqual(result["recognized_amm_instruction_count"], 2)
         self.assertFalse(result["selected_pool_instruction_verified"])
         self.assertFalse(result["transaction_pool_membership_verified"])
 
     def test_unrecognized_program_occurrence_does_not_prove_membership(self):
-        result = _prove(occurrences=_occurrences(program_id="UnrecognizedProgram111"))
+        result = _prove(
+            transaction=_transaction(
+                instructions=[_instruction(program_id="UnrecognizedProgram111")]
+            )
+        )
+        self.assertEqual(result["recognized_amm_instruction_count"], 0)
         self.assertFalse(result["selected_pool_instruction_verified"])
         self.assertFalse(result["transaction_pool_membership_verified"])
 
@@ -180,33 +229,52 @@ class TransactionPoolMembershipTests(unittest.TestCase):
         wrong_asset = _prove(
             report=_report(
                 token_deltas=[
-                    _delta(ASSET_VAULT, ASSET_MINT, 10, owner="WrongOwner111"),
+                    _delta(
+                        ASSET_VAULT,
+                        ASSET_MINT,
+                        10,
+                        owner="WrongOwner111",
+                    ),
                     _delta(COUNTER_VAULT, COUNTER_MINT, -20),
                 ]
             )
         )
         self.assertFalse(wrong_asset["vault_authority_verified"])
         self.assertFalse(wrong_asset["transaction_pool_membership_verified"])
-        self.assertIn("asset_vault_owner_mismatch", wrong_asset["rejection_reasons"])
+        self.assertIn(
+            "asset_vault_owner_mismatch", wrong_asset["rejection_reasons"]
+        )
 
         wrong_counter = _prove(
             report=_report(
                 token_deltas=[
                     _delta(ASSET_VAULT, ASSET_MINT, 10),
-                    _delta(COUNTER_VAULT, COUNTER_MINT, -20, owner="WrongOwner111"),
+                    _delta(
+                        COUNTER_VAULT,
+                        COUNTER_MINT,
+                        -20,
+                        owner="WrongOwner111",
+                    ),
                 ]
             )
         )
         self.assertFalse(wrong_counter["vault_authority_verified"])
-        self.assertIn("counter_vault_owner_mismatch", wrong_counter["rejection_reasons"])
+        self.assertIn(
+            "counter_vault_owner_mismatch",
+            wrong_counter["rejection_reasons"],
+        )
 
     def test_shared_owner_is_required(self):
-        with self.assertRaisesRegex(X1TransactionPoolMembershipError, "shared_owner is required"):
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError, "shared_owner is required"
+        ):
             _prove(identity=_identity(shared_owner=None))
 
     def test_single_vault_is_not_enough(self):
         result = _prove(
-            report=_report(token_deltas=[_delta(ASSET_VAULT, ASSET_MINT, 10)])
+            report=_report(
+                token_deltas=[_delta(ASSET_VAULT, ASSET_MINT, 10)]
+            )
         )
         self.assertFalse(result["transaction_pool_membership_verified"])
         self.assertIn("counter_vault_delta_missing", result["rejection_reasons"])
@@ -253,26 +321,38 @@ class TransactionPoolMembershipTests(unittest.TestCase):
             )
         )
         self.assertFalse(result["transaction_pool_membership_verified"])
-        self.assertIn("duplicate_token_delta_account", result["rejection_reasons"])
+        self.assertIn(
+            "duplicate_token_delta_account", result["rejection_reasons"]
+        )
 
     def test_identity_must_be_explicitly_verified_boolean(self):
-        with self.assertRaisesRegex(X1TransactionPoolMembershipError, "must be a boolean"):
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError, "must be a boolean"
+        ):
             _prove(identity=_identity(identity_verified="true"))
-        with self.assertRaisesRegex(X1TransactionPoolMembershipError, "must be verified"):
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError, "must be verified"
+        ):
             _prove(identity=_identity(identity_verified=False))
 
     def test_distinct_vaults_and_mints_required(self):
-        with self.assertRaisesRegex(X1TransactionPoolMembershipError, "vault accounts must be distinct"):
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError,
+            "vault accounts must be distinct",
+        ):
             _prove(identity=_identity(counter_vault=ASSET_VAULT))
-        with self.assertRaisesRegex(X1TransactionPoolMembershipError, "vault mints must be distinct"):
+        with self.assertRaisesRegex(
+            X1TransactionPoolMembershipError,
+            "vault mints must be distinct",
+        ):
             _prove(identity=_identity(counter_mint=ASSET_MINT))
 
-    def test_instruction_occurrences_must_be_a_sequence(self):
-        with self.assertRaisesRegex(TypeError, "instruction_occurrences must be a sequence"):
+    def test_transaction_must_be_a_mapping(self):
+        with self.assertRaisesRegex(TypeError, "transaction must be a mapping"):
             prove_transaction_pool_membership(
                 verification_report=_report(),
                 pool_identity=_identity(),
-                instruction_occurrences="not-a-sequence",
+                transaction="not-a-transaction",
             )
 
 
