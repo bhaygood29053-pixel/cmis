@@ -20,7 +20,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from liquidity_scout.providers.x1.ninja_history import CHAIN, X1_NINJA_SOURCE
+from liquidity_scout.providers.x1.ninja_history import (
+    CHAIN,
+    OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS,
+    OBSERVED_TRADE_ROW_KEYS,
+    X1_NINJA_SOURCE,
+)
 from liquidity_scout.providers.x1.transaction_semantics import VerificationReport
 
 
@@ -32,6 +37,15 @@ WALLET_DIRECTION_BASIS = "SIGNER_OR_ROUTED_BALANCE_DIRECTION"
 CONFIRMED_SIDE_LEVEL = "PROVIDER_SIDE_ONCHAIN_CONFIRMED"
 _MAX_SAMPLE_ROWS = 100
 _SUPPORTED_SIDES = frozenset({"BUY", "SELL"})
+_UNVERIFIED_INPUT_SEMANTICS = (
+    "side_classification_verified",
+    "token_amount_units_verified",
+    "usd_value_source_verified",
+    "lp_event_semantics_verified",
+    "transaction_signature_verified",
+    "finality_verified",
+    "pagination_or_range_verified",
+)
 
 
 class X1NinjaTradeHistorySampleEvidenceError(ValueError):
@@ -43,6 +57,15 @@ def _strict_true(name: str, value: Any) -> None:
         raise X1NinjaTradeHistorySampleEvidenceError(f"{name} must be a boolean")
     if value is not True:
         raise X1NinjaTradeHistorySampleEvidenceError(f"{name} must be verified")
+
+
+def _strict_false(name: str, value: Any) -> None:
+    if not isinstance(value, bool):
+        raise X1NinjaTradeHistorySampleEvidenceError(f"{name} must be a boolean")
+    if value is not False:
+        raise X1NinjaTradeHistorySampleEvidenceError(
+            f"{name} must remain explicitly unverified"
+        )
 
 
 def _required_text(name: str, value: Any) -> str:
@@ -77,6 +100,32 @@ def _normalize_reports(
             )
         normalized[signature] = report
     return normalized
+
+
+def _revalidate_observed_shape(
+    raw_response: Mapping[str, Any],
+    trades: list[Any],
+) -> None:
+    missing_top = sorted(
+        OBSERVED_TRADE_HISTORY_TOP_LEVEL_KEYS - set(raw_response.keys())
+    )
+    if missing_top:
+        raise X1NinjaTradeHistorySampleEvidenceError(
+            "raw_response is missing observed top-level field(s): "
+            + ", ".join(missing_top)
+        )
+
+    for index, row in enumerate(trades):
+        if not isinstance(row, Mapping):
+            raise X1NinjaTradeHistorySampleEvidenceError(
+                f"trade row {index} must be a mapping"
+            )
+        missing_row = sorted(OBSERVED_TRADE_ROW_KEYS - set(row.keys()))
+        if missing_row:
+            raise X1NinjaTradeHistorySampleEvidenceError(
+                f"trade row {index} is missing observed field(s): "
+                + ", ".join(missing_row)
+            )
 
 
 def verify_ninja_trade_history_sample(
@@ -133,6 +182,16 @@ def verify_ninja_trade_history_sample(
         contract.get("trade_row_shape_verified"),
     )
 
+    semantics = observation.get("semantics")
+    if not isinstance(semantics, Mapping):
+        raise X1NinjaTradeHistorySampleEvidenceError("observation semantics are required")
+    _strict_true("semantics.trade_rows_verified", semantics.get("trade_rows_verified"))
+    for semantic_name in _UNVERIFIED_INPUT_SEMANTICS:
+        _strict_false(
+            f"semantics.{semantic_name}",
+            semantics.get(semantic_name),
+        )
+
     raw_response = observation.get("raw_response")
     if not isinstance(raw_response, Mapping):
         raise X1NinjaTradeHistorySampleEvidenceError("raw_response must be a mapping")
@@ -140,6 +199,17 @@ def verify_ninja_trade_history_sample(
     if not isinstance(trades, list):
         raise X1NinjaTradeHistorySampleEvidenceError(
             "raw_response.trades must be a list"
+        )
+    _revalidate_observed_shape(raw_response, trades)
+
+    returned_trade_count = contract.get("returned_trade_count")
+    if (
+        isinstance(returned_trade_count, bool)
+        or not isinstance(returned_trade_count, int)
+        or returned_trade_count != len(trades)
+    ):
+        raise X1NinjaTradeHistorySampleEvidenceError(
+            "contract.returned_trade_count must exactly match raw_response.trades"
         )
 
     reports = _normalize_reports(verification_reports)
@@ -156,11 +226,6 @@ def verify_ninja_trade_history_sample(
     side_match_complete = True
 
     for index, raw_row in enumerate(selected_rows):
-        if not isinstance(raw_row, Mapping):
-            raise X1NinjaTradeHistorySampleEvidenceError(
-                f"trade row {index} must be a mapping"
-            )
-
         row_pool = _required_text(
             f"trade row {index}.poolAddress", raw_row.get("poolAddress")
         )
