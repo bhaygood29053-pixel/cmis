@@ -3,6 +3,7 @@ import unittest
 from liquidity_scout.cmis.evidence import (
     AGREEMENT,
     CONFLICT,
+    SOURCE_INDEPENDENCE_UNPROVEN,
     build_evidence_observation,
 )
 from liquidity_scout.providers.x1.reserve_verification import (
@@ -45,17 +46,33 @@ class X1ReserveVerificationTests(unittest.TestCase):
         values.update(overrides)
         return self._observation(**values)
 
-    def test_matching_independent_reserves_are_high_quality_and_promotable(self):
+    def test_matching_reserves_need_explicit_independence_for_promotion(self):
         result = verify_x1_pool_reserve(self._observation(), self._rpc())
 
         self.assertEqual(result["verification"]["status"], AGREEMENT)
-        self.assertEqual(result["data_quality"]["quality"], "HIGH")
-        self.assertTrue(result["cmis_promotable"])
+        self.assertEqual(result["data_quality"]["quality"], "MEDIUM")
+        self.assertIsNone(result["data_quality"]["source_independence_verified"])
+        self.assertTrue(result["data_quality"]["same_fact_agreement_verified"])
+        self.assertFalse(result["data_quality"]["independent_agreement_verified"])
+        self.assertIn(SOURCE_INDEPENDENCE_UNPROVEN, result["data_quality"]["reasons"])
+        self.assertFalse(result["cmis_promotable"])
+
+        proven = verify_x1_pool_reserve(
+            self._observation(),
+            self._rpc(),
+            source_independence_verified=True,
+        )
+        self.assertEqual(proven["verification"]["status"], AGREEMENT)
+        self.assertEqual(proven["data_quality"]["quality"], "HIGH")
+        self.assertTrue(proven["data_quality"]["source_independence_verified"])
+        self.assertTrue(proven["data_quality"]["independent_agreement_verified"])
+        self.assertTrue(proven["cmis_promotable"])
 
     def test_conflicting_reserves_are_low_quality_and_not_promotable(self):
         result = verify_x1_pool_reserve(
             self._observation(),
             self._rpc(normalized_value="249.999"),
+            source_independence_verified=True,
         )
 
         self.assertEqual(result["verification"]["status"], CONFLICT)
@@ -66,6 +83,7 @@ class X1ReserveVerificationTests(unittest.TestCase):
         result = verify_x1_pool_reserve(
             self._observation(semantics_verified=False),
             self._rpc(),
+            source_independence_verified=True,
         )
 
         self.assertEqual(result["verification"]["code"], SEMANTICS_UNVERIFIED)
@@ -75,6 +93,7 @@ class X1ReserveVerificationTests(unittest.TestCase):
         result = verify_x1_pool_reserve(
             self._observation(identity_verified=False),
             self._rpc(),
+            source_independence_verified=True,
         )
 
         self.assertEqual(result["verification"]["code"], IDENTITY_UNVERIFIED)
@@ -84,15 +103,18 @@ class X1ReserveVerificationTests(unittest.TestCase):
         result = verify_x1_pool_reserve(
             self._observation(),
             self._observation(source_role="onchain_verifier"),
+            source_independence_verified=True,
         )
 
         self.assertEqual(result["verification"]["code"], SAME_SOURCE)
+        self.assertFalse(result["data_quality"]["source_independence_verified"])
         self.assertFalse(result["cmis_promotable"])
 
     def test_non_reserve_fact_is_rejected(self):
         result = verify_x1_pool_reserve(
             self._observation(fact_type="total_supply"),
             self._rpc(fact_type="total_supply"),
+            source_independence_verified=True,
         )
 
         self.assertEqual(result["verification"]["code"], WRONG_FACT_TYPE)
@@ -102,12 +124,21 @@ class X1ReserveVerificationTests(unittest.TestCase):
         result = verify_x1_pool_reserve(
             self._observation(freshness_verified=False),
             self._rpc(freshness_verified=False),
+            source_independence_verified=True,
         )
 
         self.assertEqual(result["verification"]["status"], AGREEMENT)
-        self.assertEqual(result["data_quality"]["quality"], "LOW")
+        self.assertEqual(result["data_quality"]["quality"], "MEDIUM")
         self.assertIn("FRESHNESS_UNVERIFIED", result["data_quality"]["reasons"])
         self.assertFalse(result["cmis_promotable"])
+
+    def test_invalid_independence_type_fails_closed(self):
+        with self.assertRaises(TypeError):
+            verify_x1_pool_reserve(
+                self._observation(),
+                self._rpc(),
+                source_independence_verified="yes",
+            )
 
 
 if __name__ == "__main__":
