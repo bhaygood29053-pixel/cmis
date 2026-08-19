@@ -112,6 +112,8 @@ def build_verified_asset_activity_response(
     asset_scope_mismatches = 0
     bounded_event_pools = 0
     exact_amount_trades = 0
+    exact_buy_amount_trades = 0
+    exact_sell_amount_trades = 0
 
     exact_buy_asset = Decimal(0)
     exact_sell_asset = Decimal(0)
@@ -217,8 +219,10 @@ def build_verified_asset_activity_response(
                 ):
                     exact_amount_trades += 1
                     if side == "BUY":
+                        exact_buy_amount_trades += 1
                         exact_buy_asset += asset_amount
                     elif side == "SELL":
+                        exact_sell_amount_trades += 1
                         exact_sell_asset += asset_amount
 
                     bucket = quote_totals.setdefault(
@@ -344,7 +348,7 @@ def build_verified_asset_activity_response(
     verification_ratio = (
         round(verified_trades / swap_candidates, 6)
         if swap_candidates > 0
-        else 1.0
+        else None
     )
 
     sources = list(market_envelope.get("sources") or [])
@@ -380,8 +384,16 @@ def build_verified_asset_activity_response(
             "unresolved_event_count": unresolved,
             "asset_scope_mismatch_count": asset_scope_mismatches,
             "exact_verified_asset_amounts": {
-                "buy_asset_amount": _decimal_text(exact_buy_asset),
-                "sell_asset_amount": _decimal_text(exact_sell_asset),
+                "buy_asset_amount": (
+                    _decimal_text(exact_buy_asset)
+                    if exact_buy_amount_trades > 0
+                    else None
+                ),
+                "sell_asset_amount": (
+                    _decimal_text(exact_sell_asset)
+                    if exact_sell_amount_trades > 0
+                    else None
+                ),
             },
             "exact_verified_quote_amounts_by_mint": exact_quotes,
             "pools": pools,
