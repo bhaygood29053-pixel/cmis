@@ -92,6 +92,85 @@ def _boolean_category(
     )
 
 
+def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
+    """Score source independence only from explicit provenance verification.
+
+    Distinct source labels and a verifier-shaped record are structural evidence
+    only.  They do not prove that the sources have independent upstream lineage.
+    CMIS therefore requires an explicit ``source_independence_verified`` evidence
+    flag before this category can receive proof credit.
+    """
+
+    raw_sources = receipt.get("sources")
+    sources = raw_sources if isinstance(raw_sources, list) else []
+    unique_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if isinstance(item, Mapping) and _text(item.get("source")) is not None
+    }
+    verifier_records = [
+        item
+        for item in sources
+        if isinstance(item, Mapping)
+        and item.get("evidence_class") == "verifier_observation"
+    ]
+    independence_flags = _flags_for(receipt, ("source_independence_verified",))
+    flag_paths = list(independence_flags)
+
+    if not unique_source_names:
+        return _category(
+            state="UNKNOWN",
+            score=None,
+            reasons=["no source identity evidence supplied"],
+            evidence_paths=flag_paths,
+        )
+    if len(unique_source_names) < 2:
+        return _category(
+            state="UNVERIFIED",
+            score=0,
+            reasons=["single-source evidence cannot establish source independence"],
+            evidence_paths=flag_paths,
+        )
+    if not verifier_records:
+        if independence_flags:
+            return _category(
+                state="UNVERIFIED",
+                score=0,
+                reasons=[
+                    "source independence flag is present but verifier observation role is not established"
+                ],
+                evidence_paths=flag_paths,
+            )
+        return _category(
+            state="UNKNOWN",
+            score=None,
+            reasons=[
+                "multiple source identities are present but independent verifier provenance is not explicitly established"
+            ],
+        )
+    if not independence_flags:
+        return _category(
+            state="UNKNOWN",
+            score=None,
+            reasons=[
+                "distinct source labels and verifier roles do not prove source independence"
+            ],
+        )
+    if all(independence_flags.values()):
+        return _category(
+            state="VERIFIED",
+            score=100,
+            reasons=["source independence is explicitly verified"],
+            evidence_paths=flag_paths,
+        )
+    return _category(
+        state="UNVERIFIED",
+        score=0,
+        reasons=["one or more source independence gates are explicitly unverified"],
+        evidence_paths=flag_paths,
+    )
+
+
 def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
     """Score evidence categories without using risk or financial severity.
 
@@ -141,46 +220,7 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
             reasons=["freshness verification evidence not supplied"],
         )
 
-    raw_sources = receipt.get("sources")
-    sources = raw_sources if isinstance(raw_sources, list) else []
-    unique_source_names = {
-        _text(item.get("source"))
-        for item in sources
-        if isinstance(item, Mapping) and _text(item.get("source")) is not None
-    }
-    verifier_records = [
-        item
-        for item in sources
-        if isinstance(item, Mapping)
-        and item.get("evidence_class") == "verifier_observation"
-    ]
-    if len(unique_source_names) >= 2 and verifier_records:
-        source_independence = _category(
-            state="VERIFIED",
-            score=100,
-            reasons=["distinct reported and verifier source records are present"],
-        )
-    elif len(unique_source_names) >= 2:
-        source_independence = _category(
-            state="PARTIAL",
-            score=50,
-            reasons=[
-                "multiple source identities are present",
-                "independent verifier role is not explicitly established",
-            ],
-        )
-    elif len(unique_source_names) == 1:
-        source_independence = _category(
-            state="UNVERIFIED",
-            score=0,
-            reasons=["single-source evidence only"],
-        )
-    else:
-        source_independence = _category(
-            state="UNKNOWN",
-            score=None,
-            reasons=["no source identity evidence supplied"],
-        )
+    source_independence = _source_independence_category(receipt)
 
     verification = receipt.get("verification")
     verification_status = (
@@ -192,25 +232,25 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
         agreement = _category(
             state="VERIFIED",
             score=100,
-            reasons=["independent same-fact agreement recorded"],
+            reasons=["same-fact agreement recorded"],
         )
     elif verification_status == "CONFLICT":
         agreement = _category(
             state="CONFLICT",
             score=0,
-            reasons=["independent evidence conflict recorded"],
+            reasons=["same-fact evidence conflict recorded"],
         )
     elif verification_status == "INSUFFICIENT_EVIDENCE":
         agreement = _category(
             state="UNKNOWN",
             score=None,
-            reasons=["independent agreement is not proven"],
+            reasons=["same-fact agreement is not proven"],
         )
     else:
         agreement = _category(
             state="UNKNOWN",
             score=None,
-            reasons=["no independent verification status supplied"],
+            reasons=["no verification status supplied"],
         )
 
     scope_flags = _flags_for(
@@ -270,6 +310,8 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
         unknown_reason="no historical coverage proof supplied",
     )
 
+    raw_sources = receipt.get("sources")
+    sources = raw_sources if isinstance(raw_sources, list) else []
     observation = receipt.get("observation")
     observed_times = (
         observation.get("observed_times")
