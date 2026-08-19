@@ -240,11 +240,6 @@ def build_evidence_receipt(envelope: Mapping[str, Any]) -> dict[str, Any]:
         verification_status = candidate if candidate in _VERIFICATION_STATUSES else None
         verification_code = _text(verification.get("code"))
 
-    promotable = data.get("cmis_promotable") if isinstance(data, Mapping) else None
-    independently_verified = bool(
-        verification_status == "AGREEMENT" and promotable is True
-    )
-
     scope_claims: list[dict[str, str]] = []
     for path in _SCOPE_PATHS:
         value = _text(_path_get(envelope, path))
@@ -255,6 +250,47 @@ def build_evidence_receipt(envelope: Mapping[str, Any]) -> dict[str, Any]:
         **_walk_evidence_flags(data, prefix="data"),
         **_walk_evidence_flags(confidence, prefix="confidence"),
     }
+
+    source_independence_flags = {
+        path: flag
+        for path, flag in evidence_flags.items()
+        if path.endswith("source_independence_verified")
+    }
+    if source_independence_flags:
+        source_independence_verified: bool | None = all(
+            source_independence_flags.values()
+        )
+    else:
+        source_independence_verified = None
+
+    unique_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if _text(item.get("source")) is not None
+    }
+    verifier_observation_present = any(
+        item.get("evidence_class") == "verifier_observation" for item in sources
+    )
+    source_structure_verified = bool(
+        len(unique_source_names) >= 2 and verifier_observation_present
+    )
+
+    promotable = data.get("cmis_promotable") if isinstance(data, Mapping) else None
+    if (
+        verification_status == "AGREEMENT"
+        and promotable is True
+        and source_independence_verified is True
+        and source_structure_verified
+    ):
+        independently_verified: bool | None = True
+    elif (
+        verification_status == "CONFLICT"
+        or source_independence_verified is False
+        or (source_independence_verified is True and not source_structure_verified)
+    ):
+        independently_verified = False
+    else:
+        independently_verified = None
 
     freshness_flags = {
         path: flag
@@ -295,7 +331,11 @@ def build_evidence_receipt(envelope: Mapping[str, Any]) -> dict[str, Any]:
     if verification_status is None:
         unresolved_fields.append("verification.status")
     elif verification_status == "INSUFFICIENT_EVIDENCE":
-        unresolved_fields.append("verification.independent_evidence")
+        unresolved_fields.append("verification.same_fact_evidence")
+    if source_independence_verified is None:
+        unresolved_fields.append("verification.source_independence")
+    elif source_independence_verified is True and not source_structure_verified:
+        unresolved_fields.append("verification.source_structure")
     if not scope_claims:
         unresolved_fields.append("evidence_scope")
     if freshness_verified is None:
@@ -326,6 +366,7 @@ def build_evidence_receipt(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "verification": {
             "status": verification_status or "UNVERIFIED",
             "code": verification_code,
+            "source_independence_verified": source_independence_verified,
             "independently_verified": independently_verified,
             "provider_assertion_promoted": False,
         },
