@@ -1,13 +1,13 @@
 """Bind bounded X1.Ninja history rows to exact transaction/pool evidence.
 
 This module is transport-free and intentionally layered on top of
-``verify_ninja_trade_history_sample``.  It consumes already-produced
+``verify_ninja_trade_history_sample``. It consumes already-produced
 ``x1_transaction_pool_membership/v3`` evidence keyed by transaction signature
 and upgrades only the narrow pool-membership facts that those proofs establish.
 
-Provider row pool labels are not treated as proof.  A sampled row is considered
+Provider row pool labels are not treated as proof. A sampled row is considered
 on-chain verified for the selected pool only when its ``txHash`` is bound to a
-valid positive membership proof for that exact pool.  History completeness,
+valid positive membership proof for that exact pool. History completeness,
 ordering, source independence, finality, amount/price semantics, and CMIS
 promotion remain outside this contract.
 """
@@ -20,7 +20,6 @@ from typing import Any
 from liquidity_scout.providers.x1.ninja_history import CHAIN
 from liquidity_scout.providers.x1.ninja_trade_history_sample_evidence import (
     CONTRACT_VERSION as BASE_CONTRACT_VERSION,
-    X1NinjaTradeHistorySampleEvidenceError,
     verify_ninja_trade_history_sample,
 )
 from liquidity_scout.providers.x1.transaction_semantics import VerificationReport
@@ -143,6 +142,20 @@ def _validate_membership_proof(
             "selected pool instruction count cannot exceed recognized AMM count"
         )
 
+    selected_evidence = proof.get("selected_pool_instruction_evidence")
+    if (
+        isinstance(selected_evidence, (str, bytes))
+        or not isinstance(selected_evidence, Sequence)
+        or any(not isinstance(item, Mapping) for item in selected_evidence)
+    ):
+        raise X1NinjaTradeHistoryPoolMembershipError(
+            "selected pool instruction evidence must be a sequence of mappings"
+        )
+    if len(selected_evidence) != selected_count:
+        raise X1NinjaTradeHistoryPoolMembershipError(
+            "selected pool instruction evidence count does not match declared count"
+        )
+
     rejection_reasons = proof.get("rejection_reasons")
     if (
         isinstance(rejection_reasons, (str, bytes))
@@ -163,7 +176,11 @@ def _validate_membership_proof(
             "membership proof must preserve cmis_promotable=false"
         )
     for field in _UNRELATED_MEMBERSHIP_FIELDS:
-        if proof.get(field) is not None:
+        if field not in proof:
+            raise X1NinjaTradeHistoryPoolMembershipError(
+                f"membership proof {field} must be explicit"
+            )
+        if proof[field] is not None:
             raise X1NinjaTradeHistoryPoolMembershipError(
                 f"membership proof {field} must remain unproven"
             )
@@ -222,7 +239,13 @@ def verify_ninja_trade_history_pool_membership(
     all_membership_verified = bool(base.get("sample_size", 0))
     all_provider_pool_claims_verified = bool(base.get("sample_size", 0))
 
-    for row in base.get("rows", []):
+    rows = base.get("rows")
+    if not isinstance(rows, list):
+        raise X1NinjaTradeHistoryPoolMembershipError(
+            "base Ninja history rows must be a list"
+        )
+
+    for row in rows:
         if not isinstance(row, Mapping):
             raise X1NinjaTradeHistoryPoolMembershipError(
                 "base Ninja history row evidence must be a mapping"
@@ -244,9 +267,7 @@ def verify_ninja_trade_history_pool_membership(
             )
 
         row_pool_matches = row.get("row_pool_matches_verified_pool_identity") is True
-        provider_pool_claim_verified = bool(
-            row_pool_matches and membership_verified
-        )
+        provider_pool_claim_verified = bool(row_pool_matches and membership_verified)
         all_membership_verified = all_membership_verified and membership_verified
         all_provider_pool_claims_verified = (
             all_provider_pool_claims_verified and provider_pool_claim_verified
