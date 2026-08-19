@@ -1,7 +1,7 @@
 """Prove one verified X1 transaction touched both vaults of one verified pool.
 
 This module is transport-free. It composes an existing ``VerificationReport``
-with an independently established pool/vault identity. It does not infer pool
+with a separately verified pool/vault identity. It does not infer pool
 membership from symbols, provider labels, balances, or a single token account.
 
 Membership is proven only when a successful recognized XDEX/XenDEX transaction
@@ -116,12 +116,12 @@ def prove_transaction_pool_membership(
         "asset_vault_mutated": asset_delta is not None and asset_delta.mint == asset_mint and asset_delta.delta_raw != 0,
         "counter_vault_mutated": counter_delta is not None and counter_delta.mint == counter_mint and counter_delta.delta_raw != 0,
         "transaction_pool_membership_verified": membership_verified,
-        "provider_row_pool_claim_verified": False,
-        "source_independence_verified": False,
-        "history_completeness_verified": False,
-        "finality_semantics_verified": False,
-        "amount_semantics_verified": False,
-        "price_semantics_verified": False,
+        "provider_row_pool_claim_verified": None,
+        "source_independence_verified": None,
+        "history_completeness_verified": None,
+        "finality_semantics_verified": None,
+        "amount_semantics_verified": None,
+        "price_semantics_verified": None,
         "cmis_promotable": False,
         "rejection_reasons": reasons,
     }
