@@ -130,8 +130,9 @@ def _validate_receipt(receipt: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("evidence receipt verification object is required")
     if verification.get("provider_assertion_promoted") is not False:
         raise ValueError("provider assertions must not be promoted")
-    if not isinstance(verification.get("independently_verified"), bool):
-        raise ValueError("receipt independently_verified must be a boolean")
+    independently_verified = verification.get("independently_verified")
+    if independently_verified is not None and not isinstance(independently_verified, bool):
+        raise ValueError("receipt independently_verified must be true, false, or null")
 
     sources = record.get("sources")
     if not isinstance(sources, list):
