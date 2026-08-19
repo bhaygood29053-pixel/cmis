@@ -49,20 +49,19 @@ That proves only that the UI has named bridge-flow/TVL concepts. It does **not**
 
 The current research pass found the public X1 Prism application but did **not** find public API documentation, a clearly attributable public source repository, or another stable machine-readable contract that explains the bridge metrics.
 
-A launch post attributed to the X1 Prism builder describes the product as community-built and states that its data is sourced on-chain from XDEX. The statement is currently corroborated only through indexed social mirrors rather than a published X1 Prism API contract or public source repository.
+Public search indexes also surfaced third-party social mirrors containing a launch-style statement attributed to `@Shaka_Vibes` about X1 Prism and XDEX sourcing. However, this research pass did **not** recover the original post URL/status identifier or another first-party artifact that makes that statement reproducibly attributable.
 
-Treat that statement as **supporting provenance evidence**, not as a verified bridge-contract fact. It creates an important negative independence signal:
+CMIS therefore excludes that social-mirror statement from accepted provenance evidence. It is **not** used to conclude that Prism depends on XDEX, and it is **not** used to make any bridge-metric source claim.
+
+The accepted conclusion requires no such social claim:
 
 ```text
-creator-attributed general data source = XDEX
 bridge-metric-specific source = unverified
 source independence from XDEX = not established
 source independence from Warp Bridge upstream = not established
 ```
 
-The statement does **not** prove that `Today In`, `Today Out`, `Net`, or `TVL` specifically originate from XDEX. However, until the bridge-specific source is identified, CMIS must not assume Prism is independent of XDEX or any other source being cross-checked.
-
-Therefore X1 Prism cannot currently be treated as an independent verifier merely because it displays values that resemble bridge facts.
+X1 Prism cannot currently be treated as an independent verifier merely because it displays values that resemble bridge facts. Independence remains unverified until the exact upstream lineage for the specific bridge metric is established.
 
 ## Independence rule
 
@@ -113,9 +112,7 @@ Do not use X1 Prism research to:
 
 ## CMIS conclusion
 
-X1 Prism remains useful as a **candidate** bridge-flow/TVL research surface because it visibly exposes relevant analytical fields. However, the current evidence does not establish a stable machine-readable contract or independent data provenance.
-
-The creator-attributed general XDEX sourcing statement increases the burden of proof for any future `independent` role. It does not by itself establish the bridge metric source, but it means CMIS should presume independence is **unverified**, not infer independence from the separate Prism domain.
+X1 Prism remains useful as a **candidate** bridge-flow/TVL research surface because it visibly exposes relevant analytical fields. However, the current reproducible evidence does not establish a stable machine-readable contract or independent data provenance.
 
 This is not evidence that Prism is unsafe or inaccurate. It is an evidence-role decision: **a source cannot be used as independent corroboration until its upstream lineage is known to be independent for the specific fact being compared.**
 
@@ -132,7 +129,7 @@ The next valid engineering step is to identify the exact read-only source used f
 ## Research sources
 
 - X1 Prism public application: `https://x1prism.com/`
-- creator-attributed launch statement observed through indexed social mirrors; discovery evidence only
+- third-party indexed social-mirror observation: excluded from accepted provenance because the original post URL/status identifier was not recovered
 - official Warp Bridge surface for comparison/context: `https://app.bridge.x1.xyz/`
 - current CMIS gap register: `docs/X1_PROVIDER_GAP_REGISTER.md`
 - Warp Bridge discovery boundary: `docs/X1_WARP_BRIDGE_SOURCE_DISCOVERY.md`
