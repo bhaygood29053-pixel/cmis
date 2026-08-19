@@ -105,9 +105,7 @@ def _instruction_accounts(
 def _transaction_signature(tx: Mapping[str, Any]) -> str:
     transaction = tx.get("transaction")
     if not isinstance(transaction, Mapping):
-        raise X1DexPoolInstructionMembershipError(
-            "transaction envelope is required"
-        )
+        raise X1DexPoolInstructionMembershipError("transaction envelope is required")
     signatures = transaction.get("signatures")
     if not isinstance(signatures, list) or not signatures:
         raise X1DexPoolInstructionMembershipError(
@@ -153,6 +151,10 @@ def verify_dex_pool_instruction_membership(
     meta = tx.get("meta")
     if not isinstance(meta, Mapping):
         raise X1DexPoolInstructionMembershipError("transaction meta is required")
+    if "err" not in meta:
+        raise X1DexPoolInstructionMembershipError(
+            "transaction meta.err is required to verify success state"
+        )
 
     hits: list[dict[str, Any]] = []
 
@@ -211,6 +213,7 @@ def verify_dex_pool_instruction_membership(
         "recognized_amm_instruction_pool_account_membership_verified": (
             membership_verified
         ),
+        "transaction_success_state_verified": True,
         "successful_recognized_amm_instruction_pool_account_membership_verified": (
             membership_verified and transaction_succeeded
         ),
@@ -226,6 +229,7 @@ def verify_dex_pool_instruction_membership(
             "instruction_account_membership_is_not_pool_mutation_proof",
             "instruction_account_membership_is_not_route_exclusivity_proof",
             "provider_trade_semantics_require_separate_evidence",
+            "index_resolution_is_limited_to_account_keys_resolved_in_the_parsed_transaction",
         ],
     }
 
