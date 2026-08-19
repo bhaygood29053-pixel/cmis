@@ -117,6 +117,8 @@ X1 Prism remains useful as a **candidate** bridge-flow/TVL research surface beca
 
 The creator-attributed general XDEX sourcing statement increases the burden of proof for any future `independent` role. It does not by itself establish the bridge metric source, but it means CMIS should presume independence is **unverified**, not infer independence from the separate Prism domain.
 
+This is not evidence that Prism is unsafe or inaccurate. It is an evidence-role decision: **a source cannot be used as independent corroboration until its upstream lineage is known to be independent for the specific fact being compared.**
+
 Until both the bridge-specific contract and actual upstream independence are proven, the accepted boundary remains:
 
 ```text
