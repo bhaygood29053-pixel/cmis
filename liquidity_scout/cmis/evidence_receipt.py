@@ -263,14 +263,31 @@ def build_evidence_receipt(envelope: Mapping[str, Any]) -> dict[str, Any]:
     else:
         source_independence_verified = None
 
+    unique_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if _text(item.get("source")) is not None
+    }
+    verifier_observation_present = any(
+        item.get("evidence_class") == "verifier_observation" for item in sources
+    )
+    source_structure_verified = bool(
+        len(unique_source_names) >= 2 and verifier_observation_present
+    )
+
     promotable = data.get("cmis_promotable") if isinstance(data, Mapping) else None
     if (
         verification_status == "AGREEMENT"
         and promotable is True
         and source_independence_verified is True
+        and source_structure_verified
     ):
         independently_verified: bool | None = True
-    elif verification_status == "CONFLICT" or source_independence_verified is False:
+    elif (
+        verification_status == "CONFLICT"
+        or source_independence_verified is False
+        or (source_independence_verified is True and not source_structure_verified)
+    ):
         independently_verified = False
     else:
         independently_verified = None
@@ -317,6 +334,8 @@ def build_evidence_receipt(envelope: Mapping[str, Any]) -> dict[str, Any]:
         unresolved_fields.append("verification.same_fact_evidence")
     if source_independence_verified is None:
         unresolved_fields.append("verification.source_independence")
+    elif source_independence_verified is True and not source_structure_verified:
+        unresolved_fields.append("verification.source_structure")
     if not scope_claims:
         unresolved_fields.append("evidence_scope")
     if freshness_verified is None:
