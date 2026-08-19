@@ -107,7 +107,7 @@ def _report(
 
 
 class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
-    def test_binds_returned_prefix_and_observes_newest_first_rpc_slot_order(self):
+    def test_binds_transaction_identity_and_observes_newest_first_order(self):
         rows = [_row("sig-2", 200), _row("sig-1", 199, side="SELL")]
         result = verify_ninja_trade_history_sample(
             observation=_observation(rows),
@@ -119,7 +119,9 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
             pool_identity_verified=True,
         )
 
-        self.assertTrue(result["sample_transaction_scope_binding_complete"])
+        self.assertTrue(result["sample_transaction_identity_binding_complete"])
+        self.assertTrue(result["sample_row_pool_identity_match_complete"])
+        self.assertFalse(result["sample_transaction_pool_membership_verified"])
         self.assertTrue(result["sample_maker_primary_signer_match_complete"])
         self.assertTrue(result["sample_provider_slot_rpc_match_complete"])
         self.assertTrue(result["sample_wallet_side_rpc_match_complete"])
@@ -127,6 +129,10 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
             result["returned_order_observation"],
             "newest_to_oldest_by_verified_rpc_slot_observed",
         )
+        self.assertFalse(
+            result["semantics"]["transaction_pool_membership_verified"]
+        )
+        self.assertFalse(result["semantics"]["rpc_source_independence_verified"])
         self.assertFalse(result["semantics"]["ordering_contract_verified"])
         self.assertFalse(result["semantics"]["pagination_or_range_verified"])
         self.assertFalse(result["semantics"]["history_exhaustive_verified"])
@@ -137,7 +143,7 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
         self.assertNotIn("priceUsd", result["rows"][0])
         self.assertNotIn("timestamp", result["rows"][0])
 
-    def test_reversed_rpc_slots_are_observed_but_not_rejected_or_promoted(self):
+    def test_reversed_rpc_slots_are_observed_but_not_promoted(self):
         rows = [_row("sig-old", 199), _row("sig-new", 200)]
         result = verify_ninja_trade_history_sample(
             observation=_observation(rows),
@@ -149,14 +155,14 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
             pool_identity_verified=True,
         )
 
-        self.assertTrue(result["sample_transaction_scope_binding_complete"])
+        self.assertTrue(result["sample_transaction_identity_binding_complete"])
         self.assertEqual(
             result["returned_order_observation"],
             "not_newest_to_oldest_by_verified_rpc_slot_observed",
         )
         self.assertFalse(result["semantics"]["ordering_contract_verified"])
 
-    def test_missing_rpc_report_keeps_sample_binding_incomplete(self):
+    def test_missing_rpc_report_keeps_transaction_identity_incomplete(self):
         rows = [_row("sig-2", 200), _row("sig-1", 199)]
         result = verify_ninja_trade_history_sample(
             observation=_observation(rows),
@@ -165,12 +171,12 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
             pool_identity_verified=True,
         )
 
-        self.assertFalse(result["sample_rpc_binding_complete"])
-        self.assertFalse(result["sample_transaction_scope_binding_complete"])
+        self.assertFalse(result["sample_rpc_report_binding_complete"])
+        self.assertFalse(result["sample_transaction_identity_binding_complete"])
         self.assertEqual(result["returned_order_observation"], "unavailable")
         self.assertFalse(result["cmis_promotable"])
 
-    def test_pool_mismatch_is_recorded_without_promoting_scope(self):
+    def test_row_pool_mismatch_does_not_change_transaction_identity_binding(self):
         rows = [_row("sig-1", 200, pool=OTHER_POOL)]
         result = verify_ninja_trade_history_sample(
             observation=_observation(rows),
@@ -179,12 +185,16 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
             pool_identity_verified=True,
         )
 
-        self.assertFalse(result["sample_pool_scope_match_complete"])
-        self.assertFalse(result["sample_transaction_scope_binding_complete"])
+        self.assertTrue(result["sample_transaction_identity_binding_complete"])
+        self.assertFalse(result["sample_row_pool_identity_match_complete"])
+        self.assertFalse(result["sample_transaction_pool_membership_verified"])
+        self.assertFalse(result["semantics"]["sample_row_pool_identity_crosscheck"])
         self.assertFalse(
-            result["semantics"][
-                "sample_transaction_identity_and_pool_scope_crosscheck"
-            ]
+            result["semantics"]["transaction_pool_membership_verified"]
+        )
+        self.assertIn(
+            "provider_row_pool_does_not_match_verified_pool_for_every_row",
+            result["warnings"],
         )
 
     def test_exact_pool_leg_side_does_not_become_wallet_level_side_evidence(self):
@@ -202,13 +212,26 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
             pool_identity_verified=True,
         )
 
-        self.assertTrue(result["sample_transaction_scope_binding_complete"])
+        self.assertTrue(result["sample_transaction_identity_binding_complete"])
         self.assertFalse(result["sample_wallet_side_rpc_match_complete"])
         self.assertFalse(result["semantics"]["sample_provider_side_crosscheck"])
         self.assertIn(
             "provider_side_not_confirmed_for_every_sampled_row",
             result["warnings"],
         )
+
+    def test_provider_side_case_is_not_normalized(self):
+        rows = [_row("sig-1", 200, side="buy")]
+        result = verify_ninja_trade_history_sample(
+            observation=_observation(rows),
+            verification_reports={"sig-1": _report("sig-1", 200, side="BUY")},
+            pool_address=POOL,
+            pool_identity_verified=True,
+        )
+
+        self.assertTrue(result["sample_transaction_identity_binding_complete"])
+        self.assertFalse(result["sample_wallet_side_rpc_match_complete"])
+        self.assertFalse(result["semantics"]["sample_provider_side_crosscheck"])
 
     def test_local_bound_samples_only_returned_prefix(self):
         rows = [
@@ -231,7 +254,7 @@ class X1NinjaTradeHistorySampleEvidenceTests(unittest.TestCase):
         self.assertEqual(result["sample_size"], 2)
         self.assertTrue(result["sample_is_returned_prefix"])
         self.assertTrue(result["sample_truncated_by_local_verifier"])
-        self.assertTrue(result["sample_transaction_scope_binding_complete"])
+        self.assertTrue(result["sample_transaction_identity_binding_complete"])
         self.assertEqual(
             [row["transaction_id"] for row in result["rows"]],
             ["sig-3", "sig-2"],
