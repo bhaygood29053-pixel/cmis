@@ -90,8 +90,15 @@ class TransactionPoolMembershipTests(unittest.TestCase):
         self.assertTrue(result["counter_vault_mutated"])
         self.assertEqual(result["rejection_reasons"], [])
         self.assertFalse(result["cmis_promotable"])
-        self.assertFalse(result["source_independence_verified"])
-        self.assertFalse(result["provider_row_pool_claim_verified"])
+        for field in (
+            "provider_row_pool_claim_verified",
+            "source_independence_verified",
+            "history_completeness_verified",
+            "finality_semantics_verified",
+            "amount_semantics_verified",
+            "price_semantics_verified",
+        ):
+            self.assertIsNone(result[field], field)
 
     def test_single_vault_is_not_enough(self):
         result = prove_transaction_pool_membership(
