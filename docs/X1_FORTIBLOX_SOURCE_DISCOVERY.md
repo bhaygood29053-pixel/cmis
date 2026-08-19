@@ -17,6 +17,7 @@ provider_status = CANDIDATE
 explorer_rest_api_documented = true
 explorer_exact_endpoint_list_verified = false
 nexus_rpc_contract_verified = false
+public_api_implementation_repo_found = false
 source_independence_verified = false
 history_completeness_verified = false
 freshness_verified = false
@@ -113,7 +114,31 @@ CMIS promotion = false
 
 No credential-bearing live probe was performed in this discovery pass.
 
-## 4. Why FortiBlox may still be useful
+## 4. Public implementation-repository check
+
+The FortiBlox documentation links to the provider's public GitHub organization:
+
+- `https://github.com/fortiblox`
+
+At this research observation, that organization exposed six public repositories: `X1-Forge`, `X1-Aether`, `X1-Stratus`, `x1-nimbus`, `Listenarr`, and `fortiblox-router`.
+
+No public repository for the Explorer REST API, Nexus RPC service, or the documentation-referenced `fortiblox-rpc-proxy` implementation was present in that visible repository set.
+
+The RPC Proxy documentation itself describes `github.com/fortiblox/fortiblox-rpc-proxy` as a future/coming-soon repository. That documentation reference is therefore not accepted as proof that an implementation repository currently exists.
+
+Accepted interpretation:
+
+```text
+provider GitHub organization provenance = VERIFIED PUBLIC SURFACE
+public Explorer API implementation repo = NOT FOUND
+public Nexus RPC implementation repo = NOT FOUND
+public fortiblox-rpc-proxy repo = NOT FOUND IN CURRENT PUBLIC REPO SET
+implementation contract inferred from docs = forbidden
+```
+
+Absence of a public implementation repository does not prove the services do not exist. It only means CMIS cannot use public source code to close the contract/provenance gap in this pass.
+
+## 5. Why FortiBlox may still be useful
 
 FortiBlox remains worth investigating because its public Explorer is X1-specific and exposes account/block/transaction/validator/token surfaces that could potentially provide:
 
@@ -125,7 +150,7 @@ FortiBlox remains worth investigating because its public Explorer is X1-specific
 
 These are candidate roles only.
 
-## 5. Required verification before any adapter
+## 6. Required verification before any adapter
 
 Before FortiBlox enters the X1 Provider, CMIS requires an exact read-only contract for each promoted capability.
 
@@ -148,7 +173,7 @@ Before FortiBlox enters the X1 Provider, CMIS requires an exact read-only contra
 6. Verify commitment/finality semantics and error handling.
 7. Keep sparse observations non-promotional.
 
-## 6. Fail-closed rules
+## 7. Fail-closed rules
 
 FortiBlox must remain non-promotional if any of the following is unresolved:
 
@@ -184,7 +209,7 @@ This work does not add:
 
 FortiBlox has a stronger current public evidence surface than a generic UI-only candidate: current provider-owned documentation explicitly claims an Explorer JSON REST API and describes its coverage.
 
-However, the current linked interactive API contract is unavailable (404), and the separately documented Nexus RPC surface has internally inconsistent lifecycle/status language.
+However, the current linked interactive API contract is unavailable (404), the separately documented Nexus RPC surface has internally inconsistent lifecycle/status language, and no matching public API/RPC implementation repository was found in the provider's current public GitHub repository set.
 
 Therefore:
 
@@ -193,6 +218,7 @@ X1-ALT-02 = CANDIDATE
 FortiBlox Explorer REST claim = documented
 exact Explorer REST contract = unavailable
 FortiBlox Nexus RPC = unverified supporting evidence
+public implementation contract = unavailable
 source independence = unverified
 CMIS promotion = false
 ```
