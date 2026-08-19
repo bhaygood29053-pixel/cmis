@@ -110,9 +110,17 @@ def _safe_quality(value: Any) -> Optional[Dict[str, Any]]:
     count = value.get("independent_source_count")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         count = None
+    distinct_count = value.get("distinct_source_label_count")
+    if isinstance(distinct_count, bool) or not isinstance(distinct_count, int) or distinct_count < 0:
+        distinct_count = None
+    independence = value.get("source_independence_verified")
+    if independence is not None and not isinstance(independence, bool):
+        independence = "INVALID"
     return {
         "quality": _text(value.get("quality")),
         "independent_source_count": count,
+        "distinct_source_label_count": distinct_count,
+        "source_independence_verified": independence,
         "identity_verified": (
             value.get("identity_verified")
             if isinstance(value.get("identity_verified"), bool)
@@ -126,6 +134,11 @@ def _safe_quality(value: Any) -> Optional[Dict[str, Any]]:
         "freshness_verified": (
             value.get("freshness_verified")
             if isinstance(value.get("freshness_verified"), bool)
+            else None
+        ),
+        "same_fact_agreement_verified": (
+            value.get("same_fact_agreement_verified")
+            if isinstance(value.get("same_fact_agreement_verified"), bool)
             else None
         ),
         "independent_agreement_verified": (
@@ -269,12 +282,15 @@ def build_verification_evidence_response(
     if (
         quality.get("quality") not in _QUALITY_LEVELS
         or quality.get("independent_source_count") is None
+        or quality.get("distinct_source_label_count") is None
+        or quality.get("source_independence_verified") == "INVALID"
         or not all(
             isinstance(quality.get(field), bool)
             for field in (
                 "identity_verified",
                 "semantics_verified",
                 "freshness_verified",
+                "same_fact_agreement_verified",
                 "independent_agreement_verified",
             )
         )
@@ -323,19 +339,40 @@ def build_verification_evidence_response(
             observed_at=observed_at,
         )
 
-    quality_agreement = quality.get("independent_agreement_verified")
-    if verification_status == AGREEMENT and quality_agreement is not True:
+    same_fact_agreement = quality.get("same_fact_agreement_verified")
+    if verification_status == AGREEMENT and same_fact_agreement is not True:
         return _error_response(
             chain_name,
             "data_quality_agreement_inconsistent",
-            "AGREEMENT verification must be reflected in the verifier's data-quality assessment.",
+            "AGREEMENT verification must be reflected as same-fact agreement in data quality.",
             asset=asset,
             observed_at=observed_at,
         )
-    if verification_status != AGREEMENT and quality_agreement is True:
+    if verification_status != AGREEMENT and same_fact_agreement is True:
         return _error_response(
             chain_name,
             "data_quality_agreement_inconsistent",
+            "Non-agreement verification cannot claim same-fact agreement in data quality.",
+            asset=asset,
+            observed_at=observed_at,
+        )
+
+    independent_agreement = quality.get("independent_agreement_verified")
+    independence = quality.get("source_independence_verified")
+    if independent_agreement is True and (
+        same_fact_agreement is not True or independence is not True
+    ):
+        return _error_response(
+            chain_name,
+            "data_quality_independence_inconsistent",
+            "Independent agreement requires both same-fact agreement and explicit source-independence proof.",
+            asset=asset,
+            observed_at=observed_at,
+        )
+    if verification_status != AGREEMENT and independent_agreement is True:
+        return _error_response(
+            chain_name,
+            "data_quality_independence_inconsistent",
             "Non-agreement verification cannot claim independent agreement in data quality.",
             asset=asset,
             observed_at=observed_at,
@@ -351,16 +388,18 @@ def build_verification_evidence_response(
         )
     if promotable and (
         quality.get("quality") != "HIGH"
-        or quality.get("independent_source_count", 0) < 2
+        or quality.get("distinct_source_label_count", 0) < 2
+        or quality.get("source_independence_verified") is not True
         or quality.get("identity_verified") is not True
         or quality.get("semantics_verified") is not True
         or quality.get("freshness_verified") is not True
+        or quality.get("same_fact_agreement_verified") is not True
         or quality.get("independent_agreement_verified") is not True
     ):
         return _error_response(
             chain_name,
             "promotion_quality_inconsistent",
-            "CMIS-promotable evidence must retain HIGH quality with verified identity, semantics, freshness, and independent agreement.",
+            "CMIS-promotable evidence must retain HIGH quality with verified identity, semantics, freshness, same-fact agreement, and explicit source independence.",
             asset=asset,
             observed_at=observed_at,
         )
@@ -407,8 +446,8 @@ def build_verification_evidence_response(
     warnings = []
     if verification_status == CONFLICT:
         warnings.append({
-            "code": "independent_source_conflict",
-            "message": "Qualifying CMIS evidence conflicts; no value is promoted or averaged.",
+            "code": "source_observation_conflict",
+            "message": "Qualifying CMIS observations conflict; no value is promoted or averaged.",
         })
     elif verification_status == INSUFFICIENT_EVIDENCE:
         warnings.append({
@@ -418,7 +457,7 @@ def build_verification_evidence_response(
     elif not promotable:
         warnings.append({
             "code": "agreement_not_promotable",
-            "message": "The observations agree, but the fact-specific verifier did not mark the fact CMIS-promotable.",
+            "message": "The observations agree, but the fact-specific verifier did not establish all promotion gates such as explicit source independence.",
         })
 
     envelope_status = OK if verification_status == AGREEMENT and promotable else PARTIAL
