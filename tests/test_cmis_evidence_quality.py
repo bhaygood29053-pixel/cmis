@@ -70,6 +70,7 @@ class CMISEvidenceReceiptTests(unittest.TestCase):
                 },
                 "verification_scope": "exact_pool_leg",
                 "scope_verified": True,
+                "source_independence_verified": True,
                 "cmis_promotable": True,
             },
             confidence={
@@ -108,9 +109,37 @@ class CMISEvidenceReceiptTests(unittest.TestCase):
         classes = {item["evidence_class"] for item in receipt["sources"]}
         self.assertIn("reported_observation", classes)
         self.assertIn("verifier_observation", classes)
+        self.assertTrue(receipt["verification"]["source_independence_verified"])
         self.assertTrue(receipt["verification"]["independently_verified"])
         self.assertFalse(receipt["verification"]["provider_assertion_promoted"])
         self.assertEqual(receipt["verification"]["status"], "AGREEMENT")
+
+    def test_agreement_without_independence_proof_remains_unknown(self):
+        envelope = self._verified_envelope()
+        del envelope["data"]["source_independence_verified"]
+
+        receipt = build_evidence_receipt(envelope)
+
+        self.assertEqual(receipt["verification"]["status"], "AGREEMENT")
+        self.assertIsNone(receipt["verification"]["source_independence_verified"])
+        self.assertIsNone(receipt["verification"]["independently_verified"])
+        self.assertIn(
+            "verification.source_independence",
+            receipt["unresolved_fields"],
+        )
+
+    def test_explicit_failed_independence_is_not_treated_as_missing(self):
+        envelope = self._verified_envelope()
+        envelope["data"]["source_independence_verified"] = False
+
+        receipt = build_evidence_receipt(envelope)
+
+        self.assertFalse(receipt["verification"]["source_independence_verified"])
+        self.assertFalse(receipt["verification"]["independently_verified"])
+        self.assertIn(
+            "data.source_independence_verified",
+            receipt["unresolved_fields"],
+        )
 
     def test_missing_evidence_stays_unknown_not_false(self):
         envelope = build_service_envelope(
@@ -125,8 +154,11 @@ class CMISEvidenceReceiptTests(unittest.TestCase):
         score = build_proof_score(receipt)
 
         self.assertEqual(receipt["verification"]["status"], "UNVERIFIED")
+        self.assertIsNone(receipt["verification"]["source_independence_verified"])
+        self.assertIsNone(receipt["verification"]["independently_verified"])
         self.assertIsNone(receipt["freshness"]["verified"])
         self.assertIn("verification.status", receipt["unresolved_fields"])
+        self.assertIn("verification.source_independence", receipt["unresolved_fields"])
         self.assertIsNone(score["categories"]["identity"]["score"])
         self.assertIsNone(score["categories"]["semantics"]["score"])
         self.assertIsNone(score["categories"]["freshness"]["score"])
