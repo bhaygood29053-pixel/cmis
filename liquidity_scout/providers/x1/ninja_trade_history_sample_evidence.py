@@ -324,12 +324,16 @@ def verify_ninja_trade_history_sample(
         )
 
     sample_size = len(selected_rows)
+    has_sample = sample_size > 0
     transaction_scope_binding_complete = bool(
-        sample_size > 0
-        and binding_complete
-        and success_complete
-        and pool_scope_complete
+        has_sample and binding_complete and success_complete and pool_scope_complete
     )
+    sample_rpc_binding_complete = bool(has_sample and binding_complete)
+    sample_rpc_success_complete = bool(has_sample and success_complete)
+    sample_pool_scope_complete = bool(has_sample and pool_scope_complete)
+    sample_maker_match_complete = bool(has_sample and maker_match_complete)
+    sample_slot_match_complete = bool(has_sample and slot_match_complete)
+    sample_side_match_complete = bool(has_sample and side_match_complete)
 
     warnings = [
         "bounded_sample_only",
@@ -341,11 +345,13 @@ def verify_ninja_trade_history_sample(
         "provider_amount_and_price_semantics_unverified",
         "observed_order_is_not_a_provider_ordering_contract",
     ]
+    if not has_sample:
+        warnings.append("empty_returned_history_sample")
     if len(trades) > sample_size:
         warnings.append("local_verifier_sample_truncated")
-    if not side_match_complete:
+    if has_sample and not side_match_complete:
         warnings.append("provider_side_not_confirmed_for_every_sampled_row")
-    if not slot_match_complete:
+    if has_sample and not slot_match_complete:
         warnings.append("provider_slot_not_confirmed_for_every_sampled_row")
 
     return {
@@ -358,13 +364,15 @@ def verify_ninja_trade_history_sample(
         "sample_size": sample_size,
         "sample_is_returned_prefix": True,
         "sample_truncated_by_local_verifier": len(trades) > sample_size,
-        "distinct_sample_transaction_ids": len(seen_signatures) == sample_size,
-        "sample_rpc_binding_complete": binding_complete,
-        "sample_rpc_transaction_success_complete": success_complete,
-        "sample_pool_scope_match_complete": pool_scope_complete,
-        "sample_maker_primary_signer_match_complete": maker_match_complete,
-        "sample_provider_slot_rpc_match_complete": slot_match_complete,
-        "sample_wallet_side_rpc_match_complete": side_match_complete,
+        "distinct_sample_transaction_ids": bool(
+            has_sample and len(seen_signatures) == sample_size
+        ),
+        "sample_rpc_binding_complete": sample_rpc_binding_complete,
+        "sample_rpc_transaction_success_complete": sample_rpc_success_complete,
+        "sample_pool_scope_match_complete": sample_pool_scope_complete,
+        "sample_maker_primary_signer_match_complete": sample_maker_match_complete,
+        "sample_provider_slot_rpc_match_complete": sample_slot_match_complete,
+        "sample_wallet_side_rpc_match_complete": sample_side_match_complete,
         "sample_transaction_scope_binding_complete": transaction_scope_binding_complete,
         "returned_order_observation": order_observation,
         "rows": row_results,
@@ -372,12 +380,8 @@ def verify_ninja_trade_history_sample(
             "sample_transaction_identity_and_pool_scope_crosscheck": (
                 transaction_scope_binding_complete
             ),
-            "sample_provider_slot_crosscheck": bool(
-                sample_size > 0 and slot_match_complete
-            ),
-            "sample_provider_side_crosscheck": bool(
-                sample_size > 0 and side_match_complete
-            ),
+            "sample_provider_slot_crosscheck": sample_slot_match_complete,
+            "sample_provider_side_crosscheck": sample_side_match_complete,
             "ordering_contract_verified": False,
             "pagination_or_range_verified": False,
             "history_exhaustive_verified": False,
