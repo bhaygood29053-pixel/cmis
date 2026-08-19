@@ -12,6 +12,8 @@ The adapter emits a CMIS wallet BUY/SELL observation only when:
 * the RPC primary signer exactly equals that wallet;
 * the transaction succeeded and invoked a recognized XDEX/XenDEX AMM;
 * the provider side was ``PROVIDER_SIDE_ONCHAIN_CONFIRMED``;
+* direction was proven from signer-owned or routed wallet balance evidence,
+  rather than from an exact pool/vault leg alone;
 * the provider side and on-chain inferred side agree on BUY/SELL; and
 * the expected and inferred asset mint exactly equal the caller-supplied,
   independently verified X1 mint identity.
@@ -32,9 +34,10 @@ from liquidity_scout.providers.x1.transaction_semantics import VerificationRepor
 
 
 SOURCE = "X1.Ninja pool trade + X1 RPC transaction verification"
-VERIFICATION_METHOD = "ninja_maker_txhash_bound_to_confirmed_x1_rpc_trade_semantics_v1"
+VERIFICATION_METHOD = "ninja_maker_txhash_bound_to_confirmed_x1_rpc_wallet_direction_v2"
 EVIDENCE_SCOPE = "single_x1_ninja_pool_trade_row_and_exact_x1_rpc_transaction"
 CONFIRMED_LEVEL = "PROVIDER_SIDE_ONCHAIN_CONFIRMED"
+WALLET_DIRECTION_BASIS = "SIGNER_OR_ROUTED_BALANCE_DIRECTION"
 _SUPPORTED_SIDES = frozenset({"BUY", "SELL"})
 
 
@@ -123,6 +126,10 @@ def build_verified_ninja_wallet_trade_observation(
         raise X1NinjaWalletTradeEvidenceError(
             "provider trade side is not deterministically on-chain confirmed"
         )
+    if verification_report.verification_basis != WALLET_DIRECTION_BASIS:
+        raise X1NinjaWalletTradeEvidenceError(
+            "wallet trade direction requires signer-owned or routed wallet balance evidence"
+        )
     if verification_report.expectation_match is not True:
         raise X1NinjaWalletTradeEvidenceError(
             "provider trade expectation is not exactly confirmed"
@@ -174,6 +181,8 @@ def build_verified_ninja_wallet_trade_observation(
         trade_direction_verified=True,
         limitations=(
             "single_transaction_fact_only",
+            "wallet_direction_requires_signer_or_routed_balance_evidence",
+            "exact_pool_leg_direction_is_not_wallet_direction",
             "x1_ninja_amount_units_not_promoted",
             "x1_ninja_timestamp_semantics_not_promoted",
             "x1_ninja_slot_semantics_not_promoted",
@@ -189,6 +198,7 @@ __all__ = [
     "EVIDENCE_SCOPE",
     "SOURCE",
     "VERIFICATION_METHOD",
+    "WALLET_DIRECTION_BASIS",
     "X1NinjaWalletTradeEvidenceError",
     "build_verified_ninja_wallet_trade_observation",
 ]
