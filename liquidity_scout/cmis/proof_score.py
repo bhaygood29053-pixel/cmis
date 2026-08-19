@@ -117,7 +117,27 @@ def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
     independence_flags = _flags_for(receipt, ("source_independence_verified",))
     flag_paths = list(independence_flags)
 
+    # Explicit failure must never be weakened to UNKNOWN merely because other
+    # structural evidence is absent. Missing evidence and a failed proof gate
+    # are different states.
+    if independence_flags and not all(independence_flags.values()):
+        return _category(
+            state="UNVERIFIED",
+            score=0,
+            reasons=["one or more source independence gates are explicitly unverified"],
+            evidence_paths=flag_paths,
+        )
+
     if not unique_source_names:
+        if independence_flags:
+            return _category(
+                state="UNVERIFIED",
+                score=0,
+                reasons=[
+                    "source independence flag is present but source identity evidence is absent"
+                ],
+                evidence_paths=flag_paths,
+            )
         return _category(
             state="UNKNOWN",
             score=None,
@@ -156,17 +176,10 @@ def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
                 "distinct source labels and verifier roles do not prove source independence"
             ],
         )
-    if all(independence_flags.values()):
-        return _category(
-            state="VERIFIED",
-            score=100,
-            reasons=["source independence is explicitly verified"],
-            evidence_paths=flag_paths,
-        )
     return _category(
-        state="UNVERIFIED",
-        score=0,
-        reasons=["one or more source independence gates are explicitly unverified"],
+        state="VERIFIED",
+        score=100,
+        reasons=["source independence is explicitly verified"],
         evidence_paths=flag_paths,
     )
 
