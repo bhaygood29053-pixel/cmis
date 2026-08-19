@@ -231,7 +231,7 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
     semantics = _boolean_category(
         _flags_for(receipt, ("semantics_verified", "field_semantics_verified")),
         verified_reason="semantic proof gates satisfied",
-        failed_reason="one or more semantics verification evidence supplied",
+        failed_reason="one or more semantic proof gates are explicitly unverified",
         unknown_reason="no explicit semantics verification evidence supplied",
     )
 
