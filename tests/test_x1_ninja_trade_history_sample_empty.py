@@ -47,14 +47,20 @@ class X1NinjaTradeHistoryEmptySampleTests(unittest.TestCase):
 
         self.assertEqual(result["sample_size"], 0)
         self.assertFalse(result["distinct_sample_transaction_ids"])
-        self.assertFalse(result["sample_rpc_binding_complete"])
+        self.assertFalse(result["sample_rpc_report_binding_complete"])
         self.assertFalse(result["sample_rpc_transaction_success_complete"])
-        self.assertFalse(result["sample_pool_scope_match_complete"])
+        self.assertFalse(result["sample_transaction_identity_binding_complete"])
+        self.assertFalse(result["sample_row_pool_identity_match_complete"])
+        self.assertFalse(result["sample_transaction_pool_membership_verified"])
         self.assertFalse(result["sample_maker_primary_signer_match_complete"])
+        self.assertFalse(result["sample_rpc_slot_available_complete"])
         self.assertFalse(result["sample_provider_slot_rpc_match_complete"])
         self.assertFalse(result["sample_wallet_side_rpc_match_complete"])
-        self.assertFalse(result["sample_transaction_scope_binding_complete"])
         self.assertEqual(result["returned_order_observation"], "unavailable")
+        self.assertFalse(
+            result["semantics"]["transaction_pool_membership_verified"]
+        )
+        self.assertFalse(result["semantics"]["rpc_source_independence_verified"])
         self.assertIn("empty_returned_history_sample", result["warnings"])
         self.assertFalse(result["cmis_promotable"])
 
