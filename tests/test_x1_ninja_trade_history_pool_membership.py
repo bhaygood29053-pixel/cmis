@@ -105,6 +105,18 @@ def _proof(
 ):
     if rejection_reasons is None:
         rejection_reasons = [] if verified else ["selected_pool_not_verified"]
+    selected_evidence = (
+        [
+            {
+                "program_id": "recognized-xdex-program",
+                "scope": "outer",
+                "group_index": 0,
+                "instruction_index": 1,
+            }
+        ]
+        if verified
+        else []
+    )
     return {
         "contract_version": "x1_transaction_pool_membership/v3",
         "chain": "x1",
@@ -122,7 +134,7 @@ def _proof(
         "recognized_amm_instruction_count": 1,
         "selected_pool_instruction_verified": verified,
         "selected_pool_instruction_count": 1 if verified else 0,
-        "selected_pool_instruction_evidence": [],
+        "selected_pool_instruction_evidence": selected_evidence,
         "asset_vault_mutated": verified,
         "counter_vault_mutated": verified,
         "vault_authority_verified": verified,
@@ -274,6 +286,22 @@ class X1NinjaTradeHistoryPoolMembershipTests(unittest.TestCase):
                 pool_identity_verified=True,
             )
 
+    def test_selected_instruction_evidence_count_must_match(self):
+        rows = [_row("sig-1", 200)]
+        bad = _proof("sig-1")
+        bad["selected_pool_instruction_evidence"] = []
+        with self.assertRaisesRegex(
+            X1NinjaTradeHistoryPoolMembershipError,
+            "evidence count does not match declared count",
+        ):
+            verify_ninja_trade_history_pool_membership(
+                observation=_observation(rows),
+                verification_reports={"sig-1": _report("sig-1", 200)},
+                transaction_pool_membership_evidence={"sig-1": bad},
+                pool_address=POOL,
+                pool_identity_verified=True,
+            )
+
     def test_only_v3_membership_contract_is_accepted(self):
         rows = [_row("sig-1", 200)]
         bad = _proof("sig-1")
@@ -297,6 +325,22 @@ class X1NinjaTradeHistoryPoolMembershipTests(unittest.TestCase):
         with self.assertRaisesRegex(
             X1NinjaTradeHistoryPoolMembershipError,
             "history_completeness_verified must remain unproven",
+        ):
+            verify_ninja_trade_history_pool_membership(
+                observation=_observation(rows),
+                verification_reports={"sig-1": _report("sig-1", 200)},
+                transaction_pool_membership_evidence={"sig-1": bad},
+                pool_address=POOL,
+                pool_identity_verified=True,
+            )
+
+    def test_membership_proof_requires_explicit_unproven_fields(self):
+        rows = [_row("sig-1", 200)]
+        bad = _proof("sig-1")
+        del bad["source_independence_verified"]
+        with self.assertRaisesRegex(
+            X1NinjaTradeHistoryPoolMembershipError,
+            "source_independence_verified must be explicit",
         ):
             verify_ninja_trade_history_pool_membership(
                 observation=_observation(rows),
