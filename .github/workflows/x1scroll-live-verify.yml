@@ -1,0 +1,55 @@
+name: X1Scroll RPC Access Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  x1scroll-rpc-access:
+    name: Read-only X1Scroll authenticated RPC access probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Require configured X1Scroll API key
+        env:
+          X1SCROLL_API_KEY: ${{ secrets.X1SCROLL_API_KEY }}
+        run: |
+          if [ -z "$X1SCROLL_API_KEY" ]; then
+            echo "X1SCROLL_API_KEY repository secret is required for the manual live probe."
+            exit 1
+          fi
+
+      - name: Probe published authenticated X1Scroll RPC transport
+        env:
+          RUN_X1SCROLL_RPC_LIVE_TESTS: "1"
+          X1SCROLL_API_KEY: ${{ secrets.X1SCROLL_API_KEY }}
+        run: |
+          python -m unittest tests.test_x1scroll_rpc_access_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only JSON-RPC access classification only."
+          echo "The provider-owned authenticated transport shape is https://rpc.x1scroll.io/v1/<redacted>."
+          echo "The API key is supplied only from the X1SCROLL_API_KEY repository secret and is never emitted by the structured observation."
+          echo "Only getHealth and getSlot are sent; no transaction/write methods are allowed."
+          echo "A successful response proves only authenticated access to that method at that observation time."
+          echo "It does not prove source independence, historical method coverage, retention, finality semantics, archival completeness, failover quality, or CMIS promotion."
+          echo "No signing, transaction preparation, broadcasting, custody, trading, bridge transfer, execution, or value movement is performed."
