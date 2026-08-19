@@ -114,6 +114,17 @@ class CMISEvidenceReceiptTests(unittest.TestCase):
         self.assertFalse(receipt["verification"]["provider_assertion_promoted"])
         self.assertEqual(receipt["verification"]["status"], "AGREEMENT")
 
+    def test_independence_flag_cannot_rescue_single_source_structure(self):
+        envelope = self._verified_envelope()
+        envelope["data"]["observations"]["verifier"]["source"] = "provider-a"
+        envelope["sources"][1]["source"] = "provider-a"
+
+        receipt = build_evidence_receipt(envelope)
+
+        self.assertTrue(receipt["verification"]["source_independence_verified"])
+        self.assertFalse(receipt["verification"]["independently_verified"])
+        self.assertIn("verification.source_structure", receipt["unresolved_fields"])
+
     def test_agreement_without_independence_proof_remains_unknown(self):
         envelope = self._verified_envelope()
         del envelope["data"]["source_independence_verified"]
