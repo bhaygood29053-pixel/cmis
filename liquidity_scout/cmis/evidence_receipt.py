@@ -263,16 +263,22 @@ def build_evidence_receipt(envelope: Mapping[str, Any]) -> dict[str, Any]:
     else:
         source_independence_verified = None
 
-    unique_source_names = {
+    reported_source_names = {
         _text(item.get("source"))
         for item in sources
-        if _text(item.get("source")) is not None
+        if item.get("evidence_class") == "reported_observation"
+        and _text(item.get("source")) is not None
     }
-    verifier_observation_present = any(
-        item.get("evidence_class") == "verifier_observation" for item in sources
-    )
-    source_structure_verified = bool(
-        len(unique_source_names) >= 2 and verifier_observation_present
+    verifier_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if item.get("evidence_class") == "verifier_observation"
+        and _text(item.get("source")) is not None
+    }
+    source_structure_verified = any(
+        reported_source != verifier_source
+        for reported_source in reported_source_names
+        for verifier_source in verifier_source_names
     )
 
     promotable = data.get("cmis_promotable") if isinstance(data, Mapping) else None
