@@ -54,7 +54,9 @@ def _flags_for(receipt: Mapping[str, Any], suffixes: tuple[str, ...]) -> dict[st
     result: dict[str, bool] = {}
     for path, value in raw.items():
         text = str(path)
-        if isinstance(value, bool) and any(text.endswith(suffix) for suffix in suffixes):
+        if isinstance(value, bool) and any(
+            text.endswith(suffix) for suffix in suffixes
+        ):
             result[text] = value
     return result
 
@@ -95,10 +97,11 @@ def _boolean_category(
 def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
     """Score source independence only from explicit provenance verification.
 
-    Distinct source labels and a verifier-shaped record are structural evidence
-    only.  They do not prove that the sources have independent upstream lineage.
-    CMIS therefore requires an explicit ``source_independence_verified`` evidence
-    flag before this category can receive proof credit.
+    Distinct source labels and verifier-shaped records are structural evidence
+    only. They do not prove independent upstream lineage. Positive proof credit
+    additionally requires a reported observation and verifier observation whose
+    source identities are themselves distinct; an unrelated third source cannot
+    rescue a same-source reported/verifier pair.
     """
 
     raw_sources = receipt.get("sources")
@@ -108,12 +111,25 @@ def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
         for item in sources
         if isinstance(item, Mapping) and _text(item.get("source")) is not None
     }
-    verifier_records = [
-        item
+    reported_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if isinstance(item, Mapping)
+        and item.get("evidence_class") == "reported_observation"
+        and _text(item.get("source")) is not None
+    }
+    verifier_source_names = {
+        _text(item.get("source"))
         for item in sources
         if isinstance(item, Mapping)
         and item.get("evidence_class") == "verifier_observation"
-    ]
+        and _text(item.get("source")) is not None
+    }
+    reported_verifier_distinct = any(
+        reported_source != verifier_source
+        for reported_source in reported_source_names
+        for verifier_source in verifier_source_names
+    )
     independence_flags = _flags_for(receipt, ("source_independence_verified",))
     flag_paths = list(independence_flags)
 
@@ -124,7 +140,9 @@ def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
         return _category(
             state="UNVERIFIED",
             score=0,
-            reasons=["one or more source independence gates are explicitly unverified"],
+            reasons=[
+                "one or more source independence gates are explicitly unverified"
+            ],
             evidence_paths=flag_paths,
         )
 
@@ -151,7 +169,7 @@ def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
             reasons=["single-source evidence cannot establish source independence"],
             evidence_paths=flag_paths,
         )
-    if not verifier_records:
+    if not verifier_source_names:
         if independence_flags:
             return _category(
                 state="UNVERIFIED",
@@ -175,6 +193,15 @@ def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
             reasons=[
                 "distinct source labels and verifier roles do not prove source independence"
             ],
+        )
+    if not reported_source_names or not reported_verifier_distinct:
+        return _category(
+            state="UNVERIFIED",
+            score=0,
+            reasons=[
+                "positive source independence requires distinct reported and verifier observation sources"
+            ],
+            evidence_paths=flag_paths,
         )
     return _category(
         state="VERIFIED",
@@ -204,7 +231,7 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
     semantics = _boolean_category(
         _flags_for(receipt, ("semantics_verified", "field_semantics_verified")),
         verified_reason="semantic proof gates satisfied",
-        failed_reason="one or more semantic proof gates are explicitly unverified",
+        failed_reason="one or more semantics verification evidence supplied",
         unknown_reason="no explicit semantics verification evidence supplied",
     )
 
@@ -292,12 +319,16 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
         if explicit_scope and scope["state"] == "UNVERIFIED":
             scope["state"] = "PARTIAL"
             scope["score"] = 25
-            scope["reasons"].insert(0, "scope is named but completeness remains unproven")
+            scope["reasons"].insert(
+                0, "scope is named but completeness remains unproven"
+            )
     elif explicit_scope:
         scope = _category(
             state="PARTIAL",
             score=50,
-            reasons=["evidence scope is explicit but completeness proof is not supplied"],
+            reasons=[
+                "evidence scope is explicit but completeness proof is not supplied"
+            ],
         )
     else:
         scope = _category(
@@ -371,12 +402,24 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
     )
     total_categories = len(CATEGORY_ORDER)
     proof_percent = round(earned / total_categories, 2)
-    category_coverage_percent = round(scored_count / total_categories * 100, 2)
-    has_conflict = any(category["state"] == "CONFLICT" for category in categories.values())
+    category_coverage_percent = round(
+        scored_count / total_categories * 100, 2
+    )
+    has_conflict = any(
+        category["state"] == "CONFLICT" for category in categories.values()
+    )
 
-    if not has_conflict and proof_percent >= 80 and category_coverage_percent >= 75:
+    if (
+        not has_conflict
+        and proof_percent >= 80
+        and category_coverage_percent >= 75
+    ):
         strength = "STRONG"
-    elif not has_conflict and proof_percent >= 50 and category_coverage_percent >= 50:
+    elif (
+        not has_conflict
+        and proof_percent >= 50
+        and category_coverage_percent >= 50
+    ):
         strength = "MODERATE"
     else:
         strength = "WEAK"
