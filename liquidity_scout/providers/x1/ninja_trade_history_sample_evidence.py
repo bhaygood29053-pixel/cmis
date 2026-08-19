@@ -2,7 +2,7 @@
 
 This module does not fetch X1.Ninja and does not claim that ``/v1/trades`` is
 complete, paginated, retained for any particular duration, finalized, or
-ordered by contract.  It accepts one already-fetched ``ninja_history``
+ordered by contract. It accepts one already-fetched ``ninja_history``
 observation plus independently produced X1 RPC ``VerificationReport`` objects
 and records only what can be established for a bounded prefix of the returned
 rows.
@@ -10,7 +10,7 @@ rows.
 The strongest positive result is intentionally narrow: every sampled Ninja
 ``txHash`` can be bound to a found/successful X1 RPC transaction, every sampled
 row is scoped to the independently verified requested pool, and the sequence
-can be described observationally using RPC slots.  Provider amount, timestamp,
+can be described observationally using RPC slots. Provider amount, timestamp,
 slot, side, pagination/range, finality, retention, and exhaustiveness semantics
 remain separate gates.
 """
@@ -20,15 +20,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from liquidity_scout.providers.x1.ninja_history import (
-    CHAIN,
-    X1_NINJA_SOURCE,
-)
+from liquidity_scout.providers.x1.ninja_history import CHAIN, X1_NINJA_SOURCE
 from liquidity_scout.providers.x1.transaction_semantics import VerificationReport
 
 
 CONTRACT_VERSION = "x1_ninja_trade_history_sample_evidence/v1"
-EVIDENCE_SOURCE = "X1.Ninja Developer API + independently verified X1 RPC transactions"
+EVIDENCE_SOURCE = (
+    "X1.Ninja Developer API + independently verified X1 RPC transactions"
+)
 WALLET_DIRECTION_BASIS = "SIGNER_OR_ROUTED_BALANCE_DIRECTION"
 CONFIRMED_SIDE_LEVEL = "PROVIDER_SIDE_ONCHAIN_CONFIRMED"
 _MAX_SAMPLE_ROWS = 100
@@ -69,7 +68,9 @@ def _normalize_reports(
     for key, report in verification_reports.items():
         signature = _required_text("verification_reports key", key)
         if not isinstance(report, VerificationReport):
-            raise TypeError("verification_reports values must be VerificationReport objects")
+            raise TypeError(
+                "verification_reports values must be VerificationReport objects"
+            )
         if report.signature != signature:
             raise X1NinjaTradeHistorySampleEvidenceError(
                 "verification report signature does not match mapping key"
@@ -89,7 +90,7 @@ def verify_ninja_trade_history_sample(
     """Cross-check a bounded returned Ninja trade-history prefix against X1 RPC.
 
     ``pool_address`` must be independently verified before this evidence can be
-    constructed.  ``max_rows`` bounds local analysis only; it is not sent to
+    constructed. ``max_rows`` bounds local analysis only; it is not sent to
     X1.Ninja and must never be described as provider pagination or range proof.
     """
 
@@ -123,15 +124,23 @@ def verify_ninja_trade_history_sample(
     contract = observation.get("contract")
     if not isinstance(contract, Mapping):
         raise X1NinjaTradeHistorySampleEvidenceError("observation contract is required")
-    _strict_true("contract.response_contract_verified", contract.get("response_contract_verified"))
-    _strict_true("contract.trade_row_shape_verified", contract.get("trade_row_shape_verified"))
+    _strict_true(
+        "contract.response_contract_verified",
+        contract.get("response_contract_verified"),
+    )
+    _strict_true(
+        "contract.trade_row_shape_verified",
+        contract.get("trade_row_shape_verified"),
+    )
 
     raw_response = observation.get("raw_response")
     if not isinstance(raw_response, Mapping):
         raise X1NinjaTradeHistorySampleEvidenceError("raw_response must be a mapping")
     trades = raw_response.get("trades")
     if not isinstance(trades, list):
-        raise X1NinjaTradeHistorySampleEvidenceError("raw_response.trades must be a list")
+        raise X1NinjaTradeHistorySampleEvidenceError(
+            "raw_response.trades must be a list"
+        )
 
     reports = _normalize_reports(verification_reports)
     selected_rows = trades[:max_rows]
@@ -152,13 +161,18 @@ def verify_ninja_trade_history_sample(
                 f"trade row {index} must be a mapping"
             )
 
-        row_pool = _required_text(f"trade row {index}.poolAddress", raw_row.get("poolAddress"))
-        tx_hash = _required_text(f"trade row {index}.txHash", raw_row.get("txHash"))
+        row_pool = _required_text(
+            f"trade row {index}.poolAddress", raw_row.get("poolAddress")
+        )
+        tx_hash = _required_text(
+            f"trade row {index}.txHash", raw_row.get("txHash")
+        )
         maker = _required_text(f"trade row {index}.maker", raw_row.get("maker"))
         provider_side_raw = raw_row.get("type")
         provider_side = (
             provider_side_raw.upper()
-            if isinstance(provider_side_raw, str) and provider_side_raw.upper() in _SUPPORTED_SIDES
+            if isinstance(provider_side_raw, str)
+            and provider_side_raw.upper() in _SUPPORTED_SIDES
             else None
         )
 
@@ -195,7 +209,7 @@ def verify_ninja_trade_history_sample(
                 binding_complete = False
 
             provider_slot = raw_row.get("slot")
-            provider_slot_matches = (
+            provider_slot_matches = bool(
                 rpc_slot is not None
                 and _valid_slot(provider_slot)
                 and provider_slot == rpc_slot
@@ -245,7 +259,7 @@ def verify_ninja_trade_history_sample(
         )
 
     sample_size = len(selected_rows)
-    sample_verification_complete = bool(
+    transaction_scope_binding_complete = bool(
         sample_size > 0
         and binding_complete
         and success_complete
@@ -286,14 +300,19 @@ def verify_ninja_trade_history_sample(
         "sample_maker_primary_signer_match_complete": maker_match_complete,
         "sample_provider_slot_rpc_match_complete": slot_match_complete,
         "sample_wallet_side_rpc_match_complete": side_match_complete,
-        "sample_verification_complete": sample_verification_complete,
+        "sample_transaction_scope_binding_complete": transaction_scope_binding_complete,
         "returned_order_observation": order_observation,
         "rows": row_results,
         "semantics": {
-            "sample_transaction_identity_crosscheck": sample_verification_complete,
-            "sample_pool_scope_crosscheck": bool(sample_size > 0 and pool_scope_complete),
-            "sample_provider_slot_crosscheck": bool(sample_size > 0 and slot_match_complete),
-            "sample_provider_side_crosscheck": bool(sample_size > 0 and side_match_complete),
+            "sample_transaction_identity_and_pool_scope_crosscheck": (
+                transaction_scope_binding_complete
+            ),
+            "sample_provider_slot_crosscheck": bool(
+                sample_size > 0 and slot_match_complete
+            ),
+            "sample_provider_side_crosscheck": bool(
+                sample_size > 0 and side_match_complete
+            ),
             "ordering_contract_verified": False,
             "pagination_or_range_verified": False,
             "history_exhaustive_verified": False,
