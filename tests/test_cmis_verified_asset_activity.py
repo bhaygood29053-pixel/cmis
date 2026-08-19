@@ -81,7 +81,7 @@ class VerifiedAssetActivityServiceTests(unittest.TestCase):
             "2",
         )
 
-    def test_empty_full_history_can_be_complete(self):
+    def test_empty_full_history_can_be_complete_without_inventing_evidence(self):
         result = build_verified_asset_activity_response(
             market_envelope=market(),
             pool_records=[{
@@ -97,6 +97,33 @@ class VerifiedAssetActivityServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["confidence"]["complete"])
+        self.assertIsNone(result["confidence"]["verification_ratio"])
+        self.assertIsNone(
+            result["data"]["exact_verified_asset_amounts"]["buy_asset_amount"]
+        )
+        self.assertIsNone(
+            result["data"]["exact_verified_asset_amounts"]["sell_asset_amount"]
+        )
+
+    def test_missing_side_amount_stays_null_when_other_side_is_verified(self):
+        result = build_verified_asset_activity_response(
+            market_envelope=market(),
+            pool_records=[{
+                "pool_address": "pool-1",
+                "pair": "AGI/XNT",
+                "history_ok": True,
+                "provider_event_count": 1,
+                "processed_event_count": 1,
+                "verifications": [verification("SELL")],
+            }],
+            matched_pool_count=1,
+            selected_pool_count=1,
+        )
+
+        amounts = result["data"]["exact_verified_asset_amounts"]
+        self.assertIsNone(amounts["buy_asset_amount"])
+        self.assertEqual(amounts["sell_asset_amount"], "2")
+        self.assertEqual(result["confidence"]["verification_ratio"], 1.0)
 
     def test_bounded_event_coverage_is_partial(self):
         result = build_verified_asset_activity_response(
