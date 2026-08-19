@@ -1,18 +1,20 @@
-"""Bounded read-only access probe for exact published X1Scroll RPC candidates.
+"""Bounded read-only access probe for X1Scroll's published API-key RPC contract.
 
-X1Scroll's public provider-owned SDK/publication currently names two X1 RPC
-candidate URLs. This module may probe only those exact HTTPS endpoints and only
-read-only JSON-RPC methods already accepted by CMIS's secondary-RPC classifier.
+X1Scroll's current provider-owned public contract publishes an authenticated RPC
+URL shaped as ``https://rpc.x1scroll.io/v1/YOUR_API_KEY``. This module constructs
+only that fixed host/path shape and probes only read-only JSON-RPC methods already
+accepted by CMIS's secondary-RPC classifier.
 
-A successful response proves access to one method at one observation time. It
-never proves source independence, archival completeness, retention depth,
-finality semantics, failover quality, or CMIS promotion. No credentials are
-accepted or transmitted by this probe.
+A successful response proves authenticated access to one method at one observation
+time. It never proves source independence, archival completeness, retention depth,
+finality semantics, failover quality, historical method coverage, or CMIS
+promotion. The API key is never returned or retained in the structured result.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+import re
 from typing import Any
 
 import requests
@@ -22,26 +24,23 @@ from liquidity_scout.providers.x1.secondary_rpc_contract import (
     classify_secondary_rpc_response,
 )
 
-VERSION = "1.0"
-SOURCE = "X1Scroll candidate RPC"
-X1SCROLL_RPC_ENDPOINTS = frozenset(
-    {
-        "https://x1scroll.io/rpc",
-        "https://rpc.x1scroll.io",
-    }
-)
+VERSION = "1.1"
+SOURCE = "X1Scroll authenticated RPC"
+X1SCROLL_RPC_BASE = "https://rpc.x1scroll.io/v1"
+X1SCROLL_RPC_REDACTED_ENDPOINT = f"{X1SCROLL_RPC_BASE}/<redacted>"
 SUPPORTED_ACCESS_METHODS = frozenset({"getHealth", "getSlot"})
+_API_KEY_RE = re.compile(r"^[A-Za-z0-9._~-]+$")
 
 
 class X1ScrollRpcAccessError(RuntimeError):
     """Sanitized bounded-probe transport failure."""
 
 
-def _endpoint(value: Any) -> str:
-    if not isinstance(value, str):
-        raise ValueError("endpoint must be a string")
-    if value not in X1SCROLL_RPC_ENDPOINTS:
-        raise ValueError("endpoint is not an exact published X1Scroll RPC candidate")
+def _api_key(value: Any) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError("api_key must be a non-empty string")
+    if not _API_KEY_RE.fullmatch(value):
+        raise ValueError("api_key contains unsupported characters")
     return value
 
 
@@ -67,22 +66,27 @@ def _http_classification(status_code: int) -> tuple[str, str]:
 
 def probe_x1scroll_rpc_access(
     *,
-    endpoint: str = "https://x1scroll.io/rpc",
+    api_key: str,
     method: str = "getHealth",
     session=requests,
     timeout: int = 10,
 ) -> dict[str, Any]:
-    """Probe one exact published X1Scroll RPC URL without credentials.
+    """Probe X1Scroll's exact published authenticated RPC transport.
+
+    The API key is accepted only as a conservative URL-path token and is used only
+    to construct the provider-owned ``/v1/{api_key}`` URL. Returned evidence always
+    exposes the redacted endpoint template instead of the credential-bearing URL.
 
     The response body is parsed only for HTTP 200 and immediately classified by
     the accepted fail-closed secondary-RPC contract. Non-200 response bodies are
     not retained. Provider exception details are deliberately suppressed.
     """
-    endpoint = _endpoint(endpoint)
+    api_key = _api_key(api_key)
     method = _method(method)
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout <= 0:
         raise ValueError("timeout must be a positive integer")
 
+    endpoint = f"{X1SCROLL_RPC_BASE}/{api_key}"
     payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": []}
     try:
         response = session.post(
@@ -92,11 +96,13 @@ def probe_x1scroll_rpc_access(
             headers={
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": "CMIS-X1Scroll-readonly-access/1.0",
+                "User-Agent": "CMIS-X1Scroll-readonly-access/1.1",
             },
         )
-    except Exception as exc:
-        raise X1ScrollRpcAccessError("X1Scroll read-only RPC access probe failed") from exc
+    except Exception:
+        raise X1ScrollRpcAccessError(
+            "X1Scroll read-only RPC access probe failed"
+        ) from None
 
     try:
         status_code = getattr(response, "status_code", None)
@@ -107,7 +113,8 @@ def probe_x1scroll_rpc_access(
             "contract_version": VERSION,
             "source": SOURCE,
             "chain": "x1",
-            "endpoint": endpoint,
+            "endpoint": X1SCROLL_RPC_REDACTED_ENDPOINT,
+            "authentication": "api_key_path_segment",
             "method": method,
             "http_status": status_code,
             "status": None,
@@ -116,11 +123,13 @@ def probe_x1scroll_rpc_access(
             "result_shape_verified": False,
             "observed_slot": None,
             "rpc_error_code": None,
-            "credentials_supplied": False,
+            "credentials_supplied": True,
+            "credentials_retained": False,
             "source_independence_verified": False,
             "archival_completeness_verified": False,
             "retention_verified": False,
             "finality_semantics_verified": False,
+            "historical_method_coverage_verified": False,
             "cmis_promotable": False,
         }
 
@@ -153,7 +162,7 @@ def probe_x1scroll_rpc_access(
 
         if observation.transport_ok and observation.result_shape_verified:
             result["status"] = "ok"
-            result["access"] = "available_unauthenticated"
+            result["access"] = "available_authenticated"
         elif observation.jsonrpc_envelope_verified and observation.error_code is not None:
             result["status"] = "unavailable"
             result["access"] = "jsonrpc_error"
@@ -171,7 +180,8 @@ __all__ = [
     "SOURCE",
     "SUPPORTED_ACCESS_METHODS",
     "VERSION",
-    "X1SCROLL_RPC_ENDPOINTS",
+    "X1SCROLL_RPC_BASE",
+    "X1SCROLL_RPC_REDACTED_ENDPOINT",
     "X1ScrollRpcAccessError",
     "probe_x1scroll_rpc_access",
 ]
