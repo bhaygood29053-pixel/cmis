@@ -359,21 +359,14 @@ def build_verification_evidence_response(
 
     independent_agreement = quality.get("independent_agreement_verified")
     independence = quality.get("source_independence_verified")
-    if independent_agreement is True and (
-        same_fact_agreement is not True or independence is not True
-    ):
+    expected_independent_agreement = bool(
+        same_fact_agreement is True and independence is True
+    )
+    if independent_agreement is not expected_independent_agreement:
         return _error_response(
             chain_name,
             "data_quality_independence_inconsistent",
-            "Independent agreement requires both same-fact agreement and explicit source-independence proof.",
-            asset=asset,
-            observed_at=observed_at,
-        )
-    if verification_status != AGREEMENT and independent_agreement is True:
-        return _error_response(
-            chain_name,
-            "data_quality_independence_inconsistent",
-            "Non-agreement verification cannot claim independent agreement in data quality.",
+            "Independent agreement must equal same-fact agreement AND explicit source-independence proof.",
             asset=asset,
             observed_at=observed_at,
         )
