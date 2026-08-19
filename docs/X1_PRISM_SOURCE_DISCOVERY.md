@@ -68,7 +68,7 @@ Therefore X1 Prism cannot currently be treated as an independent verifier merely
 
 For CMIS same-fact verification, a different website or source label is not evidence of source independence.
 
-Before X1 Prism may participate in an independent bridge cross-check, CMIS must determine whether its bridge values are derived independently from the source being checked. For example, if Prism simply reads the official Warp Bridge API, reproduces the same upstream cache, or derives the values from the same XDEX/indexer evidence, numerical agreement would not count as independent corroboration.
+Before X1 Prism may participate in an independent bridge cross-check, CMIS must determine whether its bridge values are derived independently from the source being checked. If Prism reads the official Warp Bridge API, reproduces the same upstream cache, or derives the values from the same XDEX/indexer evidence, numerical agreement would not count as independent corroboration.
 
 A future independence proof must identify both sides of the comparison:
 
