@@ -13,7 +13,13 @@ from liquidity_scout.services.cmis_verification_evidence_lookup import (
 SUBJECT = "x1:pool111:mint111:vault111"
 
 
-def stored_envelope(*, status="ok", promotable=True, freshness=True):
+def stored_envelope(
+    *,
+    status="ok",
+    promotable=True,
+    freshness=True,
+    source_independence_verified=True,
+):
     quality = "HIGH" if promotable else "LOW"
     fact_value = "42" if promotable else None
     fact_unit = "TOKEN_UNITS" if promotable else None
@@ -40,10 +46,13 @@ def stored_envelope(*, status="ok", promotable=True, freshness=True):
     data_quality = {
         "quality": quality,
         "independent_source_count": 2,
+        "distinct_source_label_count": 2,
+        "source_independence_verified": source_independence_verified,
         "identity_verified": True,
         "semantics_verified": True,
         "freshness_verified": freshness,
-        "independent_agreement_verified": True,
+        "same_fact_agreement_verified": True,
+        "independent_agreement_verified": source_independence_verified is True,
         "reasons": [] if freshness else ["FRESHNESS_UNVERIFIED"],
     }
     return {
@@ -153,6 +162,7 @@ class CMISVerificationEvidenceLookupTests(unittest.TestCase):
         self.assertEqual(response["data"]["verification"]["status"], "AGREEMENT")
         self.assertEqual(response["data"]["fact"]["normalized_value"], "42")
         self.assertTrue(response["data"]["cmis_promotable"])
+        self.assertIs(response["data"]["data_quality"]["source_independence_verified"], True)
         self.assertEqual(
             response["data"]["evidence_ref"],
             {"evidence_id": evidence_id, "recorded_at": 2000.0},
@@ -189,6 +199,34 @@ class CMISVerificationEvidenceLookupTests(unittest.TestCase):
         self.assertEqual(
             response["data"]["observations"]["primary"]["normalized_value"],
             "42",
+        )
+
+    def test_legacy_promotable_quality_without_explicit_independence_fails_closed(self):
+        legacy = stored_envelope()
+        for quality in (
+            legacy["data"]["data_quality"],
+            legacy["confidence"],
+        ):
+            quality.pop("distinct_source_label_count", None)
+            quality.pop("source_independence_verified", None)
+            quality.pop("same_fact_agreement_verified", None)
+
+        response = lookup_verification_evidence(
+            FakeLedger(
+                record={
+                    "evidence_id": "ve_legacy",
+                    "recorded_at": 2000.0,
+                    "envelope": legacy,
+                }
+            ),
+            chain="x1",
+            evidence_id="ve_legacy",
+        )
+
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(
+            response["errors"][0]["code"],
+            "verification_evidence_record_invalid",
         )
 
     def test_lookup_does_not_mutate_persisted_record(self):
