@@ -52,6 +52,7 @@ _QUALITY_BOOLEAN_FIELDS = (
     "identity_verified",
     "semantics_verified",
     "freshness_verified",
+    "same_fact_agreement_verified",
     "independent_agreement_verified",
 )
 
@@ -140,6 +141,8 @@ def _safe_quality(value: Any) -> dict[str, Any]:
     fields = (
         "quality",
         "independent_source_count",
+        "distinct_source_label_count",
+        "source_independence_verified",
         *_QUALITY_BOOLEAN_FIELDS,
     )
     record = {field: _safe_scalar(value.get(field)) for field in fields}
@@ -163,9 +166,21 @@ def _validate_quality(
     if isinstance(source_count, bool) or not isinstance(source_count, int) or source_count < 0:
         raise ValueError("verification evidence independent_source_count is invalid")
 
+    label_count = quality.get("distinct_source_label_count")
+    if isinstance(label_count, bool) or not isinstance(label_count, int) or label_count < 0:
+        raise ValueError("verification evidence distinct_source_label_count is invalid")
+
     for field in _QUALITY_BOOLEAN_FIELDS:
         if not isinstance(quality.get(field), bool):
             raise ValueError(f"verification evidence {field} must be boolean")
+
+    source_independence_verified = quality.get("source_independence_verified")
+    if source_independence_verified is not None and not isinstance(
+        source_independence_verified, bool
+    ):
+        raise ValueError(
+            "verification evidence source_independence_verified must be boolean or null"
+        )
 
     unique_sources = {
         _text(record.get("source"))
@@ -174,10 +189,19 @@ def _validate_quality(
     }
     if source_count != len(unique_sources):
         raise ValueError("verification evidence independent source count is inconsistent")
+    if label_count != len(unique_sources):
+        raise ValueError("verification evidence distinct source label count is inconsistent")
 
-    agreement_verified = quality.get("independent_agreement_verified") is True
-    if agreement_verified != (verification_status == AGREEMENT):
-        raise ValueError("verification evidence agreement quality state is inconsistent")
+    same_fact_agreement_verified = quality.get("same_fact_agreement_verified") is True
+    if same_fact_agreement_verified != (verification_status == AGREEMENT):
+        raise ValueError("verification evidence same-fact agreement quality state is inconsistent")
+
+    independent_agreement_verified = quality.get("independent_agreement_verified") is True
+    expected_independent_agreement = bool(
+        same_fact_agreement_verified and source_independence_verified is True
+    )
+    if independent_agreement_verified != expected_independent_agreement:
+        raise ValueError("verification evidence independent agreement quality state is inconsistent")
 
     expected_identity = all(record.get("identity_verified") is True for record in (primary, verifier))
     expected_semantics = all(record.get("semantics_verified") is True for record in (primary, verifier))
@@ -192,10 +216,13 @@ def _validate_quality(
     if promotable and not (
         level == "HIGH"
         and source_count >= 2
+        and label_count >= 2
+        and source_independence_verified is True
         and expected_identity
         and expected_semantics
         and expected_freshness
-        and agreement_verified
+        and same_fact_agreement_verified
+        and independent_agreement_verified
     ):
         raise ValueError("CMIS-promotable evidence requires HIGH fully verified quality")
 

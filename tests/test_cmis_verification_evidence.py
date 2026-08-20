@@ -41,10 +41,11 @@ def observation(
     )
 
 
-def verified_result(primary=None, verifier=None):
+def verified_result(primary=None, verifier=None, *, source_independence_verified=True):
     return verify_x1_pool_reserve(
         primary or observation("X1.Ninja"),
         verifier or observation("X1 RPC", slot=101),
+        source_independence_verified=source_independence_verified,
     )
 
 
@@ -83,6 +84,9 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertEqual(response["data"]["verification"]["status"], "AGREEMENT")
         self.assertTrue(response["data"]["cmis_promotable"])
         self.assertEqual(response["confidence"]["quality"], "HIGH")
+        self.assertTrue(response["confidence"]["same_fact_agreement_verified"])
+        self.assertTrue(response["confidence"]["source_independence_verified"])
+        self.assertTrue(response["confidence"]["independent_agreement_verified"])
         self.assertTrue(response["confidence"]["cmis_promotable"])
         self.assertEqual(
             response["sources"],
@@ -105,6 +109,26 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(response["warnings"], [])
         self.assertEqual(response["errors"], [])
+
+    def test_same_fact_agreement_without_independence_is_partial_not_error(self):
+        result = verified_result(source_independence_verified=None)
+        self.assertFalse(result["cmis_promotable"])
+        self.assertEqual(result["data_quality"]["quality"], "MEDIUM")
+        self.assertTrue(result["data_quality"]["same_fact_agreement_verified"])
+        self.assertIsNone(result["data_quality"]["source_independence_verified"])
+        self.assertFalse(result["data_quality"]["independent_agreement_verified"])
+
+        response = build_verification_evidence_response(result)
+
+        self.assertEqual(response["status"], "partial")
+        self.assertEqual(response["data"]["verification"]["status"], "AGREEMENT")
+        self.assertFalse(response["data"]["cmis_promotable"])
+        self.assertIsNone(response["data"]["fact"]["normalized_value"])
+        self.assertEqual(response["confidence"]["quality"], "MEDIUM")
+        self.assertTrue(response["confidence"]["same_fact_agreement_verified"])
+        self.assertIsNone(response["confidence"]["source_independence_verified"])
+        self.assertFalse(response["confidence"]["independent_agreement_verified"])
+        self.assertEqual(response["warnings"][0]["code"], "agreement_not_promotable")
 
     def test_agreement_without_freshness_is_partial_but_not_a_promoted_fact(self):
         result = verified_result(
@@ -145,7 +169,7 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertIsNone(response["data"]["fact"]["normalized_value"])
         self.assertIsNone(response["data"]["fact"]["unit"])
         self.assertFalse(response["data"]["cmis_promotable"])
-        self.assertEqual(response["warnings"][0]["code"], "independent_source_conflict")
+        self.assertEqual(response["warnings"][0]["code"], "source_observation_conflict")
 
     def test_insufficient_evidence_is_partial_and_preserves_verifier_reason(self):
         result = verified_result(
@@ -233,12 +257,12 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertEqual(response["errors"][0]["code"], "data_quality_invalid")
 
         result = copy.deepcopy(verified_result())
-        result["data_quality"]["independent_agreement_verified"] = False
+        result["data_quality"]["source_independence_verified"] = None
         response = build_verification_evidence_response(result)
         self.assertEqual(response["status"], "error")
         self.assertEqual(
             response["errors"][0]["code"],
-            "data_quality_agreement_inconsistent",
+            "data_quality_independence_inconsistent",
         )
 
         result = copy.deepcopy(verified_result())
@@ -248,7 +272,7 @@ class CMISVerificationEvidenceTests(unittest.TestCase):
         self.assertEqual(response["errors"][0]["code"], "promotion_quality_inconsistent")
 
         result = copy.deepcopy(verified_result())
-        result["data_quality"]["independent_source_count"] = 1
+        result["data_quality"]["distinct_source_label_count"] = 1
         response = build_verification_evidence_response(result)
         self.assertEqual(response["status"], "error")
         self.assertEqual(response["errors"][0]["code"], "promotion_quality_inconsistent")

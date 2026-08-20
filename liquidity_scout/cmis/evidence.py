@@ -5,7 +5,8 @@ semantics. It records already-observed facts with explicit provenance and
 compares only facts whose identity and units are compatible.
 
 Conflicting observations are never averaged. Missing, malformed, differently
-scoped, or differently-unitized observations fail closed.
+scoped, or differently-unitized observations fail closed. Distinct provider
+labels are observable provenance but are not proof of upstream independence.
 """
 
 from __future__ import annotations
@@ -23,6 +24,8 @@ UNIT_MISMATCH = "UNIT_MISMATCH"
 VALUE_MISSING = "VALUE_MISSING"
 VALUE_INVALID = "VALUE_INVALID"
 SINGLE_SOURCE_ONLY = "SINGLE_SOURCE_ONLY"
+SOURCE_INDEPENDENCE_UNPROVEN = "SOURCE_INDEPENDENCE_UNPROVEN"
+SOURCE_INDEPENDENCE_FAILED = "SOURCE_INDEPENDENCE_FAILED"
 VALUES_AGREE = "VALUES_AGREE"
 VALUES_DISAGREE = "VALUES_DISAGREE"
 
@@ -137,7 +140,11 @@ def compare_same_fact_exact(
     primary: Mapping[str, Any],
     verifier: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Compare two independently sourced normalized observations exactly.
+    """Compare two normalized observations of the same fact exactly.
+
+    This primitive proves same-fact numeric agreement or conflict. It does not
+    infer that the two observations are independently sourced merely because
+    their ``source`` labels differ. Independence is a separate evidence gate.
 
     The function deliberately has no tolerance parameter. Reserve/supply style
     facts should first be normalized to the same proven unit and observation
@@ -208,11 +215,24 @@ def build_data_quality_assessment(
     *,
     observations: list[Mapping[str, Any]],
     verification: Optional[Mapping[str, Any]] = None,
+    source_independence_verified: Optional[bool] = None,
 ) -> dict[str, Any]:
-    """Return transparent quality dimensions without a pseudo-precise score."""
+    """Return transparent quality dimensions without a pseudo-precise score.
+
+    ``source_independence_verified`` is intentionally tri-state. ``True`` means
+    an accepted fact-specific evidence contract has separately proven upstream
+    independence for the exact observations. ``False`` means independence was
+    explicitly disproven. ``None`` means independence remains unknown. Distinct
+    source labels alone never upgrade this field.
+    """
+    if source_independence_verified is not None and not isinstance(
+        source_independence_verified, bool
+    ):
+        raise TypeError("source_independence_verified must be true, false, or null")
+
     records = [item for item in observations if isinstance(item, Mapping)]
 
-    independent_sources = {
+    distinct_source_labels = {
         _text(item.get("source"))
         for item in records
         if _text(item.get("source"))
@@ -231,16 +251,20 @@ def build_data_quality_assessment(
     verification_status = (
         _text((verification or {}).get("status")) if verification else None
     )
-    agreement_verified = verification_status == AGREEMENT
+    same_fact_agreement_verified = verification_status == AGREEMENT
+    independent_agreement_verified = bool(
+        same_fact_agreement_verified and source_independence_verified is True
+    )
 
     if verification_status == CONFLICT:
         quality = "LOW"
     elif (
-        len(independent_sources) >= 2
+        len(distinct_source_labels) >= 2
+        and source_independence_verified is True
         and identity_verified
         and semantics_verified
         and freshness_verified
-        and agreement_verified
+        and same_fact_agreement_verified
     ):
         quality = "HIGH"
     elif records and identity_verified and semantics_verified and freshness_verified:
@@ -249,8 +273,12 @@ def build_data_quality_assessment(
         quality = "LOW"
 
     reasons = []
-    if len(independent_sources) < 2:
+    if len(distinct_source_labels) < 2:
         reasons.append(SINGLE_SOURCE_ONLY)
+    if source_independence_verified is None:
+        reasons.append(SOURCE_INDEPENDENCE_UNPROVEN)
+    elif source_independence_verified is False:
+        reasons.append(SOURCE_INDEPENDENCE_FAILED)
     if not identity_verified:
         reasons.append("IDENTITY_UNVERIFIED")
     if not semantics_verified:
@@ -258,17 +286,22 @@ def build_data_quality_assessment(
     if not freshness_verified:
         reasons.append("FRESHNESS_UNVERIFIED")
     if verification_status == CONFLICT:
-        reasons.append("INDEPENDENT_SOURCE_CONFLICT")
-    elif verification and not agreement_verified:
-        reasons.append("INDEPENDENT_AGREEMENT_UNPROVEN")
+        reasons.append("SOURCE_OBSERVATION_CONFLICT")
+    elif verification and not same_fact_agreement_verified:
+        reasons.append("SAME_FACT_AGREEMENT_UNPROVEN")
 
     return {
         "quality": quality,
-        "independent_source_count": len(independent_sources),
+        # Compatibility field: this counts distinct source labels only. It is
+        # not an independence proof and must never be used as one by itself.
+        "independent_source_count": len(distinct_source_labels),
+        "distinct_source_label_count": len(distinct_source_labels),
+        "source_independence_verified": source_independence_verified,
         "identity_verified": identity_verified,
         "semantics_verified": semantics_verified,
         "freshness_verified": freshness_verified,
-        "independent_agreement_verified": agreement_verified,
+        "same_fact_agreement_verified": same_fact_agreement_verified,
+        "independent_agreement_verified": independent_agreement_verified,
         "reasons": reasons,
     }
 
@@ -279,6 +312,8 @@ __all__ = [
     "IDENTITY_MISMATCH",
     "INSUFFICIENT_EVIDENCE",
     "SINGLE_SOURCE_ONLY",
+    "SOURCE_INDEPENDENCE_FAILED",
+    "SOURCE_INDEPENDENCE_UNPROVEN",
     "UNIT_MISMATCH",
     "VALUE_INVALID",
     "VALUE_MISSING",
