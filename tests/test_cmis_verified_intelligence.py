@@ -1,165 +1,207 @@
-import copy
+from datetime import datetime, timezone
 import unittest
-from unittest.mock import patch
 
+from liquidity_scout.cmis.concentration import build_top_account_concentration
+from liquidity_scout.cmis.concentration_change import compare_top_account_concentration
+from liquidity_scout.cmis.evidence_receipt import build_evidence_receipt
+from liquidity_scout.cmis.intelligence_evidence import build_intelligence_evidence_bundle
+from liquidity_scout.cmis.proof_score import build_proof_score
 from liquidity_scout.services.cmis_verified_intelligence import (
     CONTRACT_VERSION,
-    build_verified_intelligence_response,
+    SERVICE,
+    build_concentration_change_intelligence_response,
 )
 
 
-class CMISVerifiedIntelligenceTests(unittest.TestCase):
-    @staticmethod
-    def _bundle(*, chain="x1"):
-        return {
-            "intelligence_evidence_id": "ie_" + "a" * 64,
-            "schema_version": 1,
-            "conclusion_type": "top_account_concentration",
-            "conclusion_fingerprint": "ic_" + "b" * 64,
-            "conclusion": {
-                "chain": chain,
-                "source": "x1_rpc",
-                "asset_id": "Mint111",
+def evidence_bundle(*, freshness_verified=True):
+    observed_at = "2026-08-18T12:00:00Z"
+    envelope = {
+        "service": "market_report",
+        "chain": "x1",
+        "status": "ok",
+        "asset": {
+            "canonical_id": "mint-1",
+            "mint": "mint-1",
+            "symbol": "TEST",
+        },
+        "data": {
+            "scope": "asset_exact",
+            "asset_identity_verified": True,
+            "field_semantics_verified": True,
+            "freshness_verified": freshness_verified,
+            "source_independence_verified": True,
+            "cmis_promotable": True,
+            "verification": {
+                "status": "AGREEMENT",
+                "code": "test_verification",
             },
-            "evidence_bundles": [
-                {
-                    "evidence_receipt": {
-                        "receipt_id": "er_" + "c" * 64,
-                        "chain": chain,
-                        "sources": [
-                            {
-                                "source": "x1_rpc",
-                                "evidence_class": "verifier_observation",
-                                "observed_at": "2026-08-20T00:00:00Z",
-                            }
-                        ],
-                    },
-                    "proof_score": {
-                        "proof_strength": "STRONG",
-                        "proof_percent": 100,
-                        "method": "cmis_proof_score/v1",
-                    },
-                }
-            ],
-            "binding": {
-                "chain_verified": True,
-                "source_coverage_verified": True,
-                "asset_coverage_verified": True,
-                "independent_verification_present": False,
-                "conclusion_sources": ["x1_rpc"],
-                "conclusion_assets": ["Mint111"],
+            "observations": {
+                "primary": {"source": "X1.Ninja", "observed_at": observed_at},
+                "verifier": {"source": "X1 RPC", "observed_at": observed_at},
             },
-            "source_classes": {
-                "source_records": [],
-                "reported_observations": [],
-                "verifier_observations": [],
-            },
-            "proof_strength_separate_from_risk": True,
-            "risk_reinterpreted": False,
-            "behavioral_interpretation_added": False,
-            "provider_assertion_promoted": False,
-            "scout_reliance_promoted": False,
-            "public_service_promoted": False,
-            "execution_authorized": False,
-        }
+        },
+        "risk": None,
+        "confidence": {},
+        "sources": [{"source": "X1.Ninja", "observed_at": observed_at}],
+        "observed_at": observed_at,
+        "warnings": [],
+        "errors": [],
+    }
+    receipt = build_evidence_receipt(envelope)
+    return {
+        "evidence_receipt": receipt,
+        "proof_score": build_proof_score(receipt),
+    }
 
-    def test_exact_revalidated_bundle_is_exposed_without_mutating_foundation(self):
-        bundle = self._bundle()
-        with patch(
-            "liquidity_scout.services.cmis_verified_intelligence.build_intelligence_evidence_bundle",
-            return_value=copy.deepcopy(bundle),
-        ):
-            result = build_verified_intelligence_response(bundle)
+
+def concentration(*, first_amount):
+    return build_top_account_concentration(
+        chain="x1",
+        asset_id="mint-1",
+        source="X1.Ninja",
+        supply_raw=1000,
+        supply_decimals=0,
+        requested_account_limit=2,
+        accounts=[
+            {"address": "acct-a", "amount": first_amount, "decimals": 0},
+            {"address": "acct-b", "amount": 150, "decimals": 0},
+        ],
+        supply_identity_verified=True,
+        account_identity_verified=True,
+    )
+
+
+def canonical_bundle(*, freshness_verified=True):
+    change = compare_top_account_concentration(
+        before=concentration(first_amount=250),
+        after=concentration(first_amount=300),
+        before_observed_at=datetime(2026, 8, 18, 12, tzinfo=timezone.utc),
+        after_observed_at=datetime(2026, 8, 18, 13, tzinfo=timezone.utc),
+    )
+    return build_intelligence_evidence_bundle(
+        conclusion_type="top_account_concentration_change",
+        conclusion=change,
+        evidence_bundles=[evidence_bundle(freshness_verified=freshness_verified)],
+    )
+
+
+class CMISVerifiedIntelligenceTests(unittest.TestCase):
+    def test_cmis_owned_concentration_change_is_exposed_without_mutating_foundation(self):
+        bundle = canonical_bundle()
+        result = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="mint-1",
+            evidence_resolver=lambda evidence_id: bundle,
+            promotion_authorized=True,
+        )
 
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["service"], "verified_intelligence")
+        self.assertEqual(result["service"], SERVICE)
         self.assertIsNone(result["risk"])
         self.assertEqual(result["data"]["contract_version"], CONTRACT_VERSION)
         self.assertTrue(result["data"]["public_service_promoted"])
         self.assertTrue(result["data"]["scout_reliance_promoted"])
         self.assertFalse(result["data"]["execution_authorized"])
-        nested = result["data"]["intelligence_evidence"]
+        self.assertEqual(
+            result["data"]["accepted_conclusion_type"],
+            "top_account_concentration_change",
+        )
+        self.assertEqual(result["data"]["facts"]["direction"], "INCREASE")
+        nested = result["data"]["evidence"]["intelligence_evidence"]
         self.assertFalse(nested["public_service_promoted"])
         self.assertFalse(nested["scout_reliance_promoted"])
         self.assertFalse(nested["execution_authorized"])
-        self.assertFalse(result["data"]["behavioral_interpretation_added"])
-        self.assertFalse(result["data"]["provider_assertion_promoted"])
+        self.assertTrue(result["data"]["evidence"]["freshness_verified"])
 
-    def test_tampered_bundle_cannot_be_promoted(self):
-        canonical = self._bundle()
-        supplied = copy.deepcopy(canonical)
-        supplied["binding"]["independent_verification_present"] = True
-        with patch(
-            "liquidity_scout.services.cmis_verified_intelligence.build_intelligence_evidence_bundle",
-            return_value=canonical,
-        ):
-            result = build_verified_intelligence_response(supplied)
-
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(
-            result["errors"][0]["code"],
-            "intelligence_evidence_exact_match_required",
-        )
-        self.assertFalse(result["data"]["execution_authorized"])
-
-    def test_validator_failure_is_fail_closed(self):
-        bundle = self._bundle()
-        with patch(
-            "liquidity_scout.services.cmis_verified_intelligence.build_intelligence_evidence_bundle",
-            side_effect=ValueError("receipt mismatch"),
-        ):
-            result = build_verified_intelligence_response(bundle)
-
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(
-            result["errors"][0]["code"],
-            "intelligence_evidence_validation_failed",
+    def test_explicit_threshold_policy_remains_separate_from_market_fact_and_risk(self):
+        bundle = canonical_bundle()
+        result = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="mint-1",
+            evidence_resolver=lambda evidence_id: bundle,
+            threshold_policy={
+                "policy_id": "x1_concentration_watch",
+                "policy_version": "1.0",
+                "absolute_delta_threshold_bps": "100",
+            },
+            promotion_authorized=True,
         )
 
-    def test_unsupported_conclusion_type_is_rejected_before_validation(self):
-        bundle = self._bundle()
-        bundle["conclusion_type"] = "whale_classification"
-        result = build_verified_intelligence_response(bundle)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["data"]["facts"]["delta_bps"], "500")
+        policy = result["data"]["policy_assessment"]
+        self.assertEqual(policy["status"], "EXCEEDS_THRESHOLD")
+        self.assertEqual(policy["policy"]["policy_id"], "x1_concentration_watch")
+        self.assertFalse(policy["risk_interpretation_verified"])
+        self.assertFalse(policy["behavioral_interpretation_verified"])
+        self.assertIsNone(result["data"]["risk_interpretation"])
+        self.assertIsNone(result["risk"])
+
+    def test_exact_asset_identity_is_required(self):
+        bundle = canonical_bundle()
+        result = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="other-mint",
+            evidence_resolver=lambda evidence_id: bundle,
+            promotion_authorized=True,
+        )
         self.assertEqual(result["status"], "error")
+        self.assertEqual(result["errors"][0]["code"], "intelligence_evidence_asset_mismatch")
+
+    def test_internal_resolver_is_required_and_missing_record_is_unavailable(self):
+        bundle = canonical_bundle()
+        missing_resolver = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="mint-1",
+            evidence_resolver=None,
+            promotion_authorized=True,
+        )
+        self.assertEqual(missing_resolver["status"], "unavailable")
         self.assertEqual(
-            result["errors"][0]["code"],
-            "unsupported_intelligence_conclusion",
+            missing_resolver["warnings"][0]["code"],
+            "internal_intelligence_evidence_resolver_unavailable",
         )
 
-    def test_requested_chain_must_match_evidence_chain(self):
-        bundle = self._bundle(chain="solana")
-        canonical = copy.deepcopy(bundle)
-        with patch(
-            "liquidity_scout.services.cmis_verified_intelligence.build_intelligence_evidence_bundle",
-            return_value=canonical,
-        ):
-            result = build_verified_intelligence_response(bundle, chain="x1")
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(
-            result["errors"][0]["code"],
-            "intelligence_evidence_chain_mismatch",
+        missing_record = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="mint-1",
+            evidence_resolver=lambda evidence_id: None,
+            promotion_authorized=True,
         )
+        self.assertEqual(missing_record["status"], "unavailable")
+        self.assertEqual(missing_record["warnings"][0]["code"], "intelligence_evidence_not_found")
 
-    def test_solana_is_not_silently_promoted(self):
-        result = build_verified_intelligence_response(self._bundle(chain="solana"), chain="solana")
+    def test_freshness_is_preserved_not_inferred_from_timestamp(self):
+        bundle = canonical_bundle(freshness_verified=False)
+        result = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="mint-1",
+            evidence_resolver=lambda evidence_id: bundle,
+            promotion_authorized=True,
+        )
+        self.assertEqual(result["status"], "partial")
+        self.assertFalse(result["data"]["evidence"]["freshness_verified"])
+        self.assertIn("data.freshness_verified", result["data"]["evidence"]["unresolved_fields"])
+        self.assertEqual(result["warnings"][0]["code"], "intelligence_evidence_not_fresh")
+
+    def test_other_chain_remains_unavailable_before_any_resolver_call(self):
+        bundle = canonical_bundle()
+        calls = []
+
+        def resolver(evidence_id):
+            calls.append(evidence_id)
+            return bundle
+
+        result = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="mint-1",
+            evidence_resolver=resolver,
+            chain="solana",
+            promotion_authorized=True,
+        )
         self.assertEqual(result["status"], "unavailable")
-        self.assertFalse(result["data"]["public_service_promoted"])
-        self.assertFalse(result["data"]["scout_reliance_promoted"])
+        self.assertEqual(calls, [])
         self.assertFalse(result["data"]["execution_authorized"])
-
-    def test_source_and_proof_traceability_are_preserved(self):
-        bundle = self._bundle()
-        with patch(
-            "liquidity_scout.services.cmis_verified_intelligence.build_intelligence_evidence_bundle",
-            return_value=copy.deepcopy(bundle),
-        ):
-            result = build_verified_intelligence_response(bundle)
-
-        self.assertEqual(result["sources"][0]["source"], "x1_rpc")
-        proof = result["data"]["proof_records"][0]
-        self.assertEqual(proof["receipt_id"], "er_" + "c" * 64)
-        self.assertEqual(proof["proof_strength"], "STRONG")
-        self.assertTrue(result["data"]["proof_strength_separate_from_risk"])
 
 
 if __name__ == "__main__":
