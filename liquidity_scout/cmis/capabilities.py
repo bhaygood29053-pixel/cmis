@@ -11,13 +11,19 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Iterable, Mapping
 
+from liquidity_scout.cmis.verified_intelligence_service import (
+    build_verified_intelligence_capability,
+)
 from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
+)
+from liquidity_scout.services.cmis_verified_intelligence import (
+    SERVICE as CONCENTRATION_CHANGE_INTELLIGENCE_SERVICE,
 )
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.8.0"
+CMIS_CONTRACT_VERSION = "1.9.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -94,6 +100,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             requirements=("exact_evidence_id_or_fact_type_subject_id",),
             limitations=("read_only_persisted_evidence_lookup",),
         ),
+        CONCENTRATION_CHANGE_INTELLIGENCE_SERVICE: build_verified_intelligence_capability(
+            chain="x1", promotion_authorized=True
+        ),
     },
     "solana": {
         "asset_lookup": _capability(
@@ -169,6 +178,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         "verification_evidence": _capability(
             "unavailable",
             limitations=("solana_persisted_verification_lookup_not_promoted",),
+        ),
+        CONCENTRATION_CHANGE_INTELLIGENCE_SERVICE: build_verified_intelligence_capability(
+            chain="solana", promotion_authorized=True
         ),
     },
 }
