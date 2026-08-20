@@ -40,7 +40,9 @@ ie_<64 lowercase hex>
 
 A caller-supplied evidence bundle is not a trust root merely because it is internally self-consistent or content-addressed.
 
-Before classification, CMIS revalidates the complete evidence bundle, including the concentration-change conclusion, Evidence Receipts, deterministic Proof Scores, chain/source/asset coverage, exact rational change, direction, and content-addressed identity.
+Before classification, CMIS revalidates the complete evidence bundle, including the concentration-change conclusion, Evidence Receipts, deterministic Proof Scores, chain/source/asset coverage, exact rational change, direction, time ordering, and content-addressed identity. Invalid or tampered receipt/proof basis therefore fails before a classification is emitted.
+
+Resolver exceptions preserve only the exception type. Arbitrary resolver text is not reflected because storage/provider failures may eventually contain credential-bearing paths, URLs, or responses.
 
 ## Classification output invariants
 
@@ -70,6 +72,8 @@ cmis_promotable = false
 execution_authorized = false
 ```
 
+Proof strength describes evidence quality only. It is neither a risk grade nor a behavioral confidence score.
+
 ## Separation from threshold policy
 
 `concentration_threshold` remains a separate explicit-policy contract.
@@ -92,6 +96,7 @@ A concentration increase does not prove:
 - an insider acted;
 - accumulation intent;
 - bot activity;
+- distribution intent;
 - market-making activity;
 - common ownership;
 - manipulation;
@@ -100,7 +105,24 @@ A concentration increase does not prove:
 - unique-holder concentration;
 - market risk severity.
 
-Those claims require separate deterministic evidence and classification contracts before they may be exposed by CMIS or relied on by a Scout.
+A concentration decrease does not prove the inverse of any of those claims. `CONCENTRATION_UNCHANGED` only means the exact accepted top-account concentration ratio did not change across the validated comparison window.
+
+Those broader claims require separate deterministic evidence and classification contracts before they may be exposed by CMIS or relied on by a Scout.
+
+## Fail-closed boundary
+
+The classifier rejects or fails closed on:
+
+- malformed/non-canonical `ie_...` identity;
+- missing trusted resolver or missing stored evidence;
+- resolved evidence whose content id does not match the requested id;
+- unsupported conclusion types;
+- tampered concentration exact ratios or direction;
+- invalid Evidence Receipt or Proof Score basis;
+- incompatible chain, asset, source/scope, or observation-time semantics;
+- attempted replacement of the canonical descriptive label with a behavioral, ownership, intent, scam/fraud, manipulation, or risk label.
+
+No fallback label is guessed.
 
 ## Promotion boundary
 
@@ -110,6 +132,6 @@ It does not add a CMIS public service, does not change `GET /v1/cmis/capabilitie
 
 ## Execution boundary
 
-No classification result authorizes transaction preparation, signing, broadcasting, custody, trading, bridge transfer, autonomous execution, or value movement.
+No classification result authorizes transaction preparation, simulation-as-execution, signing, broadcasting, custody, trading, bridge transfer, autonomous execution, or value movement.
 
 CMIS remains read-only intelligence at this boundary.

@@ -8,8 +8,8 @@ and derives only a descriptive direction label from the already-verified numeric
 fact.
 
 Classification is not public-service promotion, Scout reliance, risk, policy, or
-execution authority. In particular, explicit concentration-threshold policy
-assessment remains a separate contract and is not used here.
+execution authority. Explicit concentration-threshold policy assessment remains a
+separate contract and is not used here.
 """
 
 from __future__ import annotations
@@ -67,9 +67,12 @@ def _resolve_evidence(
     try:
         resolved = evidence_resolver(evidence_id)
     except Exception as exc:
+        # Resolver exceptions can originate below provider/storage boundaries.
+        # Preserve the exception type without reflecting arbitrary text that could
+        # contain a credential-bearing path, URL, or provider response.
         raise ValueError(
-            "trusted internal intelligence evidence resolution failed: "
-            f"{type(exc).__name__}: {exc}"
+            "trusted internal intelligence evidence resolution failed "
+            f"({type(exc).__name__})"
         ) from exc
     if resolved is None:
         raise ValueError("the requested CMIS intelligence evidence was not found")
@@ -215,7 +218,11 @@ def validate_concentration_direction_classification(
     ):
         raise ValueError("classification_id must be a canonical icl_ content id")
     evidence = supplied.get("evidence")
-    evidence_id = evidence.get("intelligence_evidence_id") if isinstance(evidence, Mapping) else None
+    evidence_id = (
+        evidence.get("intelligence_evidence_id")
+        if isinstance(evidence, Mapping)
+        else None
+    )
     rebuilt = build_concentration_direction_classification(
         evidence_id,
         evidence_resolver=evidence_resolver,
