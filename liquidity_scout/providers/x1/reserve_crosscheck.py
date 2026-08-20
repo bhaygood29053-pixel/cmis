@@ -2,8 +2,9 @@
 
 This module is deliberately transport-free. It does not fetch X1.Ninja or RPC
 state, discover vaults, infer provider fields, infer units, prove freshness, or
-apply a tolerance. Callers must supply already-collected provider/RPC artifacts,
-a verified pool/vault identity, and an explicit semantic proof manifest.
+prove upstream source independence. Callers must supply already-collected
+provider/RPC artifacts, a verified pool/vault identity, an explicit semantic
+proof manifest, and any separately accepted source-independence proof state.
 
 The orchestrator exists to make the reserve proof chain replayable:
 
@@ -11,7 +12,8 @@ semantic proof gate -> RPC identity binding -> reserve evidence -> exact verifie
 
 Both asset and counter reserve legs must independently satisfy the existing
 value verifier and the stronger RPC account/mint/authority identity binding
-before the overall cross-check can become CMIS-promotable.
+before the overall cross-check can become CMIS-promotable. Different source
+labels alone never establish source independence.
 """
 
 from __future__ import annotations
@@ -34,7 +36,7 @@ from liquidity_scout.providers.x1.reserve_verification import (
 )
 
 
-VERSION = "1.1"
+VERSION = "1.2"
 ROLES = ("asset", "counter")
 SEMANTIC_PROOF_REJECTED = "SEMANTIC_PROOF_REJECTED"
 RPC_BALANCE_MISSING = "RPC_BALANCE_MISSING"
@@ -91,6 +93,7 @@ def run_x1_reserve_crosscheck(
     observed_at: Any,
     rpc_identities: Mapping[str, Any] | None = None,
     observation_scope_verified: bool = False,
+    source_independence_verified: bool | None = None,
 ) -> dict[str, Any]:
     """Replay the two-leg X1 reserve verification chain, failing closed.
 
@@ -102,6 +105,10 @@ def run_x1_reserve_crosscheck(
     never derives freshness from wall-clock proximity, provider timestamps, or
     RPC slots. A verified observation scope also requires an explicit
     ``observed_at`` value so the proof remains auditable.
+
+    ``source_independence_verified`` is a separate tri-state proof input. It is
+    never inferred from the labels ``X1.Ninja`` and ``X1 RPC``. Unknown
+    independence preserves exact agreement as evidence but blocks promotion.
     """
     for name, value in (
         ("pool_detail", pool_detail),
@@ -113,6 +120,10 @@ def run_x1_reserve_crosscheck(
             raise TypeError(f"{name} must be a mapping")
     if rpc_identities is not None and not isinstance(rpc_identities, Mapping):
         raise TypeError("rpc_identities must be a mapping when supplied")
+    if source_independence_verified is not None and not isinstance(
+        source_independence_verified, bool
+    ):
+        raise TypeError("source_independence_verified must be true, false, or null")
 
     scope_requested = bool(observation_scope_verified)
     scope_verified = scope_requested and observed_at is not None
@@ -122,6 +133,8 @@ def run_x1_reserve_crosscheck(
         warnings.append("observation_scope_unverified")
     if scope_requested and observed_at is None:
         errors.append(f"observation_scope:{OBSERVED_AT_MISSING}")
+    if source_independence_verified is not True:
+        warnings.append("source_independence_unverified")
 
     semantic_proof = validate_reserve_semantic_proof(
         pool_detail,
@@ -198,6 +211,7 @@ def run_x1_reserve_crosscheck(
         verification = verify_x1_pool_reserve(
             evidence["provider"],
             evidence["rpc"],
+            source_independence_verified=source_independence_verified,
         )
         role_results[role] = {
             "rpc_identity": dict(role_identity) if isinstance(role_identity, Mapping) else None,
@@ -215,6 +229,7 @@ def run_x1_reserve_crosscheck(
     overall_verification = _overall_status(role_results)
     cmis_promotable = (
         overall_verification == AGREEMENT
+        and source_independence_verified is True
         and rpc_identity_binding.get("identity_binding_verified") is True
         and all(
             role_results.get(role, {}).get("cmis_promotable") is True
@@ -229,11 +244,12 @@ def run_x1_reserve_crosscheck(
         "pool_address": semantic_proof.get("pool_address"),
         "overall_verification": overall_verification,
         "observation_scope_verified": scope_verified,
+        "source_independence_verified": source_independence_verified,
         "semantic_proof": semantic_proof,
         "rpc_identity_binding": rpc_identity_binding,
         "roles": role_results,
         "cmis_promotable": cmis_promotable,
-        "warnings": warnings,
+        "warnings": list(dict.fromkeys(warnings)),
         "errors": list(dict.fromkeys(errors)),
     }
 
