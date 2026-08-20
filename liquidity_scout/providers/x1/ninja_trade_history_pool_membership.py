@@ -64,6 +64,41 @@ def _non_negative_int(name: str, value: Any) -> int:
     return value
 
 
+def _validate_selected_instruction_occurrence(
+    *,
+    index: int,
+    occurrence: Mapping[str, Any],
+) -> None:
+    _required_text(
+        f"membership proof selected_pool_instruction_evidence[{index}].program_id",
+        occurrence.get("program_id"),
+    )
+    scope = _required_text(
+        f"membership proof selected_pool_instruction_evidence[{index}].scope",
+        occurrence.get("scope"),
+    )
+    if scope not in {"outer", "inner"}:
+        raise X1NinjaTradeHistoryPoolMembershipError(
+            "membership proof selected instruction scope must be outer or inner"
+        )
+    _non_negative_int(
+        f"membership proof selected_pool_instruction_evidence[{index}].instruction_index",
+        occurrence.get("instruction_index"),
+    )
+
+    group_index = occurrence.get("group_index")
+    if scope == "outer":
+        if group_index is not None:
+            raise X1NinjaTradeHistoryPoolMembershipError(
+                "membership proof outer selected instruction group_index must be null"
+            )
+    else:
+        _non_negative_int(
+            f"membership proof selected_pool_instruction_evidence[{index}].group_index",
+            group_index,
+        )
+
+
 def _validate_membership_proof(
     *,
     signature: str,
@@ -94,6 +129,28 @@ def _validate_membership_proof(
     if proof_pool != expected_pool:
         raise X1NinjaTradeHistoryPoolMembershipError(
             "membership proof pool does not match selected verified pool"
+        )
+
+    asset_mint = _required_text(
+        "membership proof asset_mint", proof.get("asset_mint")
+    )
+    asset_vault = _required_text(
+        "membership proof asset_vault", proof.get("asset_vault")
+    )
+    counter_mint = _required_text(
+        "membership proof counter_mint", proof.get("counter_mint")
+    )
+    counter_vault = _required_text(
+        "membership proof counter_vault", proof.get("counter_vault")
+    )
+    _required_text("membership proof shared_owner", proof.get("shared_owner"))
+    if asset_mint == counter_mint:
+        raise X1NinjaTradeHistoryPoolMembershipError(
+            "membership proof asset and counter mints must be distinct"
+        )
+    if asset_vault == counter_vault:
+        raise X1NinjaTradeHistoryPoolMembershipError(
+            "membership proof asset and counter vaults must be distinct"
         )
 
     instruction_evidence_bound = _strict_bool(
@@ -154,6 +211,11 @@ def _validate_membership_proof(
     if len(selected_evidence) != selected_count:
         raise X1NinjaTradeHistoryPoolMembershipError(
             "selected pool instruction evidence count does not match declared count"
+        )
+    for index, occurrence in enumerate(selected_evidence):
+        _validate_selected_instruction_occurrence(
+            index=index,
+            occurrence=occurrence,
         )
 
     rejection_reasons = proof.get("rejection_reasons")
