@@ -1,8 +1,8 @@
-# CMIS Phase 12 — Verified Intelligence Service Contract
+# CMIS Phase 12 — First Verified Intelligence Service Contract
 
 ## Status
 
-Draft read-only service contract for X1 Scout reliance.
+Accepted-candidate contract/store layer for Issue #237. **Not yet advertised by the canonical CMIS gateway or capability manifest.**
 
 ## Purpose
 
@@ -12,41 +12,160 @@ Phase 11 established deterministic Verified Intelligence foundations, but those 
 - `scout_reliance_promoted = false`
 - `execution_authorized = false`
 
-Phase 12 does **not** change those foundation objects. It adds a narrow wrapper service, `verified_intelligence`, that may be relied on by an X1 Scout only after CMIS deterministically rebuilds the supplied Phase 11 intelligence-evidence bundle and proves an exact match.
+The first Phase 12 slice does not promote the whole foundation. It defines exactly one bounded service contract around:
 
-## Contract
+`top_account_concentration_change`
 
-Service contract: `verified_intelligence/v1`
+The service name/version is:
 
-Initial chain scope: `x1` only.
+`concentration_change_intelligence/v1`
 
-Accepted conclusion types are exactly the deterministic conclusion types already accepted by `liquidity_scout.cmis.intelligence_evidence`.
+Initial chain scope is `x1` only.
 
-The request contains one exact `intelligence_evidence` bundle. The service:
+## Why the first draft was narrowed
 
-1. rejects unsupported conclusion types;
-2. reruns the existing Phase 11 deterministic evidence-bundle validator;
-3. requires the caller-supplied bundle to equal the rebuilt bundle exactly;
-4. preserves receipt IDs, Proof Score records, source traceability, conclusion scope, and all nested foundation flags;
-5. promotes only the wrapper result for public/Scout reliance;
-6. keeps risk separate from proof;
-7. adds no behavioral, ownership, intent, fraud, manipulation, or execution interpretation;
-8. always keeps `execution_authorized = false`.
+A content-addressed Evidence Receipt proves deterministic integrity, not who supplied it. Therefore a Scout/caller must not be allowed to submit a complete `intelligence_evidence` bundle and obtain promotion merely because the bundle can be rebuilt exactly.
+
+The public request trust root is instead:
+
+1. exact `chain = x1`;
+2. exact `asset_id`;
+3. one canonical CMIS-owned `intelligence_evidence_id` (`ie_...`);
+4. an internal CMIS resolver/store that returns the already-built canonical bundle.
+
+Caller-supplied conclusions, Evidence Receipts, Proof Scores, or full intelligence bundles are rejected.
+
+## CMIS-owned evidence store
+
+`IntelligenceEvidenceLedger` is an internal SQLite-backed store for the first Phase 12 slice.
+
+It:
+
+- accepts only canonical `top_account_concentration_change` intelligence-evidence bundles;
+- reruns the existing Phase 11 deterministic bundle validator before storage;
+- stores sanitized canonical JSON keyed by the exact content-addressed `ie_...` id;
+- revalidates the bundle again on read;
+- is idempotent by evidence id;
+- has no public store endpoint.
+
+Persistence ownership is the trust boundary. The content id alone is not authentication.
+
+## Request contract
+
+Conceptual request:
+
+```json
+{
+  "service": "concentration_change_intelligence",
+  "chain": "x1",
+  "params": {
+    "asset_id": "<exact asset identity>",
+    "intelligence_evidence_id": "ie_<sha256>",
+    "threshold_policy": {
+      "policy_id": "optional-explicit-policy",
+      "policy_version": "1.0",
+      "absolute_delta_threshold_bps": "100"
+    }
+  }
+}
+```
+
+`threshold_policy` is optional. If supplied, it must contain exactly the three named fields. There is no hidden/default threshold.
+
+The dispatcher does not accept:
+
+- `intelligence_evidence`;
+- `evidence_receipt`;
+- `proof_score`;
+- wallet/behavior inputs;
+- arbitrary extra parameters.
+
+## Response separation
+
+The service response keeps three layers distinct:
+
+### Facts
+
+`data.facts` is the exact revalidated `cmis_top_account_concentration_change.v1` conclusion. It preserves:
+
+- exact X1 asset/source identity;
+- observed top-token-account scope;
+- requested top-N and observed count;
+- before/after observation times;
+- exact rational before/after/delta shares;
+- numeric direction;
+- the original limitations.
+
+It does **not** convert token accounts into unique holders or beneficial owners.
+
+### Evidence / proof
+
+`data.evidence` preserves:
+
+- the CMIS-owned `intelligence_evidence_id`;
+- Evidence Receipt ids;
+- exact Proof Score records;
+- explicit Evidence Receipt freshness state;
+- unresolved evidence fields;
+- limitations;
+- the nested Phase 11 intelligence-evidence bundle.
+
+Nested Phase 11 objects remain non-promoted. Proof strength remains separate from risk.
+
+Freshness is not inferred from timestamps. If every authoritative receipt explicitly says freshness is verified, the service may report `freshness_verified = true`. Explicit false remains false; missing/unknown remains null. False or unknown freshness yields a partial service result rather than a silent upgrade.
+
+### Optional deterministic policy assessment
+
+When `threshold_policy` is supplied, CMIS applies the already-accepted deterministic concentration-threshold evaluator. The threshold is explicitly caller/policy supplied and versioned.
+
+The output remains a policy observation only:
+
+- `WITHIN_THRESHOLD`;
+- `AT_THRESHOLD`;
+- `EXCEEDS_THRESHOLD`.
+
+A threshold crossing does not establish whale/insider behavior, accumulation, distribution, manipulation, ownership, or risk.
+
+`risk` remains separate/null in this service.
 
 ## Promotion boundary
 
-Wrapper-level promotion is scoped as:
+The contract/store layer is intentionally fail-closed before integration:
 
-`exact_revalidated_intelligence_evidence_bundle_only`
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+callable = false
+promotion_blocker = canonical_runtime_and_capability_manifest_integration_required
+```
 
-The nested Phase 11 evidence remains non-promoted. A strong Proof Score by itself does not authorize service promotion, change risk, or authorize execution.
+The candidate promotion scope is:
+
+`cmis_owned_top_account_concentration_change_evidence_by_id`
+
+A later Issue #237 integration must explicitly:
+
+1. wire the internal ledger/resolver into the canonical CMIS runtime;
+2. add exactly this service to the public capability manifest for X1;
+3. keep Solana unavailable;
+4. prove manifest/runtime service lists do not drift;
+5. authorize public/Scout reliance only at that canonical integration boundary;
+6. preserve the Phase 11 `intelligence_foundation` non-promotion flags.
+
+Until that step is accepted, this contract does not advertise itself as a supported CMIS service.
 
 ## Unsupported scope
 
-Solana and future chains remain unavailable for this service until a separate accepted Scout-reliance contract defines their scope.
+This milestone does not promote:
 
-This contract does not authorize whale, insider, bot, accumulator, distributor, market-maker, ownership, relationship, or behavioral-intent labels.
+- `top_account_concentration` snapshots as a separate public service;
+- wallet activity observations or summaries;
+- generic sanitized history observations or historical comparisons;
+- holder/beneficial-owner identity;
+- whale, insider, bot, accumulator, distributor, market-maker, manipulation, relationship, or intent labels;
+- Solana/future-chain intelligence;
+- direct provider access from Roberta or Chain Scouts.
 
 ## Execution boundary
 
-This service is read-only. It performs no provider collection, transaction construction, signing, broadcasting, custody, trading, bridge transfer, or autonomous value movement.
+This service/store layer is read-only. It performs no transaction preparation, simulation as an execution precursor, signing, broadcasting, custody, trading, bridge transfer, autonomous execution, or value movement. `execution_authorized = false` remains mandatory.
