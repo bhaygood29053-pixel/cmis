@@ -1,12 +1,12 @@
 """CMIS-owned persistence for the first bounded Phase 12 intelligence contract.
 
 The public/Scout service must never trust a caller-supplied evidence bundle merely
-because it is content-addressed and internally self-consistent.  This ledger is
+because it is content-addressed and internally self-consistent. This ledger is
 the internal trust root for the first promoted slice: one already-built,
 deterministically revalidated ``top_account_concentration_change`` intelligence
 evidence bundle is stored by CMIS and later resolved by its ``ie_...`` id.
 
-No public store endpoint is defined here.  Provider payloads, wallet authority,
+No public store endpoint is defined here. Provider payloads, wallet authority,
 transaction preparation, signing, broadcasting, custody, execution, and value
 movement are outside this module.
 """
@@ -26,6 +26,7 @@ from liquidity_scout.cmis.intelligence_evidence import build_intelligence_eviden
 
 
 VERSION = "1.0"
+SUPPORTED_CHAIN = "x1"
 ACCEPTED_CONCLUSION_TYPE = "top_account_concentration_change"
 _ID_RE = re.compile(r"^ie_[0-9a-f]{64}$")
 
@@ -37,9 +38,9 @@ def normalize_intelligence_evidence_id(value: Any) -> str:
 
 
 def validate_concentration_change_intelligence_evidence(value: Any) -> dict[str, Any]:
-    """Return one exact canonical concentration-change intelligence bundle.
+    """Return one exact canonical X1 concentration-change intelligence bundle.
 
-    This validates deterministic integrity only.  Trust that the record is
+    This validates deterministic integrity only. Trust that the record is
     CMIS-owned comes from resolving it through this internal ledger, not from the
     content id itself.
     """
@@ -58,11 +59,19 @@ def validate_concentration_change_intelligence_evidence(value: Any) -> dict[str,
     if supplied != rebuilt:
         raise ValueError("intelligence evidence does not match its deterministic canonical bundle")
     normalize_intelligence_evidence_id(rebuilt.get("intelligence_evidence_id"))
+    conclusion = rebuilt.get("conclusion")
+    chain = (
+        str(conclusion.get("chain") or "").strip().lower()
+        if isinstance(conclusion, Mapping)
+        else ""
+    )
+    if chain != SUPPORTED_CHAIN:
+        raise ValueError("the Phase 12 intelligence evidence ledger accepts only x1 evidence")
     return rebuilt
 
 
 class IntelligenceEvidenceLedger:
-    """SQLite-backed CMIS-owned store for canonical concentration-change evidence."""
+    """SQLite-backed CMIS-owned store for canonical X1 concentration-change evidence."""
 
     def __init__(self, db_path: str):
         if not isinstance(db_path, str) or not db_path.strip():
@@ -108,8 +117,8 @@ class IntelligenceEvidenceLedger:
         conclusion = safe["conclusion"]
         chain = str(conclusion.get("chain") or "").strip().lower()
         asset_id = str(conclusion.get("asset_id") or "").strip()
-        if not chain or not asset_id:
-            raise ValueError("canonical intelligence evidence requires chain and asset_id")
+        if chain != SUPPORTED_CHAIN or not asset_id:
+            raise ValueError("canonical intelligence evidence requires x1 chain and asset_id")
         evidence_id = safe["intelligence_evidence_id"]
         canonical = json.dumps(
             safe,
@@ -174,6 +183,7 @@ class IntelligenceEvidenceLedger:
 __all__ = [
     "ACCEPTED_CONCLUSION_TYPE",
     "IntelligenceEvidenceLedger",
+    "SUPPORTED_CHAIN",
     "VERSION",
     "normalize_intelligence_evidence_id",
     "validate_concentration_change_intelligence_evidence",

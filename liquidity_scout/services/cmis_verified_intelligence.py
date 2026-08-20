@@ -1,14 +1,14 @@
 """First bounded Phase 12 CMIS intelligence service contract.
 
 The first service slice is intentionally limited to one deterministic conclusion:
-``top_account_concentration_change``.  A public/Scout caller supplies only an
-exact chain, asset id, and CMIS-owned ``ie_...`` evidence id.  The evidence
+``top_account_concentration_change``. A public/Scout caller supplies only an
+exact chain, asset id, and CMIS-owned ``ie_...`` evidence id. The evidence
 bundle itself must be resolved through an internal CMIS dependency; caller-
 supplied receipts, proof scores, or intelligence bundles are never a trust root.
 
 An optional explicit threshold policy may classify the already-verified numeric
-change.  That policy output remains separate from the market fact, Proof Score,
-and risk.  No behavioral, ownership, intent, risk, or execution interpretation
+change. That policy output remains separate from the market fact, Proof Score,
+and risk. No behavioral, ownership, intent, risk, or execution interpretation
 is added.
 """
 
@@ -267,7 +267,12 @@ def build_concentration_change_intelligence_response(
 
     summary = _evidence_summary(rebuilt)
     freshness_verified = summary["freshness_verified"]
-    status = OK if freshness_verified is True else PARTIAL
+    unresolved_fields = summary["unresolved_fields"]
+    status = (
+        OK
+        if freshness_verified is True and not unresolved_fields
+        else PARTIAL
+    )
     warnings: list[dict[str, str]] = []
     if freshness_verified is False:
         warnings.append({
@@ -278,6 +283,11 @@ def build_concentration_change_intelligence_response(
         warnings.append({
             "code": "intelligence_evidence_freshness_unknown",
             "message": "Evidence freshness is not explicitly verified by every authoritative Evidence Receipt.",
+        })
+    if unresolved_fields:
+        warnings.append({
+            "code": "intelligence_evidence_unresolved_fields",
+            "message": "Authoritative Evidence Receipts retain unresolved evidence fields.",
         })
 
     promoted = bool(promotion_authorized)
@@ -297,7 +307,7 @@ def build_concentration_change_intelligence_response(
             "receipt_ids": summary["receipt_ids"],
             "proof_records": summary["proof_records"],
             "freshness_verified": freshness_verified,
-            "unresolved_fields": summary["unresolved_fields"],
+            "unresolved_fields": unresolved_fields,
             "limitations": summary["limitations"],
             "intelligence_evidence": rebuilt,
         },
@@ -310,13 +320,14 @@ def build_concentration_change_intelligence_response(
         SERVICE,
         chain_name,
         status,
-        asset={"canonical_id": asset, "mint": asset},
+        asset={"canonical_id": asset},
         data=data,
         risk=None,
         confidence={
             "cmis_owned_evidence_resolved": True,
             "deterministic_evidence_revalidated": True,
             "freshness_verified": freshness_verified,
+            "unresolved_fields": unresolved_fields,
             "proof_records": summary["proof_records"],
         },
         sources=_source_records(rebuilt),

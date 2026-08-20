@@ -12,11 +12,11 @@ from liquidity_scout.cmis.intelligence_evidence_ledger import IntelligenceEviden
 from liquidity_scout.cmis.proof_score import build_proof_score
 
 
-def canonical_bundle(*, conclusion_type="top_account_concentration_change"):
+def canonical_bundle(*, chain="x1", conclusion_type="top_account_concentration_change"):
     observed_at = "2026-08-18T12:00:00Z"
     envelope = {
         "service": "market_report",
-        "chain": "x1",
+        "chain": chain,
         "status": "ok",
         "asset": {"canonical_id": "mint-1", "mint": "mint-1"},
         "data": {
@@ -43,7 +43,7 @@ def canonical_bundle(*, conclusion_type="top_account_concentration_change"):
     evidence = {"evidence_receipt": receipt, "proof_score": build_proof_score(receipt)}
 
     before = build_top_account_concentration(
-        chain="x1",
+        chain=chain,
         asset_id="mint-1",
         source="X1.Ninja",
         supply_raw=1000,
@@ -60,7 +60,7 @@ def canonical_bundle(*, conclusion_type="top_account_concentration_change"):
         conclusion = before
     else:
         after = build_top_account_concentration(
-            chain="x1",
+            chain=chain,
             asset_id="mint-1",
             source="X1.Ninja",
             supply_raw=1000,
@@ -125,6 +125,13 @@ class CMISIntelligenceEvidenceLedgerTests(unittest.TestCase):
                 "only top_account_concentration_change",
             ):
                 ledger.store(snapshot)
+
+    def test_store_rejects_non_x1_evidence_even_when_structurally_valid(self):
+        solana = canonical_bundle(chain="solana")
+        with TemporaryDirectory() as directory:
+            ledger = IntelligenceEvidenceLedger(str(Path(directory) / "intelligence.sqlite3"))
+            with self.assertRaisesRegex(ValueError, "accepts only x1 evidence"):
+                ledger.store(solana)
 
     def test_lookup_requires_canonical_content_id_and_missing_is_none(self):
         with TemporaryDirectory() as directory:
