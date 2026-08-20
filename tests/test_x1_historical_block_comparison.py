@@ -49,7 +49,7 @@ class HistoricalBlockComparisonTests(unittest.TestCase):
         self.assertFalse(result.finality_semantics_verified)
         self.assertFalse(result.cmis_promotable)
 
-    def test_distinct_labels_do_not_prove_source_independence(self):
+    def test_distinct_labels_without_independence_proof_stay_unknown(self):
         official = extract_historical_block_fact(
             source="official-x1-rpc", requested_slot=100, payload=payload()
         )
@@ -58,7 +58,21 @@ class HistoricalBlockComparisonTests(unittest.TestCase):
         )
         result = compare_historical_block_facts(official, secondary)
         self.assertEqual(result.status, "INSUFFICIENT_EVIDENCE")
-        self.assertFalse(result.source_independence_verified)
+        self.assertIsNone(result.source_independence_verified)
+        self.assertFalse(result.same_fact_identity_verified)
+
+    def test_explicit_failed_independence_stays_false(self):
+        official = extract_historical_block_fact(
+            source="official-x1-rpc", requested_slot=100, payload=payload()
+        )
+        secondary = extract_historical_block_fact(
+            source="secondary-x1-rpc", requested_slot=100, payload=payload()
+        )
+        result = compare_historical_block_facts(
+            official, secondary, source_independence_verified=False
+        )
+        self.assertEqual(result.status, "INSUFFICIENT_EVIDENCE")
+        self.assertIs(result.source_independence_verified, False)
         self.assertFalse(result.same_fact_identity_verified)
 
     def test_conflicting_blockhash_is_preserved(self):
@@ -77,7 +91,7 @@ class HistoricalBlockComparisonTests(unittest.TestCase):
         self.assertIn("blockhash", result.conflicts)
         self.assertFalse(result.cmis_promotable)
 
-    def test_same_source_is_insufficient_even_when_independence_is_claimed(self):
+    def test_same_source_is_rejected_even_when_independence_is_claimed(self):
         official = extract_historical_block_fact(
             source="x1-rpc", requested_slot=100, payload=payload()
         )
@@ -88,8 +102,19 @@ class HistoricalBlockComparisonTests(unittest.TestCase):
             official, secondary, source_independence_verified=True
         )
         self.assertEqual(result.status, "INSUFFICIENT_EVIDENCE")
-        self.assertFalse(result.source_independence_verified)
+        self.assertIs(result.source_independence_verified, False)
         self.assertFalse(result.same_fact_identity_verified)
+
+    def test_same_source_without_external_claim_is_explicitly_non_independent(self):
+        official = extract_historical_block_fact(
+            source="x1-rpc", requested_slot=100, payload=payload()
+        )
+        secondary = extract_historical_block_fact(
+            source="x1-rpc", requested_slot=100, payload=payload()
+        )
+        result = compare_historical_block_facts(official, secondary)
+        self.assertEqual(result.status, "INSUFFICIENT_EVIDENCE")
+        self.assertIs(result.source_independence_verified, False)
 
     def test_different_requested_slots_are_insufficient_evidence(self):
         official = extract_historical_block_fact(
@@ -103,6 +128,7 @@ class HistoricalBlockComparisonTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "INSUFFICIENT_EVIDENCE")
         self.assertFalse(result.same_fact_identity_verified)
+        self.assertTrue(result.source_independence_verified)
 
     def test_skipped_slots_do_not_break_request_context(self):
         fact = extract_historical_block_fact(
@@ -174,6 +200,19 @@ class HistoricalBlockComparisonTests(unittest.TestCase):
             official, secondary, source_independence_verified=True
         )
         self.assertEqual(result.status, "INSUFFICIENT_EVIDENCE")
+        self.assertTrue(result.source_independence_verified)
+
+    def test_none_independence_is_accepted_as_unknown(self):
+        official = extract_historical_block_fact(
+            source="official", requested_slot=100, payload=payload()
+        )
+        secondary = extract_historical_block_fact(
+            source="secondary", requested_slot=100, payload=payload()
+        )
+        result = compare_historical_block_facts(
+            official, secondary, source_independence_verified=None
+        )
+        self.assertIsNone(result.source_independence_verified)
 
     def test_independence_flag_type_safety(self):
         official = extract_historical_block_fact(
@@ -182,7 +221,7 @@ class HistoricalBlockComparisonTests(unittest.TestCase):
         secondary = extract_historical_block_fact(
             source="secondary", requested_slot=100, payload=payload()
         )
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(TypeError, "boolean or None"):
             compare_historical_block_facts(
                 official, secondary, source_independence_verified="yes"
             )
