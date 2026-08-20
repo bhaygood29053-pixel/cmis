@@ -106,6 +106,25 @@ class SolanaMarketVerificationTests(unittest.TestCase):
         self.assertNotIn("average_price", result)
         self.assertNotIn("selected_pair", result)
 
+    def test_structural_rejection_precedes_outlier_conflict(self):
+        result = verify_jupiter_vs_dexscreener_prices(
+            jupiter("1.00"),
+            dexscreener(
+                pair("PairA", "1.50"),
+                pair("PairA", "1.00"),
+            ),
+            max_relative_difference="0.01",
+        )
+
+        self.assertEqual(result["status"], INSUFFICIENT_EVIDENCE)
+        self.assertFalse(result["cmis_promotable"])
+        self.assertIn("dexscreener_pair_contract_invalid", result["rejection_reasons"])
+        self.assertIn(
+            {"pair": "PairA", "reason": "duplicate_pair_address"},
+            result["structural_rejections"],
+        )
+        self.assertEqual(result["comparisons"], [])
+
     def test_quote_side_pair_is_ineligible_and_never_used_as_requested_mint_price(self):
         result = verify_jupiter_vs_dexscreener_prices(
             jupiter("1.00"),
