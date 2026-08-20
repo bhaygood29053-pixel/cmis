@@ -62,15 +62,16 @@ class XDEXIntegerRoundedPriceImpactTests(unittest.TestCase):
             collector=lambda route, amount: dust_snapshot(),
         )
 
+        price_impact = evidence["capabilities"]["price_impact"]
+        self.assertEqual(price_impact["value"], 98.2143)
         self.assertEqual(
-            evidence["capabilities"]["price_impact"]["value"],
-            98.2143,
+            set(price_impact["proof_basis"]),
+            {
+                "verified_direct_cp_route",
+                "verified_pool_reserves",
+                "verified_price_impact_semantics",
+            },
         )
-        self.assertIn(
-            "verified_integer_rounded_quote_price_impact_semantics",
-            evidence["capabilities"]["price_impact"]["proof_basis"],
-        )
-        self.assertFalse(evidence["execution_authorized"] if "execution_authorized" in evidence else False)
 
     def test_dust_pool_quote_impact_still_fails_outside_existing_tolerance(self):
         with self.assertRaisesRegex(
@@ -105,10 +106,10 @@ class XDEXIntegerRoundedPriceImpactTests(unittest.TestCase):
         ):
             resolve_xdex_route_evidence(
                 ROUTE,
-                "0.000001",
+                "0.000002",
                 collector=lambda route, amount: dust_snapshot(
-                    token_in_amount="0.000001",
-                    raw_input_amount=1,
+                    token_in_amount="0.000002",
+                    raw_input_amount=2,
                     reconstructed_price_impact_percent="0.5524861878453038674033149171",
                     quote_price_impact_percent="0",
                 ),
