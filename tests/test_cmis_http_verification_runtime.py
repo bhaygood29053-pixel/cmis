@@ -54,6 +54,7 @@ def evidence_envelope():
     verified = verify_x1_pool_reserve(
         observation("X1.Ninja", slot=100),
         observation("X1 RPC", slot=101),
+        source_independence_verified=True,
     )
     return build_verification_evidence_response(
         verified,
@@ -140,6 +141,7 @@ class CMISHTTPVerificationRuntimeTests(unittest.TestCase):
         self.assertEqual(body["status"], "ok")
         self.assertEqual(body["data"]["fact"]["subject_id"], SUBJECT)
         self.assertEqual(body["data"]["fact"]["normalized_value"], "42")
+        self.assertIs(body["data"]["data_quality"]["source_independence_verified"], True)
         self.assertEqual(
             body["data"]["evidence_ref"]["evidence_id"],
             stored["evidence_id"],
