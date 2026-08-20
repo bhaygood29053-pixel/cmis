@@ -2,7 +2,7 @@
 
 ## Status
 
-Promotion candidate for Issue #237.
+Accepted on `main`; Issue #237 is complete.
 
 The accepted contract/store prerequisite from PR #238 remains narrow and fail-closed. This integration promotes exactly one public X1 service through the canonical CMIS runtime and capability manifest:
 
@@ -161,6 +161,8 @@ promotion_rule = new_accepted_public_service_contract_required
 ```
 
 Its broader foundation primitives remain non-public/non-automatic, including wallet activity, sanitized history, and raw concentration snapshots.
+
+Later accepted deterministic classification and wallet-relationship evidence foundations also remain internal/non-promoted. Their acceptance does not widen `concentration_change_intelligence/v1`, change the capability manifest, or grant additional Scout reliance.
 
 ## Unsupported scope
 
