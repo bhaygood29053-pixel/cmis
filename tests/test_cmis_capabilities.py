@@ -32,7 +32,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.8.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.9.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),

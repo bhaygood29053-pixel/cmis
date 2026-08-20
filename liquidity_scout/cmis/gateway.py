@@ -28,6 +28,9 @@ from liquidity_scout.cmis.assets import (
     MARKET_PLUS_NATIVE,
     NATIVE,
 )
+from liquidity_scout.cmis.verified_intelligence_service import (
+    dispatch_verified_intelligence_request,
+)
 from liquidity_scout.market.resolver import (
     AmbiguousAssetError,
     find_matches_for_term,
@@ -49,6 +52,9 @@ from liquidity_scout.services.cmis_pre_trade import build_pre_trade_check_respon
 from liquidity_scout.services.cmis_rank import build_rank_response
 from liquidity_scout.services.cmis_risk import build_risk_check_response
 from liquidity_scout.services.cmis_tokenomics import build_tokenomics_response
+from liquidity_scout.services.cmis_verified_intelligence import (
+    SERVICE as CONCENTRATION_CHANGE_INTELLIGENCE_SERVICE,
+)
 
 
 SUPPORTED_SERVICES = (
@@ -59,6 +65,7 @@ SUPPORTED_SERVICES = (
     "tokenomics",
     "risk_check",
     "pre_trade_check",
+    CONCENTRATION_CHANGE_INTELLIGENCE_SERVICE,
 )
 
 KNOWN_CHAINS = ("x1", "solana")
@@ -80,11 +87,18 @@ class CMISGateway:
         x1_supply_provider: Optional[X1SupplyProvider] = None,
         history_backend: Any = None,
         asset_registry: Optional[AssetRegistry] = None,
+        intelligence_evidence_resolver: Any = None,
     ):
         self.x1_market_provider = x1_market_provider or X1Provider()
         self.x1_supply_provider = x1_supply_provider or X1SupplyProvider()
         self.history_backend = history_backend or default_history_backend
         self.asset_registry = asset_registry or DEFAULT_ASSET_REGISTRY
+        if (
+            intelligence_evidence_resolver is not None
+            and not callable(intelligence_evidence_resolver)
+        ):
+            raise ValueError("intelligence_evidence_resolver must be callable when supplied")
+        self.intelligence_evidence_resolver = intelligence_evidence_resolver
 
     @staticmethod
     def _text(value: Any) -> Optional[str]:
@@ -637,8 +651,6 @@ class CMISGateway:
                 "unsupported_chain",
                 "Unsupported chain: " + chain,
             )
-        if chain not in SUPPORTED_CHAINS:
-            return self._chain_unavailable(service, chain)
         if not isinstance(params, Mapping):
             return self._gateway_error(
                 service,
@@ -646,6 +658,14 @@ class CMISGateway:
                 "invalid_params",
                 "params must be a JSON object/mapping.",
             )
+        if service == CONCENTRATION_CHANGE_INTELLIGENCE_SERVICE:
+            return dispatch_verified_intelligence_request(
+                request,
+                evidence_resolver=self.intelligence_evidence_resolver,
+                promotion_authorized=True,
+            )
+        if chain not in SUPPORTED_CHAINS:
+            return self._chain_unavailable(service, chain)
 
         if service == "asset_lookup":
             return self._asset_lookup(asset)

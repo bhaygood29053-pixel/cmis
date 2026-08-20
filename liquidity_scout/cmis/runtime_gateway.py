@@ -2,13 +2,15 @@
 
 The HTTP runtime needs the accepted risk/trade extensions, persisted
 ``verification_evidence`` lookup, narrowly eligible Solana identity/tokenomics/
-market/history/risk layers, deterministic XDEX route evidence, and evidence-
-quality metadata on one cooperative gateway class.
+market/history/risk layers, deterministic XDEX route evidence, the CMIS-owned
+concentration-change intelligence evidence ledger, and evidence-quality metadata
+on one cooperative gateway class.
 
-Verification evidence persistence and the XDEX exact-route resolver are internal
-runtime dependencies. Callers can select evidence only by the public service
-contract; they cannot inject a ledger, trusted route evidence, or resolver
-through an HTTP request.
+Verification evidence persistence, intelligence evidence persistence, and the
+XDEX exact-route resolver are internal runtime dependencies. Callers can select
+evidence only by the public service contract; they cannot inject a ledger,
+trusted route evidence, resolver, provider payload, or evidence bundle through
+an HTTP request.
 
 Solana service code remains provider-injected, but the production runtime can
 construct accepted read-only providers from deployment environment
@@ -27,6 +29,7 @@ from typing import Any
 
 from liquidity_scout.cmis.evidence_ledger import VerificationEvidenceLedger
 from liquidity_scout.cmis.evidence_quality_gateway import EvidenceQualityMixin
+from liquidity_scout.cmis.intelligence_evidence_ledger import IntelligenceEvidenceLedger
 from liquidity_scout.cmis.pre_trade_policy_gateway import PreTradePolicyMixin
 from liquidity_scout.cmis.solana_gateway import SolanaAssetLookupMixin
 from liquidity_scout.cmis.solana_historical_gateway import SolanaHistoricalCompareMixin
@@ -54,6 +57,11 @@ DEFAULT_VERIFICATION_EVIDENCE_DB = os.path.join(
     os.path.expanduser("~"),
     ".liquidity_scout",
     "verification_evidence.db",
+)
+DEFAULT_INTELLIGENCE_EVIDENCE_DB = os.path.join(
+    os.path.expanduser("~"),
+    ".liquidity_scout",
+    "intelligence_evidence.db",
 )
 SUPPORTED_SERVICES = (
     *TRADE_SUPPORTED_SERVICES,
@@ -84,6 +92,8 @@ class RuntimeCMISGateway(
         *,
         verification_evidence_ledger: Any = None,
         verification_evidence_db_path: str | None = None,
+        intelligence_evidence_ledger: Any = None,
+        intelligence_evidence_db_path: str | None = None,
         solana_runtime_env: Any = None,
         xdex_route_resolver: Any = None,
         **kwargs: Any,
@@ -109,6 +119,38 @@ class RuntimeCMISGateway(
                     os.makedirs(parent, exist_ok=True)
             ledger = VerificationEvidenceLedger(path)
 
+        intelligence_ledger = intelligence_evidence_ledger
+        if intelligence_ledger is None:
+            configured_intelligence_path = (
+                intelligence_evidence_db_path
+                if intelligence_evidence_db_path is not None
+                else os.getenv(
+                    "CMIS_INTELLIGENCE_EVIDENCE_DB",
+                    DEFAULT_INTELLIGENCE_EVIDENCE_DB,
+                )
+            )
+            intelligence_path = str(configured_intelligence_path or "").strip()
+            if not intelligence_path:
+                raise ValueError(
+                    "CMIS intelligence-evidence database path must not be empty."
+                )
+            if intelligence_path != ":memory:":
+                parent = os.path.dirname(os.path.abspath(intelligence_path))
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+            intelligence_ledger = IntelligenceEvidenceLedger(intelligence_path)
+
+        intelligence_resolver = getattr(intelligence_ledger, "get", None)
+        if not callable(intelligence_resolver):
+            raise ValueError(
+                "intelligence_evidence_ledger must provide a callable get method"
+            )
+        self.intelligence_evidence_ledger = intelligence_ledger
+        # The production runtime owns this trust root. Any stray constructor
+        # kwarg is overwritten rather than allowed to replace the CMIS-owned
+        # resolver with a caller-controlled implementation.
+        kwargs["intelligence_evidence_resolver"] = intelligence_resolver
+
         solana_dependencies, solana_status = build_solana_runtime_dependencies(
             solana_runtime_env
         )
@@ -131,6 +173,7 @@ class RuntimeCMISGateway(
 
 
 __all__ = [
+    "DEFAULT_INTELLIGENCE_EVIDENCE_DB",
     "DEFAULT_VERIFICATION_EVIDENCE_DB",
     "RuntimeCMISGateway",
     "SUPPORTED_SERVICES",
