@@ -18,6 +18,7 @@ CHAIN = "solana"
 SOURCE = "solana_rpc"
 DEFAULT_RPC_URL = "https://api.mainnet-beta.solana.com"
 DEFAULT_COMMITMENT = "confirmed"
+CANONICAL_TOKEN_LARGEST_ACCOUNT_LIMIT = 20
 
 # Canonical Solana token-program identities. These are checked together with
 # the RPC jsonParsed program label before ``program_identity_verified`` may be
@@ -283,7 +284,13 @@ class SolanaRPCProvider:
         }
 
     def get_token_largest_accounts(self, mint: str) -> dict[str, Any]:
-        """Return top token accounts without mislabeling them as total holders."""
+        """Return canonical top token accounts without mislabeling holders.
+
+        Solana's canonical RPC contract describes the method as the top 20 token
+        accounts. Some infrastructure providers return a larger provider-specific
+        extension. CMIS validates ordering, preserves the raw provider row count,
+        and normalizes the public account list back to the canonical top-20 scope.
+        """
 
         mint = _text(mint, field="mint")
         result = self._request(
@@ -295,7 +302,8 @@ class SolanaRPCProvider:
         if not isinstance(value, list):
             raise SolanaRPCError("getTokenLargestAccounts result.value must be a list")
 
-        accounts: list[dict[str, Any]] = []
+        provider_accounts: list[dict[str, Any]] = []
+        previous_amount: int | None = None
         for index, item in enumerate(value):
             if not isinstance(item, Mapping):
                 raise SolanaRPCError(
@@ -303,17 +311,37 @@ class SolanaRPCProvider:
                 )
             address = _text(item.get("address"), field="token account address")
             amount = _raw_amount(item.get("amount"), field="token account amount")
+            amount_int = int(amount)
+            if previous_amount is not None and amount_int > previous_amount:
+                raise SolanaRPCError(
+                    "getTokenLargestAccounts accounts must be ordered by non-increasing raw amount"
+                )
+            previous_amount = amount_int
             decimals = _u8(item.get("decimals"), field="token decimals")
             ui_amount_string = item.get("uiAmountString")
             if ui_amount_string is not None and not isinstance(ui_amount_string, str):
                 raise SolanaRPCError("uiAmountString must be a string or null")
-            accounts.append(
+            provider_accounts.append(
                 {
                     "address": address,
                     "amount_raw": amount,
                     "decimals": decimals,
                     "ui_amount_string": ui_amount_string,
                 }
+            )
+
+        provider_account_count = len(provider_accounts)
+        accounts = provider_accounts[:CANONICAL_TOKEN_LARGEST_ACCOUNT_LIMIT]
+        provider_extended = provider_account_count > CANONICAL_TOKEN_LARGEST_ACCOUNT_LIMIT
+        warning = (
+            "getTokenLargestAccounts is concentration evidence only and does not "
+            "establish total holder, wallet, or beneficial-owner count."
+        )
+        if provider_extended:
+            warning += (
+                " The RPC provider returned more rows than the canonical Solana "
+                "top-20 contract; CMIS preserved the provider row count and normalized "
+                "the account list to the canonical top-20 scope."
             )
 
         return {
@@ -324,17 +352,18 @@ class SolanaRPCProvider:
             "context_slot": slot,
             "accounts": accounts,
             "account_count_observed": len(accounts),
+            "provider_account_count_returned": provider_account_count,
+            "canonical_account_limit": CANONICAL_TOKEN_LARGEST_ACCOUNT_LIMIT,
+            "provider_extended_result_truncated": provider_extended,
             "counted_entity": "token_accounts",
             "coverage": "largest_token_accounts_only",
             "total_holder_count_verified": False,
-            "warning": (
-                "getTokenLargestAccounts is concentration evidence only and does not "
-                "establish total holder, wallet, or beneficial-owner count."
-            ),
+            "warning": warning,
         }
 
 
 __all__ = [
+    "CANONICAL_TOKEN_LARGEST_ACCOUNT_LIMIT",
     "CHAIN",
     "DEFAULT_RPC_URL",
     "SOURCE",
