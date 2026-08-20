@@ -38,6 +38,8 @@ public_service_promoted = false
 scout_reliance_promoted = false
 ```
 
+CMIS now also has accepted deterministic descriptive-classification and direct wallet-relationship evidence foundations. These remain internal/read-only/non-promoted and preserve `cmis_promotable=false` and `execution_authorized=false`. Their existence does not authorize Roberta or a Chain Scout to call internal helpers, treat them as public services, or infer behavioral/ownership conclusions.
+
 ## Shared public service surface
 
 Where the live manifest permits, the shared contract includes:
@@ -53,6 +55,8 @@ Where the live manifest permits, the shared contract includes:
 - `concentration_change_intelligence` — bounded X1-only promoted service under CMIS `1.9.0`
 
 A runtime service does not become an autonomous Scout action merely because it exists.
+
+The deterministic classification and wallet-relationship foundations are intentionally absent from this public service list because no separate public-service/Scout-reliance promotion contract has been accepted for them.
 
 ## First promoted Verified Intelligence service — Phase 12
 
@@ -77,6 +81,14 @@ Solana is explicitly unavailable/non-callable/non-promoted for this service.
 The request is bound to X1 plus exact asset context and a canonical CMIS-owned intelligence evidence id. CMIS resolves and revalidates the stored evidence internally. Caller-supplied intelligence bundles, Evidence Receipts, Proof Scores, provider assertions, behavioral labels, or replacement verification state are not accepted as trust inputs.
 
 The service does not convert token accounts into total unique holders or beneficial owners. It does not establish whale, insider, bot, accumulator, distributor, market-maker, manipulation, common-owner, relationship, or intent labels. Optional concentration-threshold output is deterministic policy evaluation, not risk. Proof strength does not become risk.
+
+## Internal deterministic interpretation boundary
+
+The accepted descriptive classification foundation may state only the exact concentration direction supported by canonical CMIS evidence. It does not convert that direction into whale, insider, accumulation/distribution intent, bot, manipulation, scam, ownership, or risk conclusions.
+
+The accepted wallet-relationship foundation may state only verified observed direct token-transfer interactions between exact chain identities under a bounded compatible evidence set. It does not establish common ownership, beneficial ownership, coordinated control, intent, complete wallet history, or complete relationship-graph coverage.
+
+Roberta and Chain Scouts may not rely on either foundation through the public service boundary unless a later promotion contract explicitly changes their eligibility.
 
 ## Chain boundaries
 
@@ -106,6 +118,12 @@ execution_authorized = false
 ```
 
 A `PASS` is not permission to trade.
+
+## Next read-only intelligence boundary
+
+Evidence-backed alerts are the next shared roadmap candidate. No alert becomes a public CMIS service or Scout-reliance capability until a separate accepted contract defines exact scope, freshness, threshold/policy identity, persistence semantics, triggering evidence, limitations, promotion state, and failure behavior.
+
+An alert may report only the verified condition that crossed its explicit rule. It may not imply whale, insider, bot, common-owner, manipulation, fraud/scam, coordinated behavior, intent, or execution authority unless a separately accepted deterministic contract proves that exact conclusion.
 
 ## Human approval and execution boundary
 
