@@ -12,6 +12,10 @@ from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
     validate_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.cmis_verified_intelligence import (
+    CONTRACT_VERSION as CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
+    SERVICE as CONCENTRATION_INTELLIGENCE_SERVICE,
+)
 from liquidity_scout.services.pre_trade_capabilities import (
     build_execution_capability_report,
 )
@@ -32,7 +36,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.8.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.9.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -42,8 +46,63 @@ class CMISCapabilityContractTests(unittest.TestCase):
             set(manifest["chains"]["solana"]["services"]),
             set(SUPPORTED_SERVICES),
         )
+        self.assertIn(CONCENTRATION_INTELLIGENCE_SERVICE, SUPPORTED_SERVICES)
         self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
         self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])
+
+    def test_first_promoted_intelligence_service_is_x1_only_and_narrow(self):
+        manifest = build_capability_manifest(
+            runtime_services=SUPPORTED_SERVICES,
+            legacy_supported_chains=SUPPORTED_CHAINS,
+            known_chains=KNOWN_CHAINS,
+        )
+        x1 = service_capability(
+            manifest,
+            chain="x1",
+            service=CONCENTRATION_INTELLIGENCE_SERVICE,
+        )
+        solana = service_capability(
+            manifest,
+            chain="solana",
+            service=CONCENTRATION_INTELLIGENCE_SERVICE,
+        )
+
+        self.assertEqual(x1["state"], "bounded")
+        self.assertTrue(x1["callable"])
+        self.assertTrue(x1["read_only"])
+        self.assertTrue(x1["public_service_promoted"])
+        self.assertTrue(x1["scout_reliance_promoted"])
+        self.assertEqual(
+            x1["service_contract_version"],
+            CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
+        )
+        self.assertEqual(
+            x1["accepted_conclusion_types"],
+            ["top_account_concentration_change"],
+        )
+        self.assertIn("cmis_owned_intelligence_evidence_id", x1["requirements"])
+        self.assertIn(
+            "caller_supplied_intelligence_evidence_not_accepted",
+            x1["limitations"],
+        )
+        self.assertIn(
+            "unresolved_receipt_fields_keep_service_partial",
+            x1["limitations"],
+        )
+        self.assertFalse(x1["execution_authorized"])
+
+        self.assertEqual(solana["state"], "unavailable")
+        self.assertFalse(solana["callable"])
+        self.assertFalse(solana["public_service_promoted"])
+        self.assertFalse(solana["scout_reliance_promoted"])
+        self.assertFalse(solana["execution_authorized"])
+
+        foundation = manifest["intelligence_foundation"]
+        self.assertFalse(foundation["public_service_promoted"])
+        self.assertFalse(foundation["scout_reliance_promoted"])
+        for capability in foundation["capabilities"].values():
+            self.assertFalse(capability["public_service_promoted"])
+            self.assertFalse(capability["scout_reliance_promoted"])
 
     def test_x1_gap_decisions_are_machine_readable_and_fail_closed(self):
         capabilities = build_x1_evidence_capability_manifest()["capabilities"]
@@ -65,8 +124,6 @@ class CMISCapabilityContractTests(unittest.TestCase):
             "unavailable",
         )
 
-        # XDEX remains field-classified instead of all-or-nothing. Coarse
-        # capabilities stay bounded because the accepted evidence is scoped.
         self.assertEqual(
             capabilities["xdex_history_semantics"]["state"],
             "bounded",
@@ -122,8 +179,6 @@ class CMISCapabilityContractTests(unittest.TestCase):
             ["usable_as_verified_fact"]
         )
 
-        # Issue #182 resolves the read-only slippage contract without claiming
-        # that a quote predicts actual fill quality.
         for name in (
             "xdex_quote_slippage_parameter_semantics",
             "xdex_quote_default_slippage",
@@ -187,10 +242,6 @@ class CMISCapabilityContractTests(unittest.TestCase):
         report = build_execution_capability_report()
         capabilities = report["evidence"]["capabilities"]
 
-        # Accepted XDEX proof is route/config scoped. Until a runtime producer
-        # resolves and re-verifies an arbitrary requested asset/route, generic
-        # pre-trade remains fail-closed even though XDEX slippage semantics are
-        # now known for the tested direct quote contract.
         self.assertEqual(capabilities["price_impact"]["status"], "unavailable")
         self.assertIsNone(capabilities["price_impact"]["value"])
         self.assertEqual(capabilities["fees"]["status"], "unavailable")
@@ -251,6 +302,9 @@ class CMISCapabilityContractTests(unittest.TestCase):
         first["chains"]["x1"]["evidence_capabilities"][
             "native_xnt_canonical_translation"
         ]["state"] = "unavailable"
+        first["chains"]["x1"]["services"][CONCENTRATION_INTELLIGENCE_SERVICE][
+            "public_service_promoted"
+        ] = False
 
         second = build_capability_manifest(
             runtime_services=SUPPORTED_SERVICES,
@@ -266,6 +320,11 @@ class CMISCapabilityContractTests(unittest.TestCase):
                 "native_xnt_canonical_translation"
             ]["state"],
             "verified",
+        )
+        self.assertTrue(
+            second["chains"]["x1"]["services"][CONCENTRATION_INTELLIGENCE_SERVICE][
+                "public_service_promoted"
+            ]
         )
 
 
