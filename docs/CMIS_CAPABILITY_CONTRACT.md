@@ -82,6 +82,23 @@ Solana is explicitly classified for this service as unavailable, non-callable, n
 
 The promotion does not change the Phase 11 foundation-level non-promotion flags and does not promote wallet activity, generic history, raw concentration snapshots, behavioral labels, ownership inference, or other intelligence primitives.
 
+## Post-Phase-12 internal deterministic foundations
+
+CMIS now also contains accepted deterministic classification and wallet-relationship evidence contracts. They remain internal implementation foundations and do **not** add runtime public services or change the capability manifest.
+
+The wallet-relationship foundation records only observed direct verified-transfer relationships reconstructed from canonical CMIS wallet-activity evidence. It does not establish ownership, beneficial ownership, behavior, intent, risk, complete history, or complete graph coverage.
+
+For both later internal foundations:
+
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+cmis_promotable = false
+execution_authorized = false
+```
+
+Issue #255 therefore required no CMIS capability-contract version bump and grants no new Scout dispatch authority.
+
 ## Chain boundary
 
 ### X1
