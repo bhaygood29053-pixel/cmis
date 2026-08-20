@@ -283,7 +283,7 @@ def _price_impact_capability(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         "proof_basis": [
             "verified_direct_cp_route",
             "verified_pool_reserves",
-            "verified_integer_rounded_quote_price_impact_semantics",
+            "verified_price_impact_semantics",
         ],
     }
 
