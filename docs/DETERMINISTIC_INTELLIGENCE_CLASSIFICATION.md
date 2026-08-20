@@ -6,7 +6,7 @@ This document defines the first internal classification contract after the Phase
 
 The contract is intentionally **descriptive, evidence-bound, read-only, and non-promoted**. It establishes how CMIS may turn an already accepted deterministic fact into a versioned classification without turning inference into fact or creating unsupported behavioral, ownership, intent, fraud, manipulation, or risk claims.
 
-Tracking issue: #250.
+Tracking issue #250 is complete. This deterministic classification contract is accepted on `main` and remains internal/non-promoted.
 
 ## First accepted classification
 
