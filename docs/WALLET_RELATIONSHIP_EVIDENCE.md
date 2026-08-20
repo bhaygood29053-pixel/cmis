@@ -2,7 +2,7 @@
 
 ## Status
 
-This document defines the first internal CMIS wallet-relationship evidence contract tracked by Issue #255.
+This document defines the first internal CMIS wallet-relationship evidence contract accepted on `main` through PR #257. Issue #255 is complete.
 
 The contract is deliberately **deterministic, evidence-bound, read-only, and non-promoted**. It records only observed direct transfer relationships that can be rebuilt from accepted CMIS wallet-activity observations. It does not infer ownership, beneficial ownership, behavior, intent, risk, or complete graph/history coverage.
 
