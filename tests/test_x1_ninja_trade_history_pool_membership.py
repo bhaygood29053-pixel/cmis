@@ -110,7 +110,7 @@ def _proof(
             {
                 "program_id": "recognized-xdex-program",
                 "scope": "outer",
-                "group_index": 0,
+                "group_index": None,
                 "instruction_index": 1,
             }
         ]
