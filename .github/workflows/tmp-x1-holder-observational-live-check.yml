@@ -1,0 +1,59 @@
+name: Temporary X1 Holder Observational Check
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/tmp-x1-holder-observational-live-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  holder-observational-check:
+    name: Read-only same-run holder observation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_HOLDER_OBSERVATIONAL_LIVE: "1"
+      X1_HOLDER_OBSERVATIONAL_OUTPUT: x1-holder-observational-evidence.json
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify X1.Ninja secret is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is not available to this workflow."
+            exit 1
+          fi
+      - name: Run same-run XENCAT holder observational comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_holder_observational_live -v
+      - name: Upload sanitized holder evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-holder-observational-evidence-${{ github.run_id }}
+          path: x1-holder-observational-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Safety boundary
+        run: |
+          echo "Read-only X1.Ninja + X1 RPC observation only."
+          echo "Numeric agreement/disagreement does not verify provider holder semantics or enumeration completeness."
+          echo "Token accounts and token-account authorities are not relabeled as wallets or beneficial owners."
+          echo "No missing value becomes zero and CMIS promotion remains false."
+          echo "No transaction preparation, signing, broadcasting, trading, bridge transfer, or value movement is performed."
