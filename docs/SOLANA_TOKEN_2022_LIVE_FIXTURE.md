@@ -24,19 +24,26 @@ The fixture is grounded in Solana's own documentation rather than symbol discove
 
 The repository constant lives in `liquidity_scout/providers/solana/live_fixture.py` so workflow and test code can share one accepted identity contract.
 
-## Accepted live checks
+## Accepted core live checks
 
-`.github/workflows/solana-token2022-live-verify.yml` binds the live probe to the exact fixture and exercises only read-only provider/runtime paths:
+`.github/workflows/solana-token2022-live-verify.yml` binds the core live probe to the exact fixture and exercises only read-only provider/runtime paths:
 
 - `getTokenSupply` succeeds for the exact mint;
 - `getAccountInfo(jsonParsed)` verifies the canonical Token-2022 owner/program identity;
 - decimals agree across canonical supply and mint-state observations;
 - Token-2022 extension names are preserved when the RPC returns them;
 - production CMIS `asset_lookup` preserves exact mint and Token-2022 program identity;
-- production CMIS `tokenomics` preserves verified total supply and its existing partial/unavailable boundaries;
-- `getTokenLargestAccounts` succeeds for the exact mint and remains explicitly bounded to largest token accounts only.
+- production CMIS `tokenomics` preserves verified total supply and its existing partial/unavailable boundaries.
 
-The workflow prefers a configured `SOLANA_RPC_URL` secret when available and otherwise uses Solana's public mainnet RPC. A failure or rate-limit on any required method is a live-readiness blocker rather than a reason to skip the check.
+The workflow prefers a configured `SOLANA_RPC_URL` secret when available and otherwise uses Solana's public mainnet RPC.
+
+## Remaining issue #244 live acceptance
+
+`getTokenLargestAccounts` remains part of the final acceptance scope because CMIS must prove that the exact live fixture preserves the existing bounded `largest_token_accounts_only` semantics without implying holder or beneficial-owner identity.
+
+GitHub-hosted validation showed that Solana's public mainnet RPC could complete the Token-2022 core methods but returned a transport HTTP error for `getTokenLargestAccounts`. Therefore the dedicated workflow does **not** silently downgrade or treat that method as proven. Final issue #244 closure requires a dedicated Solana RPC endpoint through `SOLANA_RPC_URL`, followed by a successful live run with `RUN_SOLANA_LARGEST_ACCOUNTS_LIVE_TESTS=1`.
+
+Deterministic provider tests continue to enforce that largest-account results are token-account observations only, with `total_holder_count_verified=false`.
 
 ## Boundaries
 
