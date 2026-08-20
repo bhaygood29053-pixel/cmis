@@ -54,7 +54,9 @@ def _flags_for(receipt: Mapping[str, Any], suffixes: tuple[str, ...]) -> dict[st
     result: dict[str, bool] = {}
     for path, value in raw.items():
         text = str(path)
-        if isinstance(value, bool) and any(text.endswith(suffix) for suffix in suffixes):
+        if isinstance(value, bool) and any(
+            text.endswith(suffix) for suffix in suffixes
+        ):
             result[text] = value
     return result
 
@@ -89,6 +91,123 @@ def _boolean_category(
         score=50,
         reasons=[verified_reason, failed_reason],
         evidence_paths=paths,
+    )
+
+
+def _source_independence_category(receipt: Mapping[str, Any]) -> dict[str, Any]:
+    """Score source independence only from explicit provenance verification.
+
+    Distinct source labels and verifier-shaped records are structural evidence
+    only. They do not prove independent upstream lineage. Positive proof credit
+    additionally requires a reported observation and verifier observation whose
+    source identities are themselves distinct; an unrelated third source cannot
+    rescue a same-source reported/verifier pair.
+    """
+
+    raw_sources = receipt.get("sources")
+    sources = raw_sources if isinstance(raw_sources, list) else []
+    unique_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if isinstance(item, Mapping) and _text(item.get("source")) is not None
+    }
+    reported_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if isinstance(item, Mapping)
+        and item.get("evidence_class") == "reported_observation"
+        and _text(item.get("source")) is not None
+    }
+    verifier_source_names = {
+        _text(item.get("source"))
+        for item in sources
+        if isinstance(item, Mapping)
+        and item.get("evidence_class") == "verifier_observation"
+        and _text(item.get("source")) is not None
+    }
+    reported_verifier_distinct = any(
+        reported_source != verifier_source
+        for reported_source in reported_source_names
+        for verifier_source in verifier_source_names
+    )
+    independence_flags = _flags_for(receipt, ("source_independence_verified",))
+    flag_paths = list(independence_flags)
+
+    # Explicit failure must never be weakened to UNKNOWN merely because other
+    # structural evidence is absent. Missing evidence and a failed proof gate
+    # are different states.
+    if independence_flags and not all(independence_flags.values()):
+        return _category(
+            state="UNVERIFIED",
+            score=0,
+            reasons=[
+                "one or more source independence gates are explicitly unverified"
+            ],
+            evidence_paths=flag_paths,
+        )
+
+    if not unique_source_names:
+        if independence_flags:
+            return _category(
+                state="UNVERIFIED",
+                score=0,
+                reasons=[
+                    "source independence flag is present but source identity evidence is absent"
+                ],
+                evidence_paths=flag_paths,
+            )
+        return _category(
+            state="UNKNOWN",
+            score=None,
+            reasons=["no source identity evidence supplied"],
+            evidence_paths=flag_paths,
+        )
+    if len(unique_source_names) < 2:
+        return _category(
+            state="UNVERIFIED",
+            score=0,
+            reasons=["single-source evidence cannot establish source independence"],
+            evidence_paths=flag_paths,
+        )
+    if not verifier_source_names:
+        if independence_flags:
+            return _category(
+                state="UNVERIFIED",
+                score=0,
+                reasons=[
+                    "source independence flag is present but verifier observation role is not established"
+                ],
+                evidence_paths=flag_paths,
+            )
+        return _category(
+            state="UNKNOWN",
+            score=None,
+            reasons=[
+                "multiple source identities are present but independent verifier provenance is not explicitly established"
+            ],
+        )
+    if not independence_flags:
+        return _category(
+            state="UNKNOWN",
+            score=None,
+            reasons=[
+                "distinct source labels and verifier roles do not prove source independence"
+            ],
+        )
+    if not reported_source_names or not reported_verifier_distinct:
+        return _category(
+            state="UNVERIFIED",
+            score=0,
+            reasons=[
+                "positive source independence requires distinct reported and verifier observation sources"
+            ],
+            evidence_paths=flag_paths,
+        )
+    return _category(
+        state="VERIFIED",
+        score=100,
+        reasons=["source independence is explicitly verified"],
+        evidence_paths=flag_paths,
     )
 
 
@@ -141,46 +260,7 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
             reasons=["freshness verification evidence not supplied"],
         )
 
-    raw_sources = receipt.get("sources")
-    sources = raw_sources if isinstance(raw_sources, list) else []
-    unique_source_names = {
-        _text(item.get("source"))
-        for item in sources
-        if isinstance(item, Mapping) and _text(item.get("source")) is not None
-    }
-    verifier_records = [
-        item
-        for item in sources
-        if isinstance(item, Mapping)
-        and item.get("evidence_class") == "verifier_observation"
-    ]
-    if len(unique_source_names) >= 2 and verifier_records:
-        source_independence = _category(
-            state="VERIFIED",
-            score=100,
-            reasons=["distinct reported and verifier source records are present"],
-        )
-    elif len(unique_source_names) >= 2:
-        source_independence = _category(
-            state="PARTIAL",
-            score=50,
-            reasons=[
-                "multiple source identities are present",
-                "independent verifier role is not explicitly established",
-            ],
-        )
-    elif len(unique_source_names) == 1:
-        source_independence = _category(
-            state="UNVERIFIED",
-            score=0,
-            reasons=["single-source evidence only"],
-        )
-    else:
-        source_independence = _category(
-            state="UNKNOWN",
-            score=None,
-            reasons=["no source identity evidence supplied"],
-        )
+    source_independence = _source_independence_category(receipt)
 
     verification = receipt.get("verification")
     verification_status = (
@@ -192,25 +272,25 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
         agreement = _category(
             state="VERIFIED",
             score=100,
-            reasons=["independent same-fact agreement recorded"],
+            reasons=["same-fact agreement recorded"],
         )
     elif verification_status == "CONFLICT":
         agreement = _category(
             state="CONFLICT",
             score=0,
-            reasons=["independent evidence conflict recorded"],
+            reasons=["same-fact evidence conflict recorded"],
         )
     elif verification_status == "INSUFFICIENT_EVIDENCE":
         agreement = _category(
             state="UNKNOWN",
             score=None,
-            reasons=["independent agreement is not proven"],
+            reasons=["same-fact agreement is not proven"],
         )
     else:
         agreement = _category(
             state="UNKNOWN",
             score=None,
-            reasons=["no independent verification status supplied"],
+            reasons=["no verification status supplied"],
         )
 
     scope_flags = _flags_for(
@@ -239,12 +319,16 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
         if explicit_scope and scope["state"] == "UNVERIFIED":
             scope["state"] = "PARTIAL"
             scope["score"] = 25
-            scope["reasons"].insert(0, "scope is named but completeness remains unproven")
+            scope["reasons"].insert(
+                0, "scope is named but completeness remains unproven"
+            )
     elif explicit_scope:
         scope = _category(
             state="PARTIAL",
             score=50,
-            reasons=["evidence scope is explicit but completeness proof is not supplied"],
+            reasons=[
+                "evidence scope is explicit but completeness proof is not supplied"
+            ],
         )
     else:
         scope = _category(
@@ -270,6 +354,8 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
         unknown_reason="no historical coverage proof supplied",
     )
 
+    raw_sources = receipt.get("sources")
+    sources = raw_sources if isinstance(raw_sources, list) else []
     observation = receipt.get("observation")
     observed_times = (
         observation.get("observed_times")
@@ -316,12 +402,24 @@ def build_proof_score(receipt: Mapping[str, Any]) -> dict[str, Any]:
     )
     total_categories = len(CATEGORY_ORDER)
     proof_percent = round(earned / total_categories, 2)
-    category_coverage_percent = round(scored_count / total_categories * 100, 2)
-    has_conflict = any(category["state"] == "CONFLICT" for category in categories.values())
+    category_coverage_percent = round(
+        scored_count / total_categories * 100, 2
+    )
+    has_conflict = any(
+        category["state"] == "CONFLICT" for category in categories.values()
+    )
 
-    if not has_conflict and proof_percent >= 80 and category_coverage_percent >= 75:
+    if (
+        not has_conflict
+        and proof_percent >= 80
+        and category_coverage_percent >= 75
+    ):
         strength = "STRONG"
-    elif not has_conflict and proof_percent >= 50 and category_coverage_percent >= 50:
+    elif (
+        not has_conflict
+        and proof_percent >= 50
+        and category_coverage_percent >= 50
+    ):
         strength = "MODERATE"
     else:
         strength = "WEAK"
