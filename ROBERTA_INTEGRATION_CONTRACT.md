@@ -38,6 +38,8 @@ public_service_promoted = false
 scout_reliance_promoted = false
 ```
 
+Post-Phase-12 deterministic classification and wallet-relationship evidence foundations are also accepted internally but remain non-public and non-promoted. They do not grant Roberta or a Chain Scout a direct callable relationship service.
+
 ## Shared public service surface
 
 Where the live manifest permits, the shared contract includes:
@@ -52,7 +54,7 @@ Where the live manifest permits, the shared contract includes:
 - `verification_evidence`
 - `concentration_change_intelligence` — bounded X1-only promoted service under CMIS `1.9.0`
 
-A runtime service does not become an autonomous Scout action merely because it exists.
+A runtime service does not become an autonomous Scout action merely because it exists. Internal deterministic modules—including wallet-relationship evidence—do not become Roberta/Scout services merely because they exist in the CMIS repository.
 
 ## First promoted Verified Intelligence service — Phase 12
 
