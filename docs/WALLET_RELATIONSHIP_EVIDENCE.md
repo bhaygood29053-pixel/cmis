@@ -40,6 +40,8 @@ wa_<64 lowercase hex>
 
 The resolved wallet-activity observation is revalidated through the accepted Phase 11 wallet-activity boundary before relationship construction. A caller/provider assertion is not a trust root merely because it names two wallets or a transaction.
 
+Trusted resolver failures preserve only the exception type. Arbitrary resolver text is neither reflected nor retained in the raised exception chain because storage/provider errors may contain credential-bearing paths, URLs, or provider responses.
+
 The relationship preserves:
 
 - exact chain;
