@@ -35,7 +35,7 @@ class HistoricalBlockComparison:
     compared_fields: tuple[str, ...]
     conflicts: tuple[str, ...]
     same_fact_identity_verified: bool
-    source_independence_verified: bool
+    source_independence_verified: bool | None
     archival_completeness_verified: bool = False
     retention_verified: bool = False
     finality_semantics_verified: bool = False
@@ -99,27 +99,41 @@ def compare_historical_block_facts(
     official: HistoricalBlockFact,
     secondary: HistoricalBlockFact,
     *,
-    source_independence_verified: bool = False,
+    source_independence_verified: bool | None = None,
 ) -> HistoricalBlockComparison:
     """Compare two captured facts without inferring source independence.
 
     Distinct source labels are necessary but not sufficient for independence.
-    The caller must explicitly provide an already-verified independence result;
-    otherwise the comparison remains ``INSUFFICIENT_EVIDENCE``.
+    ``None`` means independence is unproven, ``False`` means it was explicitly
+    rejected/disproven, and ``True`` means an accepted external contract proved
+    independence for these observations. Positive proof still requires distinct
+    non-empty source identities.
     """
     if not isinstance(official, HistoricalBlockFact) or not isinstance(secondary, HistoricalBlockFact):
         raise TypeError("official and secondary must be HistoricalBlockFact values")
-    if not isinstance(source_independence_verified, bool):
-        raise TypeError("source_independence_verified must be a boolean")
+    if source_independence_verified is not None and not isinstance(source_independence_verified, bool):
+        raise TypeError("source_independence_verified must be a boolean or None")
 
     official_source = official.source.strip()
     secondary_source = secondary.source.strip()
-    distinct_sources = bool(official_source and secondary_source and official_source != secondary_source)
-    independent = source_independence_verified and distinct_sources
+    source_identities_present = bool(official_source and secondary_source)
+    distinct_sources = bool(
+        source_identities_present and official_source != secondary_source
+    )
+
+    if source_independence_verified is True:
+        independent: bool | None = True if distinct_sources else False
+    elif source_independence_verified is False:
+        independent = False
+    elif source_identities_present and official_source == secondary_source:
+        independent = False
+    else:
+        independent = None
+
     same_slot = official.requested_slot == secondary.requested_slot
     verified = official.contract_verified and secondary.contract_verified
 
-    if not independent or not same_slot or not verified:
+    if independent is not True or not same_slot or not verified:
         return HistoricalBlockComparison(
             requested_slot=official.requested_slot,
             status="INSUFFICIENT_EVIDENCE",

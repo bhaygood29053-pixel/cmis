@@ -24,9 +24,11 @@ class HistoricalComparisonEvidenceTests(unittest.TestCase):
         evidence = build_historical_comparison_evidence(
             self._comparison(), observed_at=datetime(2026, 8, 18, 5, 0, tzinfo=timezone.utc)
         )
+        self.assertEqual(evidence.schema_version, "x1_historical_comparison_evidence.v2")
         self.assertEqual(evidence.subject_id, "x1:block:42")
         self.assertEqual(evidence.status, "AGREEMENT")
         self.assertEqual(evidence.data_quality, "HIGH")
+        self.assertIs(evidence.source_independence_verified, True)
         self.assertFalse(evidence.archival_completeness_verified)
         self.assertFalse(evidence.retention_verified)
         self.assertFalse(evidence.finality_semantics_verified)
@@ -42,7 +44,21 @@ class HistoricalComparisonEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence.data_quality, "HIGH")
         self.assertFalse(evidence.cmis_promotable)
 
-    def test_insufficient_evidence_is_low_quality(self):
+    def test_unknown_independence_is_preserved_as_null(self):
+        evidence = build_historical_comparison_evidence(
+            self._comparison(
+                status="INSUFFICIENT_EVIDENCE",
+                compared_fields=(),
+                same_fact_identity_verified=False,
+                source_independence_verified=None,
+            ),
+            observed_at=datetime(2026, 8, 18, 5, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(evidence.data_quality, "LOW")
+        self.assertIsNone(evidence.source_independence_verified)
+        self.assertIsNone(evidence.to_dict()["source_independence_verified"])
+
+    def test_explicit_failed_independence_is_preserved_as_false(self):
         evidence = build_historical_comparison_evidence(
             self._comparison(
                 status="INSUFFICIENT_EVIDENCE",
@@ -53,6 +69,17 @@ class HistoricalComparisonEvidenceTests(unittest.TestCase):
             observed_at=datetime(2026, 8, 18, 5, 0, tzinfo=timezone.utc),
         )
         self.assertEqual(evidence.data_quality, "LOW")
+        self.assertIs(evidence.source_independence_verified, False)
+        self.assertIs(evidence.to_dict()["source_independence_verified"], False)
+
+    def test_non_boolean_non_null_independence_is_rejected(self):
+        comparison = self._comparison()
+        object.__setattr__(comparison, "source_independence_verified", "yes")
+        with self.assertRaisesRegex(TypeError, "boolean or None"):
+            build_historical_comparison_evidence(
+                comparison,
+                observed_at=datetime(2026, 8, 18, 5, 0, tzinfo=timezone.utc),
+            )
 
     def test_naive_timestamp_is_rejected(self):
         with self.assertRaises(ValueError):

@@ -5,6 +5,8 @@ from liquidity_scout.cmis.evidence import (
     CONFLICT,
     IDENTITY_MISMATCH,
     INSUFFICIENT_EVIDENCE,
+    SOURCE_INDEPENDENCE_FAILED,
+    SOURCE_INDEPENDENCE_UNPROVEN,
     UNIT_MISMATCH,
     VALUE_MISSING,
     VALUES_AGREE,
@@ -128,7 +130,7 @@ class CMISEvidenceTests(unittest.TestCase):
         self.assertEqual(result["code"], VALUE_MISSING)
         self.assertIsNone(result["agreement"])
 
-    def test_high_quality_requires_two_sources_and_verified_agreement(self):
+    def test_distinct_source_labels_do_not_prove_independence(self):
         primary = self._observation()
         verifier = self._observation(
             source="X1 RPC",
@@ -141,10 +143,53 @@ class CMISEvidenceTests(unittest.TestCase):
             verification=verification,
         )
 
-        self.assertEqual(quality["quality"], "HIGH")
+        self.assertEqual(quality["quality"], "MEDIUM")
         self.assertEqual(quality["independent_source_count"], 2)
+        self.assertEqual(quality["distinct_source_label_count"], 2)
+        self.assertIsNone(quality["source_independence_verified"])
+        self.assertTrue(quality["same_fact_agreement_verified"])
+        self.assertFalse(quality["independent_agreement_verified"])
+        self.assertIn(SOURCE_INDEPENDENCE_UNPROVEN, quality["reasons"])
+
+    def test_high_quality_requires_explicit_independence_and_agreement(self):
+        primary = self._observation()
+        verifier = self._observation(
+            source="X1 RPC",
+            source_role="onchain_verifier",
+        )
+        verification = compare_same_fact_exact(primary, verifier)
+
+        quality = build_data_quality_assessment(
+            observations=[primary, verifier],
+            verification=verification,
+            source_independence_verified=True,
+        )
+
+        self.assertEqual(quality["quality"], "HIGH")
+        self.assertEqual(quality["distinct_source_label_count"], 2)
+        self.assertTrue(quality["source_independence_verified"])
+        self.assertTrue(quality["same_fact_agreement_verified"])
         self.assertTrue(quality["independent_agreement_verified"])
         self.assertEqual(quality["reasons"], [])
+
+    def test_explicit_failed_independence_cannot_be_high(self):
+        primary = self._observation()
+        verifier = self._observation(
+            source="X1 RPC",
+            source_role="onchain_verifier",
+        )
+        verification = compare_same_fact_exact(primary, verifier)
+
+        quality = build_data_quality_assessment(
+            observations=[primary, verifier],
+            verification=verification,
+            source_independence_verified=False,
+        )
+
+        self.assertEqual(quality["quality"], "MEDIUM")
+        self.assertFalse(quality["source_independence_verified"])
+        self.assertFalse(quality["independent_agreement_verified"])
+        self.assertIn(SOURCE_INDEPENDENCE_FAILED, quality["reasons"])
 
     def test_same_source_with_two_roles_is_not_independent(self):
         primary = self._observation(source_role="market_provider")
@@ -154,6 +199,7 @@ class CMISEvidenceTests(unittest.TestCase):
         quality = build_data_quality_assessment(
             observations=[primary, verifier],
             verification=verification,
+            source_independence_verified=True,
         )
 
         self.assertEqual(quality["quality"], "MEDIUM")
@@ -167,7 +213,9 @@ class CMISEvidenceTests(unittest.TestCase):
 
         self.assertEqual(quality["quality"], "MEDIUM")
         self.assertEqual(quality["independent_source_count"], 1)
+        self.assertIsNone(quality["source_independence_verified"])
         self.assertIn("SINGLE_SOURCE_ONLY", quality["reasons"])
+        self.assertIn(SOURCE_INDEPENDENCE_UNPROVEN, quality["reasons"])
 
     def test_conflict_forces_low_quality(self):
         primary = self._observation(normalized_value="1000")
@@ -181,11 +229,13 @@ class CMISEvidenceTests(unittest.TestCase):
         quality = build_data_quality_assessment(
             observations=[primary, verifier],
             verification=verification,
+            source_independence_verified=True,
         )
 
         self.assertEqual(quality["quality"], "LOW")
+        self.assertFalse(quality["same_fact_agreement_verified"])
         self.assertFalse(quality["independent_agreement_verified"])
-        self.assertIn("INDEPENDENT_SOURCE_CONFLICT", quality["reasons"])
+        self.assertIn("SOURCE_OBSERVATION_CONFLICT", quality["reasons"])
 
     def test_unverified_semantics_stays_low(self):
         primary = self._observation(semantics_verified=False)
@@ -194,6 +244,13 @@ class CMISEvidenceTests(unittest.TestCase):
 
         self.assertEqual(quality["quality"], "LOW")
         self.assertIn("SEMANTICS_UNVERIFIED", quality["reasons"])
+
+    def test_invalid_independence_type_fails_closed(self):
+        with self.assertRaises(TypeError):
+            build_data_quality_assessment(
+                observations=[self._observation()],
+                source_independence_verified="yes",
+            )
 
 
 if __name__ == "__main__":

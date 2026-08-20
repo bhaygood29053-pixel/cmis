@@ -22,7 +22,7 @@ class HistoricalComparisonEvidence:
     compared_fields: tuple[str, ...]
     conflicts: tuple[str, ...]
     same_fact_identity_verified: bool
-    source_independence_verified: bool
+    source_independence_verified: bool | None
     data_quality: str
     archival_completeness_verified: bool = False
     retention_verified: bool = False
@@ -49,16 +49,23 @@ def build_historical_comparison_evidence(
         raise TypeError("comparison must be a HistoricalBlockComparison")
     if comparison.status not in {"AGREEMENT", "CONFLICT", "INSUFFICIENT_EVIDENCE"}:
         raise ValueError("unsupported historical comparison status")
+    if comparison.source_independence_verified is not None and not isinstance(
+        comparison.source_independence_verified, bool
+    ):
+        raise TypeError("source_independence_verified must be a boolean or None")
 
     if comparison.status == "INSUFFICIENT_EVIDENCE":
         quality = "LOW"
-    elif comparison.same_fact_identity_verified and comparison.source_independence_verified:
+    elif (
+        comparison.same_fact_identity_verified
+        and comparison.source_independence_verified is True
+    ):
         quality = "HIGH"
     else:
         quality = "LOW"
 
     return HistoricalComparisonEvidence(
-        schema_version="x1_historical_comparison_evidence.v1",
+        schema_version="x1_historical_comparison_evidence.v2",
         fact_type="historical_block_identity_comparison",
         subject_id=f"x1:block:{comparison.requested_slot}",
         chain="x1",
