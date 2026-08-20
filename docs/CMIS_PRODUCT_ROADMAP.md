@@ -30,6 +30,8 @@ Accepted milestones:
 - **CMIS Phase 12 — first narrow public-service / Scout-reliance promotion: COMPLETE for X1 `concentration_change_intelligence/v1`.**
 - **CMIS capability contract: 1.9.0.**
 - **Roberta adoption/readiness of that exact X1 service: COMPLETE.**
+- **Post-Phase-12 deterministic classification contract: COMPLETE and internal/non-promoted.**
+- **Wallet relationship evidence foundation — Issue #255 / PR #257: COMPLETE and internal/non-promoted.**
 - **Controlled transaction execution: unauthorized / not an active CMIS milestone.**
 
 CMIS and Roberta phase numbering are separate. CMIS Phase 12 does not mean Roberta Controlled Execution has started.
@@ -71,6 +73,26 @@ Solana remains unavailable/non-callable/non-promoted for this service.
 The wrapper resolves canonical CMIS-owned intelligence evidence internally and revalidates deterministic evidence before returning facts/proof. Caller-supplied intelligence bundles, Evidence Receipts, Proof Scores, provider assertions, behavioral labels, or replacement verification state are rejected as trust shortcuts.
 
 The service does not establish unique-holder totals or beneficial owners. Token-account concentration remains token-account concentration. Optional threshold output is deterministic policy evaluation, not risk. Proof Score is not risk.
+
+## Post-Phase-12 internal deterministic foundations
+
+Two additional read-only deterministic contracts are now accepted on `main` without public-service or Scout-reliance promotion:
+
+1. deterministic concentration-direction classification over canonical CMIS-owned intelligence evidence;
+2. deterministic observed direct wallet-relationship evidence reconstructed from canonical verified wallet-activity observations.
+
+The wallet-relationship contract preserves exact chain, asset, sender, recipient, transaction identity, direction, verified amount/unit when available, provenance, scope, and bounded compatible summaries. Missing amount remains unknown rather than zero-filled.
+
+Neither contract establishes ownership, beneficial ownership, whale/insider/bot status, coordinated behavior, intent, manipulation, fraud, market risk severity, complete history, or complete graph coverage.
+
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+cmis_promotable = false
+execution_authorized = false
+```
+
+Any exposure beyond the internal deterministic foundation requires a separate accepted promotion contract.
 
 ## Verified-data foundation
 
@@ -121,7 +143,7 @@ Continue deepening field-level X1 and Solana verification without weakening trut
 
 ### Verified Intelligence
 
-Phase 11 foundation complete; first Phase 12 narrow X1 public-service promotion complete. Future interpretation layers require separate deterministic contracts before broader Scout use.
+Phase 11 foundation complete; first Phase 12 narrow X1 public-service promotion complete; deterministic descriptive classification and direct wallet-relationship evidence foundations are also complete internally. Future interpretation, alerting, ownership, behavioral, or broader Scout-reliance layers still require separate accepted contracts.
 
 ### Early Warning
 
@@ -144,12 +166,12 @@ Completed:
 4. pinned historical executed-fee reconstruction;
 5. route-scoped pre-trade evidence seam;
 6. explicit concentration-threshold evaluator;
-7. **Phase 12** first public-service / Scout-reliance contract for X1 `concentration_change_intelligence/v1`, with Roberta adoption/readiness complete.
+7. **Phase 12** first public-service / Scout-reliance contract for X1 `concentration_change_intelligence/v1`, with Roberta adoption/readiness complete;
+8. deterministic descriptive intelligence classification contract, accepted internally and non-promoted;
+9. wallet relationship evidence with explicit non-ownership semantics, accepted internally through Issue #255 / PR #257.
 
 Next read-only candidates:
 
-8. deterministic inference/classification contracts before behavioral/ownership labels;
-9. wallet relationship evidence with explicit non-ownership semantics;
 10. evidence-backed alert contracts;
 11. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
 12. field-by-field Solana maturity;
