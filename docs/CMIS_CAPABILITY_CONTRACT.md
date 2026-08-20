@@ -58,6 +58,24 @@ promotion_rule = new_accepted_public_service_contract_required
 
 Foundation primitive names do not silently become public services.
 
+## Accepted internal deterministic extensions
+
+CMIS now also contains two accepted deterministic, read-only, non-promoted foundations built above canonical CMIS evidence:
+
+- descriptive intelligence classification for the exact verified concentration direction supported by canonical evidence;
+- direct wallet-relationship evidence for verified token transfers between exact chain identities with explicit non-ownership semantics.
+
+These internal contracts do **not** add runtime public service names to `GET /v1/cmis/capabilities` and remain equivalent to:
+
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+cmis_promotable = false
+execution_authorized = false
+```
+
+They do not authorize whale, insider, bot, accumulator, distributor, market-maker, common-owner, beneficial-owner, manipulation, fraud/scam, intent, behavioral, or risk claims. A future alert/public-service/Scout-reliance capability requires its own separately accepted deterministic promotion contract.
+
 ## Phase 12 narrow promotion
 
 CMIS `1.9.0` separately promotes exactly one wrapper service on X1:
@@ -80,7 +98,7 @@ For this operation, Scouts require CMIS contract `>=1.9.0` and must validate the
 
 Solana is explicitly classified for this service as unavailable, non-callable, non-promoted, and `execution_authorized=false`.
 
-The promotion does not change the Phase 11 foundation-level non-promotion flags and does not promote wallet activity, generic history, raw concentration snapshots, behavioral labels, ownership inference, or other intelligence primitives.
+The promotion does not change the Phase 11 foundation-level non-promotion flags and does not promote wallet activity, generic history, raw concentration snapshots, deterministic descriptive classification, direct wallet relationships, behavioral labels, ownership inference, or other intelligence primitives.
 
 ## Chain boundary
 
@@ -91,6 +109,10 @@ X1 is the mature CMIS surface. `pre_trade_check` remains bounded and analysis-on
 ### Solana
 
 Solana Phase 10 remains a bounded read-only provider/runtime foundation beneath the same CMIS contract. Exact-mint identity and bounded/partial market, tokenomics, risk, and narrow historical services are capability-specific. Recognition of the chain does not imply X1 parity or availability of the Phase 12 concentration service.
+
+## Next capability boundary
+
+The next roadmap candidate is an evidence-backed alert contract. No alert becomes callable, public, or Scout-reliant merely because the underlying deterministic classification or relationship evidence exists. Alert scope, freshness, threshold/policy identity, persistence semantics, triggering evidence, and limitations must be separately accepted before any promotion.
 
 ## Drift protection
 
