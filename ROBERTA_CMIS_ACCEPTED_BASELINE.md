@@ -26,7 +26,8 @@ The accepted manifest includes:
 - risk/proof separation;
 - missing-evidence-is-unknown semantics;
 - read-only Phase 11 `intelligence_foundation` with public-service and Scout-reliance promotion false;
-- one separately promoted read-only X1 intelligence service, `concentration_change_intelligence`, under service contract `concentration_change_intelligence/v1`.
+- one separately promoted read-only X1 intelligence service, `concentration_change_intelligence`, under service contract `concentration_change_intelligence/v1`;
+- accepted post-Phase-12 deterministic classification and wallet-relationship evidence foundations whose public-service promotion, Scout reliance, CMIS promotion, and execution authorization remain false.
 
 Roberta does not call capability discovery directly; Scouts validate it before CMIS dispatch.
 
@@ -160,7 +161,9 @@ CMIS has accepted read-only foundations for:
 
 These foundations do not authorize or prove whale, insider, bot, accumulator, distributor, market-maker, ownership, relationship, manipulation, fraud, or behavioral-intent labels.
 
-The core Phase 11 intelligence primitives remain outside automatic public `supported_services` / Scout reliance. The separately promoted `concentration_change_intelligence/v1` wrapper is the only accepted exception at this checkpoint and is limited to its exact X1 evidence-id scope.
+Post-Phase-12 CMIS has also accepted two internal deterministic contracts: descriptive concentration-direction classification and observed direct wallet-relationship evidence. The wallet-relationship evidence proves only exact observed transfer relationships reconstructed from canonical wallet-activity observations and explicitly preserves non-ownership, non-behavioral, non-risk, incomplete-history, and incomplete-graph semantics.
+
+The core Phase 11 primitives and these later internal deterministic foundations remain outside automatic public `supported_services` / Scout reliance. The separately promoted `concentration_change_intelligence/v1` wrapper is the only accepted public Verified Intelligence exception at this checkpoint and is limited to its exact X1 evidence-id scope.
 
 ## Roberta consumption boundary
 
@@ -183,6 +186,7 @@ Roberta must not:
 - recalculate deterministic CMIS comparisons to obtain a preferred answer;
 - treat raw provider responses or asserted proof labels as verified on their own;
 - turn the remaining internal intelligence foundations into public services;
+- treat internal wallet-relationship evidence as proof of ownership, beneficial ownership, coordinated behavior, intent, fraud, manipulation, or complete relationship-graph coverage;
 - broaden the promoted concentration-change service beyond its exact accepted conclusion/scope;
 - treat analysis, proof, PASS, or human review as authorization to execute value movement.
 
