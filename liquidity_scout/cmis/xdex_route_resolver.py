@@ -121,13 +121,43 @@ def _ceil_fee(amount: int, rate_ppm: int) -> int:
     return (amount * rate_ppm + FEE_DENOMINATOR - 1) // FEE_DENOMINATOR
 
 
-def _reconstruct_impact(raw_input: int, reserve_in: int, trade_fee_ppm: int) -> Decimal:
+def _reconstruct_continuous_impact(
+    raw_input: int,
+    reserve_in: int,
+    trade_fee_ppm: int,
+) -> Decimal:
+    """Reconstruct the continuous CP impact used by the provider snapshot proof."""
     if trade_fee_ppm < 0 or trade_fee_ppm >= FEE_DENOMINATOR:
         raise XDEXRouteResolverError("snapshot trade_fee_rate_ppm is outside the accepted range")
     net_input = raw_input - _ceil_fee(raw_input, trade_fee_ppm)
     if net_input <= 0:
         raise XDEXRouteResolverError("snapshot trade fee consumes the complete raw input")
     return Decimal(net_input) * Decimal(100) / Decimal(reserve_in + net_input)
+
+
+def _reconstruct_quote_impact(
+    raw_input: int,
+    reserve_in: int,
+    reserve_out: int,
+    trade_fee_ppm: int,
+) -> Decimal:
+    """Reconstruct XDEX quote ``priceImpactPct`` from integer-rounded CP output.
+
+    Bounded live quote evidence established that the quote-side price-impact
+    semantic follows the integer token output produced by the CP curve, not the
+    continuous reserve-ratio expression. Keeping this separate from the snapshot
+    continuous reconstruction preserves both proofs instead of silently changing
+    the meaning of ``reconstructed_price_impact_percent``.
+    """
+    if trade_fee_ppm < 0 or trade_fee_ppm >= FEE_DENOMINATOR:
+        raise XDEXRouteResolverError("snapshot trade_fee_rate_ppm is outside the accepted range")
+    net_input = raw_input - _ceil_fee(raw_input, trade_fee_ppm)
+    if net_input <= 0:
+        raise XDEXRouteResolverError("snapshot trade fee consumes the complete raw input")
+    raw_output = net_input * reserve_out // (reserve_in + net_input)
+    if raw_output <= 0:
+        raise XDEXRouteResolverError("integer-rounded CP output is zero for the requested input")
+    return Decimal(raw_output) * Decimal(100) / Decimal(reserve_out)
 
 
 def _validated_snapshot(
@@ -195,7 +225,10 @@ def _validated_snapshot(
         snapshot.get("active_reserve_in_raw"),
         "snapshot.active_reserve_in_raw",
     )
-    _positive_int(snapshot.get("active_reserve_out_raw"), "snapshot.active_reserve_out_raw")
+    reserve_out = _positive_int(
+        snapshot.get("active_reserve_out_raw"),
+        "snapshot.active_reserve_out_raw",
+    )
     input_decimals = _nonnegative_int(snapshot.get("input_decimals"), "snapshot.input_decimals")
     output_decimals = _nonnegative_int(snapshot.get("output_decimals"), "snapshot.output_decimals")
     if input_decimals > 255 or output_decimals > 255:
@@ -206,11 +239,21 @@ def _validated_snapshot(
     if scaled != Decimal(raw_input):
         raise XDEXRouteResolverError("snapshot token_in_amount/raw_input_amount are inconsistent")
 
-    independently_reconstructed = _reconstruct_impact(raw_input, reserve_in, trade_fee_ppm)
+    independently_reconstructed = _reconstruct_continuous_impact(
+        raw_input,
+        reserve_in,
+        trade_fee_ppm,
+    )
     if reconstructed != independently_reconstructed:
         raise XDEXRouteResolverError(
             "snapshot reconstructed price impact does not match deterministic reserve arithmetic"
         )
+    quote_semantic_reconstructed = _reconstruct_quote_impact(
+        raw_input,
+        reserve_in,
+        reserve_out,
+        trade_fee_ppm,
+    )
 
     return {
         **dict(snapshot),
@@ -218,13 +261,14 @@ def _validated_snapshot(
         "token_in_amount": snapshot_amount,
         "observed_at": observed_at,
         "reconstructed_price_impact": reconstructed,
+        "quote_semantic_price_impact": quote_semantic_reconstructed,
         "quote_price_impact": quoted,
         "trade_fee_rate_ppm": trade_fee_ppm,
     }
 
 
 def _price_impact_capability(snapshot: Mapping[str, Any]) -> dict[str, Any]:
-    reconstructed = snapshot["reconstructed_price_impact"]
+    reconstructed = snapshot["quote_semantic_price_impact"]
     quoted = snapshot["quote_price_impact"]
     delta = abs(reconstructed - quoted)
     if delta > PRICE_IMPACT_TOLERANCE_PERCENTAGE_POINTS:
