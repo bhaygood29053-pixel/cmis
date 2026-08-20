@@ -136,9 +136,19 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
 
         if REQUIRE_TOKEN_2022:
             fixture = SOLANA_TOKEN_2022_LIVE_FIXTURE
-            self.assertEqual(identity["data"]["program"]["kind"], fixture.program_kind)
-            self.assertEqual(identity["data"]["program"]["owner_program_id"], fixture.program_id)
+            self.assertEqual(
+                identity["data"]["program"]["program_kind"],
+                fixture.program_kind,
+            )
+            self.assertEqual(
+                identity["data"]["program"]["owner_program_id"],
+                fixture.program_id,
+            )
             self.assertEqual(identity["data"]["decimals"], fixture.decimals)
+            self.assertEqual(
+                identity["data"]["extension_names"],
+                self.provider.get_mint_account(self.mint)["extension_names"],
+            )
 
         self.assertEqual(tokenomics["status"], "partial")
         self.assertEqual(tokenomics["chain"], "solana")
