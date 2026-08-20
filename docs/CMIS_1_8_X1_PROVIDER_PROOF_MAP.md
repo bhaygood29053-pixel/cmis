@@ -196,33 +196,52 @@ A specialist source may move from `CANDIDATE` toward bounded/active CMIS use onl
 
 A provider does not need to be globally promoted. Individual fields may be accepted while other fields remain unavailable.
 
-## CMIS 1.8.x execution priority
+## CMIS 1.8.x accepted baseline and next handoff
 
-### Priority A — integrate current evidence-hardening PRs
+### Accepted evidence-hardening baseline
 
-- PR #231: explicit source-independence proof in Proof Score.
-- PR #233: explicit source independence in shared CMIS data quality.
-- PR #230: exact fail-closed X1 transaction-to-pool membership proof.
+The dependency-safe evidence/history stack is integrated into `main`:
 
-These should be integrated in a dependency-safe order with full post-integration deterministic CI. No merge occurs without explicit approval.
+`#231 -> #233 -> #235 -> #230 -> #228 -> #236`
 
-### Priority B — connect existing provider candidates to the proof map
+This establishes the current 1.8.x baseline for:
 
-1. X1 Ninja trade/history evidence uses the #230 transaction-to-pool proof where applicable.
-2. FortiBlox remains secondary-indexer candidate until exact machine contract and provenance are verified.
-3. X1SCR receives a bounded token/holder-distribution contract investigation; no wallet/beneficial-owner promotion by inference.
-4. X1 Prism bridge metrics receive backend/provenance discovery; no bridge operational claim from UI alone.
-5. X1 Validator HQ receives a validator metric/ranking contract investigation.
-6. X1 Space receives a wallet/alert contract investigation only if it exposes a reproducible machine-readable source suitable for CMIS.
+- explicit tri-state source-independence evidence;
+- Proof Score / Evidence Receipt preservation of that tri-state;
+- historical comparison preservation of unknown versus explicitly failed independence;
+- exact fail-closed transaction-to-pool membership proof;
+- bounded X1.Ninja trade-history evidence;
+- composition of sampled history rows with exact pool-membership evidence.
 
-### Priority C — external access gaps
+The integrated baseline does not promote unsupported provider facts. Source independence, pagination/range exhaustiveness, retention/finality, provider amount/price/timestamp semantics, beneficial ownership, and behavioral intent remain unavailable unless separately proven.
 
-- X1Scroll/archive RPC evidence remains separate and credential-gated where applicable.
-- X1 Ninja SSE/live-event access must be tested rather than assumed.
-- historical source redundancy must be based on actual observations and contracts, not marketing descriptions.
-- bridge machine-readable provenance remains unavailable until discovered and verified.
+### Provider-gap work remains under #30
+
+1. FortiBlox remains a secondary-indexer candidate until exact machine contract and provenance are verified.
+2. X1SCR remains a bounded token/holder-distribution candidate; no wallet/beneficial-owner promotion by inference.
+3. X1 Prism bridge metrics require backend/provenance discovery; UI values do not prove bridge operational state.
+4. X1 Validator HQ requires exact validator metric/ranking semantics before promotion.
+5. X1 Space remains a wallet/alert candidate only if a reproducible machine-readable source is accepted.
+6. X1Scroll/archive RPC and X1 Ninja SSE/live-event access remain separate credential/access gaps where applicable.
 
 External provider uncertainty does not block the `1.8.x` hardening line when CMIS represents it accurately as `partial`, `unavailable`, `ambiguous`, or unverified.
+
+### Phase 12 read-only intelligence handoff
+
+Issue #237 is the next explicit roadmap/contract gate: promote exactly one public read-only Verified Intelligence service for Chain Scout reliance without bypassing CMIS evidence, proof, freshness, provenance, scope, or unknown-state rules.
+
+Draft PR #238 is an implementation candidate for that gate and must be reviewed against #237 before any public capability advertisement or Scout reliance is accepted. In particular:
+
+- promotion must be explicit and versioned;
+- X1-only scope must remain explicit unless another chain is separately accepted;
+- nested Phase 11 evidence must not be silently reclassified or strengthened;
+- Evidence Receipt IDs, Proof Score records, freshness, limitations, unresolved fields, and proof/risk separation must be preserved;
+- facts, deterministic policy outputs, and unsupported interpretations must remain distinguishable;
+- behavioral, ownership, relationship, and intent labels remain unavailable;
+- capability-manifest exposure and Scout reliance must fail closed until accepted;
+- no provider access may bypass CMIS.
+
+The Phase 12 gate does not reopen Controlled Execution and does not authorize transaction preparation, simulation as an execution precursor, signing, broadcasting, custody, trading, bridge transfer, autonomous execution, or value movement.
 
 ## Completion condition for provider/evidence hardening
 
