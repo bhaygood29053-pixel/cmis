@@ -1,0 +1,55 @@
+name: Temporary X1.Ninja SSE Access Check
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/x1-ninja-sse-live-access-temp.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sse-access-check:
+    name: Read-only SSE handshake classification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      RUN_X1_NINJA_SSE_LIVE_TESTS: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify X1.Ninja secret is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is not available to this workflow."
+            exit 1
+          fi
+
+      - name: Classify X1.Ninja SSE handshake access
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_x1_ninja_trade_stream_live -v
+
+      - name: Safety boundary
+        run: |
+          echo "Read-only HTTP/SSE handshake classification only."
+          echo "No SSE event body is consumed."
+          echo "No event schema, ordering, finality, reconnect, backfill, freshness, or CMIS promotion is inferred."
+          echo "No transaction preparation, signing, broadcasting, trading, or value movement is performed."
