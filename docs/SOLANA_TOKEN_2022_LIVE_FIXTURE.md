@@ -34,7 +34,9 @@ The repository constant lives in `liquidity_scout/providers/solana/live_fixture.
 - Token-2022 extension names are preserved when the RPC returns them;
 - production CMIS `asset_lookup` preserves exact mint and Token-2022 program identity;
 - production CMIS `tokenomics` preserves verified total supply and its existing partial/unavailable boundaries;
-- `getTokenLargestAccounts` is additionally exercised when a dedicated RPC secret is configured and remains explicitly bounded to largest token accounts only.
+- `getTokenLargestAccounts` succeeds for the exact mint and remains explicitly bounded to largest token accounts only.
+
+The workflow prefers a configured `SOLANA_RPC_URL` secret when available and otherwise uses Solana's public mainnet RPC. A failure or rate-limit on any required method is a live-readiness blocker rather than a reason to skip the check.
 
 ## Boundaries
 
