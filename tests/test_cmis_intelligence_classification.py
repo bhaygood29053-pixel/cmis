@@ -121,6 +121,8 @@ class CMISIntelligenceClassificationTests(unittest.TestCase):
         self.assertFalse(result["scout_reliance_promoted"])
         self.assertFalse(result["cmis_promotable"])
         self.assertFalse(result["execution_authorized"])
+        self.assertFalse(result["basis"]["policy_evaluation_used"])
+        self.assertFalse(result["basis"]["hidden_threshold_used"])
 
     def test_decrease_and_no_change_have_exact_deterministic_labels(self):
         cases = (
@@ -159,6 +161,20 @@ class CMISIntelligenceClassificationTests(unittest.TestCase):
                 evidence_resolver=lambda evidence_id: None,
             )
 
+    def test_resolver_failure_does_not_reflect_arbitrary_exception_text(self):
+        bundle = canonical_bundle()
+
+        def resolver(_):
+            raise RuntimeError("https://user:secret@example.invalid/private")
+
+        with self.assertRaisesRegex(ValueError, r"failed \(RuntimeError\)") as raised:
+            build_concentration_direction_classification(
+                bundle["intelligence_evidence_id"],
+                evidence_resolver=resolver,
+            )
+        self.assertNotIn("secret", str(raised.exception))
+        self.assertNotIn("example.invalid", str(raised.exception))
+
     def test_resolved_evidence_must_match_requested_content_id(self):
         requested = canonical_bundle(before_amount=250, after_amount=300)
         other = canonical_bundle(before_amount=250, after_amount=350)
@@ -168,7 +184,7 @@ class CMISIntelligenceClassificationTests(unittest.TestCase):
                 evidence_resolver=resolver_for(other),
             )
 
-    def test_tampered_or_unsupported_evidence_fails_before_classification(self):
+    def test_tampered_conclusion_fails_before_classification(self):
         bundle = canonical_bundle()
         tampered = deepcopy(bundle)
         tampered["conclusion"]["direction"] = "DECREASE"
@@ -178,6 +194,46 @@ class CMISIntelligenceClassificationTests(unittest.TestCase):
                 evidence_resolver=resolver_for(tampered),
             )
 
+    def test_tampered_evidence_receipt_or_proof_score_fails_closed(self):
+        bundle = canonical_bundle()
+
+        bad_receipt = deepcopy(bundle)
+        bad_receipt["evidence_bundles"][0]["evidence_receipt"]["freshness"][
+            "verified"
+        ] = False
+        with self.assertRaises(ValueError):
+            build_concentration_direction_classification(
+                bundle["intelligence_evidence_id"],
+                evidence_resolver=resolver_for(bad_receipt),
+            )
+
+        bad_proof = deepcopy(bundle)
+        bad_proof["evidence_bundles"][0]["proof_score"]["proof_strength"] = "LOW"
+        with self.assertRaises(ValueError):
+            build_concentration_direction_classification(
+                bundle["intelligence_evidence_id"],
+                evidence_resolver=resolver_for(bad_proof),
+            )
+
+    def test_incompatible_chain_scope_or_time_semantics_fail_closed(self):
+        bundle = canonical_bundle()
+        cases = (
+            ("chain", "solana"),
+            ("scope", "beneficial_owners"),
+            ("after_observed_at", "2026-08-18T11:00:00Z"),
+        )
+        for field, value in cases:
+            with self.subTest(field=field):
+                tampered = deepcopy(bundle)
+                tampered["conclusion"][field] = value
+                with self.assertRaises(ValueError):
+                    build_concentration_direction_classification(
+                        bundle["intelligence_evidence_id"],
+                        evidence_resolver=resolver_for(tampered),
+                    )
+
+    def test_unsupported_conclusion_type_fails_closed(self):
+        bundle = canonical_bundle()
         unsupported = deepcopy(bundle)
         unsupported["conclusion_type"] = "wallet_activity_summary"
         with self.assertRaisesRegex(ValueError, "only top_account_concentration_change"):
@@ -192,14 +248,24 @@ class CMISIntelligenceClassificationTests(unittest.TestCase):
             bundle["intelligence_evidence_id"],
             evidence_resolver=resolver_for(bundle),
         )
-        tampered = deepcopy(result)
-        tampered["label"] = "WHALE_ACCUMULATION"
-
-        with self.assertRaisesRegex(ValueError, "deterministic canonical classification"):
-            validate_concentration_direction_classification(
-                tampered,
-                evidence_resolver=resolver_for(bundle),
-            )
+        for forbidden_label in (
+            "WHALE_ACCUMULATION",
+            "INSIDER_ACTIVITY",
+            "BOT_DISTRIBUTION",
+            "MANIPULATION",
+            "COMMON_OWNER",
+            "SCAM",
+        ):
+            with self.subTest(label=forbidden_label):
+                tampered = deepcopy(result)
+                tampered["label"] = forbidden_label
+                with self.assertRaisesRegex(
+                    ValueError, "deterministic canonical classification"
+                ):
+                    validate_concentration_direction_classification(
+                        tampered,
+                        evidence_resolver=resolver_for(bundle),
+                    )
 
     def test_classification_validation_rebuilds_exact_evidence_and_record(self):
         bundle = canonical_bundle()
