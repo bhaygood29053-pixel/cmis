@@ -33,6 +33,10 @@ Scouts validate service state/callability, chain requirements, Evidence Receipt 
 
 The core Phase 11 `intelligence_foundation` remains read-only and non-promoted as a group.
 
+CMIS also now has accepted internal deterministic descriptive-classification and direct wallet-relationship evidence foundations. Both remain read-only/non-promoted, do not appear as callable Scout services, and preserve `scout_reliance_promoted=false`, `cmis_promotable=false`, and `execution_authorized=false`.
+
+A Scout must not call internal classification or wallet-relationship helpers directly, infer a service from their existence, or upgrade their evidence into behavioral/ownership labels.
+
 ## Public service surface
 
 Where the live manifest permits:
@@ -78,6 +82,8 @@ X1 is the mature CMIS surface. Evidence remains scope-specific: pool-, route-, p
 
 The Phase 12 concentration wrapper is explicit-only in Roberta/X1 Scout adoption; it is not an autonomous planner capability merely because the service is callable.
 
+The internal wallet-relationship foundation proves only observed direct interactions supported by canonical CMIS evidence. It does not establish common ownership, beneficial ownership, coordinated behavior, intent, or complete relationship-graph/history coverage.
+
 ## Solana
 
 Solana Phase 10 is complete as a separate read-only provider path beneath the same CMIS architecture. Exact-mint identity, SPL Token / Token-2022 handling, bounded market/tokenomics/risk/history, and source cross-checks remain capability-specific and fail closed. Solana does not inherit X1 capabilities.
@@ -96,6 +102,12 @@ execution_authorized = false
 ```
 
 A `PASS` is not permission to trade.
+
+## Next read-only promotion boundary
+
+Evidence-backed alerts are the next roadmap candidate. Scouts may not emit or rely on a CMIS alert service until an explicit contract proves scope, freshness, threshold/policy identity, persistence semantics, triggering evidence, limitations, public-service promotion, and Scout-reliance eligibility.
+
+Alert wording may not imply whale/insider/bot/common-owner/manipulation/fraud/intent claims unless separately accepted deterministic evidence contracts authorize those exact conclusions.
 
 ## Safety
 
