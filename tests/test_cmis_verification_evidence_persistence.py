@@ -52,6 +52,7 @@ def verifier_result(*, fresh=True):
     return verify_x1_pool_reserve(
         observation("X1.Ninja", fresh=fresh),
         observation("X1 RPC", fresh=fresh),
+        source_independence_verified=True,
     )
 
 
@@ -170,6 +171,7 @@ def crosscheck(*, fresh=True, missing_counter=False):
         observed_at=1000.0,
         rpc_identities=rpc_identities(),
         observation_scope_verified=fresh,
+        source_independence_verified=True,
     )
 
 

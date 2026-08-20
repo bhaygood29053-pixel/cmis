@@ -48,6 +48,7 @@ def envelope(value="42", *, verifier_value=None, freshness=True):
             freshness=freshness,
             slot=101,
         ),
+        source_independence_verified=True,
     )
     return build_verification_evidence_response(
         result,
