@@ -13,8 +13,25 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 )
 
 
-def evidence_bundle(*, freshness_verified=True):
+def evidence_bundle(*, freshness_verified=True, source_independence_verified=True):
     observed_at = "2026-08-18T12:00:00Z"
+    data = {
+        "scope": "asset_exact",
+        "asset_identity_verified": True,
+        "field_semantics_verified": True,
+        "freshness_verified": freshness_verified,
+        "cmis_promotable": True,
+        "verification": {
+            "status": "AGREEMENT",
+            "code": "test_verification",
+        },
+        "observations": {
+            "primary": {"source": "X1.Ninja", "observed_at": observed_at},
+            "verifier": {"source": "X1 RPC", "observed_at": observed_at},
+        },
+    }
+    if source_independence_verified is not None:
+        data["source_independence_verified"] = source_independence_verified
     envelope = {
         "service": "market_report",
         "chain": "x1",
@@ -24,22 +41,7 @@ def evidence_bundle(*, freshness_verified=True):
             "mint": "mint-1",
             "symbol": "TEST",
         },
-        "data": {
-            "scope": "asset_exact",
-            "asset_identity_verified": True,
-            "field_semantics_verified": True,
-            "freshness_verified": freshness_verified,
-            "source_independence_verified": True,
-            "cmis_promotable": True,
-            "verification": {
-                "status": "AGREEMENT",
-                "code": "test_verification",
-            },
-            "observations": {
-                "primary": {"source": "X1.Ninja", "observed_at": observed_at},
-                "verifier": {"source": "X1 RPC", "observed_at": observed_at},
-            },
-        },
+        "data": data,
         "risk": None,
         "confidence": {},
         "sources": [{"source": "X1.Ninja", "observed_at": observed_at}],
@@ -71,7 +73,7 @@ def concentration(*, first_amount):
     )
 
 
-def canonical_bundle(*, freshness_verified=True):
+def canonical_bundle(*, freshness_verified=True, source_independence_verified=True):
     change = compare_top_account_concentration(
         before=concentration(first_amount=250),
         after=concentration(first_amount=300),
@@ -81,7 +83,12 @@ def canonical_bundle(*, freshness_verified=True):
     return build_intelligence_evidence_bundle(
         conclusion_type="top_account_concentration_change",
         conclusion=change,
-        evidence_bundles=[evidence_bundle(freshness_verified=freshness_verified)],
+        evidence_bundles=[
+            evidence_bundle(
+                freshness_verified=freshness_verified,
+                source_independence_verified=source_independence_verified,
+            )
+        ],
     )
 
 
@@ -107,11 +114,13 @@ class CMISVerifiedIntelligenceTests(unittest.TestCase):
             "top_account_concentration_change",
         )
         self.assertEqual(result["data"]["facts"]["direction"], "INCREASE")
+        self.assertEqual(result["asset"], {"canonical_id": "mint-1"})
         nested = result["data"]["evidence"]["intelligence_evidence"]
         self.assertFalse(nested["public_service_promoted"])
         self.assertFalse(nested["scout_reliance_promoted"])
         self.assertFalse(nested["execution_authorized"])
         self.assertTrue(result["data"]["evidence"]["freshness_verified"])
+        self.assertEqual(result["data"]["evidence"]["unresolved_fields"], [])
 
     def test_explicit_threshold_policy_remains_separate_from_market_fact_and_risk(self):
         bundle = canonical_bundle()
@@ -182,7 +191,28 @@ class CMISVerifiedIntelligenceTests(unittest.TestCase):
         self.assertEqual(result["status"], "partial")
         self.assertFalse(result["data"]["evidence"]["freshness_verified"])
         self.assertIn("data.freshness_verified", result["data"]["evidence"]["unresolved_fields"])
-        self.assertEqual(result["warnings"][0]["code"], "intelligence_evidence_not_fresh")
+        warning_codes = {warning["code"] for warning in result["warnings"]}
+        self.assertIn("intelligence_evidence_not_fresh", warning_codes)
+        self.assertIn("intelligence_evidence_unresolved_fields", warning_codes)
+
+    def test_unresolved_source_independence_keeps_service_partial_even_when_fresh(self):
+        bundle = canonical_bundle(source_independence_verified=None)
+        result = build_concentration_change_intelligence_response(
+            bundle["intelligence_evidence_id"],
+            asset_id="mint-1",
+            evidence_resolver=lambda evidence_id: bundle,
+            promotion_authorized=True,
+        )
+        self.assertEqual(result["status"], "partial")
+        self.assertTrue(result["data"]["evidence"]["freshness_verified"])
+        self.assertIn(
+            "verification.source_independence",
+            result["data"]["evidence"]["unresolved_fields"],
+        )
+        self.assertIn(
+            "intelligence_evidence_unresolved_fields",
+            {warning["code"] for warning in result["warnings"]},
+        )
 
     def test_other_chain_remains_unavailable_before_any_resolver_call(self):
         bundle = canonical_bundle()
