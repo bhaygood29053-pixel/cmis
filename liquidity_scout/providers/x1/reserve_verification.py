@@ -1,14 +1,14 @@
 """Deterministic X1 pool-reserve verification over already-proven evidence.
 
 This module intentionally does not fetch X1.Ninja or RPC data and does not infer
-reserve units, vault identity, token decimals, or timing semantics. Provider-
-specific adapters must prove those facts first and construct CMIS evidence
-observations before calling this verifier.
+reserve units, vault identity, token decimals, timing semantics, or upstream
+source independence. Provider-specific adapters must prove those facts first and
+construct CMIS evidence observations before calling this verifier.
 """
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from liquidity_scout.cmis.evidence import (
     CONFLICT,
@@ -36,6 +36,8 @@ def _failed(
     code: str,
     primary: Mapping[str, Any],
     verifier: Mapping[str, Any],
+    *,
+    source_independence_verified: Optional[bool] = None,
 ) -> dict[str, Any]:
     verification = {
         "status": INSUFFICIENT_EVIDENCE,
@@ -49,6 +51,7 @@ def _failed(
         "data_quality": build_data_quality_assessment(
             observations=[primary, verifier],
             verification=verification,
+            source_independence_verified=source_independence_verified,
         ),
         "cmis_promotable": False,
     }
@@ -57,44 +60,78 @@ def _failed(
 def verify_x1_pool_reserve(
     primary: Mapping[str, Any],
     verifier: Mapping[str, Any],
+    *,
+    source_independence_verified: Optional[bool] = None,
 ) -> dict[str, Any]:
-    """Verify one X1 pool reserve from two independent proven observations.
+    """Verify one X1 pool reserve from two proven observations.
 
     Exact comparison is intentionally strict. A future live adapter may need to
     coordinate observations at a common slot or otherwise prove an acceptable
     observation scope before constructing these records. This function never
     introduces a hidden tolerance for moving reserves.
+
+    ``source_independence_verified`` is a separate tri-state evidence input:
+    ``True`` means the caller has an accepted proof that the two observations
+    are upstream-independent for this exact fact, ``False`` means independence
+    was disproven, and ``None`` means independence is unknown. Different source
+    labels are necessary for this two-source verifier but are not sufficient to
+    prove independence or permit CMIS promotion.
     """
     if not isinstance(primary, Mapping) or not isinstance(verifier, Mapping):
         raise TypeError("X1 reserve verification requires mapping observations.")
+    if source_independence_verified is not None and not isinstance(
+        source_independence_verified, bool
+    ):
+        raise TypeError("source_independence_verified must be true, false, or null")
 
     if (
         _text(primary.get("fact_type")) != FACT_TYPE
         or _text(verifier.get("fact_type")) != FACT_TYPE
     ):
-        return _failed(WRONG_FACT_TYPE, primary, verifier)
+        return _failed(
+            WRONG_FACT_TYPE,
+            primary,
+            verifier,
+            source_independence_verified=source_independence_verified,
+        )
 
     if (
         primary.get("identity_verified") is not True
         or verifier.get("identity_verified") is not True
     ):
-        return _failed(IDENTITY_UNVERIFIED, primary, verifier)
+        return _failed(
+            IDENTITY_UNVERIFIED,
+            primary,
+            verifier,
+            source_independence_verified=source_independence_verified,
+        )
 
     if (
         primary.get("semantics_verified") is not True
         or verifier.get("semantics_verified") is not True
     ):
-        return _failed(SEMANTICS_UNVERIFIED, primary, verifier)
+        return _failed(
+            SEMANTICS_UNVERIFIED,
+            primary,
+            verifier,
+            source_independence_verified=source_independence_verified,
+        )
 
     primary_source = _text(primary.get("source"))
     verifier_source = _text(verifier.get("source"))
     if primary_source is None or verifier_source is None or primary_source == verifier_source:
-        return _failed(SAME_SOURCE, primary, verifier)
+        return _failed(
+            SAME_SOURCE,
+            primary,
+            verifier,
+            source_independence_verified=False,
+        )
 
     verification = compare_same_fact_exact(primary, verifier)
     quality = build_data_quality_assessment(
         observations=[primary, verifier],
         verification=verification,
+        source_independence_verified=source_independence_verified,
     )
 
     return {
@@ -103,6 +140,8 @@ def verify_x1_pool_reserve(
         "cmis_promotable": (
             verification.get("status") not in {CONFLICT, INSUFFICIENT_EVIDENCE}
             and quality.get("quality") == "HIGH"
+            and quality.get("source_independence_verified") is True
+            and quality.get("independent_agreement_verified") is True
         ),
     }
 
