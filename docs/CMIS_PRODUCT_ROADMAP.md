@@ -2,37 +2,21 @@
 
 ## Purpose
 
-**CMIS — Cross-Chain Market Intelligence Service** is the deterministic evidence, verification, normalization, historical-intelligence, risk, and bounded pre-trade layer beneath chain-specific Scouts.
-
-The canonical project architecture is:
+**CMIS — Cross-Chain Market Intelligence Service** is the deterministic evidence, verification, normalization, historical-intelligence, risk, bounded pre-trade, and promoted read-only intelligence layer beneath chain-specific Scouts.
 
 ```text
 User / transport
-      ↓
-Roberta — coordinator and user-facing voice
-      ↓
-Chain Scout
-      ↓
-CMIS — deterministic intelligence authority
-      ↓
-Chain Provider / verified source
+  -> Roberta
+    -> Chain Scout
+      -> CMIS
+        -> Chain Provider / verified source
 ```
 
-The repository was originally created as **Liquidity Scout**. That name is retained only for historical context and the compatibility Python namespace `liquidity_scout`; it is not a second current user-facing product beside Roberta.
+The repository was originally created as **Liquidity Scout**. That name remains only as historical context and in the compatibility Python namespace `liquidity_scout`; it is not a second current authority layer.
 
-The long-term goal is to make CMIS a premium blockchain-intelligence service that converts raw market and on-chain activity into **verified, explainable, auditable, and machine-consumable intelligence**.
+Core principle: premium users may receive more depth, history, speed, automation, analytics, and access, but never a weaker or different definition of truth.
 
-Core principle:
-
-> Premium users may receive more depth, history, speed, automation, analytics, and access, but never a weaker or different definition of truth.
-
-Verification standards remain consistent across every service tier.
-
----
-
-## Roadmap status — 2026-08-18
-
-The original product-sequence numbering in this document predates later GitHub execution-phase numbering. They are not a one-to-one mapping.
+## Roadmap status — 2026-08-20
 
 Accepted milestones:
 
@@ -41,218 +25,80 @@ Accepted milestones:
 - **Remaining X1 evidence gaps: CLASSIFIED at an explicit fail-closed capability boundary.**
 - **Deterministic pre-trade trade-size analysis: COMPLETE.**
 - **CMIS Phase 11 — read-only Verified Intelligence foundation: COMPLETE.**
-- **XDEX quote/history semantics: materially advanced with field-by-field bounded verification.**
-- **Pinned XENCAT/native-XNT historical execution-fee model: 2800 ppm STRONGLY CORROBORATED / BOUNDED.**
-- **Fail-closed route-scoped pre-trade evidence seam: COMPLETE.**
-- **Deterministic explicit-policy concentration-threshold evaluation: COMPLETE.**
+- **CMIS Phase 12 — first public read-only Verified Intelligence service: ACCEPTED for X1.**
+- **XDEX quote/history and route evidence: bounded field-by-field progress accepted.**
 
-Phase 10 completion is recorded in [`PHASE_10_COMPLETION.md`](./PHASE_10_COMPLETION.md). Phase 11 completion is recorded in [`PHASE_11_COMPLETION.md`](./PHASE_11_COMPLETION.md).
+CMIS contract `1.9.0` preserves the Phase 11 `intelligence_foundation` as read-only and unpromoted as a whole while separately promoting exactly one Phase 12 service:
 
-CMIS contract `1.8.0` exposes Evidence Receipt / Proof Score requirements and a discoverable read-only `intelligence_foundation`. Phase 11 intelligence primitives remain outside `supported_services`, with `public_service_promoted = false` and `scout_reliance_promoted = false` until a separately accepted service contract authorizes promotion.
+```text
+concentration_change_intelligence/v1
+accepted conclusion: top_account_concentration_change
+initial chain: X1 only
+```
 
-Recent accepted post-foundation work also established:
+For X1 the service is bounded, callable, read-only, publicly promoted, Scout-reliance promoted, and `execution_authorized=false`. For Solana it is unavailable/non-callable with promotion false and `execution_authorized=false`.
 
-- XDEX 1-minute history timestamp/OHLC semantics for tested verified scope while keeping unverified volume semantics bounded;
-- verified XDEX quote route/config identity and independently reproducible route-scoped price-impact semantics;
-- verified quote-side slippage parameter percent units and current default behavior, while keeping quote tolerance distinct from expected execution slippage;
-- a bounded 23-swap state-contiguous historical execution reconstruction strongly supporting 2800-ppm execution for the pinned XENCAT/native-XNT config and strongly rejecting 3000-ppm execution for that tested sequence;
-- a hardened internal route-evidence seam that may expose only exact, fresh, scope-matched, accepted-proof price-impact and fee evidence to pre-trade analysis;
-- deterministic explicit-policy threshold evaluation over canonical top-account concentration changes without creating whale/insider/behavioral or risk labels.
-
-No controlled-execution milestone is active in CMIS. Transaction construction, signing, broadcasting, custody, trading, bridge transfer, autonomous execution, and autonomous value movement remain unauthorized.
-
----
+No controlled-execution milestone is active in CMIS.
 
 ## 1. Stable architecture and ownership
 
-```text
-Users / channels
-      ↓
-Roberta
-      ↓
-X1 Scout / Solana Scout
-      ↓
-CMIS
-      ↓
-X1 / XDEX / Solana providers and verified sources
-```
+Roberta owns user intent, policy, coordination, and final explanation. Chain Scouts own chain-specific planning and interpretation. CMIS owns deterministic facts, evidence, proof, risk, capability eligibility, bounded pre-trade calculations, and accepted intelligence-service calculations. Providers own source transport/parsing beneath CMIS.
 
-Authority flows downward:
+Roberta and Scouts must not manufacture provider facts, recompute CMIS proof/risk into a second source of truth, or promote unavailable evidence.
 
-```text
-Roberta → Chain Scout → CMIS → Chain Provider
-```
-
-Verified information flows upward:
-
-```text
-Chain Provider → CMIS → Chain Scout → Roberta
-```
-
-### CMIS owns
-
-- deterministic collection and normalization;
-- blockchain/provider verification where accepted;
-- source comparison and conflict handling;
-- explicit confidence, proof, freshness, scope, and verification state;
-- historical evidence storage;
-- deterministic risk features;
-- Evidence Receipts and Proof Scores;
-- cross-chain canonical schemas;
-- capability eligibility contracts;
-- bounded analysis-only pre-trade calculations;
-- future premium intelligence APIs and alerts when separately accepted.
-
-### Chain Scouts own
-
-- chain-specific investigation planning;
-- choosing allowed CMIS services for the user objective;
-- preserving exact CMIS status, provenance, limitations, and uncertainty;
-- chain-specific interpretation without manufacturing provider facts.
-
-### Roberta owns
-
-- user intent and conversational coordination;
-- specialist selection;
-- broader/cross-chain synthesis;
-- user-facing explanation and policy framing;
-- human-review boundaries.
-
-Roberta and Chain Scouts must not rewrite deterministic CMIS facts, recompute CMIS proof into a second source of truth, or promote unavailable evidence.
-
----
-
-## 2. Completed verified-data foundation
+## 2. Verified-data foundation
 
 ### X1 / XDEX — COMPLETE / ACTIVE foundation
 
-Accepted capabilities include, where their exact evidence contracts permit:
+Accepted capabilities include exact identity, market/ranking support, tokenomics/authority facts, transaction/trade verification, provider-vs-chain reconciliation, persisted verification evidence, deterministic risk, bounded trade-size analysis, field/scope-specific route evidence, and fail-closed behavior for incomplete/stale/conflicting evidence.
 
-- exact asset/pool identity;
-- market reports and rankings;
-- tokenomics and authority facts;
-- successful transaction confirmation;
-- chain slot/timestamp identity checks;
-- recognized XDEX program detection;
-- token-account delta analysis;
-- exact pool-leg matching;
-- deterministic BUY/SELL verification;
-- provider-vs-chain reconciliation;
-- bounded verified asset activity;
-- persisted verification evidence;
-- deterministic risk checks;
-- deterministic trade-size analysis;
-- bounded route-scoped price-impact and fee evidence where exact route/proof/freshness gates pass;
-- fail-closed behavior for incomplete, stale, incompatible, or contradictory evidence.
+Program-, pool-, route-, account-, or sample-scoped completeness remains distinct from asset-wide/global X1 completeness.
 
-Program-, pool-, route-, or sample-scoped completeness remains distinct from asset-wide/global X1 completeness.
+### Solana Phase 10 — COMPLETE read-only foundation
 
-### X1 evidence capability boundary — COMPLETE / ACTIVE
+Accepted components include exact-mint identity, SPL Token and Token-2022 handling, canonical supply/authority evidence, configured Jupiter/Helius/DEX Screener evidence, deterministic cross-source checks, provenance-safe observation history, and bounded/partial read-only services where advertised.
 
-The capability registry records facts as `verified`, `bounded`, or `unavailable` instead of treating provider gaps as implicit promises.
-
-Examples that remain bounded/unavailable include holder/beneficial-owner semantics, archival completeness, live-event semantics, and bridge operational/route/fee/capacity/lifecycle facts unless a newer accepted evidence contract explicitly promotes them.
-
-XDEX semantics have advanced since the original boundary was created. Current accepted evidence is field- and scope-specific rather than a blanket statement that all XDEX quote/history semantics are either verified or unavailable.
-
-### XDEX semantic and execution-evidence progress — ACTIVE / BOUNDED
-
-Accepted current distinctions include:
-
-- quote route and AMM-config identity can be verified for exact tested routes;
-- route-scoped `priceImpactPct` can be independently reproduced where pool/reserve/config evidence is accepted;
-- quote `slippage` uses percent units and current omitted-slippage behavior has been verified for tested scope;
-- quote slippage tolerance / minimum-received behavior is **not** an expected execution-slippage estimate;
-- XDEX history `t` and tested OHLC behavior have bounded corroboration; unverified history fields remain unpromoted;
-- the pinned XENCAT/native-XNT 2800-ppm historical execution model is strongly corroborated by a state-contiguous completed-swap sequence;
-- the observed 3000-ppm zero-slippage quote baseline is localized to the quote layer for that tested scope, not proven as a hidden executed fee;
-- the private backend reason for the 2800→3000 quote behavior remains unavailable;
-- global route optimality, fill quality, route quality, generic execution quality, and universal XDEX execution semantics remain unproven.
-
-### Solana Phase 10 read-only foundation — COMPLETE
-
-Solana is implemented beneath the same CMIS contract rather than as a separate intelligence stack.
-
-Accepted components include:
-
-- exact-mint identity through canonical Solana RPC;
-- SPL Token and Token-2022 identity handling;
-- canonical token supply and mint/freeze authority evidence;
-- RPC slot/context provenance;
-- optional largest-token-account concentration evidence that is not holder-total coverage;
-- Jupiter read-only evidence when configured;
-- Helius indexed evidence when configured;
-- DEX Screener pair-scoped market evidence;
-- deterministic cross-source price/supply gates;
-- provenance-safe observation history;
-- bounded/partial `asset_lookup`, `tokenomics`, `market_report`, `risk_check`, and narrow `historical_compare` services;
-- environment-owned production composition and read-only live acceptance.
-
-Solana ranking, pre-trade execution modeling, trade verification, verified asset-wide activity, signing, broadcasting, and custody remain unavailable until separately implemented and promoted.
-
----
+Solana is not assumed to have X1 parity. Ranking, pre-trade execution modeling, trade verification, verified asset-wide activity, and the Phase 12 concentration-change service remain unavailable unless separately promoted.
 
 ## 3. Evidence quality and Verified Intelligence
 
 ### Evidence Receipts and Proof Score — COMPLETE / ACTIVE
 
-CMIS produces deterministic evidence receipts and proof scores without rewriting the underlying service result.
+Evidence Receipts preserve provenance, verification state, scope, freshness, disagreements, limitations, unresolved fields, and content-addressed identity. Proof Score remains separate from market risk.
 
-Evidence receipts preserve available provenance, verification state, evidence scope, freshness indicators, disagreements, limitations, unresolved fields, and content-addressed identity.
+### Phase 11 foundation — COMPLETE / STILL UNPROMOTED AS A WHOLE
 
-Proof scores keep proof strength separate from risk. Missing evidence remains missing/unknown rather than becoming a fabricated false or zero value.
+Phase 11 established deterministic primitives for top-account concentration and compatible numeric change, neutral wallet activity, sanitized sparse history/comparison, and evidence-bound conclusions.
 
-### CMIS Phase 11 read-only Verified Intelligence foundation — COMPLETE
+The top-level foundation remains:
 
-Accepted foundations include:
+```text
+read_only = true
+public_service_promoted = false
+scout_reliance_promoted = false
+```
 
-- exact top-account concentration observations with raw rational evidence;
-- compatible-scope numeric concentration-change comparison;
-- neutral verified wallet activity facts without behavioral labels;
-- bounded activity windows, first/last observed activity, transaction counts, and verified volume with explicit units;
-- sanitized sparse historical storage for concentration, wallet activity, liquidity, supply, price, and activity;
-- compatible-series comparison ordered by canonical observation time;
-- no interpolation or zero-filled missing history;
-- evidence-bound conclusions using exact Evidence Receipts and recomputed Proof Scores;
-- content-addressed observation, receipt, conclusion, and evidence-bundle identities;
-- explicit provider-reported versus verifier-observed evidence separation.
+Broader concentration snapshots, wallet activity, sanitized history, and generic evidence-bound conclusions are not automatically added to `supported_services`.
 
-Phase 11 does **not** promote whale, insider, bot, market-maker, accumulator, distributor, ownership, relationship, scam, manipulation, or behavioral-intent claims.
+### Phase 12 concentration-change intelligence — ACCEPTED / X1 ONLY
 
-### Explicit-policy concentration threshold — COMPLETE / INTERNAL FOUNDATION
+The first separately promoted intelligence service is:
 
-CMIS can deterministically compare a canonical concentration change with an explicit caller-supplied versioned threshold and report only:
+```text
+service: concentration_change_intelligence
+contract: concentration_change_intelligence/v1
+accepted conclusion: top_account_concentration_change
+```
 
-- `WITHIN_THRESHOLD`;
-- `AT_THRESHOLD`;
-- `EXCEEDS_THRESHOLD`.
+The public trust root is CMIS-owned evidence, not caller self-attestation. A request binds exact `chain=x1`, exact asset identity, and one canonical CMIS-owned `intelligence_evidence_id`; optional explicit/versioned threshold policy is allowed. Caller-supplied conclusions, full intelligence bundles, Evidence Receipts, or Proof Scores are rejected as trusted inputs.
 
-This is policy evaluation, not a market fact and not behavioral/risk interpretation. There is no hidden default threshold, no public-service promotion, and no automatic Scout reliance.
+The service preserves observed **top-token-account** scope. It does not convert token accounts into unique holders or beneficial owners. Optional threshold output is deterministic policy observation only (`WITHIN_THRESHOLD`, `AT_THRESHOLD`, `EXCEEDS_THRESHOLD`), not market risk or behavioral interpretation. `risk` remains null/separate.
 
----
+Unsupported scope still includes generic `verified_intelligence`, public intelligence-evidence upload/storage, raw concentration snapshots as a separate service, wallet activity services, generic history services, holder/beneficial-owner identity, behavioral/intent labels, and Solana concentration intelligence.
 
-## 4. Pre-trade analysis — COMPLETE foundation / bounded route evidence
+## 4. Pre-trade analysis — COMPLETE foundation / bounded evidence
 
-`pre_trade_check` remains analysis only.
-
-Accepted deterministic behavior includes:
-
-- requested notional evaluation;
-- verified notional-to-liquidity ratio where verified liquidity exists;
-- versioned trade-size policy;
-- fail-closed missing/conflicting liquidity behavior;
-- explicit risk-evidence freshness policy;
-- exact route-scoped internal evidence seam for selected advanced fields.
-
-The route-evidence seam requires exact token-in/token-out/pool/AMM-config identity, an accepted CMIS evidence producer, explicit freshness, exact semantic/unit contracts, and accepted proof-basis labels. It does not accept arbitrary caller assertions.
-
-Currently:
-
-- route-scoped **price impact** may be available when the exact accepted proof gates pass;
-- bounded **AMM/execution-model fee evidence** may be available for an exactly matched accepted route/evidence scope;
-- XDEX quote slippage tolerance is explicitly rejected as an **expected execution slippage** estimate;
-- expected execution slippage remains unavailable without a separately accepted execution-slippage observation contract;
-- route quality, bridge dependency, transaction simulation, fill quality, and execution quality remain unavailable unless separately proven.
+`pre_trade_check` remains analysis only. Accepted behavior includes requested notional evaluation, verified notional-to-liquidity ratio where evidence exists, versioned trade-size policy, freshness handling, and exact evidence-gated advanced fields.
 
 Every current result preserves:
 
@@ -263,167 +109,79 @@ execution_authorized = false
 
 A `PASS` is not permission or advice to execute a trade.
 
----
-
 ## 5. Product direction
 
-CMIS progresses through four capability layers.
-
 ### Layer A — Verified Data
-
-Established substantially on X1 and as a bounded read-only foundation on Solana:
-
-- identity;
-- market/liquidity evidence;
-- tokenomics and authorities;
-- transaction/trade verification where supported;
-- historical comparisons;
-- deterministic risk;
-- bounded pre-trade analysis;
-- evidence receipts and proof scoring.
+Established substantially on X1 and as a bounded read-only foundation on Solana.
 
 ### Layer B — Verified Intelligence
+The Phase 11 foundation is complete, and Phase 12 has now proven the promotion pattern by exposing one narrow X1 service through the canonical runtime/capability manifest. Future intelligence services require their own accepted service, evidence, chain-scope, and Scout-reliance contracts.
 
-Read-only deterministic foundations now exist for:
-
-- top-account concentration and numeric changes;
-- neutral wallet activity;
-- sparse provenance-safe intelligence history;
-- evidence-bound conclusions;
-- explicit-policy concentration-threshold evaluation.
-
-Future interpretation layers require separate accepted contracts before public/automatic Scout use:
-
-- wallet behavior profiles;
-- wallet relationship graphs;
-- verified whale classifications;
-- liquidity deterioration classifications;
-- abnormal mint/burn/authority behavior;
-- historical-pattern interpretation;
-- broader cross-source disagreement intelligence.
+Potential future interpretation layers include wallet behavior profiles, relationship evidence, verified classifications, liquidity deterioration, abnormal authority/issuance behavior, historical-pattern interpretation, and broader cross-source disagreement intelligence. None is implied by the Phase 12 concentration service.
 
 ### Layer C — Early Warning
-
-Potential future monitoring includes:
-
-- explicit evidence-backed risk thresholds;
-- rapid liquidity removal;
-- verified deployer-linked activity;
-- unusual issuance/authority changes;
-- market-structure changes;
-- source disagreement/staleness;
-- configurable alerts/webhooks.
-
-No alert should imply ownership, intent, manipulation, or fraud beyond the accepted evidence/classification contract.
+Future alerts require explicit evidence-backed scope, freshness, threshold, persistence, and classification semantics. No alert should imply ownership, intent, manipulation, or fraud beyond an accepted contract.
 
 ### Layer D — Cross-Chain Intelligence
-
-- X1: active mature foundation;
-- Solana: read-only Phase 10 foundation complete;
-- Ethereum: future explicit provider/verification milestone;
-- future chain-neutral identity/provenance schemas;
-- future bridge/stablecoin/capital-flow evidence only after source semantics are accepted.
-
----
+- X1: mature active foundation plus first promoted Phase 12 intelligence service;
+- Solana: Phase 10 read-only foundation complete, no Phase 12 concentration service yet;
+- Ethereum: future explicit provider/verification milestone.
 
 ## 6. Premium capability candidates
 
-These are product candidates, not active implementation authority:
+Premium candidates include deeper wallet intelligence after classification contracts, wallet relationship evidence with non-ownership semantics, evidence-backed alerting, investigation/evidence export, developer/agent API access, longer retention where proven, chain-neutral capital-flow primitives, Ethereum support, and institutional audit/access-control capabilities.
 
-1. deeper wallet intelligence after classification contracts are accepted;
-2. wallet relationship evidence with explicit non-ownership semantics;
-3. historical manipulation/risk-pattern similarity without unsupported accusations;
-4. evidence-backed real-time alerting;
-5. investigation mode and evidence export;
-6. developer/agent API access, quotas, subscriptions, and webhooks;
-7. longer retention only where archival/continuous coverage is actually proven;
-8. chain-neutral capital-flow primitives;
-9. Ethereum provider/verification foundation;
-10. institutional audit/retention/access-control capabilities.
-
-Potential service tiers may include Public, Pro, Intelligence, and Institutional offerings, but tier boundaries never change the verification standard.
-
----
+Premium access never changes the verification standard.
 
 ## 7. Recommended implementation sequence from the current boundary
 
-### Completed immediate work
+### Completed
 
 1. deterministic pre-trade trade-size policy — **COMPLETE**;
-2. CMIS Phase 11 concentration/wallet/history/evidence foundation — **COMPLETE**;
-3. XDEX quote/history semantic verification — **BOUNDED FIELD-BY-FIELD PROGRESS ACCEPTED**;
-4. pinned XDEX historical executed-fee reconstruction — **COMPLETE / STRONGLY CORROBORATED BOUNDED RESULT**;
-5. route-scoped pre-trade evidence seam — **COMPLETE**;
-6. explicit concentration-threshold evaluator — **COMPLETE**.
+2. Phase 11 concentration/wallet/history/evidence foundation — **COMPLETE**;
+3. XDEX semantic/evidence work — **BOUNDED FIELD-BY-FIELD PROGRESS ACCEPTED**;
+4. route-scoped pre-trade evidence seam — **COMPLETE**;
+5. explicit concentration-threshold evaluator — **COMPLETE**;
+6. Phase 12 `concentration_change_intelligence/v1` canonical runtime/capability promotion for X1 — **COMPLETE**.
 
 ### Next accepted-milestone candidates — NOT YET ACTIVE
 
-7. define a new public-service/Scout-reliance contract before exposing Phase 11 intelligence primitives as callable services;
-8. define deterministic inference/classification contracts before whale, insider, bot, accumulator, distributor, market-maker, or behavioral labels;
-9. add wallet relationship evidence only after scope, identity, provenance, and non-ownership semantics are formally accepted;
-10. add alert rules only when underlying fields have explicit scope, freshness, threshold, persistence, and evidence semantics;
-11. deepen XDEX route/execution evidence field-by-field without invoking transaction preparation as a shortcut to proof;
-12. mature Solana coverage field-by-field rather than treating Phase 10 as full parity;
+7. add further public intelligence services only through separate accepted promotion contracts; do not widen the Phase 11 foundation implicitly;
+8. define deterministic inference/classification contracts before whale, insider, bot, accumulator, distributor, market-maker, ownership, or behavioral labels;
+9. add wallet relationship evidence only after identity/provenance/non-ownership semantics are accepted;
+10. add alert rules only with explicit scope/freshness/threshold/persistence/evidence semantics;
+11. deepen XDEX route/execution evidence field-by-field without using transaction preparation as a shortcut to proof;
+12. mature Solana coverage field-by-field and promote any Solana intelligence service separately;
 13. begin Ethereum only under an explicit capability table and acceptance plan;
-14. productize investigation/evidence export and premium access only after the underlying deterministic services are stable.
+14. productize investigation/evidence export and premium access only after deterministic services are stable.
 
-None of these candidates is an active execution milestone merely because it appears here.
-
----
+None of these candidates is an execution milestone merely because it appears here.
 
 ## 8. Governance principles
 
-1. **Facts before interpretation.** Deterministic facts remain separate from Roberta/LLM interpretation.
-2. **Providers are candidates.** Important claims are checked against authoritative chain evidence where possible.
-3. **Unknown remains unknown.** Missing evidence is never filled with model guesses.
-4. **Inference is labeled.** Relationship, behavior, risk-similarity, and forecast outputs identify their evidentiary status.
-5. **Evidence is reproducible.** Material conclusions retain sufficient provenance for audit/reproduction.
-6. **Freshness is explicit.** Live/historical observations preserve time/slot/block provenance where available.
-7. **Cross-chain normalization preserves chain provenance.** Canonical fields do not erase source/chain differences.
-8. **Risk and proof are separate.** Evidence strength is not risk severity.
-9. **Route scope is not asset-wide scope.** One pool/config/route cannot silently become a global claim.
-10. **No autonomous execution by implication.** Intelligence, monitoring, pre-trade analysis, and human review do not authorize signing or execution.
-11. **Premium does not change truth.** Paid access expands capability, not factual standards.
-
----
+1. Facts before interpretation.
+2. Providers are candidate evidence, not automatic truth.
+3. Unknown remains unknown.
+4. Inference is labeled.
+5. Evidence is reproducible.
+6. Freshness is explicit.
+7. Cross-chain normalization preserves chain provenance.
+8. Risk and proof are separate.
+9. Route/account scope is not asset-wide scope.
+10. Public-service promotion is explicit and service-specific.
+11. No autonomous execution by implication.
+12. Premium does not change truth.
 
 ## 9. Strategic positioning
 
-CMIS is the canonical project/service identity for this repository. Roberta is the normal user-facing conversational coordinator in the accepted project architecture.
-
-Suggested positioning:
-
-> **CMIS is a blockchain evidence and intelligence service that converts raw market and chain activity into verified, explainable, machine-consumable intelligence.**
-
-Short differentiator:
-
-> **CMIS does not just report what a market source says happened. It attempts to determine what can actually be proven, records the evidence, and makes that verified intelligence reusable by agents and applications.**
-
----
+**CMIS is a blockchain evidence and intelligence service that converts raw market and chain activity into verified, explainable, machine-consumable intelligence.**
 
 ## 10. Relationship to Roberta
 
-CMIS supplies verified facts, historical features, evidence receipts, proof strength, confidence, deterministic risk signals, and accepted bounded pre-trade evidence.
+CMIS supplies verified facts, evidence receipts, proof strength, deterministic risk, bounded pre-trade evidence, and separately promoted read-only intelligence services. Chain Scouts investigate within their chain. Roberta coordinates, applies policy, and explains.
 
-Roberta may synthesize those results for broader market interpretation, cross-chain context, user policy, and normal human explanations. Roberta must not silently promote inference into a CMIS-verified fact, recalculate market/proof truth, or collapse risk and evidence quality into one synthetic grade.
-
-Conceptually:
-
-```text
-CMIS verifies what the evidence supports.
-Chain Scouts investigate within their chain.
-Roberta coordinates and explains.
-```
-
----
+Roberta must not silently promote inference into a CMIS-verified fact, recalculate market/proof truth, collapse risk and evidence quality into one grade, or treat X1 service promotion as cross-chain promotion.
 
 ## 11. Success criterion
 
-CMIS should answer four questions clearly:
-
-1. **What was reported?**
-2. **What can be independently verified?**
-3. **How strong and complete is the evidence?**
-4. **What remains unknown or unavailable under the accepted evidence contract?**
-
-Historical-pattern and probabilistic interpretation may be layered on top only without erasing the distinction between fact, proof quality, risk, and inference.
+CMIS should answer clearly: what was reported, what can be verified, how strong/complete the evidence is, what deterministic policy/intelligence service concluded within its exact contract, and what remains unknown or unavailable.
