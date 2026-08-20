@@ -46,11 +46,13 @@ The verifier computes the symmetric relative difference for Jupiter versus every
 abs(jupiter_price - pair_price) / max(abs(jupiter_price), abs(pair_price))
 ```
 
-The evidence status is:
+Structural validation has precedence over numerical classification. If any DEX Screener pair record is malformed, lacks a pair address, or duplicates another pair address, the verifier returns `INSUFFICIENT_EVIDENCE` with `dexscreener_pair_contract_invalid` and does not emit `AGREEMENT` or `CONFLICT`, even when another structurally valid pair could otherwise be compared.
+
+For structurally valid pair lists, the evidence status is:
 
 - `AGREEMENT` only when every eligible comparison is within the configured tolerance;
 - `CONFLICT` when at least one eligible comparison is outside the configured tolerance;
-- `INSUFFICIENT_EVIDENCE` when the accepted source/identity/price contract cannot support a comparison.
+- `INSUFFICIENT_EVIDENCE` when no eligible comparison remains or another accepted source/identity/price precondition cannot support a comparison.
 
 CMIS does not average pair prices, cherry-pick an agreeing pair, or allow callers to override the deployment policy through request parameters.
 
@@ -93,6 +95,7 @@ The accepted contract is covered by:
   - `[0,1]` validation;
   - all-pair agreement;
   - one-outlier conflict;
+  - structural-invalid pair-contract precedence over numerical conflict;
   - insufficient-evidence and exact-mint/price-subject boundaries;
   - non-promotion despite numerical agreement.
 - `tests/test_cmis_solana_market_report.py`
