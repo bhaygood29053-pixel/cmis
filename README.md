@@ -42,13 +42,17 @@ CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific inve
 
 ## Current roadmap position
 
-As of August 18, 2026:
+As of August 20, 2026:
 
 - **CMIS Phase 10 — Solana read-only provider foundation:** complete.
 - **Evidence Receipts + Proof Score milestone:** complete.
 - **X1 evidence-capability boundary:** complete and fail-closed.
 - **Deterministic pre-trade trade-size analysis:** complete.
 - **CMIS Phase 11 — read-only Verified Intelligence foundation:** complete.
+- **CMIS Phase 12 — first narrow X1 public-service / Scout-reliance promotion:** complete for `concentration_change_intelligence/v1`.
+- **Deterministic descriptive intelligence classification foundation:** complete, internal/read-only/non-promoted.
+- **Deterministic wallet relationship evidence foundation:** complete with explicit non-ownership semantics and no public/Scout promotion.
+- **Next read-only milestone:** evidence-backed alert contracts.
 - **Controlled transaction execution:** not an active CMIS milestone and not authorized.
 
 The authoritative product roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). Phase 11 completion is documented in [`docs/PHASE_11_COMPLETION.md`](./docs/PHASE_11_COMPLETION.md).
@@ -65,6 +69,7 @@ The versioned CMIS service contract includes, depending on chain capability stat
 - `risk_check`
 - `pre_trade_check`
 - `verification_evidence`
+- `concentration_change_intelligence` — bounded X1-only promoted service under CMIS `1.9.0`
 
 The live capability manifest is authoritative:
 
@@ -74,7 +79,7 @@ GET /v1/cmis/capabilities
 
 Every chain/service combination is classified explicitly rather than assumed from another chain. Missing, incompatible, or non-callable capability evidence fails closed.
 
-CMIS contract `1.8.0` also exposes a bounded read-only `intelligence_foundation` describing the accepted Phase 11 primitives. Those primitives are deliberately **not** automatically promoted into public Scout services.
+The current CMIS contract is `1.9.0`. It preserves the bounded read-only `intelligence_foundation` and separately advertises the exact promoted concentration-change service. The deterministic classification and wallet-relationship foundations are internal/read-only/non-promoted and therefore do not silently become public Scout services or capability-manifest operations.
 
 ## X1 / XDEX foundation
 
@@ -120,7 +125,16 @@ CMIS Phase 11 established read-only deterministic primitives for:
 - sanitized sparse historical intelligence storage and compatible-series comparison;
 - evidence-bound conclusions with content-addressed Evidence Receipts and recomputed Proof Scores.
 
-CMIS does **not** infer labels such as insider, whale, bot, accumulator, distributor, market maker, manipulator, or common owner unless a later accepted evidence/classification contract explicitly permits such a conclusion.
+Additional accepted internal deterministic foundations now include:
+
+- descriptive classification of the exact concentration direction proven by canonical CMIS evidence, without behavioral/ownership/intent/risk interpretation;
+- direct wallet-relationship evidence for verified token transfers between exact chain identities, with explicit non-ownership semantics, content-addressed evidence identity, bounded compatible aggregation, and duplicate protection.
+
+Neither foundation is a public CMIS service or a Scout-reliance contract. CMIS does **not** infer labels such as insider, whale, bot, accumulator, distributor, market maker, manipulator, scam, beneficial owner, or common owner from these foundations.
+
+## Early-warning direction
+
+The next read-only intelligence milestone is an evidence-backed alert contract. Alerts must have explicit evidence scope, freshness, threshold/policy identity, persistence or repetition semantics, triggering observations, and limitations. Alert wording may report only the condition actually proven and may not silently imply ownership, intent, manipulation, fraud, scam, coordinated behavior, or execution authority.
 
 ## Pre-trade analysis
 
@@ -204,6 +218,8 @@ Key documentation:
 docs/CMIS_CAPABILITY_CONTRACT.md
 docs/CMIS_PRODUCT_ROADMAP.md
 docs/CMIS_IDENTITY_MIGRATION.md
+docs/DETERMINISTIC_INTELLIGENCE_CLASSIFICATION.md
+docs/WALLET_RELATIONSHIP_EVIDENCE.md
 docs/PHASE_10_COMPLETION.md
 docs/PHASE_11_COMPLETION.md
 SCOUT_CMIS_INTEGRATION_CONTRACT.md
