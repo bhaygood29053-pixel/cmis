@@ -42,12 +42,25 @@ class SolanaRuntimeConfigTests(unittest.TestCase):
         )
         self.assertNotIn("solana_jupiter_provider", dependencies)
         self.assertNotIn("solana_helius_provider", dependencies)
+        self.assertNotIn("solana_price_max_relative_difference", dependencies)
         self.assertTrue(status["enabled"])
         self.assertTrue(status["rpc_configured"])
         self.assertTrue(status["dexscreener_configured"])
         self.assertTrue(status["observation_ledger_configured"])
         self.assertFalse(status["jupiter_configured"])
         self.assertFalse(status["helius_configured"])
+        self.assertFalse(status["price_crosscheck_policy_configured"])
+
+    def test_blank_price_policy_does_not_create_a_hidden_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dependencies, status = build_solana_runtime_dependencies({
+                "CMIS_SOLANA_PROVIDER_ENABLED": "1",
+                "CMIS_SOLANA_PRICE_MAX_RELATIVE_DIFFERENCE": "   ",
+                "CMIS_SOLANA_OBSERVATION_DB": os.path.join(directory, "history.db"),
+            })
+
+        self.assertNotIn("solana_price_max_relative_difference", dependencies)
+        self.assertFalse(status["price_crosscheck_policy_configured"])
 
     def test_optional_keyed_sources_and_policies_are_environment_owned(self):
         with tempfile.TemporaryDirectory() as directory:
