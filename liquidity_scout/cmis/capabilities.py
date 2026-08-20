@@ -14,10 +14,16 @@ from typing import Any, Iterable, Mapping
 from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.cmis_verified_intelligence import (
+    ACCEPTED_CONCLUSION_TYPES as CONCENTRATION_INTELLIGENCE_CONCLUSION_TYPES,
+    CONTRACT_VERSION as CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
+    PROMOTION_SCOPE as CONCENTRATION_INTELLIGENCE_PROMOTION_SCOPE,
+    SERVICE as CONCENTRATION_INTELLIGENCE_SERVICE,
+)
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.8.0"
+CMIS_CONTRACT_VERSION = "1.9.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -57,6 +63,58 @@ def _intelligence_capability(
     }
 
 
+def _promoted_concentration_intelligence_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
+            "promotion_scope": None,
+            "accepted_conclusion_types": [],
+            "requirements": [],
+            "limitations": ["concentration_change_intelligence_not_available_for_chain"],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
+        "promotion_scope": CONCENTRATION_INTELLIGENCE_PROMOTION_SCOPE,
+        "accepted_conclusion_types": sorted(CONCENTRATION_INTELLIGENCE_CONCLUSION_TYPES),
+        "requirements": [
+            "exact_x1_asset_id",
+            "cmis_owned_intelligence_evidence_id",
+            "trusted_internal_evidence_resolver",
+            "deterministic_bundle_revalidation",
+            "top_account_concentration_change_only",
+            "content_addressed_evidence_receipts",
+            "exact_recomputed_proof_scores",
+            "receipt_chain_source_and_asset_coverage",
+        ],
+        "limitations": [
+            "caller_supplied_intelligence_evidence_not_accepted",
+            "phase_11_foundation_objects_remain_unpromoted",
+            "observed_top_token_account_scope_is_incomplete",
+            "token_accounts_are_not_unique_holders",
+            "beneficial_owner_identity_unverified",
+            "proof_strength_remains_separate_from_risk",
+            "threshold_policy_is_not_a_market_fact",
+            "unresolved_receipt_fields_keep_service_partial",
+            "no_behavioral_or_ownership_labels",
+            "no_provider_assertion_promotion",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "execution_authorized": False,
+    }
+
+
 _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
     "x1": {
         "asset_lookup": _capability("supported"),
@@ -93,6 +151,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             "bounded",
             requirements=("exact_evidence_id_or_fact_type_subject_id",),
             limitations=("read_only_persisted_evidence_lookup",),
+        ),
+        CONCENTRATION_INTELLIGENCE_SERVICE: _promoted_concentration_intelligence_capability(
+            available=True
         ),
     },
     "solana": {
@@ -169,6 +230,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         "verification_evidence": _capability(
             "unavailable",
             limitations=("solana_persisted_verification_lookup_not_promoted",),
+        ),
+        CONCENTRATION_INTELLIGENCE_SERVICE: _promoted_concentration_intelligence_capability(
+            available=False
         ),
     },
 }
@@ -276,6 +340,16 @@ def validate_capability_contract(
             if callable_flag is not (state != "unavailable"):
                 raise RuntimeError(
                     f"CMIS capability {chain}/{service} has inconsistent callable flag."
+                )
+            if capability.get("public_service_promoted") is True and callable_flag is not True:
+                raise RuntimeError(
+                    f"CMIS capability {chain}/{service} promotes a non-callable service."
+                )
+            if capability.get("scout_reliance_promoted") is True and capability.get(
+                "public_service_promoted"
+            ) is not True:
+                raise RuntimeError(
+                    f"CMIS capability {chain}/{service} promotes Scout reliance without public promotion."
                 )
 
 

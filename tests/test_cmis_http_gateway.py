@@ -5,6 +5,9 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from liquidity_scout.cmis import http as cmis_http
+from liquidity_scout.services.cmis_verified_intelligence import (
+    SERVICE as CONCENTRATION_INTELLIGENCE_SERVICE,
+)
 
 
 class StubGateway:
@@ -95,12 +98,17 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.8.0")
+        self.assertEqual(response["contract_version"], "1.9.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
-        self.assertEqual(len(response["supported_services"]), 10)
+        self.assertEqual(len(response["supported_services"]), 11)
         self.assertIn("verification_evidence", response["supported_services"])
         self.assertIn("trade_verification", response["supported_services"])
         self.assertIn("verified_asset_activity", response["supported_services"])
+        self.assertIn(
+            CONCENTRATION_INTELLIGENCE_SERVICE,
+            response["supported_services"],
+        )
+        self.assertNotIn("verified_intelligence", response["supported_services"])
         self.assertNotIn("wallet_activity_facts", response["supported_services"])
         self.assertNotIn("top_account_concentration", response["supported_services"])
         self.assertEqual(response["supported_chains"], ["x1"])
@@ -183,6 +191,18 @@ class CMISHTTPGatewayTests(unittest.TestCase):
             ["warp_bridge_operational_state"]["state"],
             "unavailable",
         )
+
+        promoted = x1[CONCENTRATION_INTELLIGENCE_SERVICE]
+        self.assertEqual(promoted["state"], "bounded")
+        self.assertTrue(promoted["callable"])
+        self.assertTrue(promoted["public_service_promoted"])
+        self.assertTrue(promoted["scout_reliance_promoted"])
+        self.assertEqual(
+            promoted["accepted_conclusion_types"],
+            ["top_account_concentration_change"],
+        )
+        self.assertFalse(promoted["execution_authorized"])
+
         self.assertEqual(solana["asset_lookup"]["state"], "bounded")
         self.assertTrue(solana["asset_lookup"]["callable"])
         self.assertIn("exact_mint", solana["asset_lookup"]["requirements"])
@@ -190,6 +210,10 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         self.assertFalse(solana["pre_trade_check"]["callable"])
         self.assertEqual(solana["pre_trade_check"]["state"], "unavailable")
         self.assertFalse(solana["verification_evidence"]["callable"])
+        self.assertFalse(solana[CONCENTRATION_INTELLIGENCE_SERVICE]["callable"])
+        self.assertFalse(
+            solana[CONCENTRATION_INTELLIGENCE_SERVICE]["scout_reliance_promoted"]
+        )
 
     def test_bearer_auth_is_enforced_when_configured(self):
         with RunningServer(api_key="test-secret") as running:
