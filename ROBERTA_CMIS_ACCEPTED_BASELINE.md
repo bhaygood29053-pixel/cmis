@@ -14,7 +14,8 @@ Accepted CMIS capability contract:
 
 ```text
 schema_version = 1
-contract_version >= 1.8.0
+global existing-service minimum = 1.8.0
+current CMIS contract = 1.9.0
 ```
 
 The accepted manifest includes:
@@ -24,9 +25,36 @@ The accepted manifest includes:
 - Proof Score schema `1`;
 - risk/proof separation;
 - missing-evidence-is-unknown semantics;
-- read-only Phase 11 `intelligence_foundation` with public-service and Scout-reliance promotion false.
+- read-only Phase 11 `intelligence_foundation` with public-service and Scout-reliance promotion false;
+- one separately promoted read-only X1 intelligence service, `concentration_change_intelligence`, under service contract `concentration_change_intelligence/v1`.
 
 Roberta does not call capability discovery directly; Scouts validate it before CMIS dispatch.
+
+The promoted X1 intelligence service requires CMIS contract `1.9.0` or newer for that operation. Existing accepted services may continue to use the older global minimum where their own contract permits it.
+
+## First promoted Verified Intelligence service — ACCEPTED / BOUNDED X1 ONLY
+
+CMIS now exposes one narrow public/Scout-reliance wrapper over the Phase 11 foundation:
+
+```text
+service = concentration_change_intelligence
+service_contract = concentration_change_intelligence/v1
+chain = x1 only
+accepted_conclusion_type = top_account_concentration_change
+promotion_scope = cmis_owned_top_account_concentration_change_evidence_by_id
+read_only = true
+execution_authorized = false
+```
+
+The service is callable only when the live manifest proves the exact promotion fields and the request supplies an exact X1 asset plus canonical CMIS-owned `ie_<64 lowercase hex>` intelligence evidence id.
+
+CMIS resolves and revalidates the evidence internally. Caller-supplied intelligence bundles, Evidence Receipts, Proof Scores, provider assertions, behavioral labels, or replacement verification state are not accepted as a shortcut to trust.
+
+The service does **not** promote the underlying Phase 11 foundation objects. It does not establish holder-total or beneficial-owner semantics, does not convert Proof Score into risk, does not add whale/insider/bot/intent/ownership labels, and does not authorize execution.
+
+Solana remains unavailable/non-promoted for this service until a separate accepted contract says otherwise.
+
+Roberta has separately adopted this exact service through X1 Scout with fail-closed CMIS 1.9 promotion checks and readiness coverage. That adoption does not broaden CMIS scope.
 
 ## Accepted evidence semantics
 
@@ -80,6 +108,8 @@ CMIS includes accepted read-only X1 primitives such as:
 
 A low-level primitive is not automatically a public Scout service. Scope, identity, semantics, units, freshness, and promotion rules remain explicit.
 
+Recent live provider-gap observations remain non-promotional. The current repository X1.Ninja credential received HTTP `403` / `access_denied` on the bounded SSE handshake probe, and a same-run XENCAT holder-looking comparison observed provider candidate `116`, RPC token-account candidate `180`, and unique token-account-authority candidate `174`. Those observations do not establish stream semantics, holder totals, wallet identity, beneficial ownership, or provider/RPC completeness.
+
 ## X1 / XDEX semantic baseline
 
 The original XENCAT/native-XNT reserve proof remains one concrete example rather than a universal provider rule.
@@ -130,7 +160,7 @@ CMIS has accepted read-only foundations for:
 
 These foundations do not authorize or prove whale, insider, bot, accumulator, distributor, market-maker, ownership, relationship, manipulation, fraud, or behavioral-intent labels.
 
-The core Phase 11 intelligence primitives remain outside public `supported_services` and outside automatic Scout reliance.
+The core Phase 11 intelligence primitives remain outside automatic public `supported_services` / Scout reliance. The separately promoted `concentration_change_intelligence/v1` wrapper is the only accepted exception at this checkpoint and is limited to its exact X1 evidence-id scope.
 
 ## Roberta consumption boundary
 
@@ -141,7 +171,8 @@ Roberta may:
 - surface conflicts and insufficient evidence;
 - coordinate specialists based on accepted service output;
 - use verified CMIS facts in broader reasoning;
-- provide answer-first conversational synthesis.
+- provide answer-first conversational synthesis;
+- request the separately promoted X1 `concentration_change_intelligence/v1` service through X1 Scout when the exact capability and evidence-id gates pass.
 
 Roberta must not:
 
@@ -151,7 +182,8 @@ Roberta must not:
 - convert insufficient evidence into a definitive fact;
 - recalculate deterministic CMIS comparisons to obtain a preferred answer;
 - treat raw provider responses or asserted proof labels as verified on their own;
-- turn internal intelligence foundations into public services;
+- turn the remaining internal intelligence foundations into public services;
+- broaden the promoted concentration-change service beyond its exact accepted conclusion/scope;
 - treat analysis, proof, PASS, or human review as authorization to execute value movement.
 
 ## Execution boundary
