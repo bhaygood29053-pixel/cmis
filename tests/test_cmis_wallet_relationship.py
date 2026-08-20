@@ -191,6 +191,26 @@ class CMISWalletRelationshipTests(unittest.TestCase):
         self.assertIsNone(result["asset_unit"])
         self.assertIn("missing_amounts_are_not_zero_filled", result["limitations"])
 
+    def test_resolver_failure_does_not_reflect_arbitrary_exception_text(self):
+        observation = transfer_observation()
+
+        def resolver(_):
+            raise RuntimeError("https://user:secret@example.invalid/private")
+
+        with self.assertRaisesRegex(
+            ValueError,
+            r"failed \(RuntimeError\)",
+        ) as raised:
+            build_direct_wallet_relationship(
+                observation["observation_id"],
+                observation_resolver=resolver,
+            )
+
+        self.assertNotIn("secret", str(raised.exception))
+        self.assertNotIn("example.invalid", str(raised.exception))
+        self.assertIsNone(raised.exception.__cause__)
+        self.assertIsNone(raised.exception.__context__)
+
     def test_tampered_transaction_or_invalid_evidence_identity_fails_closed(self):
         observation = transfer_observation()
         tampered = deepcopy(observation)

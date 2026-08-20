@@ -68,13 +68,23 @@ def _resolve_wallet_activity(
     observation_id = _normalize_observation_id(wallet_activity_observation_id)
     if not callable(observation_resolver):
         raise ValueError("a trusted internal wallet-activity observation resolver is required")
+    resolver_error_type = None
+
     try:
         resolved = observation_resolver(observation_id)
     except Exception as exc:
+        # Resolver failures can originate below storage/provider boundaries.
+        # Preserve only the exception type. Do not retain or reflect the
+        # underlying exception because it may contain credentials, URLs,
+        # filesystem paths, or provider responses.
+        resolver_error_type = type(exc).__name__
+
+    if resolver_error_type is not None:
         raise ValueError(
-            "trusted internal wallet-activity observation resolution failed: "
-            f"{type(exc).__name__}: {exc}"
-        ) from exc
+            "trusted internal wallet-activity observation resolution failed "
+            f"({resolver_error_type})"
+        )
+
     if resolved is None:
         raise ValueError("the requested CMIS wallet-activity observation was not found")
     if not isinstance(resolved, Mapping):
