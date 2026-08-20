@@ -31,7 +31,7 @@ Capability schema `1` is required. Existing services retain the accepted global 
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
-The core Phase 11 `intelligence_foundation` remains read-only and non-promoted as a group.
+The core Phase 11 `intelligence_foundation` remains read-only and non-promoted as a group. Accepted post-Phase-12 deterministic classification and wallet-relationship evidence foundations also remain internal/non-promoted and do not create Scout dispatch authority.
 
 ## Public service surface
 
@@ -61,6 +61,8 @@ execution_authorized = false
 ```
 
 Solana is unavailable/non-callable/non-promoted for this service.
+
+There is currently no public `wallet_relationship` service. Issue #255 added an internal CMIS deterministic evidence foundation only; Scouts may not call the internal resolver/builder directly or promote its observed-transfer evidence into ownership, behavior, intent, fraud, manipulation, or risk claims.
 
 A Scout must validate these exact fields before dispatch and preserve the returned facts/evidence/proof/limitations without recomputation. The service does not establish unique-holder or beneficial-owner semantics and does not authorize whale/insider/bot/intent/ownership labels.
 
