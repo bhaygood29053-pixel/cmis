@@ -29,8 +29,26 @@ class CMISIntelligenceEvidencePhase11Tests(unittest.TestCase):
         asset_id="mint-1",
         verification_status="AGREEMENT",
         promotable=True,
+        source_independence_verified=None,
     ):
         observed_at = "2026-08-18T12:00:00Z"
+        data = {
+            "scope": "asset_exact",
+            "asset_identity_verified": True,
+            "field_semantics_verified": True,
+            "freshness_verified": True,
+            "cmis_promotable": promotable,
+            "verification": {
+                "status": verification_status,
+                "code": "test_verification",
+            },
+            "observations": {
+                "primary": {"source": source, "observed_at": observed_at},
+                "verifier": {"source": verifier, "observed_at": observed_at},
+            },
+        }
+        if source_independence_verified is not None:
+            data["source_independence_verified"] = source_independence_verified
         envelope = {
             "service": "market_report",
             "chain": chain,
@@ -40,21 +58,7 @@ class CMISIntelligenceEvidencePhase11Tests(unittest.TestCase):
                 "mint": asset_id,
                 "symbol": "TEST",
             },
-            "data": {
-                "scope": "asset_exact",
-                "asset_identity_verified": True,
-                "field_semantics_verified": True,
-                "freshness_verified": True,
-                "cmis_promotable": promotable,
-                "verification": {
-                    "status": verification_status,
-                    "code": "test_verification",
-                },
-                "observations": {
-                    "primary": {"source": source, "observed_at": observed_at},
-                    "verifier": {"source": verifier, "observed_at": observed_at},
-                },
-            },
+            "data": data,
             "risk": None,
             "confidence": {},
             "sources": [{"source": source, "observed_at": observed_at}],
@@ -145,7 +149,12 @@ class CMISIntelligenceEvidencePhase11Tests(unittest.TestCase):
         self.assertTrue(result["binding"]["chain_verified"])
         self.assertTrue(result["binding"]["source_coverage_verified"])
         self.assertTrue(result["binding"]["asset_coverage_verified"])
-        self.assertTrue(result["binding"]["independent_verification_present"])
+        self.assertFalse(result["binding"]["independent_verification_present"])
+        self.assertIsNone(
+            result["evidence_bundles"][0]["evidence_receipt"]["verification"][
+                "independently_verified"
+            ]
+        )
         self.assertTrue(result["proof_strength_separate_from_risk"])
         self.assertFalse(result["risk_reinterpreted"])
         self.assertFalse(result["behavioral_interpretation_added"])
@@ -153,6 +162,20 @@ class CMISIntelligenceEvidencePhase11Tests(unittest.TestCase):
         self.assertFalse(result["scout_reliance_promoted"])
         self.assertFalse(result["public_service_promoted"])
         self.assertFalse(result["execution_authorized"])
+
+    def test_independent_verification_presence_requires_explicit_proof(self):
+        result = build_intelligence_evidence_bundle(
+            conclusion_type="top_account_concentration",
+            conclusion=self.concentration(),
+            evidence_bundles=[self.evidence(source_independence_verified=True)],
+        )
+        self.assertTrue(result["binding"]["independent_verification_present"])
+        self.assertIs(
+            result["evidence_bundles"][0]["evidence_receipt"]["verification"][
+                "independently_verified"
+            ],
+            True,
+        )
 
     def test_reported_and_verifier_observations_remain_distinct(self):
         result = build_intelligence_evidence_bundle(
