@@ -7,6 +7,10 @@ probe remains available behind a second flag because shared public Solana RPC
 endpoints may block/rate-limit that heavier method and no promoted Phase 10
 service depends on it.
 
+When ``SOLANA_LIVE_REQUIRE_TOKEN_2022=1`` the probe is additionally bound to the
+repository-approved Token-2022 fixture and fails closed if the exact mint,
+program identity, decimals, or extension parsing drift.
+
 No test accepts a signing keypair or constructs/broadcasts a transaction.
 """
 
@@ -15,11 +19,13 @@ import tempfile
 import unittest
 
 from liquidity_scout.cmis.runtime_gateway import RuntimeCMISGateway
+from liquidity_scout.providers.solana.live_fixture import SOLANA_TOKEN_2022_LIVE_FIXTURE
 from liquidity_scout.providers.solana.rpc import SolanaRPCProvider
 
 
 RUN_LIVE = os.getenv("RUN_SOLANA_LIVE_TESTS") == "1"
 RUN_LARGEST = os.getenv("RUN_SOLANA_LARGEST_ACCOUNTS_LIVE_TESTS") == "1"
+REQUIRE_TOKEN_2022 = os.getenv("SOLANA_LIVE_REQUIRE_TOKEN_2022") == "1"
 
 
 @unittest.skipUnless(RUN_LIVE, "RUN_SOLANA_LIVE_TESTS=1 is required")
@@ -28,6 +34,10 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         mint = os.getenv("SOLANA_LIVE_TEST_MINT", "").strip()
         if not mint:
             self.skipTest("SOLANA_LIVE_TEST_MINT is required for token RPC probes")
+        if REQUIRE_TOKEN_2022 and mint != SOLANA_TOKEN_2022_LIVE_FIXTURE.mint:
+            self.fail(
+                "Token-2022 live acceptance requires the repository-approved exact fixture mint"
+            )
         self.mint = mint
         self.provider = SolanaRPCProvider()
 
@@ -54,6 +64,21 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         # identity semantics, but supply values are not compared across calls
         # until CMIS has an explicit shared observation-scope contract.
         self.assertEqual(supply["decimals"], mint_account["decimals"])
+
+        if REQUIRE_TOKEN_2022:
+            fixture = SOLANA_TOKEN_2022_LIVE_FIXTURE
+            self.assertEqual(mint_account["owner_program_id"], fixture.program_id)
+            self.assertEqual(mint_account["program_kind"], fixture.program_kind)
+            self.assertEqual(mint_account["decimals"], fixture.decimals)
+            self.assertEqual(supply["decimals"], fixture.decimals)
+            self.assertIsInstance(mint_account["extension_names"], list)
+            self.assertTrue(mint_account["extension_names"])
+            self.assertTrue(
+                all(
+                    isinstance(name, str) and bool(name.strip())
+                    for name in mint_account["extension_names"]
+                )
+            )
 
     @unittest.skipUnless(
         RUN_LARGEST,
@@ -108,6 +133,22 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
                 for source in identity["sources"]
             )
         )
+
+        if REQUIRE_TOKEN_2022:
+            fixture = SOLANA_TOKEN_2022_LIVE_FIXTURE
+            self.assertEqual(
+                identity["data"]["program"]["program_kind"],
+                fixture.program_kind,
+            )
+            self.assertEqual(
+                identity["data"]["program"]["owner_program_id"],
+                fixture.program_id,
+            )
+            self.assertEqual(identity["data"]["decimals"], fixture.decimals)
+            self.assertEqual(
+                identity["data"]["extension_names"],
+                self.provider.get_mint_account(self.mint)["extension_names"],
+            )
 
         self.assertEqual(tokenomics["status"], "partial")
         self.assertEqual(tokenomics["chain"], "solana")
