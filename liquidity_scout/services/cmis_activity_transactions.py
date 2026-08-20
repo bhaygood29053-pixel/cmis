@@ -171,6 +171,8 @@ def attach_transaction_aggregation(envelope: Any):
     )
 
     exact_count = 0
+    exact_buy_count = 0
+    exact_sell_count = 0
     exact_buy_asset = Decimal(0)
     exact_sell_asset = Decimal(0)
     quote_totals = {}
@@ -188,19 +190,25 @@ def attach_transaction_aggregation(envelope: Any):
 
         exact_count += 1
         side = event.get("side")
-        if side == "BUY":
-            exact_buy_asset += asset_amount
-        elif side == "SELL":
-            exact_sell_asset += asset_amount
-
         bucket = quote_totals.setdefault(
             quote_mint,
-            {"buy": Decimal(0), "sell": Decimal(0)},
+            {
+                "buy": Decimal(0),
+                "sell": Decimal(0),
+                "buy_count": 0,
+                "sell_count": 0,
+            },
         )
         if side == "BUY":
+            exact_buy_count += 1
+            exact_buy_asset += asset_amount
             bucket["buy"] += quote_amount
+            bucket["buy_count"] += 1
         elif side == "SELL":
+            exact_sell_count += 1
+            exact_sell_asset += asset_amount
             bucket["sell"] += quote_amount
+            bucket["sell_count"] += 1
 
     by_signature = {}
     missing_signature_count = 0
@@ -249,13 +257,25 @@ def attach_transaction_aggregation(envelope: Any):
         "exact_amount_verified_trade_count": exact_count,
         "missing_signature_event_count": missing_signature_count,
         "exact_verified_asset_amounts": {
-            "buy_asset_amount": _decimal_text(exact_buy_asset),
-            "sell_asset_amount": _decimal_text(exact_sell_asset),
+            "buy_asset_amount": (
+                _decimal_text(exact_buy_asset) if exact_buy_count > 0 else None
+            ),
+            "sell_asset_amount": (
+                _decimal_text(exact_sell_asset) if exact_sell_count > 0 else None
+            ),
         },
         "exact_verified_quote_amounts_by_mint": {
             mint: {
-                "buy_quote_amount": _decimal_text(values["buy"]),
-                "sell_quote_amount": _decimal_text(values["sell"]),
+                "buy_quote_amount": (
+                    _decimal_text(values["buy"])
+                    if values["buy_count"] > 0
+                    else None
+                ),
+                "sell_quote_amount": (
+                    _decimal_text(values["sell"])
+                    if values["sell_count"] > 0
+                    else None
+                ),
             }
             for mint, values in sorted(quote_totals.items())
         },
