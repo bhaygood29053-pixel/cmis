@@ -42,13 +42,17 @@ CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific inve
 
 ## Current roadmap position
 
-As of August 18, 2026:
+As of August 20, 2026:
 
 - **CMIS Phase 10 — Solana read-only provider foundation:** complete.
 - **Evidence Receipts + Proof Score milestone:** complete.
 - **X1 evidence-capability boundary:** complete and fail-closed.
 - **Deterministic pre-trade trade-size analysis:** complete.
 - **CMIS Phase 11 — read-only Verified Intelligence foundation:** complete.
+- **CMIS Phase 12 — first narrow X1 Verified Intelligence service promotion:** complete for `concentration_change_intelligence/v1`.
+- **Deterministic intelligence classification foundation:** complete and internal/non-promoted.
+- **Deterministic wallet-relationship evidence foundation:** complete and internal/non-promoted.
+- **CMIS capability contract:** `1.9.0`.
 - **Controlled transaction execution:** not an active CMIS milestone and not authorized.
 
 The authoritative product roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). Phase 11 completion is documented in [`docs/PHASE_11_COMPLETION.md`](./docs/PHASE_11_COMPLETION.md).
@@ -65,6 +69,7 @@ The versioned CMIS service contract includes, depending on chain capability stat
 - `risk_check`
 - `pre_trade_check`
 - `verification_evidence`
+- `concentration_change_intelligence`
 
 The live capability manifest is authoritative:
 
@@ -74,7 +79,7 @@ GET /v1/cmis/capabilities
 
 Every chain/service combination is classified explicitly rather than assumed from another chain. Missing, incompatible, or non-callable capability evidence fails closed.
 
-CMIS contract `1.8.0` also exposes a bounded read-only `intelligence_foundation` describing the accepted Phase 11 primitives. Those primitives are deliberately **not** automatically promoted into public Scout services.
+CMIS contract `1.9.0` retains the bounded read-only `intelligence_foundation` describing the accepted Phase 11 primitives. Those primitives are deliberately **not** automatically promoted into public Scout services. The manifest separately promotes only the accepted X1 `concentration_change_intelligence/v1` service. Deterministic classification and wallet-relationship evidence remain internal and non-promoted.
 
 ## X1 / XDEX foundation
 
@@ -119,6 +124,13 @@ CMIS Phase 11 established read-only deterministic primitives for:
 - neutral verified wallet-activity facts without behavioral labels;
 - sanitized sparse historical intelligence storage and compatible-series comparison;
 - evidence-bound conclusions with content-addressed Evidence Receipts and recomputed Proof Scores.
+
+Post-Phase-12 accepted internal deterministic foundations also include:
+
+- descriptive concentration-direction classification over exact revalidated CMIS intelligence evidence;
+- observed direct wallet-relationship evidence reconstructed from canonical verified wallet-activity observations, with explicit non-ownership semantics.
+
+These later foundations remain read-only, non-public, non-promoted, and unavailable for automatic Scout reliance.
 
 CMIS does **not** infer labels such as insider, whale, bot, accumulator, distributor, market maker, manipulator, or common owner unless a later accepted evidence/classification contract explicitly permits such a conclusion.
 
@@ -206,6 +218,9 @@ docs/CMIS_PRODUCT_ROADMAP.md
 docs/CMIS_IDENTITY_MIGRATION.md
 docs/PHASE_10_COMPLETION.md
 docs/PHASE_11_COMPLETION.md
+docs/PHASE_12_VERIFIED_INTELLIGENCE_SERVICE.md
+docs/DETERMINISTIC_INTELLIGENCE_CLASSIFICATION.md
+docs/WALLET_RELATIONSHIP_EVIDENCE.md
 SCOUT_CMIS_INTEGRATION_CONTRACT.md
 ROBERTA_INTEGRATION_CONTRACT.md
 ```
