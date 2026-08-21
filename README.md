@@ -42,7 +42,7 @@ CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific inve
 
 ## Current roadmap position
 
-As of August 20, 2026:
+As of August 21, 2026:
 
 - **CMIS Phase 10 — Solana read-only provider foundation:** complete.
 - **Evidence Receipts + Proof Score milestone:** complete.
@@ -52,11 +52,12 @@ As of August 20, 2026:
 - **CMIS Phase 12 — first narrow X1 public-service / Scout-reliance promotion:** complete for `concentration_change_intelligence/v1`.
 - **Deterministic descriptive intelligence classification foundation:** complete, internal/read-only/non-promoted.
 - **Deterministic wallet relationship evidence foundation:** complete with explicit non-ownership semantics and no public/Scout promotion.
+- **Deterministic concentration-threshold alert evidence foundation:** complete, internal/read-only/non-promoted under Issue #263 / PR #264.
 - **CMIS deterministic engineering workflow / three-axis review:** adopted and repository-authoritative.
-- **Next read-only milestone:** evidence-backed alert contracts.
+- **Next read-only alert work:** broader alert contracts or multi-observation persistence only under a separately accepted deterministic contract.
 - **Controlled transaction execution:** not an active CMIS milestone and not authorized.
 
-The authoritative product roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering workflow is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). Phase 11 completion is documented in [`docs/PHASE_11_COMPLETION.md`](./docs/PHASE_11_COMPLETION.md).
+The authoritative product roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering workflow is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted concentration-threshold alert contract is documented in [`docs/CONCENTRATION_THRESHOLD_ALERT_EVIDENCE.md`](./docs/CONCENTRATION_THRESHOLD_ALERT_EVIDENCE.md). Phase 11 completion is documented in [`docs/PHASE_11_COMPLETION.md`](./docs/PHASE_11_COMPLETION.md).
 
 ## Roberta-facing service surface
 
@@ -80,7 +81,7 @@ GET /v1/cmis/capabilities
 
 Every chain/service combination is classified explicitly rather than assumed from another chain. Missing, incompatible, or non-callable capability evidence fails closed.
 
-The current CMIS contract is `1.9.0`. It preserves the bounded read-only `intelligence_foundation` and separately advertises the exact promoted concentration-change service. The deterministic classification and wallet-relationship foundations are internal/read-only/non-promoted and therefore do not silently become public Scout services or capability-manifest operations.
+The current CMIS contract is `1.9.0`. It preserves the bounded read-only `intelligence_foundation` and separately advertises the exact promoted concentration-change service. The deterministic classification, wallet-relationship, and concentration-threshold alert foundations are internal/read-only/non-promoted and therefore do not silently become public Scout services or capability-manifest operations.
 
 ## X1 / XDEX foundation
 
@@ -129,13 +130,16 @@ CMIS Phase 11 established read-only deterministic primitives for:
 Additional accepted internal deterministic foundations now include:
 
 - descriptive classification of the exact concentration direction proven by canonical CMIS evidence, without behavioral/ownership/intent/risk interpretation;
-- direct wallet-relationship evidence for verified token transfers between exact chain identities, with explicit non-ownership semantics, content-addressed evidence identity, bounded compatible aggregation, and duplicate protection.
+- direct wallet-relationship evidence for verified token transfers between exact chain identities, with explicit non-ownership semantics, content-addressed evidence identity, bounded compatible aggregation, and duplicate protection;
+- concentration-threshold alert evidence for one canonical concentration-change observation, with explicit expected chain/asset identity, fixed `basis_points` threshold unit, GT/GTE semantics, freshness, single-observation persistence, deterministic triggering-evidence identity, and deterministic alert identity.
 
-Neither foundation is a public CMIS service or a Scout-reliance contract. CMIS does **not** infer labels such as insider, whale, bot, accumulator, distributor, market maker, manipulator, scam, beneficial owner, or common owner from these foundations.
+These foundations are not public CMIS services or Scout-reliance contracts. CMIS does **not** infer labels such as insider, whale, bot, accumulator, distributor, market maker, manipulator, scam, beneficial owner, or common owner from these foundations. The alert foundation is deterministic policy evaluation over accepted evidence and is not a risk/severity score.
 
 ## Early-warning direction
 
-The next read-only intelligence milestone is an evidence-backed alert contract. Alerts must have explicit evidence scope, freshness, threshold/policy identity, persistence or repetition semantics, triggering observations, and limitations. Alert wording may report only the condition actually proven and may not silently imply ownership, intent, manipulation, fraud, scam, coordinated behavior, or execution authority.
+The first read-only evidence-backed alert foundation is complete under Issue #263 / PR #264. The accepted concentration-threshold contract binds exact expected chain/asset identity, evidence scope, freshness, explicit threshold/policy identity, fixed basis-point units, GT/GTE equality semantics, single-observation persistence, triggering evidence, deterministic content-addressed IDs, and limitations.
+
+Alert wording may report only the threshold condition actually proven and may not silently imply ownership, intent, manipulation, fraud, scam, coordinated behavior, risk severity, price direction, or execution authority. Multi-observation persistence, bounded time windows, additional alert conditions, alert delivery, public-service promotion, Scout reliance, and Roberta planner behavior remain future separately accepted work.
 
 ## Engineering governance
 
@@ -230,6 +234,7 @@ docs/CMIS_ENGINEERING_WORKFLOW.md
 docs/CMIS_IDENTITY_MIGRATION.md
 docs/DETERMINISTIC_INTELLIGENCE_CLASSIFICATION.md
 docs/WALLET_RELATIONSHIP_EVIDENCE.md
+docs/CONCENTRATION_THRESHOLD_ALERT_EVIDENCE.md
 docs/PHASE_10_COMPLETION.md
 docs/PHASE_11_COMPLETION.md
 SCOUT_CMIS_INTEGRATION_CONTRACT.md
