@@ -1,6 +1,6 @@
 # Scout ↔ CMIS Capability Contract
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-21
 
 CMIS publishes machine-readable service eligibility at:
 
@@ -81,6 +81,25 @@ For this operation, Scouts require CMIS contract `>=1.9.0` and must validate the
 Solana is explicitly classified for this service as unavailable, non-callable, non-promoted, and `execution_authorized=false`.
 
 The promotion does not change the Phase 11 foundation-level non-promotion flags and does not promote wallet activity, generic history, raw concentration snapshots, behavioral labels, ownership inference, or other intelligence primitives.
+
+## Post-Phase-12 internal deterministic foundations
+
+CMIS also contains accepted deterministic descriptive-classification and wallet-relationship evidence contracts. They remain internal implementation foundations and do **not** add runtime public services or change the capability manifest.
+
+The wallet-relationship foundation records only observed direct verified-transfer relationships reconstructed from canonical CMIS wallet-activity evidence. It does not establish ownership, beneficial ownership, behavior, intent, risk, complete history, or complete graph coverage.
+
+The active next intelligence milestone, Issue #263, is a deterministic concentration-threshold alert-evidence foundation built from accepted canonical concentration evidence plus explicit threshold/comparator policy. Until a later accepted promotion contract says otherwise, it is internal and non-public and does not add a capability-manifest service.
+
+For these internal foundations:
+
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+cmis_promotable = false
+execution_authorized = false
+```
+
+They grant no new Scout dispatch authority and require no public capability-contract widening merely because the internal deterministic contracts exist.
 
 ## Chain boundary
 
