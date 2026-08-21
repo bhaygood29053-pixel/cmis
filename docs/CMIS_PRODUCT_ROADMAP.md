@@ -1,6 +1,6 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-21
 
 ## Canonical architecture
 
@@ -30,12 +30,14 @@ Accepted milestones:
 - **CMIS Phase 12 — first narrow public-service / Scout-reliance promotion: COMPLETE for X1 `concentration_change_intelligence/v1`.**
 - **Deterministic descriptive intelligence classification foundation: COMPLETE, internal/read-only/non-promoted.**
 - **Deterministic wallet relationship evidence with explicit non-ownership semantics: COMPLETE, internal/read-only/non-promoted.**
+- **Deterministic concentration-threshold alert evidence (#263/#264): COMPLETE, internal/read-only/non-promoted.**
 - **CMIS deterministic engineering workflow / three-axis authority review: ADOPTED and repository-authoritative.**
 - **CMIS capability contract: 1.9.0.**
 - **Roberta adoption/readiness of the promoted X1 concentration service: COMPLETE.**
+- **Parallel X1 provider-gap work (#30): OPEN, read-only/fail-closed.**
 - **Controlled transaction execution: unauthorized / not an active CMIS milestone.**
 
-The next shared Verified Intelligence milestone is **evidence-backed alert contracts** with explicit scope, freshness, threshold, persistence, and evidence semantics.
+No further public alert service, Scout-reliance promotion, or next Verified Intelligence promotion milestone is currently accepted. Any such next slice requires a separate issue/spec/roadmap gate.
 
 The engineering workflow adopted under CMIS #259 is authoritative at [`CMIS_ENGINEERING_WORKFLOW.md`](./CMIS_ENGINEERING_WORKFLOW.md) and is coordinated with `bhaygood29053-pixel/roberta-langgraph#97`. It governs how future roadmap items are implemented and reviewed; it does not itself promote a runtime capability.
 
@@ -57,21 +59,23 @@ These primitives do not automatically become public Scout services and do not au
 
 ## Post-Phase-12 deterministic internal foundations
 
-Two additional read-only deterministic contracts are now accepted on `main` without public-service or Scout-reliance promotion:
+Three additional read-only deterministic contracts are now accepted on `main` without public-service or Scout-reliance promotion:
 
 1. **Deterministic descriptive intelligence classification** — classifies only the exact verified concentration direction supported by canonical CMIS evidence and does not infer behavior, ownership, intent, fraud, manipulation, or risk.
 2. **Deterministic wallet relationship evidence** — represents only verified observed direct token-transfer interactions between exact chain identities and explicitly preserves non-ownership semantics.
+3. **Deterministic concentration-threshold alert evidence** — evaluates a single canonical `cmis_top_account_concentration_change.v1` concentration-change evidence object against exact chain/asset identity, explicit `basis_points` threshold units, deterministic GT/GTE comparator semantics, canonical freshness, and single-observation persistence, deriving content-addressed evidence and alert identities.
 
-Both foundations remain equivalent to:
+These foundations remain equivalent to:
 
 ```text
+read_only = true
 public_service_promoted = false
 scout_reliance_promoted = false
 cmis_promotable = false
 execution_authorized = false
 ```
 
-They do not change the capability manifest, do not grant Roberta or a Chain Scout a new callable service, and do not authorize labels such as whale, insider, bot, accumulator, distributor, common owner, manipulator, scam, or intent.
+They do not change the capability manifest, do not grant Roberta or a Chain Scout a new callable service, and do not authorize labels such as whale, insider, bot, accumulator, distributor, common owner, manipulator, scam, intent, risk severity, or imminent price movement.
 
 ## Phase 12 first promoted intelligence service
 
@@ -121,7 +125,7 @@ Evidence Receipts preserve provenance, verification state, scope, freshness, dis
 
 Proof Score remains separate from risk. Missing evidence remains unknown rather than fabricated false/zero.
 
-CMIS now has accepted deterministic descriptive classification and direct wallet-relationship evidence foundations, but neither authorizes behavioral/ownership interpretation or public promotion. No current CMIS phase promotes whale, insider, bot, accumulator, distributor, market-maker, common-owner, manipulation, fraud, scam, behavioral-intent, or beneficial-owner claims.
+CMIS now has accepted deterministic descriptive classification, direct wallet-relationship evidence, and concentration-threshold alert evidence foundations, but none authorizes behavioral/ownership interpretation or public promotion. No current CMIS phase promotes whale, insider, bot, accumulator, distributor, market-maker, common-owner, manipulation, fraud, scam, behavioral-intent, beneficial-owner, risk-severity, or imminent-price claims from these foundations.
 
 ## Pre-trade analysis
 
@@ -146,11 +150,11 @@ Continue deepening field-level X1 and Solana verification without weakening trut
 
 ### Verified Intelligence
 
-Phase 11 foundation, the first Phase 12 X1 public-service promotion, deterministic descriptive classification, and deterministic wallet-relationship evidence are complete. The next interpretation-layer milestone is evidence-backed alerts under a separately accepted deterministic contract before broader Scout use.
+Phase 11 foundation, the first Phase 12 X1 public-service promotion, deterministic descriptive classification, deterministic wallet-relationship evidence, and the first deterministic concentration-threshold alert evidence foundation are complete. Broader Scout use or public alert delivery requires a separately accepted promotion/adoption contract; none is active at this checkpoint.
 
 ### Early Warning
 
-The next milestone is a read-only deterministic alert foundation. Alerts must bind exact evidence scope, freshness, explicit threshold/policy identity, persistence/repetition semantics, triggering observations, and limitations. An alert may report only the condition actually proven and may not imply ownership, intent, manipulation, fraud, scam, or behavioral coordination beyond separately accepted contracts.
+The first read-only deterministic alert foundation is complete under #263/#264. It binds exact subject/evidence scope, freshness, threshold/comparator policy, single-observation persistence, triggering evidence, and deterministic identities. It is internal/non-promoted and may report only the condition actually proven; it does not imply ownership, intent, manipulation, fraud, scam, behavioral coordination, risk severity, imminent price movement, or execution authority.
 
 ### Cross-Chain Intelligence
 
@@ -171,17 +175,18 @@ Completed:
 6. explicit concentration-threshold evaluator;
 7. **Phase 12** first public-service / Scout-reliance contract for X1 `concentration_change_intelligence/v1`, with Roberta adoption/readiness complete;
 8. deterministic descriptive inference/classification contract with behavioral/ownership interpretation explicitly excluded;
-9. deterministic wallet relationship evidence with explicit non-ownership semantics.
+9. deterministic wallet relationship evidence with explicit non-ownership semantics;
+10. deterministic concentration-threshold alert evidence foundation with explicit subject/unit/freshness/comparator/persistence/identity rules.
 
-Next read-only candidates:
+Future read-only candidates, not active milestones unless separately accepted:
 
-10. **evidence-backed alert contracts** with explicit scope/freshness/threshold/persistence/evidence rules;
-11. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-12. field-by-field Solana maturity;
-13. Ethereum only under an explicit capability/acceptance plan;
-14. investigation/evidence export and premium access after deterministic services stabilize.
+- deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+- field-by-field Solana maturity;
+- Ethereum only under an explicit capability/acceptance plan;
+- investigation/evidence export and premium access after deterministic services stabilize;
+- any alert public-service/Scout-reliance promotion or delivery runtime under a separate promotion contract.
 
-Parallel provider-gap work remains read-only and fail-closed: Warp Bridge source discovery, historical redundancy/source-independence, holder-semantics evidence, and alternate-provider verification.
+Parallel provider-gap work remains read-only and fail-closed under #30: Warp Bridge source discovery, historical redundancy/source-independence, holder-semantics evidence, and alternate-provider verification.
 
 None of these items authorizes execution.
 
