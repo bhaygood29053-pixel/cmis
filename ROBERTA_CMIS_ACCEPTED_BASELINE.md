@@ -28,6 +28,13 @@ The accepted manifest includes:
 - read-only Phase 11 `intelligence_foundation` with public-service and Scout-reliance promotion false;
 - one separately promoted read-only X1 intelligence service, `concentration_change_intelligence`, under service contract `concentration_change_intelligence/v1`.
 
+Accepted **internal/non-promoted** deterministic foundations now also include:
+
+- descriptive concentration-direction classification over canonical CMIS intelligence evidence;
+- direct wallet-relationship evidence for verified token-transfer interactions, with explicit non-ownership semantics.
+
+Neither internal foundation is automatically a Roberta/Scout-callable service. The active next CMIS intelligence milestone, #263, is likewise internal/read-only/non-promoted unless a later separately accepted promotion contract changes that state.
+
 Roberta does not call capability discovery directly; Scouts validate it before CMIS dispatch.
 
 The promoted X1 intelligence service requires CMIS contract `1.9.0` or newer for that operation. Existing accepted services may continue to use the older global minimum where their own contract permits it.
@@ -50,7 +57,7 @@ The service is callable only when the live manifest proves the exact promotion f
 
 CMIS resolves and revalidates the evidence internally. Caller-supplied intelligence bundles, Evidence Receipts, Proof Scores, provider assertions, behavioral labels, or replacement verification state are not accepted as a shortcut to trust.
 
-The service does **not** promote the underlying Phase 11 foundation objects. It does not establish holder-total or beneficial-owner semantics, does not convert Proof Score into risk, does not add whale/insider/bot/intent/ownership labels, and does not authorize execution.
+The service does **not** promote the underlying Phase 11 foundation objects or later internal classification/relationship foundations. It does not establish holder-total or beneficial-owner semantics, does not convert Proof Score into risk, does not add whale/insider/bot/intent/ownership labels, and does not authorize execution.
 
 Solana remains unavailable/non-promoted for this service until a separate accepted contract says otherwise.
 
@@ -158,9 +165,33 @@ CMIS has accepted read-only foundations for:
 - evidence-bound conclusions with content-addressed receipts/proof;
 - deterministic explicit-policy concentration-threshold evaluation.
 
-These foundations do not authorize or prove whale, insider, bot, accumulator, distributor, market-maker, ownership, relationship, manipulation, fraud, or behavioral-intent labels.
+The core Phase 11 intelligence primitives remain outside automatic public `supported_services` / Scout reliance. The separately promoted `concentration_change_intelligence/v1` wrapper is the only accepted public/Scout-reliance exception at this checkpoint and is limited to its exact X1 evidence-id scope.
 
-The core Phase 11 intelligence primitives remain outside automatic public `supported_services` / Scout reliance. The separately promoted `concentration_change_intelligence/v1` wrapper is the only accepted exception at this checkpoint and is limited to its exact X1 evidence-id scope.
+## Post-Phase-12 internal Verified Intelligence foundations
+
+CMIS has additionally accepted two deterministic internal/read-only/non-promoted foundations:
+
+1. **Descriptive intelligence classification** — derives only the exact concentration-direction label supported by revalidated canonical CMIS evidence. It adds no behavioral, ownership, intent, fraud, manipulation, or risk interpretation.
+2. **Wallet relationship evidence** — records verified observed direct token-transfer interactions between exact chain identities, preserving direction, asset/chain identity, bounded scope, deterministic identity, duplicate protection, and explicit non-ownership semantics.
+
+These foundations do **not** establish common ownership, beneficial ownership, whale/insider/bot/accumulator/distributor/market-maker status, coordinated control, intent, manipulation, fraud/scam, complete graph/history coverage, or risk severity. They remain:
+
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+cmis_promotable = false
+execution_authorized = false
+```
+
+They are therefore not yet callable Roberta/Scout services solely because the internal CMIS contracts exist.
+
+## Active next intelligence milestone — CMIS #263
+
+The next accepted CMIS work is a deterministic **concentration-threshold alert evidence contract** built only from accepted canonical concentration evidence and explicit deterministic threshold policy.
+
+The #263 slice is foundation-only/internal/read-only. It must preserve exact chain/asset/evidence identity, scope, units, freshness, comparator/equality semantics, threshold/policy identity, persistence/repetition semantics where used, triggering observations, provenance, Proof Score/risk separation, limitations, and deterministic content-addressed alert identity.
+
+It does not by itself create a public alert service, grant Scout reliance, change Roberta runtime behavior, infer behavioral/ownership/risk labels, or authorize execution. Any Roberta adoption requires a later separately accepted CMIS promotion contract plus a Roberta roadmap gate.
 
 ## Roberta consumption boundary
 
@@ -182,7 +213,7 @@ Roberta must not:
 - convert insufficient evidence into a definitive fact;
 - recalculate deterministic CMIS comparisons to obtain a preferred answer;
 - treat raw provider responses or asserted proof labels as verified on their own;
-- turn the remaining internal intelligence foundations into public services;
+- turn internal classification, wallet-relationship, or alert foundations into public services;
 - broaden the promoted concentration-change service beyond its exact accepted conclusion/scope;
 - treat analysis, proof, PASS, or human review as authorization to execute value movement.
 
