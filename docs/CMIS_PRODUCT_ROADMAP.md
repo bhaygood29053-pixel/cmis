@@ -63,7 +63,7 @@ Three additional read-only deterministic contracts are now accepted on `main` wi
 
 1. **Deterministic descriptive intelligence classification** — classifies only the exact verified concentration direction supported by canonical CMIS evidence and does not infer behavior, ownership, intent, fraud, manipulation, or risk.
 2. **Deterministic wallet relationship evidence** — represents only verified observed direct token-transfer interactions between exact chain identities and explicitly preserves non-ownership semantics.
-3. **Deterministic concentration-threshold alert evidence** — evaluates a single canonical concentration observation against exact chain/asset identity, explicit `basis_points` threshold units, deterministic GT/GTE comparator semantics, canonical freshness, and single-observation persistence, deriving content-addressed evidence and alert identities.
+3. **Deterministic concentration-threshold alert evidence** — evaluates a single canonical `cmis_top_account_concentration_change.v1` concentration-change evidence object against exact chain/asset identity, explicit `basis_points` threshold units, deterministic GT/GTE comparator semantics, canonical freshness, and single-observation persistence, deriving content-addressed evidence and alert identities.
 
 These foundations remain equivalent to:
 
