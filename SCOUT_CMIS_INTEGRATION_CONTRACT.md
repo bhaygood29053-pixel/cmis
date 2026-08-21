@@ -1,6 +1,6 @@
 # Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-21
 
 ## Boundary
 
@@ -31,7 +31,7 @@ Capability schema `1` is required. Existing services retain the accepted global 
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
-The core Phase 11 `intelligence_foundation` remains read-only and non-promoted as a group.
+The core Phase 11 `intelligence_foundation` remains read-only and non-promoted as a group. Accepted post-Phase-12 deterministic descriptive-classification and wallet-relationship evidence foundations also remain internal/non-promoted and do not create Scout dispatch authority. The active Issue #263 concentration-threshold alert-evidence foundation is likewise internal/read-only/non-promoted unless a later accepted contract promotes it.
 
 ## Public service surface
 
@@ -62,7 +62,9 @@ execution_authorized = false
 
 Solana is unavailable/non-callable/non-promoted for this service.
 
-A Scout must validate these exact fields before dispatch and preserve the returned facts/evidence/proof/limitations without recomputation. The service does not establish unique-holder or beneficial-owner semantics and does not authorize whale/insider/bot/intent/ownership labels.
+There is currently no public classification, wallet-relationship, or alert service. Those contracts are internal CMIS deterministic foundations only; Scouts may not call their internal resolver/builder paths directly or promote their evidence into unsupported ownership, behavior, intent, manipulation, fraud, risk, or execution claims.
+
+A Scout must validate the Phase 12 concentration service fields before dispatch and preserve returned facts/evidence/proof/limitations without recomputation. The service does not establish unique-holder or beneficial-owner semantics and does not authorize whale/insider/bot/intent/ownership labels.
 
 ## Request/response rules
 
@@ -96,6 +98,19 @@ execution_authorized = false
 ```
 
 A `PASS` is not permission to trade.
+
+## Internal intelligence and alert boundary
+
+Descriptive classification, wallet-relationship evidence, and the active Issue #263 concentration-threshold alert foundation remain:
+
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+cmis_promotable = false
+execution_authorized = false
+```
+
+Any future Scout use requires a separately accepted CMIS public-service/Scout-reliance promotion plus a Roberta adoption/readiness gate. Internal completion alone does not grant dispatch authority.
 
 ## Safety
 
