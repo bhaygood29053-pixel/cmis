@@ -42,7 +42,7 @@ CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific inve
 
 ## Current roadmap position
 
-As of August 20, 2026:
+As of August 21, 2026:
 
 - **CMIS Phase 10 — Solana read-only provider foundation:** complete.
 - **Evidence Receipts + Proof Score milestone:** complete.
@@ -52,8 +52,10 @@ As of August 20, 2026:
 - **CMIS Phase 12 — first narrow X1 public-service / Scout-reliance promotion:** complete for `concentration_change_intelligence/v1`.
 - **Deterministic descriptive intelligence classification foundation:** complete, internal/read-only/non-promoted.
 - **Deterministic wallet relationship evidence foundation:** complete with explicit non-ownership semantics and no public/Scout promotion.
+- **Deterministic concentration-threshold alert evidence foundation (#263/#264):** complete, internal/read-only/non-promoted.
 - **CMIS deterministic engineering workflow / three-axis review:** adopted and repository-authoritative.
-- **Next read-only milestone:** evidence-backed alert contracts.
+- **Parallel X1 provider-gap work:** Issue #30 remains open, read-only, and fail-closed.
+- **Next promoted intelligence milestone:** not yet accepted; a separate contract/gate is required before any alert public-service or Scout-reliance promotion.
 - **Controlled transaction execution:** not an active CMIS milestone and not authorized.
 
 The authoritative product roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering workflow is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). Phase 11 completion is documented in [`docs/PHASE_11_COMPLETION.md`](./docs/PHASE_11_COMPLETION.md).
@@ -80,7 +82,7 @@ GET /v1/cmis/capabilities
 
 Every chain/service combination is classified explicitly rather than assumed from another chain. Missing, incompatible, or non-callable capability evidence fails closed.
 
-The current CMIS contract is `1.9.0`. It preserves the bounded read-only `intelligence_foundation` and separately advertises the exact promoted concentration-change service. The deterministic classification and wallet-relationship foundations are internal/read-only/non-promoted and therefore do not silently become public Scout services or capability-manifest operations.
+The current CMIS contract is `1.9.0`. It preserves the bounded read-only `intelligence_foundation` and separately advertises the exact promoted concentration-change service. The deterministic classification, wallet-relationship, and concentration-alert foundations are internal/read-only/non-promoted and therefore do not silently become public Scout services or capability-manifest operations.
 
 ## X1 / XDEX foundation
 
@@ -129,13 +131,16 @@ CMIS Phase 11 established read-only deterministic primitives for:
 Additional accepted internal deterministic foundations now include:
 
 - descriptive classification of the exact concentration direction proven by canonical CMIS evidence, without behavioral/ownership/intent/risk interpretation;
-- direct wallet-relationship evidence for verified token transfers between exact chain identities, with explicit non-ownership semantics, content-addressed evidence identity, bounded compatible aggregation, and duplicate protection.
+- direct wallet-relationship evidence for verified token transfers between exact chain identities, with explicit non-ownership semantics, content-addressed evidence identity, bounded compatible aggregation, and duplicate protection;
+- concentration-threshold alert evidence built from canonical concentration evidence plus explicit threshold/comparator, freshness, subject, unit, and single-observation persistence semantics, with deterministic content-addressed evidence/alert identities.
 
-Neither foundation is a public CMIS service or a Scout-reliance contract. CMIS does **not** infer labels such as insider, whale, bot, accumulator, distributor, market maker, manipulator, scam, beneficial owner, or common owner from these foundations.
+These foundations are not public CMIS services or Scout-reliance contracts. The alert foundation preserves `read_only=true`, `public_service_promoted=false`, `scout_reliance_promoted=false`, `cmis_promotable=false`, and `execution_authorized=false`. CMIS does **not** infer labels such as insider, whale, bot, accumulator, distributor, market maker, manipulator, scam, beneficial owner, common owner, risk severity, or imminent price movement from these foundations.
 
 ## Early-warning direction
 
-The next read-only intelligence milestone is an evidence-backed alert contract. Alerts must have explicit evidence scope, freshness, threshold/policy identity, persistence or repetition semantics, triggering observations, and limitations. Alert wording may report only the condition actually proven and may not silently imply ownership, intent, manipulation, fraud, scam, coordinated behavior, or execution authority.
+Issue #263 / PR #264 completed the first deterministic concentration-threshold alert evidence foundation. It reports only the exact threshold condition supported by accepted canonical concentration evidence and explicit deterministic policy; alert state is separate from Proof Score and risk.
+
+No alert public service, Scout-reliance path, delivery runtime, Roberta planner behavior, multi-observation persistence, or execution authority has been promoted. Any next alert/promotion slice requires a separately accepted issue/spec/roadmap gate.
 
 ## Engineering governance
 
@@ -230,6 +235,7 @@ docs/CMIS_ENGINEERING_WORKFLOW.md
 docs/CMIS_IDENTITY_MIGRATION.md
 docs/DETERMINISTIC_INTELLIGENCE_CLASSIFICATION.md
 docs/WALLET_RELATIONSHIP_EVIDENCE.md
+docs/CONCENTRATION_THRESHOLD_ALERT_EVIDENCE.md
 docs/PHASE_10_COMPLETION.md
 docs/PHASE_11_COMPLETION.md
 SCOUT_CMIS_INTEGRATION_CONTRACT.md
