@@ -13,8 +13,9 @@ It does not create a public CMIS service, Scout-reliance contract, Roberta behav
 The accepted first slice supports:
 
 - one canonical CMIS concentration-change observation;
+- explicit expected chain and asset/subject identity;
 - explicit policy identity and version;
-- explicit absolute-delta threshold in basis points;
+- explicit absolute-delta threshold with fixed `basis_points` unit;
 - explicit `GT` (`>`) or `GTE` (`>=`) comparator semantics;
 - freshness measured from canonical `after_observed_at` to canonical `evaluated_at`;
 - single-observation persistence only;
@@ -24,22 +25,33 @@ The accepted first slice supports:
 
 Multi-observation persistence, duration windows, repetition rules, alert delivery, public service promotion, and Scout/Roberta adoption are out of scope for this slice.
 
-## Canonical input authority
+## Canonical input and subject authority
 
 The alert builder accepts exactly the canonical v1 concentration-change field set. Extra fields are rejected so caller-supplied ownership, behavior, risk, fraud, manipulation, intent, or replacement verification labels cannot ride alongside otherwise valid evidence.
+
+The caller must also supply normalized `expected_chain` and `expected_asset_id` policy bindings. The canonical concentration change must match both exactly before alert evaluation continues. A canonical observation for a different chain or asset is valid evidence for that other subject, but is unavailable for the requested alert subject and therefore fails closed here.
+
+The threshold unit is also explicit. Version 1 accepts only:
+
+```text
+threshold_unit = basis_points
+metric = absolute_delta_bps
+```
+
+No implicit unit conversion is performed. Percent, ratio, token amount, fiat amount, or other units are rejected.
 
 The existing concentration-threshold evaluator remains authoritative for:
 
 - concentration-change schema validation;
 - exact-ratio consistency;
-- chain/asset/source/scope identity;
+- chain/asset/source/scope identity inside the canonical evidence;
 - requested/observed account bounds;
 - canonical observation timestamps;
 - direction consistency;
 - explicit threshold normalization;
 - non-promotable behavioral/risk boundaries.
 
-The alert layer wraps that evaluator; it does not reproduce or replace its concentration truth logic.
+The alert layer wraps that evaluator; it does not reproduce or replace its concentration truth logic. The returned evaluator subject must still match the independently supplied expected chain and asset.
 
 ## Comparator semantics
 
@@ -93,7 +105,7 @@ The alert ID is SHA-256 over canonical JSON for all material alert content excep
 ca_<64 lowercase hex>
 ```
 
-Canonical JSON uses sorted keys and compact separators. Rebuilding the same accepted alert from the same evidence and policy produces the same IDs. Changing material evidence, policy, comparator, freshness, threshold, or evaluation content changes the applicable ID.
+Canonical JSON uses sorted keys and compact separators. Rebuilding the same accepted alert from the same evidence and policy produces the same IDs. Changing material evidence, expected subject identity, policy, comparator, freshness, threshold, unit, or evaluation content changes the applicable ID or causes fail-closed rejection.
 
 ## Evidence, proof, risk, and authority separation
 
@@ -123,6 +135,9 @@ The first slice rejects or fails closed for:
 
 - non-canonical or extra concentration-change fields;
 - invalid canonical concentration evidence rejected by the existing evaluator;
+- canonical evidence whose chain does not match `expected_chain`;
+- canonical evidence whose asset/subject does not match `expected_asset_id`;
+- a threshold unit other than `basis_points`;
 - unsupported or ambiguous comparator values;
 - missing/hidden threshold values;
 - non-canonical timestamps;

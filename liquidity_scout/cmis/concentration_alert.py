@@ -1,10 +1,10 @@
 """Deterministic internal concentration-threshold alert evidence.
 
 This module wraps the accepted concentration-threshold evaluator. It adds
-freshness, explicit comparator identity, single-observation persistence, and
-content-addressed evidence/alert identities without promoting the result into
-a public service, Scout-reliance contract, behavioral inference, risk score, or
-execution authority.
+freshness, explicit subject/comparator/unit identity, single-observation
+persistence, and content-addressed evidence/alert identities without promoting
+the result into a public service, Scout-reliance contract, behavioral inference,
+risk score, or execution authority.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ _ALERT_SCHEMA = "cmis_concentration_threshold_alert.v1"
 _EVIDENCE_ID_PREFIX = "ce_"
 _ALERT_ID_PREFIX = "ca_"
 _SUPPORTED_COMPARATORS = frozenset({"GT", "GTE"})
+_THRESHOLD_UNIT = "basis_points"
 _CHANGE_KEYS = frozenset(
     {
         "schema",
@@ -129,9 +130,12 @@ def _observation_age_seconds(after_observed_at: datetime, evaluated_at: datetime
 def build_concentration_threshold_alert(
     *,
     change: Mapping[str, Any],
+    expected_chain: str,
+    expected_asset_id: str,
     policy_id: str,
     policy_version: str,
     absolute_delta_threshold_bps: Any,
+    threshold_unit: str,
     comparator: str,
     evaluated_at: str,
     max_evidence_age_seconds: Any,
@@ -146,6 +150,17 @@ def build_concentration_threshold_alert(
         raise ValueError("change must be a canonical CMIS concentration change object.")
     if set(change) != set(_CHANGE_KEYS):
         raise ValueError("change must contain exactly the canonical v1 concentration-change fields.")
+
+    chain = _normalized_text("expected_chain", expected_chain)
+    asset_id = _normalized_text("expected_asset_id", expected_asset_id)
+    unit = _normalized_text("threshold_unit", threshold_unit)
+    if unit != _THRESHOLD_UNIT:
+        raise ValueError(f"threshold_unit must be {_THRESHOLD_UNIT}.")
+
+    if change.get("chain") != chain:
+        raise ValueError("change.chain does not match expected_chain.")
+    if change.get("asset_id") != asset_id:
+        raise ValueError("change.asset_id does not match expected_asset_id.")
 
     policy = _normalized_text("policy_id", policy_id)
     version = _normalized_text("policy_version", policy_version)
@@ -171,6 +186,11 @@ def build_concentration_threshold_alert(
         policy_version=version,
         absolute_delta_threshold_bps=absolute_delta_threshold_bps,
     )
+
+    if threshold_evaluation["chain"] != chain:
+        raise ValueError("threshold evaluation chain does not match expected_chain.")
+    if threshold_evaluation["asset_id"] != asset_id:
+        raise ValueError("threshold evaluation asset_id does not match expected_asset_id.")
 
     if threshold_evaluation["status"] == "EXCEEDS_THRESHOLD":
         condition_state = "ABOVE_THRESHOLD"
@@ -216,8 +236,12 @@ def build_concentration_threshold_alert(
         "policy": {
             "policy_id": policy,
             "policy_version": version,
+            "subject": {
+                "chain": chain,
+                "asset_id": asset_id,
+            },
             "metric": "absolute_delta_bps",
-            "unit": "basis_points",
+            "unit": unit,
             "absolute_delta_threshold_bps": threshold_evaluation["policy"][
                 "absolute_delta_threshold_bps"
             ],
