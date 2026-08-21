@@ -1,6 +1,6 @@
 # Roberta ↔ Chain Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-21
 
 ## Canonical hierarchy
 
@@ -38,6 +38,10 @@ public_service_promoted = false
 scout_reliance_promoted = false
 ```
 
+Post-Phase-12 deterministic descriptive-classification and wallet-relationship evidence foundations are also accepted internally but remain non-public, non-Scout-reliant, non-promotable, and execution-disabled. They do not grant Roberta or a Chain Scout a direct callable relationship/classification service.
+
+The active next CMIS intelligence milestone, Issue #263, is a deterministic concentration-threshold alert-evidence foundation. It is likewise internal/read-only/non-promoted unless a later separately accepted promotion contract changes that state.
+
 ## Shared public service surface
 
 Where the live manifest permits, the shared contract includes:
@@ -52,7 +56,7 @@ Where the live manifest permits, the shared contract includes:
 - `verification_evidence`
 - `concentration_change_intelligence` — bounded X1-only promoted service under CMIS `1.9.0`
 
-A runtime service does not become an autonomous Scout action merely because it exists.
+A runtime service does not become an autonomous Scout action merely because it exists. Internal deterministic modules—including classification, wallet-relationship, and alert foundations—do not become Roberta/Scout services merely because they exist in the CMIS repository.
 
 ## First promoted Verified Intelligence service — Phase 12
 
@@ -77,6 +81,25 @@ Solana is explicitly unavailable/non-callable/non-promoted for this service.
 The request is bound to X1 plus exact asset context and a canonical CMIS-owned intelligence evidence id. CMIS resolves and revalidates the stored evidence internally. Caller-supplied intelligence bundles, Evidence Receipts, Proof Scores, provider assertions, behavioral labels, or replacement verification state are not accepted as trust inputs.
 
 The service does not convert token accounts into total unique holders or beneficial owners. It does not establish whale, insider, bot, accumulator, distributor, market-maker, manipulation, common-owner, relationship, or intent labels. Optional concentration-threshold output is deterministic policy evaluation, not risk. Proof strength does not become risk.
+
+## Internal deterministic intelligence foundations
+
+Accepted internal/read-only/non-promoted foundations now include:
+
+1. descriptive classification of the exact concentration direction proven by canonical CMIS evidence;
+2. verified direct wallet-relationship evidence for observed token-transfer interactions between exact chain identities, with explicit non-ownership semantics;
+3. active Issue #263 concentration-threshold alert evidence, which must preserve exact canonical evidence identity, explicit threshold/comparator policy, freshness, scope, triggering observations, persistence/repetition semantics where used, provenance, limitations, deterministic alert identity, and Proof Score/risk separation.
+
+For these internal foundations:
+
+```text
+public_service_promoted = false
+scout_reliance_promoted = false
+cmis_promotable = false
+execution_authorized = false
+```
+
+They do not establish ownership, beneficial ownership, coordinated control, behavioral intent, manipulation, fraud/scam, complete history/graph coverage, risk severity, imminent price movement, or execution authority. Roberta adoption requires a later separately accepted CMIS promotion contract and a separate Roberta adoption/readiness gate.
 
 ## Chain boundaries
 
