@@ -62,9 +62,12 @@ class ConcentrationThresholdAlertTests(unittest.TestCase):
     def _build(self, **overrides):
         kwargs = {
             "change": _change(),
+            "expected_chain": "x1",
+            "expected_asset_id": "mint-1",
             "policy_id": "concentration-alert",
             "policy_version": "1.0.0",
             "absolute_delta_threshold_bps": "100",
+            "threshold_unit": "basis_points",
             "comparator": "GTE",
             "evaluated_at": "2026-08-20T20:05:00Z",
             "max_evidence_age_seconds": 300,
@@ -87,6 +90,26 @@ class ConcentrationThresholdAlertTests(unittest.TestCase):
         self.assertFalse(result["behavioral_interpretation_verified"])
         self.assertFalse(result["risk_interpretation_verified"])
         self.assertFalse(result["execution_authorized"])
+
+    def test_policy_binds_subject_and_basis_point_unit(self):
+        result = self._build()
+        self.assertEqual(
+            result["policy"]["subject"],
+            {"chain": "x1", "asset_id": "mint-1"},
+        )
+        self.assertEqual(result["policy"]["unit"], "basis_points")
+
+    def test_wrong_chain_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "chain does not match expected_chain"):
+            self._build(expected_chain="solana")
+
+    def test_wrong_asset_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "asset_id does not match expected_asset_id"):
+            self._build(expected_asset_id="mint-2")
+
+    def test_incompatible_threshold_unit_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "threshold_unit must be basis_points"):
+            self._build(threshold_unit="percent")
 
     def test_equality_does_not_trigger_gt(self):
         result = self._build(comparator="GT", _status="AT_THRESHOLD")
@@ -167,9 +190,12 @@ class ConcentrationThresholdAlertTests(unittest.TestCase):
     def test_real_existing_evaluator_integration(self):
         result = build_concentration_threshold_alert(
             change=_change(),
+            expected_chain="x1",
+            expected_asset_id="mint-1",
             policy_id="concentration-alert",
             policy_version="1.0.0",
             absolute_delta_threshold_bps="100",
+            threshold_unit="basis_points",
             comparator="GTE",
             evaluated_at="2026-08-20T20:05:00Z",
             max_evidence_age_seconds=300,
@@ -182,9 +208,12 @@ class ConcentrationThresholdAlertTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "absolute_delta_threshold_bps"):
             build_concentration_threshold_alert(
                 change=_change(),
+                expected_chain="x1",
+                expected_asset_id="mint-1",
                 policy_id="concentration-alert",
                 policy_version="1.0.0",
                 absolute_delta_threshold_bps=None,
+                threshold_unit="basis_points",
                 comparator="GTE",
                 evaluated_at="2026-08-20T20:05:00Z",
                 max_evidence_age_seconds=300,
@@ -198,9 +227,12 @@ class ConcentrationThresholdAlertTests(unittest.TestCase):
         ) as evaluator:
             build_concentration_threshold_alert(
                 change=change,
+                expected_chain="x1",
+                expected_asset_id="mint-1",
                 policy_id="concentration-alert",
                 policy_version="1.2.3",
                 absolute_delta_threshold_bps="55.5",
+                threshold_unit="basis_points",
                 comparator="GT",
                 evaluated_at="2026-08-20T20:01:00Z",
                 max_evidence_age_seconds=60,
