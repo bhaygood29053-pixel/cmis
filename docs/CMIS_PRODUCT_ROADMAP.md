@@ -1,6 +1,6 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-21
 
 ## Canonical architecture
 
@@ -30,12 +30,15 @@ Accepted milestones:
 - **CMIS Phase 12 — first narrow public-service / Scout-reliance promotion: COMPLETE for X1 `concentration_change_intelligence/v1`.**
 - **Deterministic descriptive intelligence classification foundation: COMPLETE, internal/read-only/non-promoted.**
 - **Deterministic wallet relationship evidence with explicit non-ownership semantics: COMPLETE, internal/read-only/non-promoted.**
+- **Deterministic concentration-threshold alert evidence foundation: COMPLETE, internal/read-only/non-promoted under Issue #263 / PR #264.**
 - **CMIS deterministic engineering workflow / three-axis authority review: ADOPTED and repository-authoritative.**
 - **CMIS capability contract: 1.9.0.**
 - **Roberta adoption/readiness of the promoted X1 concentration service: COMPLETE.**
 - **Controlled transaction execution: unauthorized / not an active CMIS milestone.**
 
-The next shared Verified Intelligence milestone is **evidence-backed alert contracts** with explicit scope, freshness, threshold, persistence, and evidence semantics.
+The first evidence-backed Early Warning foundation is now complete: a deterministic concentration-threshold alert contract with explicit expected chain/asset binding, fixed `basis_points` threshold units, GT/GTE comparator semantics, freshness, single-observation persistence, triggering-evidence identity, and deterministic content-addressed alert identity.
+
+Any broader alert work—such as multi-observation persistence, duration windows, additional alert conditions, public-service promotion, Scout reliance, or Roberta planner behavior—requires a separately accepted issue and contract.
 
 The engineering workflow adopted under CMIS #259 is authoritative at [`CMIS_ENGINEERING_WORKFLOW.md`](./CMIS_ENGINEERING_WORKFLOW.md) and is coordinated with `bhaygood29053-pixel/roberta-langgraph#97`. It governs how future roadmap items are implemented and reviewed; it does not itself promote a runtime capability.
 
@@ -57,12 +60,13 @@ These primitives do not automatically become public Scout services and do not au
 
 ## Post-Phase-12 deterministic internal foundations
 
-Two additional read-only deterministic contracts are now accepted on `main` without public-service or Scout-reliance promotion:
+Three additional read-only deterministic contracts are now accepted on `main` without public-service or Scout-reliance promotion:
 
 1. **Deterministic descriptive intelligence classification** — classifies only the exact verified concentration direction supported by canonical CMIS evidence and does not infer behavior, ownership, intent, fraud, manipulation, or risk.
 2. **Deterministic wallet relationship evidence** — represents only verified observed direct token-transfer interactions between exact chain identities and explicitly preserves non-ownership semantics.
+3. **Deterministic concentration-threshold alert evidence** — evaluates one canonical concentration-change observation against an explicit versioned threshold policy, expected chain/asset identity, fixed basis-point unit, GT/GTE comparator, freshness bound, and single-observation persistence; it produces deterministic evidence/alert identities without implying behavioral, ownership, risk, or execution meaning.
 
-Both foundations remain equivalent to:
+All three foundations remain equivalent to:
 
 ```text
 public_service_promoted = false
@@ -121,7 +125,7 @@ Evidence Receipts preserve provenance, verification state, scope, freshness, dis
 
 Proof Score remains separate from risk. Missing evidence remains unknown rather than fabricated false/zero.
 
-CMIS now has accepted deterministic descriptive classification and direct wallet-relationship evidence foundations, but neither authorizes behavioral/ownership interpretation or public promotion. No current CMIS phase promotes whale, insider, bot, accumulator, distributor, market-maker, common-owner, manipulation, fraud, scam, behavioral-intent, or beneficial-owner claims.
+CMIS now has accepted deterministic descriptive classification, direct wallet-relationship evidence, and concentration-threshold alert foundations. None authorizes behavioral/ownership interpretation or public promotion. The alert foundation is deterministic policy evaluation over accepted canonical evidence, not a risk/severity score. No current CMIS phase promotes whale, insider, bot, accumulator, distributor, market-maker, common-owner, manipulation, fraud, scam, behavioral-intent, or beneficial-owner claims.
 
 ## Pre-trade analysis
 
@@ -146,11 +150,13 @@ Continue deepening field-level X1 and Solana verification without weakening trut
 
 ### Verified Intelligence
 
-Phase 11 foundation, the first Phase 12 X1 public-service promotion, deterministic descriptive classification, and deterministic wallet-relationship evidence are complete. The next interpretation-layer milestone is evidence-backed alerts under a separately accepted deterministic contract before broader Scout use.
+Phase 11 foundation, the first Phase 12 X1 public-service promotion, deterministic descriptive classification, deterministic wallet-relationship evidence, and the first deterministic concentration-threshold alert foundation are complete. Further interpretation-layer work requires separately accepted deterministic contracts before broader Scout use.
 
 ### Early Warning
 
-The next milestone is a read-only deterministic alert foundation. Alerts must bind exact evidence scope, freshness, explicit threshold/policy identity, persistence/repetition semantics, triggering observations, and limitations. An alert may report only the condition actually proven and may not imply ownership, intent, manipulation, fraud, scam, or behavioral coordination beyond separately accepted contracts.
+The first read-only deterministic alert foundation is complete under Issue #263 / PR #264. It binds exact expected chain/asset identity, accepted evidence scope, freshness, explicit threshold/policy identity, fixed basis-point units, GT/GTE comparison semantics, single-observation persistence, triggering evidence, deterministic IDs, and limitations.
+
+It may report only the deterministic threshold condition actually proven. It may not imply ownership, intent, manipulation, fraud, scam, coordinated behavior, risk severity, price direction, or execution authority. Multi-observation persistence, bounded duration/window rules, additional alert types, alert delivery, public-service promotion, Scout reliance, and Roberta adoption remain future separately accepted work.
 
 ### Cross-Chain Intelligence
 
@@ -171,15 +177,16 @@ Completed:
 6. explicit concentration-threshold evaluator;
 7. **Phase 12** first public-service / Scout-reliance contract for X1 `concentration_change_intelligence/v1`, with Roberta adoption/readiness complete;
 8. deterministic descriptive inference/classification contract with behavioral/ownership interpretation explicitly excluded;
-9. deterministic wallet relationship evidence with explicit non-ownership semantics.
+9. deterministic wallet relationship evidence with explicit non-ownership semantics;
+10. deterministic concentration-threshold alert evidence foundation with explicit subject/unit/freshness/persistence semantics and no promotion.
 
 Next read-only candidates:
 
-10. **evidence-backed alert contracts** with explicit scope/freshness/threshold/persistence/evidence rules;
-11. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-12. field-by-field Solana maturity;
-13. Ethereum only under an explicit capability/acceptance plan;
-14. investigation/evidence export and premium access after deterministic services stabilize.
+11. broader evidence-backed alert contracts or multi-observation persistence only under separately accepted scope/freshness/window/deduplication semantics;
+12. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+13. field-by-field Solana maturity;
+14. Ethereum only under an explicit capability/acceptance plan;
+15. investigation/evidence export and premium access after deterministic services stabilize.
 
 Parallel provider-gap work remains read-only and fail-closed: Warp Bridge source discovery, historical redundancy/source-independence, holder-semantics evidence, and alternate-provider verification.
 
