@@ -35,7 +35,9 @@ Accepted milestones:
 - **Roberta adoption/readiness of the promoted X1 concentration service: COMPLETE.**
 - **Controlled transaction execution: unauthorized / not an active CMIS milestone.**
 
-The next shared Verified Intelligence milestone is **evidence-backed alert contracts** with explicit scope, freshness, threshold, persistence, and evidence semantics.
+The active next Verified Intelligence milestone is **CMIS #263 — deterministic concentration-threshold alert evidence**. This first alert slice is internal, read-only, and non-promoted: it does not create a public service, grant Scout reliance, change Roberta behavior, or authorize execution. It must bind canonical concentration evidence to explicit threshold/comparator, freshness, scope, persistence/repetition, triggering-observation, provenance, and deterministic alert-identity semantics.
+
+Parallel X1 provider-gap work remains tracked under **CMIS #30** and stays fail-closed/read-only.
 
 The engineering workflow adopted under CMIS #259 is authoritative at [`CMIS_ENGINEERING_WORKFLOW.md`](./CMIS_ENGINEERING_WORKFLOW.md) and is coordinated with `bhaygood29053-pixel/roberta-langgraph#97`. It governs how future roadmap items are implemented and reviewed; it does not itself promote a runtime capability.
 
@@ -146,11 +148,11 @@ Continue deepening field-level X1 and Solana verification without weakening trut
 
 ### Verified Intelligence
 
-Phase 11 foundation, the first Phase 12 X1 public-service promotion, deterministic descriptive classification, and deterministic wallet-relationship evidence are complete. The next interpretation-layer milestone is evidence-backed alerts under a separately accepted deterministic contract before broader Scout use.
+Phase 11 foundation, the first Phase 12 X1 public-service promotion, deterministic descriptive classification, and deterministic wallet-relationship evidence are complete. The active interpretation-layer milestone is CMIS #263, the first deterministic evidence-backed concentration-threshold alert contract, before any broader alert or Scout use.
 
 ### Early Warning
 
-The next milestone is a read-only deterministic alert foundation. Alerts must bind exact evidence scope, freshness, explicit threshold/policy identity, persistence/repetition semantics, triggering observations, and limitations. An alert may report only the condition actually proven and may not imply ownership, intent, manipulation, fraud, scam, or behavioral coordination beyond separately accepted contracts.
+**Active: CMIS #263.** The first read-only deterministic alert foundation must bind exact canonical concentration evidence, freshness, explicit threshold/comparator and policy identity, scope, persistence/repetition semantics, triggering observations, provenance, limitations, and a deterministic content-addressed alert identity. It remains internal/non-promoted until a later separately accepted promotion contract says otherwise. An alert may report only the condition actually proven and may not imply ownership, intent, manipulation, fraud, scam, risk severity, imminent price movement, or behavioral coordination beyond separately accepted contracts.
 
 ### Cross-Chain Intelligence
 
@@ -173,15 +175,19 @@ Completed:
 8. deterministic descriptive inference/classification contract with behavioral/ownership interpretation explicitly excluded;
 9. deterministic wallet relationship evidence with explicit non-ownership semantics.
 
-Next read-only candidates:
+Active next read-only milestone:
 
-10. **evidence-backed alert contracts** with explicit scope/freshness/threshold/persistence/evidence rules;
-11. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-12. field-by-field Solana maturity;
-13. Ethereum only under an explicit capability/acceptance plan;
-14. investigation/evidence export and premium access after deterministic services stabilize.
+10. **CMIS #263 — deterministic concentration-threshold alert evidence contract**, internal/read-only/non-promoted.
 
-Parallel provider-gap work remains read-only and fail-closed: Warp Bridge source discovery, historical redundancy/source-independence, holder-semantics evidence, and alternate-provider verification.
+Following read-only candidates:
+
+11. broader evidence-backed alert contracts only after #263 establishes the first accepted alert boundary;
+12. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+13. field-by-field Solana maturity;
+14. Ethereum only under an explicit capability/acceptance plan;
+15. investigation/evidence export and premium access after deterministic services stabilize.
+
+Parallel provider-gap work remains read-only and fail-closed under CMIS #30: Warp Bridge source discovery, historical redundancy/source-independence, holder-semantics evidence, and alternate-provider verification.
 
 None of these items authorizes execution.
 
