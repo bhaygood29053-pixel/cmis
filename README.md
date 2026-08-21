@@ -53,7 +53,8 @@ As of August 20, 2026:
 - **Deterministic descriptive intelligence classification foundation:** complete, internal/read-only/non-promoted.
 - **Deterministic wallet relationship evidence foundation:** complete with explicit non-ownership semantics and no public/Scout promotion.
 - **CMIS deterministic engineering workflow / three-axis review:** adopted and repository-authoritative.
-- **Next read-only milestone:** evidence-backed alert contracts.
+- **Active next read-only milestone:** CMIS #263, deterministic concentration-threshold alert evidence, internal/read-only/non-promoted.
+- **Parallel provider-gap work:** CMIS #30, read-only/fail-closed.
 - **Controlled transaction execution:** not an active CMIS milestone and not authorized.
 
 The authoritative product roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering workflow is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). Phase 11 completion is documented in [`docs/PHASE_11_COMPLETION.md`](./docs/PHASE_11_COMPLETION.md).
@@ -135,7 +136,9 @@ Neither foundation is a public CMIS service or a Scout-reliance contract. CMIS d
 
 ## Early-warning direction
 
-The next read-only intelligence milestone is an evidence-backed alert contract. Alerts must have explicit evidence scope, freshness, threshold/policy identity, persistence or repetition semantics, triggering observations, and limitations. Alert wording may report only the condition actually proven and may not silently imply ownership, intent, manipulation, fraud, scam, coordinated behavior, or execution authority.
+**Active milestone: CMIS #263.** The first deterministic alert contract is a concentration-threshold alert built only from accepted canonical CMIS concentration evidence and explicit deterministic threshold policy. It must preserve exact scope, freshness, comparator/equality semantics, threshold/policy identity, persistence or repetition rules, triggering observations, provenance, Proof Score/risk separation, limitations, and deterministic content-addressed alert identity.
+
+The #263 slice remains internal, read-only, and non-promoted. It does not create a public CMIS service, grant Scout reliance, change Roberta behavior, or authorize execution. Alert wording may report only the exact condition proven and may not silently imply ownership, intent, manipulation, fraud, scam, coordinated behavior, risk severity, or imminent price movement.
 
 ## Engineering governance
 
