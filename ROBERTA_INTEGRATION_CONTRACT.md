@@ -1,6 +1,6 @@
 # Roberta ↔ Chain Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-25
 
 ## Canonical hierarchy
 
@@ -77,6 +77,16 @@ Solana is explicitly unavailable/non-callable/non-promoted for this service.
 The request is bound to X1 plus exact asset context and a canonical CMIS-owned intelligence evidence id. CMIS resolves and revalidates the stored evidence internally. Caller-supplied intelligence bundles, Evidence Receipts, Proof Scores, provider assertions, behavioral labels, or replacement verification state are not accepted as trust inputs.
 
 The service does not convert token accounts into total unique holders or beneficial owners. It does not establish whale, insider, bot, accumulator, distributor, market-maker, manipulation, common-owner, relationship, or intent labels. Optional concentration-threshold output is deterministic policy evaluation, not risk. Proof strength does not become risk.
+
+## Post-Phase-12 internal deterministic foundations
+
+Accepted CMIS `main` foundations also include:
+
+- deterministic descriptive concentration-direction classification;
+- direct wallet-relationship evidence with explicit non-ownership/non-beneficial-owner semantics;
+- concentration-threshold alert evidence bound to canonical concentration evidence, exact identity, explicit threshold units/comparator, freshness, and deterministic evidence identity.
+
+All remain internal/read-only/non-promoted. They do not create a new capability-manifest service, Scout dispatch authority, behavioral or ownership label, risk conclusion, or execution authority. There is currently no accepted next public intelligence/alert service or Scout-reliance promotion.
 
 ## Chain boundaries
 
