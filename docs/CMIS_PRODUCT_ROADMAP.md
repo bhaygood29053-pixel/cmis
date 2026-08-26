@@ -1,6 +1,6 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-08-23 (America/New_York)
+Last reconciled: 2026-08-26 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
 
@@ -36,6 +36,7 @@ Accepted milestones on `main`:
 - **CMIS deterministic engineering workflow / three-axis review: ADOPTED and repository-authoritative.**
 - **CMIS capability contract: `1.9.0`.**
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
+- **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
 - **Parallel X1 provider-gap work (#30): OPEN, read-only/fail-closed.**
 - **Controlled transaction execution: UNAUTHORIZED / not an active CMIS milestone.**
 
@@ -162,6 +163,10 @@ The branch defines a bounded authenticated read-only access classifier for provi
 
 No live provider-access result is accepted until the required credential-backed probe is executed and accepted. Source independence, historical coverage, retention, finality semantics, archival completeness, and CMIS promotion remain false/unproven.
 
+### PR #227 — FortiBlox provider contract research ⚠️ Open candidate research
+
+The branch records provider-owned Explorer documentation and supporting Nexus RPC discovery evidence without promoting FortiBlox into CMIS. Exact Explorer endpoint/response semantics, current Nexus RPC behavior, source independence, freshness/history/finality semantics, and CMIS promotion remain unverified. No adapter should be built from guessed endpoint paths.
+
 ### Existing non-promotional observations
 
 Recent bounded evidence still shows:
@@ -276,21 +281,23 @@ Completed:
 7. Phase 12 X1 `concentration_change_intelligence/v1` promotion + Roberta adoption/readiness;
 8. deterministic descriptive classification with behavioral/ownership interpretation excluded;
 9. deterministic direct wallet-relationship evidence with explicit non-ownership semantics;
-10. deterministic concentration-threshold alert evidence foundation.
+10. deterministic concentration-threshold alert evidence foundation;
+11. paired Roberta #226 / CMIS #269 architecture/source-of-truth reconciliation.
 
 Current parallel work:
 
-11. continue Issue #30 provider-gap hardening under read-only/fail-closed contracts;
-12. resolve/accept or close PR #242 based on exact Warp Bridge provenance evidence;
-13. resolve/accept or close PR #229 based on bounded X1Scroll credential-backed access evidence.
+12. continue Issue #30 provider-gap hardening under read-only/fail-closed contracts;
+13. resolve/accept or close PR #242 based on exact Warp Bridge provenance evidence;
+14. resolve/accept or close PR #229 based on bounded X1Scroll credential-backed access evidence;
+15. resolve/accept or close PR #227 based on reproducible FortiBlox provider-contract evidence.
 
 Future candidates — **not active milestones until separately accepted**:
 
-14. any public alert/Scout-reliance promotion;
-15. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-16. further field-by-field Solana maturity;
-17. Ethereum under an explicit capability/acceptance plan;
-18. investigation/evidence export and premium access.
+16. any public alert/Scout-reliance promotion;
+17. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+18. further field-by-field Solana maturity;
+19. Ethereum under an explicit capability/acceptance plan;
+20. investigation/evidence export and premium access.
 
 None authorizes execution.
 
@@ -318,6 +325,8 @@ CMIS verifies what the evidence supports.
 Chain Scouts investigate and interpret within their chain.
 Roberta coordinates and explains.
 ```
+
+The paired Roberta #226 / CMIS #269 source-sync reconciliation is merged. Roberta's accepted Mastering Blockchain 4e exercise-bank construction now reaches Stage 8 / Market Structure; Stages 9-14 plus the final capstone remain outstanding. Roberta PR #228 proposes automated source-grounded training but remains open/unaccepted.
 
 Roberta may synthesize accepted CMIS results but must not recalculate CMIS truth/proof, silently upgrade inference to fact, collapse risk and evidence quality into one score, or treat internal non-promoted foundations as callable services.
 
