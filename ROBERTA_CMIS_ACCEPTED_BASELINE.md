@@ -1,6 +1,6 @@
 # Roberta ↔ CMIS Accepted Baseline
 
-Last reconciled: 2026-08-25 (America/New_York)
+Last reconciled: 2026-08-26 (America/New_York)
 
 ## Purpose
 
@@ -22,7 +22,7 @@ User / transport
 
 Roberta coordinates and explains. Chain Scouts investigate/interpret within exact chain scope. CMIS owns deterministic freshness-sensitive facts, evidence, proof quality, risk, capability state, historical intelligence, and bounded analysis-only pre-trade calculations.
 
-Roberta Learning System sources, source-mastery plans, Pyramid training/learned-concept state, LangGraph checkpoints, HXMP memory, policy state, and human review do **not** override CMIS for freshness-sensitive market/blockchain facts.
+Roberta Learning System sources, autonomous source-mastery plans, Pyramid training/learned-concept state, retained lessons, LangGraph checkpoints, HXMP memory, policy state, and human review do **not** override CMIS for freshness-sensitive market/blockchain facts.
 
 ## Current contract baseline
 
@@ -87,7 +87,7 @@ Where exact contracts permit, accepted X1 building blocks include identity/suppl
 
 Scope remains explicit. Program-, pool-, route-, provider-, token-account-, or sample-scoped evidence is not silently widened to asset/global truth.
 
-Current provider-gap work remains non-promotional. Issue #30 is still open; draft PR #242 (Warp Bridge provenance) and draft PR #229 (X1Scroll authenticated RPC access) are not accepted provider capability by virtue of existing as branches.
+Current provider-gap work remains non-promotional. Issue #30 is still open; draft PR #242 (Warp Bridge provenance), draft PR #229 (X1Scroll authenticated RPC access), and candidate-research PR #227 (FortiBlox) are not accepted provider capability by virtue of existing as branches.
 
 ## Solana boundary
 
@@ -130,31 +130,27 @@ execution_authorized = false
 
 They do not establish common/beneficial ownership, whale/insider/bot status, intent, manipulation, fraud/scam, complete graph coverage, risk severity, causality, or imminent price movement.
 
-## Roberta Learning System / source-mastery / Pyramid interaction
+## Roberta Learning System / autonomous Learning Plane interaction
 
-Roberta now has accepted Learning System Phases 1-9, an accepted-but-unimplemented Phase 10 general retention specification, and a source-specific Pyramid mastery system.
+Roberta Learning System Phases 1-10 are accepted on Roberta `main`. Hardened Phase 10 verified retention is implemented as a narrow deterministic provider-neutral/in-memory retention layer, and an exact active retained lesson may be classified as `verified_learned_knowledge` with full lineage. That classification explicitly does not authorize source truth, live state, CMIS/provider trust, governance mutation, wallet activity, operational trust, or execution.
 
-The Pyramid can:
+Roberta PR #228 merged on 2026-08-26 and accepted the first end-to-end autonomous source-grounded Learning Plane controller. After explicit static-source selection, the accepted controller can bind immutable source provenance, create/resume a frozen source-mastery plan, generate and independently verify source-grounded learning targets, publish deterministic curriculum banks, run canonical exams, remediate failures, perform closed-book retention and transfer checks, promote only curriculum-scoped verified concepts, preserve immutable failure evidence, resume safely, and run a final source capstone.
 
-- bind a frozen source-specific plan to training progress;
-- use source-grounded exercise banks and provenance-scoped retrieval;
-- run 300-question canonical source stages while preserving historical 1,000-question audit results;
-- perform source-grounded remediation and supplemental practice;
-- require closed-book retention for critical-origin learning;
-- persist narrowly curriculum-scoped learned concepts after exact Pyramid verification gates.
+For *Mastering Blockchain, Fourth Edition*, accepted prebuilt exercise-bank construction reaches Stage 8 / Market Structure. Stages 9-14 are not yet separately accepted prebuilt repository banks, although the autonomous controller may generate missing banks at runtime under its validation contract. Bank availability is not mastery; mastery requires every frozen required stage and final capstone to pass in the authoritative source-mastery ledger.
 
 None of that changes CMIS authority.
 
 Specifically:
 
 - a book/whitepaper/source record cannot override fresh CMIS evidence;
-- a source-mastery plan or stage PASS cannot create a market fact;
-- a Pyramid PASS/PARTIAL/FAIL, grader note, expected answer, practice result, or learned concept cannot create CMIS truth;
+- an autonomous source-mastery plan, generated bank, stage PASS, or capstone PASS cannot create a market fact;
+- a Pyramid PASS/PARTIAL/FAIL, grader note, expected answer, practice result, retained lesson, or learned concept cannot create CMIS truth;
 - source-grounded reconstruction/practice cannot promote provider trust;
-- curriculum-scoped learned concepts are static training aids, not current market/blockchain state;
+- curriculum-scoped learned concepts and `verified_learned_knowledge` are static learning state, not current market/blockchain state;
 - Phase 9 `verified_for_learning` cannot create CMIS truth;
-- any future general retained lesson remains subordinate to fresh CMIS/provider evidence for freshness-sensitive state;
-- learning/retention approval never becomes wallet/execution authority.
+- retained lessons remain subordinate to fresh CMIS/provider evidence for freshness-sensitive state;
+- learning/retention approval never becomes wallet/execution authority;
+- the Learning Plane cannot self-modify CMIS contracts, provider authority, Scout-reliance promotion, prompts/tools/policies that establish runtime authority, or Controlled Execution permissions.
 
 ## Roberta consumption boundary
 
@@ -170,8 +166,8 @@ Roberta must not:
 - treat raw provider responses as verified on their own;
 - turn internal CMIS foundations into public services;
 - broaden `concentration_change_intelligence/v1` beyond its accepted X1 scope;
-- treat source plans, books, Pyramid learned concepts, memory, policy, or human review as replacements for current CMIS evidence;
-- treat analysis/proof/PASS/alert/human-review state as authorization for value movement.
+- treat source plans, books, Pyramid learned concepts, retained lessons, memory, policy, or human review as replacements for current CMIS evidence;
+- treat analysis/proof/PASS/alert/learning/human-review state as authorization for value movement.
 
 ## Execution boundary
 
