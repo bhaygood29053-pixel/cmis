@@ -1,6 +1,6 @@
 # Roberta ↔ Chain Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-25
+Last reconciled: 2026-08-26
 
 ## Canonical hierarchy
 
@@ -12,9 +12,9 @@ User / transport
         -> Chain Provider
 ```
 
-Roberta owns orchestration, user policy, cross-chain coordination, approval boundaries, and final user-facing synthesis. Chain Scouts own chain-specific planning and interpretation, but do not manufacture facts. CMIS owns deterministic verified facts, evidence, Evidence Receipts, Proof Scores, risk, capability eligibility, historical intelligence, and bounded analysis-only pre-trade calculations. Providers remain beneath CMIS.
+Roberta owns orchestration, user policy, cross-chain coordination, learning-workflow coordination, approval boundaries, and final user-facing synthesis. Chain Scouts own chain-specific planning and interpretation, but do not manufacture facts. CMIS owns deterministic verified facts, evidence, Evidence Receipts, Proof Scores, risk, capability eligibility, historical intelligence, and bounded analysis-only pre-trade calculations. Providers remain beneath CMIS.
 
-Fresh accepted CMIS/provider evidence overrides remembered, checkpointed, or conversational live-market values. Missing evidence remains unknown/unavailable; it is never converted into zero, false, or an LLM estimate. Risk and Proof Score remain separate dimensions.
+Fresh accepted CMIS/provider evidence overrides remembered, checkpointed, retained, source-mastery, Pyramid, or conversational live-market values. Missing evidence remains unknown/unavailable; it is never converted into zero, false, or an LLM estimate. Risk and Proof Score remain separate dimensions.
 
 The working Python namespace `liquidity_scout` may remain during incremental migration; it is a compatibility identifier, not a second authority layer.
 
@@ -88,6 +88,25 @@ Accepted CMIS `main` foundations also include:
 
 All remain internal/read-only/non-promoted. They do not create a new capability-manifest service, Scout dispatch authority, behavioral or ownership label, risk conclusion, or execution authority. There is currently no accepted next public intelligence/alert service or Scout-reliance promotion.
 
+## Roberta autonomous Learning Plane boundary
+
+Roberta Learning System Phases 1-10 are accepted on Roberta `main`, and PR #228's autonomous source-grounded Learning Plane is merged and accepted.
+
+The Learning Plane may autonomously process an explicitly selected static source through provenance, curriculum, examination, remediation, retention/transfer verification, and curriculum-scoped learned-concept promotion. Exact active retained lessons may also be classified as `verified_learned_knowledge` under Roberta's accepted retention contract.
+
+Those states are **not CMIS trust inputs**. They do not create or alter:
+
+- current blockchain/market facts;
+- provider verification or source independence;
+- CMIS capability eligibility;
+- public-service or Scout-reliance promotion;
+- Evidence Receipt / Proof Score semantics;
+- deterministic risk semantics;
+- wallet permissions;
+- execution authority.
+
+For freshness-sensitive claims, Roberta must continue routing through the relevant Chain Scout -> CMIS -> provider path. A learned or retained value that conflicts with fresh accepted CMIS/provider evidence is subordinate to the fresh evidence.
+
 ## Chain boundaries
 
 ### X1
@@ -121,10 +140,10 @@ A `PASS` is not permission to trade.
 
 Human review is exact-proposal review, not a reusable signing credential.
 
-No current CMIS result, Scout report, Roberta policy decision, or human approval authorizes transaction preparation for execution, signing, broadcasting, custody, live trading, bridge transfer, or autonomous value movement.
+No current CMIS result, Scout report, Roberta policy decision, Learning Plane result, retained lesson, learned concept, or human approval authorizes transaction preparation for execution, signing, broadcasting, custody, live trading, bridge transfer, or autonomous value movement.
 
 Roberta Controlled Execution remains locked/not started.
 
 ## Core principle
 
-**CMIS determines what verified evidence supports now. Chain Scouts preserve and interpret the chain-specific result. Roberta coordinates, applies policy, and explains the result to the user.**
+**CMIS determines what verified evidence supports now. Chain Scouts preserve and interpret the chain-specific result. Roberta coordinates, learns within bounded static-source rules, applies policy, and explains the result to the user.**
