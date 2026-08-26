@@ -38,7 +38,7 @@ Verified information flows upward:
 Chain Provider -> CMIS -> Chain Scout -> Roberta
 ```
 
-CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
+CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, learning-workflow coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
 
 ## Current roadmap position — reconciled 2026-08-26
 
@@ -57,6 +57,7 @@ Accepted on `main`:
 - **CMIS capability contract:** `1.9.0`.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
+- **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main` via PR #228; its post-merge source/roadmap state is synchronized through Roberta PR #231.
 
 Not accepted/promoted:
 
@@ -67,7 +68,7 @@ Not accepted/promoted:
 - no Ethereum provider milestone without a separate accepted gate;
 - no Controlled Execution or value movement.
 
-The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md).
+The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-08-26.md`](./docs/PROJECT_STATUS_2026-08-26.md).
 
 ## Active provider-gap work — not accepted capability
 
@@ -171,7 +172,7 @@ Core trust rules:
 7. Pool/route/provider/token-account/sample scope is not silently widened to asset/global scope.
 8. Chain provenance is preserved.
 9. Inference requires a separately accepted contract.
-10. No execution authority is created by PASS/WARN/BLOCK, alert state, Proof Score, or human review.
+10. No execution authority is created by PASS/WARN/BLOCK, alert state, Proof Score, learning state, or human review.
 
 ## X1 / XDEX foundation
 
@@ -226,9 +227,13 @@ A `PASS` is not permission to trade.
 
 ## Roberta dependency/status context
 
-Roberta's accepted Mastering Blockchain 4e exercise-bank construction now reaches Stage 8 / Market Structure. Stages 9-14 plus the final source capstone remain outstanding build milestones; bank availability is not mastery. Roberta PR #228 proposes autonomous source-grounded training but remains open/unaccepted.
+Roberta Learning System Phases 1-10 are accepted on Roberta `main`. Hardened Phase 10 verified retention is implemented, and exact active retained lessons can be classified as `verified_learned_knowledge` while all operational/source/live-state/CMIS-provider/governance/wallet/execution authority remains false.
 
-No Roberta Learning System, Pyramid, memory, policy, or human-review state overrides CMIS for freshness-sensitive facts or creates CMIS execution authority.
+Roberta PR #228 merged on 2026-08-26 and accepted the first end-to-end autonomous source-grounded Learning Plane controller. After explicit static-source selection, Roberta can bind immutable source provenance, create or resume a frozen source-mastery plan, generate and independently verify learning targets, publish deterministic curriculum banks, run canonical exams, remediate source-grounded weaknesses, verify closed-book retention and transfer, promote only narrowly verified curriculum-scoped concepts, preserve immutable failure evidence, resume safely, and run a final source capstone.
+
+Roberta's accepted *Mastering Blockchain, Fourth Edition* prebuilt banks reach Stage 8 / Market Structure. Stages 9-14 are not yet separately accepted prebuilt repository banks, though the accepted autonomous controller may generate missing later-stage banks at runtime under its validation contract. Bank availability is not mastery; final mastery requires every frozen required stage and capstone to pass in the authoritative ledger.
+
+No Roberta Learning System, autonomous Learning Plane, retained lesson, learned concept, Pyramid, memory, policy, or human-review state overrides CMIS for freshness-sensitive facts, promotes CMIS/provider trust, or creates CMIS execution authority.
 
 ## Engineering governance
 
@@ -314,6 +319,7 @@ docs/WALLET_RELATIONSHIP_EVIDENCE.md
 docs/CONCENTRATION_THRESHOLD_ALERT_EVIDENCE.md
 docs/PHASE_10_COMPLETION.md
 docs/PHASE_11_COMPLETION.md
+docs/PROJECT_STATUS_2026-08-26.md
 ROBERTA_CMIS_ACCEPTED_BASELINE.md
 ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md
 SCOUT_CMIS_INTEGRATION_CONTRACT.md
@@ -332,7 +338,7 @@ CMIS is an intelligence system, not an autonomous execution engine. It does not 
 - bridge value movement;
 - autonomous value movement.
 
-Human review in Roberta is a review boundary, not a reusable signing credential.
+Human review in Roberta is a review boundary, not a reusable signing credential. Learning or retention state is not a signing credential either.
 
 ## Identity migration
 
@@ -342,4 +348,4 @@ See [`docs/CMIS_IDENTITY_MIGRATION.md`](./docs/CMIS_IDENTITY_MIGRATION.md).
 
 ---
 
-**CMIS verifies. Chain Scouts investigate. Roberta coordinates and explains.**
+**CMIS verifies. Chain Scouts investigate. Roberta coordinates, learns within bounded rules, and explains.**
