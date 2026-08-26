@@ -23,10 +23,13 @@
 
 ## Roberta dependency/status context
 
-- Roberta's source-specific Pyramid architecture is accepted and its Mastering Blockchain 4e banks are now accepted through Stage 8 / Market Structure on Roberta `main`.
-- Roberta PR #228 proposes autonomous source-grounded training for later stages but remains open/unaccepted.
-- Learning/training state remains subordinate to fresh CMIS/provider evidence for freshness-sensitive facts and cannot alter CMIS trust or execution authority.
+- Roberta's source-specific Pyramid architecture is accepted and its Mastering Blockchain 4e banks are accepted through Stage 8 / Market Structure on Roberta `main`.
+- Roberta is formalizing its Learning System as a separate automated background **Learning Plane** with layered source intake, provenance, curriculum, training, examination, remediation, retention, and knowledge-promotion workers.
+- Roberta PR #228 proposes the first end-to-end autonomous source-grounded training controller for that plane but remains open/unaccepted.
+- Learning-plane knowledge uses explicit candidate -> verified learned -> separately gated operational states. No learning state becomes CMIS truth.
+- Fresh accepted CMIS/provider evidence remains authoritative over remembered/checkpointed or learned static material for freshness-sensitive facts.
+- The Learning Plane cannot alter CMIS capability contracts, provider authority, Scout-reliance promotion, risk/Proof Score semantics, or execution authority.
 
 ## Execution boundary
 
-Controlled transaction execution is unauthorized. No CMIS result, pre-trade `PASS`, alert, proof result, Scout report, Roberta policy decision, learning result, or human approval authorizes signing, broadcasting, custody, live trading/swaps, bridge transfer, or autonomous value movement.
+Controlled transaction execution is unauthorized. No CMIS result, pre-trade `PASS`, alert, proof result, Scout report, Roberta policy decision, learning result, retention result, operational-knowledge promotion, or human approval authorizes signing, broadcasting, custody, live trading/swaps, bridge transfer, or autonomous value movement.
