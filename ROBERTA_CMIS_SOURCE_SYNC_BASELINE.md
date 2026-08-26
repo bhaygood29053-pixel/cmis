@@ -2,6 +2,8 @@
 
 Last reconciled: 2026-08-25 (America/New_York)
 
+Merge verified: 2026-08-26 — paired Roberta PR #226 and CMIS PR #269 are merged on both `main` branches.
+
 This file is the compact cross-project synchronization baseline for source-of-truth documentation. It does not replace `ROBERTA_INTEGRATION_CONTRACT.md`, `ROBERTA_CMIS_ACCEPTED_BASELINE.md`, or `docs/CMIS_PRODUCT_ROADMAP.md`.
 
 ## Canonical authority path
