@@ -17,9 +17,16 @@
 - X1 provider-gap Issue #30 remains open under read-only/fail-closed contracts.
 - Draft PR #242 covers Warp Bridge provenance binding and does not establish accepted bridge capability.
 - Draft PR #229 covers bounded X1Scroll authenticated RPC access and does not establish accepted live provider capability without the required credential-backed evidence.
+- Draft PR #227 keeps FortiBlox at candidate/research status and does not promote it into CMIS.
 - Solana continues field-by-field maturity; it does not inherit X1 capabilities or promotion state.
 - There is no accepted next public alert/intelligence service or Scout-reliance promotion.
 
+## Roberta dependency/status context
+
+- Roberta's source-specific Pyramid architecture is accepted and its Mastering Blockchain 4e banks are now accepted through Stage 8 / Market Structure on Roberta `main`.
+- Roberta PR #228 proposes autonomous source-grounded training for later stages but remains open/unaccepted.
+- Learning/training state remains subordinate to fresh CMIS/provider evidence for freshness-sensitive facts and cannot alter CMIS trust or execution authority.
+
 ## Execution boundary
 
-Controlled transaction execution is unauthorized. No CMIS result, pre-trade `PASS`, alert, proof result, Scout report, Roberta policy decision, or human approval authorizes signing, broadcasting, custody, live trading/swaps, bridge transfer, or autonomous value movement.
+Controlled transaction execution is unauthorized. No CMIS result, pre-trade `PASS`, alert, proof result, Scout report, Roberta policy decision, learning result, or human approval authorizes signing, broadcasting, custody, live trading/swaps, bridge transfer, or autonomous value movement.
