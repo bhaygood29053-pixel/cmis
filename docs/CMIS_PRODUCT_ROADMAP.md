@@ -16,9 +16,9 @@ User / transport
 
 The repository began as Liquidity Scout. The `liquidity_scout` Python namespace remains a compatibility implementation detail; it is not a separate authority layer.
 
-Roberta owns orchestration/final synthesis. Chain Scouts own chain-specific planning/interpretation. CMIS owns deterministic verified facts, evidence, risk, capability eligibility, historical intelligence, and bounded analysis-only pre-trade calculations. Providers remain beneath CMIS.
+Roberta owns orchestration/final synthesis and bounded learning-workflow coordination. Chain Scouts own chain-specific planning/interpretation. CMIS owns deterministic verified facts, evidence, risk, capability eligibility, historical intelligence, and bounded analysis-only pre-trade calculations. Providers remain beneath CMIS.
 
-Fresh accepted CMIS/provider facts override remembered live values. Missing evidence remains unknown/unavailable and is never zero-filled. Risk remains separate from Proof Score.
+Fresh accepted CMIS/provider facts override remembered, retained, source-mastery, Pyramid, or conversational live values. Missing evidence remains unknown/unavailable and is never zero-filled. Risk remains separate from Proof Score.
 
 ## Current accepted roadmap state
 
@@ -37,6 +37,7 @@ Accepted milestones on `main`:
 - **CMIS capability contract: `1.9.0`.**
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
+- **Roberta autonomous Learning Plane upstream dependency: ACCEPTED on Roberta `main` via PR #228; post-merge Roberta source/roadmap reconciliation is accepted via PR #231.**
 - **Parallel X1 provider-gap work (#30): OPEN, read-only/fail-closed.**
 - **Controlled transaction execution: UNAUTHORIZED / not an active CMIS milestone.**
 
@@ -203,7 +204,8 @@ Core rules:
 8. Route/pool/provider/sample scope is not global asset scope.
 9. Chain provenance is never erased by cross-chain normalization.
 10. Inference requires a separately accepted contract.
-11. No autonomous execution by implication.
+11. Learning/retention state is not a provider-verification shortcut.
+12. No autonomous execution by implication.
 
 ## Pre-trade analysis
 
@@ -225,6 +227,16 @@ execution_authorized = false
 ```
 
 A `PASS` is not permission to trade.
+
+## Roberta Learning Plane dependency
+
+Roberta Learning System Phases 1-10 are accepted on Roberta `main`. Hardened Phase 10 verified retention is implemented under its narrow deterministic contract. Exact active retained lessons may be classified as `verified_learned_knowledge`, but the classification preserves `operational_trust_authorized=false`, `source_truth_authorized=false`, `live_state_authorized=false`, `cmis_provider_trust_authorized=false`, `governance_mutation_authorized=false`, `wallet_authorized=false`, and `execution_authorized=false`.
+
+Roberta PR #228 merged on 2026-08-26 and accepted the first end-to-end autonomous source-grounded Learning Plane controller. After explicit source selection, Roberta may bind immutable provenance, create/resume a frozen source plan, generate and independently verify source-grounded targets, publish deterministic exercise banks, run canonical source-stage exams, remediate failures, run separate closed-book retention and transfer checks, promote only curriculum-scoped verified concepts, preserve immutable failure evidence, resume safely from durable state, and run a final source capstone.
+
+For *Mastering Blockchain, Fourth Edition*, accepted prebuilt banks reach Stage 8 / Market Structure. Stages 9-14 are not yet separately accepted prebuilt repository banks, although the autonomous controller may generate missing banks at runtime under its validation contract. Bank availability is not mastery; the source is mastered only after every required frozen stage and the final capstone pass in the authoritative ledger.
+
+This Learning Plane is upstream reasoning/knowledge capability, not a new CMIS authority channel. Static learning state never overrides fresh accepted CMIS/provider evidence, never establishes source independence or provider trust, and never changes CMIS capability/promotion/risk/execution semantics.
 
 ## Product direction
 
@@ -282,22 +294,23 @@ Completed:
 8. deterministic descriptive classification with behavioral/ownership interpretation excluded;
 9. deterministic direct wallet-relationship evidence with explicit non-ownership semantics;
 10. deterministic concentration-threshold alert evidence foundation;
-11. paired Roberta #226 / CMIS #269 architecture/source-of-truth reconciliation.
+11. paired Roberta #226 / CMIS #269 architecture/source-of-truth reconciliation;
+12. reconcile CMIS documentation with accepted Roberta PR #228 / PR #231 Learning Plane state.
 
 Current parallel work:
 
-12. continue Issue #30 provider-gap hardening under read-only/fail-closed contracts;
-13. resolve/accept or close PR #242 based on exact Warp Bridge provenance evidence;
-14. resolve/accept or close PR #229 based on bounded X1Scroll credential-backed access evidence;
-15. resolve/accept or close PR #227 based on reproducible FortiBlox provider-contract evidence.
+13. continue Issue #30 provider-gap hardening under read-only/fail-closed contracts;
+14. resolve/accept or close PR #242 based on exact Warp Bridge provenance evidence;
+15. resolve/accept or close PR #229 based on bounded X1Scroll credential-backed access evidence;
+16. resolve/accept or close PR #227 based on reproducible FortiBlox provider-contract evidence.
 
 Future candidates — **not active milestones until separately accepted**:
 
-16. any public alert/Scout-reliance promotion;
-17. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-18. further field-by-field Solana maturity;
-19. Ethereum under an explicit capability/acceptance plan;
-20. investigation/evidence export and premium access.
+17. any public alert/Scout-reliance promotion;
+18. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+19. further field-by-field Solana maturity;
+20. Ethereum under an explicit capability/acceptance plan;
+21. investigation/evidence export and premium access.
 
 None authorizes execution.
 
@@ -316,21 +329,21 @@ Meaningful changes require:
 7. no merge while any required review axis is blocked;
 8. post-merge README/roadmap/source-of-truth reconciliation.
 
-The canonical evidence system remains the Evidence Receipt / Proof Score / provenance architecture. LLM judgment is not the trust root for CMIS fact/proof/risk/intelligence truth.
+The canonical evidence system remains the Evidence Receipt / Proof Score / provenance architecture. LLM judgment and Learning Plane state are not the trust root for CMIS fact/proof/risk/intelligence truth.
 
 ## Relationship to Roberta
 
 ```text
 CMIS verifies what the evidence supports.
 Chain Scouts investigate and interpret within their chain.
-Roberta coordinates and explains.
+Roberta coordinates, learns within bounded static-source rules, and explains.
 ```
 
-The paired Roberta #226 / CMIS #269 source-sync reconciliation is merged. Roberta's accepted Mastering Blockchain 4e exercise-bank construction now reaches Stage 8 / Market Structure; Stages 9-14 plus the final capstone remain outstanding. Roberta PR #228 proposes automated source-grounded training but remains open/unaccepted.
+The paired Roberta #226 / CMIS #269 source-sync reconciliation is merged. Roberta PR #228's autonomous Learning Plane and PR #231's post-merge source/roadmap synchronization are also merged on Roberta `main`. Roberta's accepted MB4E prebuilt bank construction reaches Stage 8 / Market Structure; Stages 9-14 plus the final capstone remain outstanding source-mastery work rather than prerequisites for the existence of the autonomous controller.
 
 Roberta may synthesize accepted CMIS results but must not recalculate CMIS truth/proof, silently upgrade inference to fact, collapse risk and evidence quality into one score, or treat internal non-promoted foundations as callable services.
 
-Roberta's Learning System, Pyramid training state, memory, policy, and human approval do not override CMIS for freshness-sensitive market/blockchain facts and do not authorize CMIS execution.
+Roberta's Learning System, autonomous Learning Plane, retained lessons, Pyramid training state, memory, policy, and human approval do not override CMIS for freshness-sensitive market/blockchain facts and do not authorize CMIS execution.
 
 ## Execution boundary
 
