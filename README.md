@@ -88,9 +88,12 @@ Closed research branches and failed verification attempts do not create provider
 Other current X1 provider-gap observations remain non-promotional:
 
 - the tested X1.Ninja SSE credential returned HTTP 403 / access denied;
-- **Issue #304 — holder semantics correction:** X1.Ninja holder-looking values, official X1 RPC token-account counts, and unique token-account-authority counts remain distinct evidence classes; raw provider `holders` values must not become verified asset-wide holder counts without counted-entity and coverage proof;
+- **Issue #304 — holder semantics correction: complete via PR #305.** X1.Ninja holder-looking values, official X1 RPC token-account counts, and unique token-account-authority counts remain distinct evidence classes; raw provider `holders` values do not become verified asset-wide holder counts without counted-entity and coverage proof;
 - those observations do not establish holder totals, wallet identity, beneficial ownership, provider completeness, or stream semantics;
 - Warp Bridge machine-readable operational state remains unavailable until an exact provenance-approved read contract is accepted.
+
+Current Solana field-maturity work:
+- **Issue #306 — observed-pair liquidity/volume aggregation:** CMIS deterministically totals only eligible unique DEX Screener pairs returned for the verified mint. The result remains explicitly observed-pair scoped; pair-universe completeness, Solana-wide liquidity/volume verification, and market-source independence remain false.
 
 ## Roberta-facing service surface
 
