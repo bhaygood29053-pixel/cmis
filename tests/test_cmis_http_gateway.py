@@ -98,7 +98,7 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.10.0")
+        self.assertEqual(response["contract_version"], "1.11.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
         self.assertEqual(len(response["supported_services"]), 11)
         self.assertIn("verification_evidence", response["supported_services"])
@@ -163,6 +163,12 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         x1_record = response["chains"]["x1"]
         x1 = x1_record["services"]
         solana = response["chains"]["solana"]["services"]
+        self.assertEqual(
+            x1["asset_lookup"]["identity_contract_version"],
+            "x1_asset_identity/v1",
+        )
+        self.assertTrue(x1["asset_lookup"]["exact_mint_normalization"])
+        self.assertTrue(x1["asset_lookup"]["metaplex_xdex_reconciliation"])
         self.assertEqual(x1["risk_check"]["state"], "supported")
         self.assertTrue(x1["risk_check"]["callable"])
         self.assertEqual(x1["pre_trade_check"]["state"], "bounded")
