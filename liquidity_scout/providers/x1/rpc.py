@@ -39,6 +39,21 @@ def _decimals(value):
     return parsed
 
 
+
+def _nonnegative_int(value):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _positive_limit(value, *, maximum=1000):
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"limit must be an integer from 1 to {maximum}.")
+    if value < 1 or value > maximum:
+        raise ValueError(f"limit must be an integer from 1 to {maximum}.")
+    return value
+
+
 def _token_amount(raw_supply, decimals):
     """Scale an RPC raw integer amount exactly, without float/Decimal rounding."""
     raw_supply = _text(raw_supply)
@@ -132,6 +147,105 @@ def rpc_request(
     raise X1RPCError(
         f"X1 RPC {method} failed after {retries} attempts: {last_error}"
     ) from last_error
+
+
+
+def parse_first_available_block_result(result):
+    """Parse getFirstAvailableBlock without implying archive completeness."""
+    first_available_block = _nonnegative_int(result)
+    if first_available_block is None:
+        return None
+
+    return {
+        "first_available_block": first_available_block,
+        "history_boundary_verified": True,
+        "archival_completeness_verified": False,
+        "source": "X1 RPC getFirstAvailableBlock",
+    }
+
+
+def parse_signatures_for_address_result(result, *, address=None):
+    """Normalize one getSignaturesForAddress page and fail closed on malformed rows."""
+    if not isinstance(result, list):
+        return None
+
+    normalized = []
+    for raw in result:
+        if not isinstance(raw, dict):
+            return None
+
+        signature = _text(raw.get("signature"))
+        slot = _nonnegative_int(raw.get("slot"))
+        if not signature or slot is None or "err" not in raw:
+            return None
+
+        block_time = raw.get("blockTime")
+        if block_time is not None:
+            if isinstance(block_time, bool) or not isinstance(block_time, (int, float)):
+                return None
+            if block_time < 0:
+                return None
+
+        normalized.append({
+            "address": _text(address) or None,
+            "signature": signature,
+            "slot": slot,
+            "err": raw.get("err"),
+            "block_time": block_time,
+            "confirmation_status": _text(raw.get("confirmationStatus")) or None,
+            "source": "X1 RPC getSignaturesForAddress",
+        })
+
+    return normalized
+
+
+def parse_block_result(result, *, slot):
+    """Parse the stable identity/timestamp fields needed by X1 history coverage."""
+    slot = _nonnegative_int(slot)
+    if slot is None:
+        raise ValueError("slot must be a non-negative integer.")
+
+    source = "X1 RPC getBlock"
+    if result is None:
+        return {
+            "slot": slot,
+            "block_available": False,
+            "identity_verified": False,
+            "blockhash": None,
+            "previous_blockhash": None,
+            "parent_slot": None,
+            "block_height": None,
+            "block_time": None,
+            "source": source,
+        }
+    if not isinstance(result, dict):
+        return None
+
+    blockhash = _text(result.get("blockhash"))
+    previous_blockhash = _text(result.get("previousBlockhash"))
+    parent_slot = _nonnegative_int(result.get("parentSlot"))
+    block_height = result.get("blockHeight")
+    block_time = result.get("blockTime")
+
+    if not blockhash or not previous_blockhash or parent_slot is None or parent_slot >= slot:
+        return None
+    if block_height is not None and _nonnegative_int(block_height) is None:
+        return None
+    if block_time is not None:
+        if isinstance(block_time, bool) or not isinstance(block_time, (int, float)) or block_time < 0:
+            return None
+
+    return {
+        "slot": slot,
+        "block_available": True,
+        "identity_verified": True,
+        "blockhash": blockhash,
+        "previous_blockhash": previous_blockhash,
+        "parent_slot": parent_slot,
+        "block_height": block_height,
+        "block_time": block_time,
+        "source": source,
+    }
 
 
 def parse_token_supply_result(result):
@@ -275,6 +389,201 @@ def parse_token_account_result(result, *, account=None):
     }
 
 
+
+def get_first_available_block(
+    *,
+    rpc_url=DEFAULT_X1_RPC_URL,
+    retries=4,
+    timeout=15,
+    post=requests.post,
+    sleep=time.sleep,
+):
+    """Return the earliest block currently exposed by the configured X1 RPC."""
+    result = rpc_request(
+        "getFirstAvailableBlock",
+        [],
+        rpc_url=rpc_url,
+        retries=retries,
+        timeout=timeout,
+        post=post,
+        sleep=sleep,
+    )
+    parsed = parse_first_available_block_result(result)
+    if parsed is None:
+        raise X1RPCError("X1 RPC getFirstAvailableBlock returned a malformed result.")
+    return parsed
+
+
+def get_signatures_for_address(
+    address,
+    *,
+    before=None,
+    limit=1000,
+    rpc_url=DEFAULT_X1_RPC_URL,
+    retries=4,
+    timeout=15,
+    post=requests.post,
+    sleep=time.sleep,
+):
+    """Return one verified page of X1 address history, newest to oldest."""
+    address = _text(address)
+    if not address:
+        raise ValueError("Address is required.")
+    limit = _positive_limit(limit)
+
+    options = {"limit": limit}
+    if before is not None:
+        before = _text(before)
+        if not before:
+            raise ValueError("before must be a non-empty transaction signature.")
+        options["before"] = before
+
+    result = rpc_request(
+        "getSignaturesForAddress",
+        [address, options],
+        rpc_url=rpc_url,
+        retries=retries,
+        timeout=timeout,
+        post=post,
+        sleep=sleep,
+    )
+    parsed = parse_signatures_for_address_result(result, address=address)
+    if parsed is None:
+        raise X1RPCError("X1 RPC getSignaturesForAddress returned malformed history.")
+    return parsed
+
+
+def get_block_time(
+    slot,
+    *,
+    rpc_url=DEFAULT_X1_RPC_URL,
+    retries=4,
+    timeout=15,
+    post=requests.post,
+    sleep=time.sleep,
+):
+    """Return an X1 block timestamp while preserving an unavailable timestamp."""
+    slot = _nonnegative_int(slot)
+    if slot is None:
+        raise ValueError("slot must be a non-negative integer.")
+
+    result = rpc_request(
+        "getBlockTime",
+        [slot],
+        rpc_url=rpc_url,
+        retries=retries,
+        timeout=timeout,
+        post=post,
+        sleep=sleep,
+    )
+    if result is None:
+        return {
+            "slot": slot,
+            "block_time": None,
+            "block_time_verified": False,
+            "source": "X1 RPC getBlockTime",
+        }
+    if isinstance(result, bool) or not isinstance(result, (int, float)) or result < 0:
+        raise X1RPCError("X1 RPC getBlockTime returned a malformed result.")
+
+    return {
+        "slot": slot,
+        "block_time": result,
+        "block_time_verified": True,
+        "source": "X1 RPC getBlockTime",
+    }
+
+
+def get_block(
+    slot,
+    *,
+    rpc_url=DEFAULT_X1_RPC_URL,
+    retries=4,
+    timeout=15,
+    post=requests.post,
+    sleep=time.sleep,
+):
+    """Return verified X1 historical block identity fields for one slot."""
+    slot = _nonnegative_int(slot)
+    if slot is None:
+        raise ValueError("slot must be a non-negative integer.")
+
+    result = rpc_request(
+        "getBlock",
+        [
+            slot,
+            {
+                "commitment": "finalized",
+                "transactionDetails": "none",
+                "rewards": False,
+                "maxSupportedTransactionVersion": 0,
+            },
+        ],
+        rpc_url=rpc_url,
+        retries=retries,
+        timeout=timeout,
+        post=post,
+        sleep=sleep,
+    )
+    parsed = parse_block_result(result, slot=slot)
+    if parsed is None:
+        raise X1RPCError("X1 RPC getBlock returned a malformed result.")
+    return parsed
+
+
+def get_parsed_transactions(
+    signatures,
+    *,
+    rpc_url=DEFAULT_X1_RPC_URL,
+    retries=4,
+    timeout=15,
+    post=requests.post,
+    sleep=time.sleep,
+):
+    """Fetch parsed transactions using the canonical getTransaction RPC method.
+
+    Solana-compatible JSON-RPC does not expose a getParsedTransactions method;
+    web3.js implements that convenience API by issuing getTransaction requests.
+    This facade preserves that behavior without inventing a non-existent RPC.
+    """
+    if isinstance(signatures, (str, bytes)) or not isinstance(signatures, (list, tuple)):
+        raise ValueError("signatures must be a list or tuple of transaction signatures.")
+
+    normalized = []
+    for raw_signature in signatures:
+        signature = _text(raw_signature)
+        if not signature:
+            raise ValueError("signatures must contain only non-empty transaction signatures.")
+
+        result = rpc_request(
+            "getTransaction",
+            [
+                signature,
+                {
+                    "encoding": "jsonParsed",
+                    "commitment": "confirmed",
+                    "maxSupportedTransactionVersion": 0,
+                },
+            ],
+            rpc_url=rpc_url,
+            retries=retries,
+            timeout=timeout,
+            post=post,
+            sleep=sleep,
+        )
+        if result is not None and not isinstance(result, dict):
+            raise X1RPCError("X1 RPC getTransaction returned a malformed result.")
+
+        normalized.append({
+            "signature": signature,
+            "transaction_available": result is not None,
+            "transaction": result,
+            "source": "X1 RPC getTransaction(jsonParsed)",
+        })
+
+    return normalized
+
+
 def get_token_supply(
     mint,
     *,
@@ -399,6 +708,57 @@ class X1RPCProvider:
             sleep=self.sleep,
         )
 
+    def get_first_available_block(self):
+        return get_first_available_block(
+            rpc_url=self.rpc_url,
+            retries=self.retries,
+            timeout=self.timeout,
+            post=self.post,
+            sleep=self.sleep,
+        )
+
+    def get_signatures_for_address(self, address, *, before=None, limit=1000):
+        return get_signatures_for_address(
+            address,
+            before=before,
+            limit=limit,
+            rpc_url=self.rpc_url,
+            retries=self.retries,
+            timeout=self.timeout,
+            post=self.post,
+            sleep=self.sleep,
+        )
+
+    def get_block_time(self, slot):
+        return get_block_time(
+            slot,
+            rpc_url=self.rpc_url,
+            retries=self.retries,
+            timeout=self.timeout,
+            post=self.post,
+            sleep=self.sleep,
+        )
+
+    def get_block(self, slot):
+        return get_block(
+            slot,
+            rpc_url=self.rpc_url,
+            retries=self.retries,
+            timeout=self.timeout,
+            post=self.post,
+            sleep=self.sleep,
+        )
+
+    def get_parsed_transactions(self, signatures):
+        return get_parsed_transactions(
+            signatures,
+            rpc_url=self.rpc_url,
+            retries=self.retries,
+            timeout=self.timeout,
+            post=self.post,
+            sleep=self.sleep,
+        )
+
     def get_token_supply(self, mint):
         return get_token_supply(
             mint,
@@ -436,10 +796,18 @@ __all__ = [
     "RPC_SOURCE",
     "X1RPCError",
     "X1RPCProvider",
+    "get_block",
+    "get_block_time",
+    "get_first_available_block",
     "get_mint_info",
+    "get_parsed_transactions",
+    "get_signatures_for_address",
     "get_token_account_info",
     "get_token_supply",
+    "parse_block_result",
+    "parse_first_available_block_result",
     "parse_mint_account_result",
+    "parse_signatures_for_address_result",
     "parse_token_account_result",
     "parse_token_supply_result",
     "rpc_request",
