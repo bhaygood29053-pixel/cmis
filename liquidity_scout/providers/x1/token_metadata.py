@@ -21,10 +21,11 @@ from typing import Any, Callable
 from liquidity_scout.providers.x1.rpc import DEFAULT_X1_RPC_URL, rpc_request
 
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 CHAIN = "x1"
 SOURCE = "X1 RPC / Metaplex Token Metadata"
 TOKEN_METADATA_PROGRAM_ID = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+TOKEN_METADATA_EXPECTED_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111"
 METADATA_ACCOUNT_KEY = 4
 METADATA_MINT_OFFSET = 33
 MAX_NAME_LENGTH = 32
@@ -258,6 +259,9 @@ def parse_token_metadata_program_account_result(
         if isinstance(context, Mapping)
         else None
     )
+    if context_slot is None:
+        raise ValueError("Token Metadata program response context slot is unavailable")
+
     value = result.get("value")
     if value is None:
         return {
@@ -277,13 +281,20 @@ def parse_token_metadata_program_account_result(
     if not isinstance(executable, bool):
         raise ValueError("Token Metadata program executable flag is malformed")
 
+    loader_owner = _text(value.get("owner"))
+    loader_owner_verified = loader_owner == TOKEN_METADATA_EXPECTED_LOADER
+
     return {
         "program_id": program_id,
         "program_exists": True,
         "executable": executable,
-        "loader_owner": _text(value.get("owner")),
+        "loader_owner": loader_owner,
+        "loader_owner_verified": loader_owner_verified,
         "context_slot": context_slot,
-        "program_executable_verified": executable is True,
+        "context_slot_verified": True,
+        "program_executable_verified": bool(
+            executable is True and loader_owner_verified
+        ),
         "source": SOURCE,
     }
 
@@ -303,13 +314,18 @@ def parse_metadata_accounts_result(
     if not program_id:
         raise ValueError("program_id is required")
 
-    rows = result
-    context_slot = None
-    if isinstance(result, Mapping) and "value" in result:
-        rows = result.get("value")
-        context = result.get("context")
-        if isinstance(context, Mapping):
-            context_slot = _nonnegative_int(context.get("slot"))
+    if not isinstance(result, Mapping) or "value" not in result:
+        raise ValueError("getProgramAccounts returned no context-bound metadata result")
+
+    rows = result.get("value")
+    context = result.get("context")
+    context_slot = (
+        _nonnegative_int(context.get("slot"))
+        if isinstance(context, Mapping)
+        else None
+    )
+    if context_slot is None:
+        raise ValueError("metadata account response context slot is unavailable")
 
     if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
         raise ValueError("getProgramAccounts returned no usable metadata account list")
@@ -320,6 +336,7 @@ def parse_metadata_accounts_result(
             "metadata_found": False,
             "metadata_account": None,
             "context_slot": context_slot,
+            "context_slot_verified": True,
             "identity_verified": False,
             "program_id": program_id,
             "source": SOURCE,
@@ -357,6 +374,7 @@ def parse_metadata_accounts_result(
         "account_owner": owner,
         "account_executable": False,
         "context_slot": context_slot,
+        "context_slot_verified": True,
         "identity_verified": True,
         "program_id": program_id,
         "source": SOURCE,
@@ -432,7 +450,7 @@ def get_token_metadata_for_mint(
         requester=requester,
     )
     if program.get("program_executable_verified") is not True:
-        raise ValueError("Token Metadata program is missing or non-executable")
+        raise ValueError("Token Metadata program identity is not verified")
 
     config = {
         "encoding": "base64",
@@ -520,6 +538,7 @@ __all__ = [
     "CHAIN",
     "METADATA_MINT_OFFSET",
     "SOURCE",
+    "TOKEN_METADATA_EXPECTED_LOADER",
     "TOKEN_METADATA_PROGRAM_ID",
     "TOKEN_STANDARD_NAMES",
     "VERSION",
