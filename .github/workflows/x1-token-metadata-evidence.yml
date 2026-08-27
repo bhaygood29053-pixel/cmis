@@ -1,0 +1,74 @@
+name: X1 Token Metadata Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  token-metadata-rpc-probe:
+    name: Read-only X1 Token Metadata verification
+    if: github.head_ref == 'feature/x1-token-metadata-evidence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run deterministic Token Metadata tests
+        run: |
+          python -m unittest tests.test_x1_token_metadata -v
+
+      - name: Run live read-only X1 Token Metadata probe
+        id: live_probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python cmis_x1_token_metadata_probe.py \
+            --mint DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb \
+            --output x1-token-metadata-evidence.json \
+            | tee x1-token-metadata-evidence.log
+
+      - name: Upload sanitized Token Metadata evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-token-metadata-evidence-${{ github.run_id }}
+          path: |
+            x1-token-metadata-evidence.json
+            x1-token-metadata-evidence.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce live verification result
+        if: steps.live_probe.outcome != 'success'
+        run: |
+          echo "X1 Token Metadata live verification did not pass."
+          exit 1
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1 JSON-RPC getAccountInfo/getProgramAccounts requests only."
+          echo "The exact-mint program-account query is bound to metadata mint offset 33."
+          echo "Metadata identity does not verify SPL mint/freeze authority, market quality, or risk."
+          echo "No transaction construction, signing, broadcasting, custody, trading, or value movement."
+          echo "No CMIS public-service, Scout-reliance, Proof Score, risk, or execution authority is promoted."
