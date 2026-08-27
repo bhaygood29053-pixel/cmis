@@ -116,7 +116,8 @@ mode = window
   -> existing metric + explicit 24h / 7d / 30d comparison
 
 mode = all_available
-  -> summarize every verified observation currently stored by CMIS for one asset
+  -> summarize every verified observation stored by CMIS for one asset,
+     including bounded verified provider price backfill when available
 
 mode = all_available_pair
   -> compare two assets only over their overlapping verified CMIS history
@@ -129,7 +130,7 @@ full_asset_lifetime_verified = false
 continuous_coverage_verified = false
 ```
 
-until separate evidence proves those stronger claims. X1.Ninja OHLCV, archive-provider history, or other external historical sources are not silently promoted into this mode merely because transport exists. Pair mode requires a second exact asset and aligned overlapping anchors within the explicit tolerance policy.
+until separate evidence proves those stronger claims. X1 now permits a narrow provider-price backfill only when XDEX close observations are cross-checked against the matching X1.Ninja OHLCV pair and timestamp/interval scope, then stored with explicit provenance. The backfill is price-only; liquidity and volume are not imported. Provider source independence, archive completeness, continuous coverage, and historical USD-stable peg behavior remain unverified. Pair mode requires a second exact asset and aligned overlapping anchors within the explicit tolerance policy.
 
 ## Chain boundary
 
