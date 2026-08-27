@@ -179,6 +179,7 @@ class RuntimeCMISGateway(
         if not callable(self.xdex_route_resolver):
             raise ValueError("xdex_route_resolver must be callable when supplied")
 
+        kwargs.setdefault("auto_record_history", True)
         super().__init__(verification_evidence_ledger=verification_ledger, **kwargs)
 
 

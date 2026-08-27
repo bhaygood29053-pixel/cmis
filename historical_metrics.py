@@ -19,8 +19,10 @@ METRIC_COLUMNS = {
     "price": "price",
     "liquidity": "liquidity",
     "volume": "volume24",
+    "transactions": "transactions24",
     "holders": "holders",
     "supply": "total_supply",
+    "pool_count": "pool_count",
 }
 
 
@@ -187,9 +189,17 @@ def open_db():
             volume24 REAL,
             holders REAL,
             total_supply REAL,
-            pool_count INTEGER
+            pool_count INTEGER,
+            transactions24 REAL
         )
     """)
+
+    columns = {
+        row[1]
+        for row in db.execute("PRAGMA table_info(snapshots)").fetchall()
+    }
+    if "transactions24" not in columns:
+        db.execute("ALTER TABLE snapshots ADD COLUMN transactions24 REAL")
 
     db.execute("""
         CREATE INDEX IF NOT EXISTS idx_snapshots_mint_ts
@@ -209,6 +219,8 @@ def record_snapshot(
     holders=None,
     total_supply=None,
     pool_count=None,
+    transactions24=None,
+    timestamp=None,
 ):
     if not mint:
         return
@@ -226,20 +238,22 @@ def record_snapshot(
             volume24,
             holders,
             total_supply,
-            pool_count
+            pool_count,
+            transactions24
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             mint,
             symbol,
-            int(time.time()),
+            int(time.time()) if timestamp is None else int(timestamp),
             price,
             liquidity,
             volume24,
             holders,
             total_supply,
             pool_count,
+            transactions24,
         ),
     )
 
@@ -304,6 +318,146 @@ def historical_value(mint, metric, period_seconds):
     return {
         "timestamp": int(ts),
         "value": float(value),
+    }
+
+
+
+def latest_snapshot_time(mint):
+    db = open_db()
+
+    row = db.execute(
+        """
+        SELECT MAX(ts)
+        FROM snapshots
+        WHERE mint = ?
+        """,
+        (mint,),
+    ).fetchone()
+
+    db.close()
+
+    if not row or row[0] is None:
+        return None
+
+    return int(row[0])
+
+
+def record_snapshot_if_due(
+    *,
+    mint,
+    symbol,
+    price=None,
+    liquidity=None,
+    volume24=None,
+    holders=None,
+    total_supply=None,
+    pool_count=None,
+    transactions24=None,
+    timestamp=None,
+    min_interval_seconds=300,
+):
+    """Persist a verified observation without creating high-frequency duplicates."""
+
+    if not mint:
+        return False
+
+    observed_at = int(time.time()) if timestamp is None else int(timestamp)
+    latest = latest_snapshot_time(mint)
+    if (
+        latest is not None
+        and min_interval_seconds is not None
+        and int(min_interval_seconds) > 0
+        and observed_at - latest < int(min_interval_seconds)
+    ):
+        return False
+
+    record_snapshot(
+        mint=mint,
+        symbol=symbol,
+        price=price,
+        liquidity=liquidity,
+        volume24=volume24,
+        holders=holders,
+        total_supply=total_supply,
+        pool_count=pool_count,
+        transactions24=transactions24,
+        timestamp=observed_at,
+    )
+    return True
+
+
+def historical_series(mint, metric, *, start_ts=None, end_ts=None):
+    """Return every locally stored verified observation for one metric."""
+
+    column = METRIC_COLUMNS.get(metric)
+    if not column:
+        return []
+
+    clauses = ["mint = ?", f"{column} IS NOT NULL"]
+    params = [mint]
+
+    if start_ts is not None:
+        clauses.append("ts >= ?")
+        params.append(int(start_ts))
+    if end_ts is not None:
+        clauses.append("ts <= ?")
+        params.append(int(end_ts))
+
+    db = open_db()
+    rows = db.execute(
+        f"""
+        SELECT ts, {column}
+        FROM snapshots
+        WHERE {" AND ".join(clauses)}
+        ORDER BY ts ASC, id ASC
+        """,
+        tuple(params),
+    ).fetchall()
+    db.close()
+
+    return [
+        {"timestamp": int(ts), "value": float(value)}
+        for ts, value in rows
+        if value is not None
+    ]
+
+
+def historical_value_at(mint, metric, target_timestamp, *, tolerance_seconds=21600):
+    """Return the closest stored observation to an explicit target time."""
+
+    column = METRIC_COLUMNS.get(metric)
+    if not column or target_timestamp is None:
+        return None
+
+    target = int(target_timestamp)
+    tolerance = max(0, int(tolerance_seconds))
+
+    db = open_db()
+    row = db.execute(
+        f"""
+        SELECT ts, {column}
+        FROM snapshots
+        WHERE mint = ?
+          AND {column} IS NOT NULL
+        ORDER BY ABS(ts - ?) ASC, ts ASC
+        LIMIT 1
+        """,
+        (mint, target),
+    ).fetchone()
+    db.close()
+
+    if not row:
+        return None
+
+    ts, value = row
+    if abs(int(ts) - target) > tolerance:
+        return None
+
+    return {
+        "timestamp": int(ts),
+        "value": float(value),
+        "target_timestamp": target,
+        "distance_seconds": abs(int(ts) - target),
     }
 
 

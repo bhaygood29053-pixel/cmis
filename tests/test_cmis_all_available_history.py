@@ -1,0 +1,270 @@
+import unittest
+
+from liquidity_scout.services import (
+    PARTIAL,
+    UNAVAILABLE,
+    build_all_available_history_profile,
+    build_all_available_pair_comparison,
+    build_historical_compare_response,
+)
+
+
+class FakeHistory:
+    def __init__(self, series=None):
+        self.series = {
+            (mint, metric): [dict(item) for item in rows]
+            for (mint, metric), rows in (series or {}).items()
+        }
+
+    def record_snapshot_if_due(self, **kwargs):
+        mint = kwargs["mint"]
+        ts = kwargs.get("timestamp")
+        if ts is None:
+            return False
+        mapping = {
+            "price": "price",
+            "liquidity": "liquidity",
+            "volume": "volume24",
+            "transactions": "transactions24",
+            "holders": "holders",
+            "supply": "total_supply",
+        }
+        for metric, field in mapping.items():
+            value = kwargs.get(field)
+            if value is None:
+                continue
+            rows = self.series.setdefault((mint, metric), [])
+            point = {"timestamp": int(ts), "value": float(value)}
+            if point not in rows:
+                rows.append(point)
+                rows.sort(key=lambda item: item["timestamp"])
+        return True
+
+    def historical_series(self, mint, metric, *, start_ts=None, end_ts=None):
+        rows = [dict(item) for item in self.series.get((mint, metric), [])]
+        if start_ts is not None:
+            rows = [item for item in rows if item["timestamp"] >= int(start_ts)]
+        if end_ts is not None:
+            rows = [item for item in rows if item["timestamp"] <= int(end_ts)]
+        return rows
+
+    def historical_value_at(self, mint, metric, target_timestamp, *, tolerance_seconds=21600):
+        rows = self.historical_series(mint, metric)
+        if not rows:
+            return None
+        target = int(target_timestamp)
+        row = min(rows, key=lambda item: abs(item["timestamp"] - target))
+        distance = abs(row["timestamp"] - target)
+        if distance > int(tolerance_seconds):
+            return None
+        return {
+            "timestamp": row["timestamp"],
+            "value": row["value"],
+            "target_timestamp": target,
+            "distance_seconds": distance,
+        }
+
+    @staticmethod
+    def percent_change(old_value, new_value):
+        if old_value == 0:
+            return None
+        return ((float(new_value) - float(old_value)) / float(old_value)) * 100.0
+
+
+def snapshot(
+    symbol,
+    mint,
+    *,
+    observed_at,
+    price,
+    liquidity=1000.0,
+    volume=100.0,
+    transactions=25,
+    holders=10,
+):
+    return {
+        "_market_report": {
+            "symbol": symbol,
+            "mint": mint,
+            "price_usd": price,
+            "liquidity_usd": liquidity,
+            "volume_24h_usd": volume,
+            "transactions_24h": transactions,
+            "holders": holders,
+            "lp_count": 2,
+            "completeness": {
+                "price": True,
+                "liquidity": True,
+                "volume_24h": True,
+                "transactions_24h": True,
+                "holders": True,
+            },
+            "provenance": {
+                "source": "X1.Ninja/XDEX",
+                "catalog_last_refresh_unix": observed_at,
+            },
+        }
+    }
+
+
+class AllAvailableHistoryTests(unittest.TestCase):
+    def test_profile_summarizes_every_stored_verified_observation_without_claiming_lifetime(self):
+        history = FakeHistory(
+            {
+                ("AGI_MINT", "price"): [
+                    {"timestamp": 1000, "value": 1.0},
+                    {"timestamp": 2000, "value": 2.0},
+                ],
+                ("AGI_MINT", "liquidity"): [
+                    {"timestamp": 1000, "value": 100.0},
+                    {"timestamp": 2000, "value": 200.0},
+                ],
+            }
+        )
+
+        profile = build_all_available_history_profile(
+            snapshot(
+                "AGI",
+                "AGI_MINT",
+                observed_at=4000,
+                price=1.5,
+                liquidity=150.0,
+            ),
+            history_backend=history,
+            metrics=["price", "liquidity"],
+            gap_threshold_seconds=1500,
+        )
+
+        self.assertEqual(profile["status"], "partial")
+        self.assertEqual(profile["mode"], "all_available")
+        self.assertEqual(
+            profile["coverage_scope"],
+            "cmis_stored_verified_observations",
+        )
+        self.assertFalse(profile["full_asset_lifetime_verified"])
+        self.assertFalse(profile["continuous_coverage_verified"])
+        self.assertEqual(profile["first_verified_observed_at"], 1000)
+        self.assertEqual(profile["last_verified_observed_at"], 4000)
+
+        price = profile["metrics"]["price"]
+        self.assertEqual(price["observation_count"], 3)
+        self.assertEqual(price["first_value"], 1.0)
+        self.assertEqual(price["last_value"], 1.5)
+        self.assertEqual(price["total_change_pct"], 50.0)
+        self.assertEqual(price["maximum_value"], 2.0)
+        self.assertEqual(price["sampled_max_drawdown_pct"], -25.0)
+        self.assertEqual(price["observed_gap_count"], 1)
+
+        liquidity = profile["metrics"]["liquidity"]
+        self.assertEqual(liquidity["total_change_pct"], 50.0)
+        self.assertIsNone(liquidity["sampled_max_drawdown_pct"])
+
+    def test_cmis_wrapper_returns_partial_with_explicit_lifetime_warning(self):
+        history = FakeHistory(
+            {
+                ("AGI_MINT", "price"): [
+                    {"timestamp": 1000, "value": 1.0},
+                    {"timestamp": 2000, "value": 2.0},
+                ]
+            }
+        )
+
+        response = build_historical_compare_response(
+            None,
+            snapshot("AGI", "AGI_MINT", observed_at=3000, price=3.0),
+            history_backend=history,
+            mode="all_available",
+            metrics=["price"],
+        )
+
+        self.assertEqual(response["service"], "historical_compare")
+        self.assertEqual(response["status"], PARTIAL)
+        self.assertEqual(response["data"]["mode"], "all_available")
+        self.assertFalse(response["confidence"]["complete"])
+        warning_codes = {item["code"] for item in response["warnings"]}
+        self.assertIn("asset_lifetime_coverage_unverified", warning_codes)
+        self.assertIn(
+            "all_available_means_all_verified_observations_currently_stored_by_cmis",
+            warning_codes,
+        )
+
+    def test_pair_comparison_uses_only_overlapping_verified_window(self):
+        history = FakeHistory(
+            {
+                ("XNT_MINT", "price"): [
+                    {"timestamp": 1000, "value": 1.0},
+                    {"timestamp": 2000, "value": 1.5},
+                ],
+                ("ANL_MINT", "price"): [
+                    {"timestamp": 2000, "value": 10.0},
+                    {"timestamp": 3000, "value": 8.0},
+                ],
+            }
+        )
+
+        comparison = build_all_available_pair_comparison(
+            snapshot("XNT", "XNT_MINT", observed_at=4000, price=2.0),
+            snapshot("ANL", "ANL_MINT", observed_at=4000, price=5.0),
+            history_backend=history,
+            metrics=["price"],
+            anchor_tolerance_seconds=1,
+        )
+
+        self.assertEqual(comparison["status"], "partial")
+        self.assertFalse(comparison["full_asset_lifetime_verified"])
+        price = comparison["common_window_metrics"]["price"]
+        self.assertEqual(price["status"], "ok")
+        self.assertEqual(price["start_observed_at"], 2000)
+        self.assertEqual(price["end_observed_at"], 4000)
+        self.assertAlmostEqual(price["primary_change_pct"], 33.3333333333)
+        self.assertEqual(price["secondary_change_pct"], -50.0)
+        self.assertAlmostEqual(
+            price["performance_difference_pct_points"],
+            83.3333333333,
+        )
+
+    def test_pair_comparison_fails_closed_without_aligned_common_anchors(self):
+        history = FakeHistory(
+            {
+                ("A", "price"): [
+                    {"timestamp": 1000, "value": 1.0},
+                    {"timestamp": 4000, "value": 2.0},
+                ],
+                ("B", "price"): [
+                    {"timestamp": 2500, "value": 10.0},
+                    {"timestamp": 4000, "value": 5.0},
+                ],
+            }
+        )
+
+        comparison = build_all_available_pair_comparison(
+            snapshot("A", "A", observed_at=4000, price=2.0),
+            snapshot("B", "B", observed_at=4000, price=5.0),
+            history_backend=history,
+            metrics=["price"],
+            anchor_tolerance_seconds=100,
+        )
+
+        self.assertEqual(comparison["status"], UNAVAILABLE)
+        self.assertEqual(
+            comparison["common_window_metrics"]["price"]["reason"],
+            "aligned_common_window_anchors_unavailable",
+        )
+
+    def test_invalid_mode_is_explicit_error(self):
+        response = build_historical_compare_response(
+            None,
+            snapshot("AGI", "AGI_MINT", observed_at=3000, price=3.0),
+            history_backend=FakeHistory(),
+            mode="everything_forever",
+        )
+
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(
+            response["errors"][0]["code"],
+            "historical_mode_invalid",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

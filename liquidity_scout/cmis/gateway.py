@@ -80,11 +80,13 @@ class CMISGateway:
         x1_supply_provider: Optional[X1SupplyProvider] = None,
         history_backend: Any = None,
         asset_registry: Optional[AssetRegistry] = None,
+        auto_record_history: bool = False,
     ):
         self.x1_market_provider = x1_market_provider or X1Provider()
         self.x1_supply_provider = x1_supply_provider or X1SupplyProvider()
         self.history_backend = history_backend or default_history_backend
         self.asset_registry = asset_registry or DEFAULT_ASSET_REGISTRY
+        self.auto_record_history = bool(auto_record_history)
 
     @staticmethod
     def _text(value: Any) -> Optional[str]:
@@ -311,7 +313,70 @@ class CMISGateway:
                 provider_asset=response.get("asset"),
                 role="market",
             )
+        self._persist_verified_market_observation(response)
         return response
+
+    def _persist_verified_market_observation(
+        self,
+        market_envelope: Mapping[str, Any],
+    ) -> None:
+        """Persist bounded verified market facts for future historical analysis."""
+
+        if not getattr(self, "auto_record_history", False):
+            return
+
+        data = market_envelope.get("data")
+        if not isinstance(data, Mapping):
+            return
+
+        completeness = data.get("completeness")
+        if not isinstance(completeness, Mapping):
+            return
+
+        mint = self._text(data.get("mint"))
+        symbol = self._text(data.get("symbol")) or "Unknown"
+        if not mint:
+            return
+
+        provenance = data.get("provenance")
+        observed_at = (
+            provenance.get("catalog_last_refresh_unix")
+            if isinstance(provenance, Mapping)
+            else None
+        )
+
+        writer = getattr(self.history_backend, "record_snapshot_if_due", None)
+        if not callable(writer):
+            return
+
+        writer(
+            mint=mint,
+            symbol=symbol,
+            price=data.get("price_usd") if completeness.get("price") is True else None,
+            liquidity=(
+                data.get("liquidity_usd")
+                if completeness.get("liquidity") is True
+                else None
+            ),
+            volume24=(
+                data.get("volume_24h_usd")
+                if completeness.get("volume_24h") is True
+                else None
+            ),
+            transactions24=(
+                data.get("transactions_24h")
+                if completeness.get("transactions_24h") is True
+                else None
+            ),
+            holders=(
+                data.get("holders")
+                if completeness.get("holders") is True
+                else None
+            ),
+            pool_count=data.get("lp_count"),
+            timestamp=observed_at,
+        )
+
 
     def _rank(self, params: Mapping[str, Any]) -> Dict[str, Any]:
         catalog, failure = self._collect_x1_catalog("rank")
@@ -448,12 +513,27 @@ class CMISGateway:
         self,
         question: Any,
         market_envelope: Mapping[str, Any],
+        *,
+        mode: str = "window",
+        compare_market_envelope: Mapping[str, Any] | None = None,
+        metrics: Any = None,
+        gap_threshold_seconds: int = 129600,
+        anchor_tolerance_seconds: int = 21600,
     ) -> Dict[str, Any]:
         market_data = market_envelope.get("data")
         if not isinstance(market_data, Mapping):
             return self._propagate_upstream("historical_compare", market_envelope)
 
         snapshot = {"_market_report": dict(market_data)}
+        compare_snapshot = None
+        if isinstance(compare_market_envelope, Mapping):
+            compare_data = compare_market_envelope.get("data")
+            if not isinstance(compare_data, Mapping):
+                return self._propagate_upstream(
+                    "historical_compare",
+                    compare_market_envelope,
+                )
+            compare_snapshot = {"_market_report": dict(compare_data)}
 
         def current_total_supply(mint: str):
             tokenomics = build_tokenomics_response(mint, chain="x1")
@@ -469,6 +549,11 @@ class CMISGateway:
             get_total_supply=current_total_supply,
             chain="x1",
             observed_at=market_envelope.get("observed_at"),
+            mode=mode,
+            compare_snapshot=compare_snapshot,
+            metrics=metrics,
+            gap_threshold_seconds=gap_threshold_seconds,
+            anchor_tolerance_seconds=anchor_tolerance_seconds,
         )
 
     def _historical_compare(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:
@@ -477,7 +562,66 @@ class CMISGateway:
         if market.get("status") in {ERROR, UNAVAILABLE, AMBIGUOUS}:
             return self._propagate_upstream("historical_compare", market)
 
-        response = self._historical_from_market(params.get("question"), market)
+        compare_market = None
+        compare_asset = self._text(params.get("compare_asset"))
+        explicit_mode = self._text(params.get("mode"))
+        if explicit_mode:
+            mode = explicit_mode.lower()
+        else:
+            question_text = (self._text(params.get("question")) or "").lower()
+            all_history_terms = (
+                "entire history",
+                "full history",
+                "all history",
+                "all available history",
+                "since inception",
+                "since launch",
+                "lifetime history",
+                "whole history",
+            )
+            if any(term in question_text for term in all_history_terms):
+                mode = "all_available_pair" if compare_asset else "all_available"
+            else:
+                mode = "window"
+
+        if mode == "all_available_pair":
+            compare_asset = self._text(params.get("compare_asset"))
+            if not compare_asset:
+                return self._gateway_error(
+                    "historical_compare",
+                    "x1",
+                    "compare_asset_required",
+                    "params.compare_asset is required for all_available_pair.",
+                )
+            compare_market = self._market_report(compare_asset)
+            if compare_market.get("status") in {ERROR, UNAVAILABLE, AMBIGUOUS}:
+                return self._propagate_upstream("historical_compare", compare_market)
+
+        gap_threshold = params.get("gap_threshold_seconds", 129600)
+        anchor_tolerance = params.get("anchor_tolerance_seconds", 21600)
+        try:
+            gap_threshold = max(0, int(gap_threshold))
+            anchor_tolerance = max(0, int(anchor_tolerance))
+        except (TypeError, ValueError):
+            return self._gateway_error(
+                "historical_compare",
+                "x1",
+                "invalid_historical_tolerance",
+                (
+                    "gap_threshold_seconds and anchor_tolerance_seconds must be "
+                    "non-negative integers."
+                ),
+            )
+
+        response = self._historical_from_market(
+            params.get("question"),
+            market,
+            mode=mode,
+            compare_market_envelope=compare_market,
+            metrics=params.get("metrics"),
+            gap_threshold_seconds=gap_threshold,
+            anchor_tolerance_seconds=anchor_tolerance,
+        )
         if isinstance(definition, Mapping) and response.get("status") in {"ok", "partial"}:
             response = self._canonicalize(
                 response,
@@ -485,6 +629,9 @@ class CMISGateway:
                 provider_asset=self._provider_asset_from_data(market.get("data")),
                 role="market",
             )
+
+        if compare_asset and isinstance(response.get("data"), dict):
+            response["data"].setdefault("compare_asset_request", compare_asset)
         return response
 
     def _risk_check(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:

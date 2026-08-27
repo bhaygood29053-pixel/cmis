@@ -36,7 +36,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.9.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.10.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -49,6 +49,35 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertIn(CONCENTRATION_INTELLIGENCE_SERVICE, SUPPORTED_SERVICES)
         self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
         self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])
+
+    def test_x1_historical_compare_advertises_all_available_boundary(self):
+        manifest = build_capability_manifest(
+            runtime_services=SUPPORTED_SERVICES,
+            legacy_supported_chains=SUPPORTED_CHAINS,
+            known_chains=KNOWN_CHAINS,
+        )
+        history = service_capability(
+            manifest,
+            chain="x1",
+            service="historical_compare",
+        )
+
+        self.assertEqual(history["state"], "supported")
+        self.assertTrue(history["callable"])
+        self.assertIn("verified_current_market_snapshot", history["requirements"])
+        self.assertIn(
+            "all_available_mode_uses_cmis_stored_verified_observations_only",
+            history["limitations"],
+        )
+        self.assertIn(
+            "all_available_does_not_imply_complete_asset_lifetime",
+            history["limitations"],
+        )
+        self.assertIn(
+            "pair_mode_requires_compare_asset_and_overlapping_verified_history",
+            history["limitations"],
+        )
+
 
     def test_first_promoted_intelligence_service_is_x1_only_and_narrow(self):
         manifest = build_capability_manifest(
