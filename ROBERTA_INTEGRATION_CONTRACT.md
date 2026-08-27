@@ -26,7 +26,7 @@ CMIS publishes deployed eligibility at:
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` remains required. Existing accepted services retain the global minimum compatible contract `1.8.0`, while the current CMIS contract is `1.9.0` and the promoted concentration service requires `>=1.9.0`.
+Capability schema `1` remains required. Existing accepted services retain the global minimum compatible contract `1.8.0`, while the current CMIS contract is `1.10.0` and the promoted concentration service continues to require `>=1.9.0`.
 
 Scouts fail closed on malformed/incompatible manifests, non-callable services, unknown chains, weakened Evidence Receipt / Proof Score declarations, or promotion metadata that does not exactly match the accepted service contract.
 
@@ -106,6 +106,18 @@ Those states are **not CMIS trust inputs**. They do not create or alter:
 - execution authority.
 
 For freshness-sensitive claims, Roberta must continue routing through the relevant Chain Scout -> CMIS -> provider path. A learned or retained value that conflicts with fresh accepted CMIS/provider evidence is subordinate to the fresh evidence.
+
+## Historical intelligence modes
+
+CMIS `1.10.0` extends the existing `historical_compare` service on X1 with deterministic `window`, `all_available`, and `all_available_pair` modes. Roberta does not compute lifetime market statistics herself.
+
+For “entire/full/lifetime history” requests, X1 Scout should preserve the exact CMIS coverage window and distinguish:
+
+- all verified history currently available to CMIS;
+- the asset's actual lifetime, which remains unverified unless CMIS explicitly proves it;
+- pairwise common-window results, which must use only overlapping verified history with accepted aligned anchors.
+
+A missing earlier asset period is not zero-filled, interpolated, or inferred from model knowledge. External OHLCV/archive history is not accepted merely because a provider can return it; CMIS promotion and semantic/range gates remain authoritative.
 
 ## Chain boundaries
 
