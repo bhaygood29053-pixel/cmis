@@ -54,7 +54,7 @@ Accepted on `main`:
 - **Deterministic direct wallet-relationship evidence:** complete, internal/read-only/non-promoted, explicit non-ownership semantics.
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
-- **CMIS capability contract:** `1.9.0`.
+- **CMIS capability contract:** `1.10.0`.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
 - **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main` via PR #228; its post-merge source/roadmap state is synchronized through Roberta PR #231.
@@ -110,6 +110,12 @@ GET /v1/cmis/capabilities
 ```
 
 Every chain/service combination is classified explicitly. A capability available on X1 is never assumed to exist on Solana, and vice versa.
+
+## All-available verified history — CMIS 1.10.0
+
+The existing `historical_compare` service now supports X1 `window`, `all_available`, and `all_available_pair` modes. The runtime CMIS gateway accumulates bounded verified market observations for price, liquidity, 24h volume, 24h transactions, and holders with duplicate throttling. Full-history output reports exact stored coverage bounds, observation counts, sampled extrema/change, sampled price drawdown, and observed gaps.
+
+“Entire history” means **all verified history currently available to CMIS**, not automatically the asset's complete lifetime. Continuous coverage, asset inception, and external OHLCV/archive completeness remain unverified unless separately proven. Pair comparisons use only the overlapping verified window and fail closed when aligned anchors are unavailable.
 
 ## First promoted Verified Intelligence service
 
