@@ -43,7 +43,8 @@ Open read-only/fail-closed research tracks include:
 
 - PR #242 — Warp Bridge proof-origin/provenance binding;
 - PR #229 — bounded authenticated X1Scroll RPC access classification for `getHealth` / `getSlot`;
-- PR #227 — FortiBlox provider-contract research.
+- PR #227 — FortiBlox provider-contract research;
+- Issue #272 — Oracle V2 read-only X1 price-evidence research, currently candidate/non-promoted pending deterministic X1 RPC verification of the repository-declared program/state, exact account layout, timestamp/freshness semantics, and source-independence treatment.
 
 None is accepted provider capability merely because a branch exists, is mergeable, or has green tests. Exact evidence, semantics, review, and merge gates remain required.
 
@@ -55,7 +56,8 @@ Continue improving:
 - historical redundancy and coverage;
 - holder/token-account semantics without overstating beneficial ownership;
 - field-by-field Solana maturity;
-- exact X1/XDEX route and provider evidence where independently provable.
+- exact X1/XDEX route and provider evidence where independently provable;
+- structurally distinct X1 price evidence where exact identity, units, observation time, freshness, and independence can be proven rather than inferred from relay/source labels.
 
 ### 3. Future public intelligence promotion
 
