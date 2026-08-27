@@ -14,13 +14,13 @@ Structural deployment baseline: **#274**
 
 Pinned upstream source: `jacklevin74/oracle-v2@97177f772689e44ca4eed9bb95be32ffdf0c5e66`
 
-Live workflow run: `33037683674`
+Live workflow run: `33037942117`
 
 Artifact:
 
-- ID: `9632630582`
-- name: `x1-oracle-v2-timestamp-evidence-33037683674`
-- digest: `sha256:3da246c305ee0225399022f62ad409626da1bd52c0ba13fcc3595a7b42bcae86`
+- ID: `9632727323`
+- name: `x1-oracle-v2-timestamp-evidence-33037942117`
+- digest: `sha256:7dd0c340490aaf738299a0900722cbd0d515b2062038de30585f99359c2e90e0`
 
 ## Result
 
