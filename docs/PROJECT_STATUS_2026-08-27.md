@@ -75,7 +75,7 @@ Recent cleanup is complete:
 - PR #227 — FortiBlox closed/archive candidate research;
 - PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-Issue #301 is now the active bounded verification item for the official/self-hosted X1 read-only node. The deterministic contract, sanitized RPC probe, finalized block PubSub reconnect/backfill probe, tests, and opt-in live workflow are implemented; live deployment evidence remains blocked until an explicit self-hosted RPC/WebSocket endpoint and configuration evidence are available. This must not be mislabeled as independent market-price evidence merely because it is a separate node deployment.
+The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 is now the active X1 provider-gap correction for holder semantics.
 
 ## Roberta dependency/status
 
@@ -87,11 +87,11 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ## Roadmap now
 
-### 1. Verify self-hosted X1 history/streaming redundancy
+### 1. Correct X1 holder semantics
 
-- verify exact node configuration/identity and bounded read-only RPC history methods;
-- verify block subscription commitment/finality, reconnect, ordering, duplicates, gaps, and backfill behavior;
-- preserve infrastructure redundancy separately from market-source independence.
+- preserve X1.Ninja holder-looking values only as provider-reported observations until counted-entity and coverage semantics are proven;
+- keep official X1 RPC token-account counts and unique token-account-authority counts explicitly distinct;
+- do not relabel token accounts, authority addresses, wallets, or beneficial owners as equivalent entities.
 
 ### 2. Continue evidence-depth work
 
