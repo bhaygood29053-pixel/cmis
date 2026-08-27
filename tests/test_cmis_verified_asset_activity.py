@@ -17,6 +17,13 @@ def market(status="ok"):
             "volume_24h_usd": 500.0,
             "transactions_24h": 10,
             "lp_count": 1,
+            "completeness": {
+                "price": True,
+                "liquidity": True,
+                "volume_24h": True,
+                "transactions_24h": True,
+                "holders": True,
+            },
         },
         "sources": [{"source": "market", "role": "market_report"}],
         "observed_at": 1.0,
@@ -52,6 +59,32 @@ def verification(side, *, mint="agi-mint", status="ok", quote_mint="quote"):
 
 
 class VerifiedAssetActivityServiceTests(unittest.TestCase):
+    def test_holder_only_market_partial_does_not_downgrade_activity(self):
+        market_envelope = market(status="partial")
+        market_envelope["data"]["completeness"]["holders"] = False
+        market_envelope["warnings"] = [{"code": "holders_incomplete"}]
+
+        result = build_verified_asset_activity_response(
+            market_envelope=market_envelope,
+            pool_records=[{
+                "pool_address": "pool-1",
+                "pair": "AGI/XNT",
+                "history_ok": True,
+                "provider_event_count": 1,
+                "processed_event_count": 1,
+                "verifications": [verification("BUY")],
+            }],
+            matched_pool_count=1,
+            selected_pool_count=1,
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(result["confidence"]["market_complete"])
+        self.assertNotIn(
+            "market_snapshot_partial",
+            {warning["code"] for warning in result["warnings"]},
+        )
+
     def test_counts_only_matching_asset_and_exact_chain_amounts(self):
         result = build_verified_asset_activity_response(
             market_envelope=market(),

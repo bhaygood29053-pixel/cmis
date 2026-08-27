@@ -15,13 +15,14 @@ from .cmis_contract import AMBIGUOUS, ERROR, OK, PARTIAL, UNAVAILABLE, build_ser
 from .market_report import build_market_report
 
 
-_COMPLETENESS_KEYS = (
+_REQUIRED_COMPLETENESS_KEYS = (
     "price",
     "liquidity",
     "volume_24h",
     "transactions_24h",
-    "holders",
 )
+_OPTIONAL_COMPLETENESS_KEYS = ("holders",)
+_COMPLETENESS_KEYS = _REQUIRED_COMPLETENESS_KEYS + _OPTIONAL_COMPLETENESS_KEYS
 
 
 def _text(value: Any) -> Optional[str]:
@@ -53,11 +54,21 @@ def _confidence(report: Mapping[str, Any]) -> Dict[str, Any]:
     }
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
+    required_checks = {
+        f"{key}_complete": completeness.get(key) is True
+        for key in _REQUIRED_COMPLETENESS_KEYS
+    }
+    required_verified = sum(1 for value in required_checks.values() if value)
+    required_total = len(required_checks)
     return {
         "complete": verified == total,
+        "all_fields_complete": verified == total,
+        "core_market_complete": required_verified == required_total,
         "verified_checks": verified,
         "total_checks": total,
         "verification_ratio": round(verified / total, 6),
+        "required_verified_checks": required_verified,
+        "required_total_checks": required_total,
         "checks": checks,
     }
 
@@ -68,12 +79,20 @@ def _warnings(report: Mapping[str, Any]) -> list:
     warnings = []
     for key in _COMPLETENESS_KEYS:
         if completeness.get(key) is not True:
-            warnings.append({
-                "code": f"{key}_incomplete",
-                "message": (
+            if key == "holders":
+                message = (
+                    "Provider holder-looking values are preserved as unverified observations; "
+                    "counted-entity, asset-binding, uniqueness, coverage, and beneficial-owner "
+                    "semantics are not verified."
+                )
+            else:
+                message = (
                     f"Market report {key.replace('_', ' ')} is missing, malformed, "
                     "conflicting, or only partially covered."
-                ),
+                )
+            warnings.append({
+                "code": f"{key}_incomplete",
+                "message": message,
             })
 
     if report.get("market_cap_usd_reported") is not None and report.get("market_cap_verified") is not True:

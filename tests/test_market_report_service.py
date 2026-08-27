@@ -101,7 +101,16 @@ class MarketReportServiceTests(unittest.TestCase):
         self.assertEqual(report["liquidity_usd"], 6000)
         self.assertEqual(report["volume_24h_usd"], 600)
         self.assertEqual(report["transactions_24h"], 30)
-        self.assertEqual(report["holders"], 1000)
+        self.assertIsNone(report["holders"])
+        self.assertEqual(report["holders_reported"], 1000)
+        self.assertEqual(report["holders_observed"], [1000])
+        self.assertFalse(report["completeness"]["holders"])
+        self.assertEqual(report["holder_semantics"]["counted_entity"], "unverified")
+        self.assertEqual(report["holder_semantics"]["coverage"], "unverified")
+        self.assertTrue(report["holder_semantics"]["provider_rows_complete"])
+        self.assertTrue(report["holder_semantics"]["provider_rows_consistent"])
+        self.assertFalse(report["holder_semantics"]["holder_semantics_verified"])
+        self.assertFalse(report["holder_semantics"]["beneficial_owner_identity_verified"])
         self.assertEqual(report["price_usd"], 0.25)
         self.assertEqual(report["price_change_24h_pct"], 4.0)
         self.assertEqual(report["safety_grade"], "A")
@@ -174,10 +183,37 @@ class MarketReportServiceTests(unittest.TestCase):
         self.assertEqual(report["transactions_24h"], 5)
         self.assertFalse(report["completeness"]["transactions_24h"])
         self.assertIsNone(report["holders"])
+        self.assertIsNone(report["holders_reported"])
         self.assertEqual(report["holders_observed"], [100, 120])
         self.assertEqual(report["holders_observed_max"], 120)
+        self.assertFalse(report["holder_semantics"]["provider_rows_consistent"])
+        self.assertFalse(report["holder_semantics"]["holder_semantics_verified"])
         self.assertFalse(report["completeness"]["holders"])
         self.assertIsNone(report["provenance"]["catalog_last_refresh_unix"])
+
+    def test_fractional_provider_holder_value_is_not_coerced(self):
+        primary = pool(
+            "P1",
+            self.agi,
+            self.xnt,
+            liquidity=1000,
+            volume24h=10,
+            txns24h=1,
+            price=0.10,
+        )
+        primary["holders"] = 100.5
+
+        report = build_market_report(
+            "AGI",
+            [(primary, "base", self.agi, 90)],
+            SimpleNamespace(xnt_price_usd=None, last_refresh=1),
+        )
+
+        self.assertIsNone(report["holders"])
+        self.assertIsNone(report["holders_reported"])
+        self.assertEqual(report["holders_observed"], [])
+        self.assertFalse(report["holder_semantics"]["provider_rows_complete"])
+        self.assertFalse(report["completeness"]["holders"])
 
     def test_empty_matches_are_rejected(self):
         with self.assertRaises(ValueError):

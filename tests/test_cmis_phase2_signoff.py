@@ -333,10 +333,13 @@ class CMISPhase2SevenServiceSignoffTests(unittest.TestCase):
                 "pre_trade_check",
             ],
         )
+        self.assertEqual(
+            [response["status"] for response in responses],
+            [OK, PARTIAL, OK, OK, OK, OK, OK],
+        )
         for response in responses:
             self.assertEqual(list(response), CANONICAL_ENVELOPE_KEYS)
             self.assertEqual(response["chain"], "x1")
-            self.assertEqual(response["status"], OK)
             self.assertIsInstance(response["asset"], dict)
             self.assertIsInstance(response["data"], dict)
             self.assertIsInstance(response["confidence"], dict)
@@ -443,7 +446,8 @@ class CMISPhase2SevenServiceSignoffTests(unittest.TestCase):
         risk = self._risk_response(market, tokenomics, historical)
         pre_trade = self._pre_trade_response(risk)
 
-        self.assertEqual(market["status"], OK)
+        self.assertEqual(market["status"], PARTIAL)
+        self.assertFalse(market["data"]["completeness"]["holders"])
         self.assertEqual(market["data"]["liquidity_usd"], 0.0)
         self.assertEqual(risk["status"], OK)
         self.assertEqual(risk["risk"]["recommendation"], BLOCK)

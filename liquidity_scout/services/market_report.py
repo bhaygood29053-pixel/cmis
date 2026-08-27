@@ -79,26 +79,29 @@ def _sum_metric(
     return sum(values), complete
 
 
-def _holder_summary(
+def _provider_holder_summary(
     pools: Sequence[Dict[str, Any]],
-) -> Tuple[Optional[int], List[int], bool]:
+) -> Tuple[Optional[int], List[int], bool, bool]:
+    """Preserve provider holder-looking values without verifying holder semantics.
+
+    Agreement across XDEX pool rows proves only provider-row consistency. It
+    does not prove what entity is counted, total coverage, uniqueness, wallet
+    identity, or beneficial ownership.
+    """
     values: List[int] = []
-    complete = True
+    rows_complete = True
 
     for pool in pools:
-        value = _first_number(pool, ("holders",))
-        if value is None:
-            complete = False
+        value = pool.get("holders")
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            rows_complete = False
             continue
-        values.append(int(value))
+        values.append(value)
 
     observed = sorted(set(values))
-    if len(observed) == 1 and complete:
-        return observed[0], observed, True
-
-    # Holder counts are asset-wide, so conflicting pool rows are uncertainty,
-    # not something the structured service should silently collapse to max().
-    return None, observed, False
+    provider_consistent = len(observed) == 1 and rows_complete
+    reported = observed[0] if provider_consistent else None
+    return reported, observed, rows_complete, provider_consistent
 
 
 def build_market_report(term: str, matches: Sequence[Match], catalog: Any) -> Dict[str, Any]:
@@ -131,7 +134,9 @@ def build_market_report(term: str, matches: Sequence[Match], catalog: Any) -> Di
         "txns24h",
         "transactions24h",
     )
-    holders, holder_observations, holders_complete = _holder_summary(pools)
+    holders_reported, holder_observations, holder_rows_complete, holder_provider_consistent = (
+        _provider_holder_summary(pools)
+    )
 
     primary_price = _first_number(primary_pool, ("priceUsd",))
     xnt_reference = _number(getattr(catalog, "xnt_price_usd", None))
@@ -159,9 +164,21 @@ def build_market_report(term: str, matches: Sequence[Match], catalog: Any) -> Di
         "liquidity_usd": liquidity,
         "volume_24h_usd": volume24,
         "transactions_24h": int(txns24) if txns24 is not None else None,
-        "holders": holders,
+        "holders": None,
+        "holders_reported": holders_reported,
         "holders_observed": holder_observations,
         "holders_observed_max": holder_observed_max,
+        "holder_semantics": {
+            "source_field": "holders",
+            "counted_entity": "unverified",
+            "coverage": "unverified",
+            "provider_rows_complete": holder_rows_complete,
+            "provider_rows_consistent": holder_provider_consistent,
+            "holder_semantics_verified": False,
+            "asset_binding_verified": False,
+            "uniqueness_semantics_verified": False,
+            "beneficial_owner_identity_verified": False,
+        },
         "price_change_1h_pct": _first_number(primary_pool, ("priceChange1h",)),
         "price_change_24h_pct": _first_number(primary_pool, ("priceChange24h",)),
         "market_cap_usd_reported": _first_number(primary_pool, ("marketCap",)),
@@ -182,7 +199,7 @@ def build_market_report(term: str, matches: Sequence[Match], catalog: Any) -> Di
             "liquidity": liquidity_complete,
             "volume_24h": volume24_complete,
             "transactions_24h": txns24_complete,
-            "holders": holders_complete,
+            "holders": False,
             "price": price_usd is not None,
         },
         "provenance": {

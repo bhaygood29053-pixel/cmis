@@ -284,7 +284,8 @@ class CMISGatewayTests(unittest.TestCase):
         })
 
         self.assertEqual(response["service"], "market_report")
-        self.assertEqual(response["status"], "ok")
+        self.assertEqual(response["status"], "partial")
+        self.assertFalse(response["data"]["completeness"]["holders"])
         self.assertEqual(response["asset"]["mint"], "MINT_AGI")
         self.assertEqual(response["data"]["liquidity_usd"], 5000)
         self.assertEqual(response["data"]["#LPs"], 1)
@@ -556,7 +557,8 @@ class CMISGatewayTests(unittest.TestCase):
             "asset": "AGI",
         })
 
-        self.assertEqual(response["status"], "ok")
+        self.assertEqual(response["status"], "partial")
+        self.assertFalse(response["data"]["completeness"]["holders"])
         self.assertEqual(history.calls, [])
 
 

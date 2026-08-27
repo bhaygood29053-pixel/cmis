@@ -282,9 +282,9 @@ Continue field-level X1 and Solana verification without weakening truth standard
 
 Near-term provider-gap priorities:
 
-- self-hosted official X1 read-only node verification for bounded history and streaming redundancy;
-- historical redundancy/source-independence evidence, keeping infrastructure redundancy separate from market-source independence;
-- holder-semantics/completeness evidence without relabeling token accounts/authorities as beneficial owners;
+- holder-semantics/completeness correction under #304 without relabeling token accounts/authorities as holders or beneficial owners;
+- Official X1 RPC remains the selected production RPC path; self-hosted redundancy is optional/deferred and does not establish market-source independence;
+- historical redundancy/source-independence remains a future evidence-depth option rather than a blocker;
 - deeper field-by-field Solana maturity under the same CMIS contracts;
 - Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
@@ -337,8 +337,8 @@ Completed:
 Current implementation sequence:
 
 13. reconcile provider-gap and Oracle status after #298/#299 and close completed timestamp-governance issues;
-14. verify the self-hosted official X1 read-only node as a bounded history/streaming redundancy source;
-15. deepen holder/token-account/authority semantics without beneficial-owner overclaim;
+14. retain #301 self-hosted-node verification as optional/deferred infrastructure after selecting Official X1 RPC as the production path;
+15. correct holder/token-account/authority semantics under #304 without beneficial-owner overclaim;
 16. mature Solana evidence field-by-field under shared CMIS contracts;
 17. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
 

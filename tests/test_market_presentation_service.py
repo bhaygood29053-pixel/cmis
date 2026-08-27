@@ -120,7 +120,7 @@ class MarketPresentationServiceTests(unittest.TestCase):
         )
         self.assertEqual(
             format_field_line("holders", snap, format_usd=usd),
-            "• Holders: 1,200",
+            "• Holders: Not available from verified data",
         )
         self.assertEqual(
             format_field_line("change24h", snap, format_usd=usd),
@@ -129,6 +129,20 @@ class MarketPresentationServiceTests(unittest.TestCase):
         self.assertEqual(
             format_field_line("liquidity", snap, format_usd=usd),
             "• Liquidity: $6,000.00 • Pools: 2",
+        )
+
+    def test_structured_provider_holder_candidate_is_labeled_unverified(self):
+        snap = snapshot()
+        snap["_market_report"] = {
+            "holders": None,
+            "holders_reported": 116,
+            "holders_observed": [116],
+            "completeness": {"holders": False},
+        }
+
+        self.assertEqual(
+            format_field_line("holders", snap, format_usd=usd),
+            "• Holders: Not verified — provider reports 116; counted-entity and coverage semantics are unverified",
         )
 
     def test_unverified_market_cap_and_circulating_supply_wording_is_stable(self):
