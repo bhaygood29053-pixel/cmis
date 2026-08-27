@@ -197,6 +197,66 @@ class CMISGatewayTests(unittest.TestCase):
         self.assertEqual(args[1]["_market_report"]["mint"], "MINT_AGI")
         self.assertEqual(kwargs["chain"], "x1")
 
+    def test_entire_history_language_selects_all_available_mode(self):
+        expected = build_service_envelope(
+            "historical_compare",
+            "x1",
+            "partial",
+        )
+        with patch(
+            "liquidity_scout.cmis.gateway.build_historical_compare_response",
+            return_value=expected,
+        ) as build:
+            response = self.gateway.dispatch({
+                "service": "historical_compare",
+                "chain": "x1",
+                "asset": "AGI",
+                "params": {"question": "Show me AGI's entire history"},
+            })
+
+        self.assertEqual(response, expected)
+        _, kwargs = build.call_args
+        self.assertEqual(kwargs["mode"], "all_available")
+
+    def test_all_available_pair_requires_compare_asset(self):
+        response = self.gateway.dispatch({
+            "service": "historical_compare",
+            "chain": "x1",
+            "asset": "AGI",
+            "params": {"mode": "all_available_pair"},
+        })
+
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(
+            response["errors"][0]["code"],
+            "compare_asset_required",
+        )
+
+    def test_base_gateway_does_not_auto_record_market_history(self):
+        class History:
+            def __init__(self):
+                self.calls = []
+
+            def record_snapshot_if_due(self, **kwargs):
+                self.calls.append(kwargs)
+                return True
+
+        history = History()
+        gateway = CMISGateway(
+            x1_market_provider=self.provider,
+            history_backend=history,
+        )
+
+        response = gateway.dispatch({
+            "service": "market_report",
+            "chain": "x1",
+            "asset": "AGI",
+        })
+
+        self.assertEqual(response["status"], "ok")
+        self.assertEqual(history.calls, [])
+
+
     def test_risk_check_composes_market_and_tokenomics_inside_cmis(self):
         tokenomics_response = build_service_envelope(
             "tokenomics",
