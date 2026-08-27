@@ -154,6 +154,9 @@ class HistoricalMetricsAllAvailableTests(unittest.TestCase):
         summary = historical_metrics.verified_price_import_summary("MINT")
         self.assertTrue(summary["available"])
         self.assertEqual(summary["observation_count"], 1)
+        self.assertEqual(summary["stored_row_count"], 1)
+        self.assertEqual(summary["usable_observation_count"], 1)
+        self.assertEqual(summary["conflicting_timestamp_count"], 0)
         self.assertEqual(summary["first_observed_at"], 500)
         self.assertEqual(summary["last_observed_at"], 500)
         self.assertEqual(summary["last_imported_at"], 900)
@@ -180,6 +183,41 @@ class HistoricalMetricsAllAvailableTests(unittest.TestCase):
             historical_metrics.historical_series("MINT", "price"),
             [{"timestamp": 1000, "value": 0.75}],
         )
+
+
+    def test_conflicting_provider_prices_at_same_timestamp_are_excluded(self):
+        historical_metrics.record_verified_price_observation(
+            mint="MINT",
+            symbol="TOK",
+            timestamp=1000,
+            price_usd=1.0,
+            source="provider-a",
+            provider_pair="MINT/USDCX",
+            quote_mint="USDCX",
+            imported_at=2000,
+        )
+        historical_metrics.record_verified_price_observation(
+            mint="MINT",
+            symbol="TOK",
+            timestamp=1000,
+            price_usd=2.0,
+            source="provider-b",
+            provider_pair="MINT/XNT*XNT/USDCX",
+            quote_mint="USDCX",
+            imported_at=2001,
+        )
+
+        self.assertEqual(
+            historical_metrics.historical_series("MINT", "price"),
+            [],
+        )
+        summary = historical_metrics.verified_price_import_summary("MINT")
+        self.assertFalse(summary["available"])
+        self.assertEqual(summary["observation_count"], 0)
+        self.assertEqual(summary["stored_row_count"], 2)
+        self.assertEqual(summary["conflicting_timestamp_count"], 1)
+        self.assertIsNone(summary["first_observed_at"])
+        self.assertIsNone(summary["last_observed_at"])
 
     def test_historical_value_at_can_use_verified_provider_price_backfill(self):
         historical_metrics.record_verified_price_observation(
