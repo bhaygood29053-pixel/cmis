@@ -1,14 +1,8 @@
 # Roberta ↔ CMIS Source Sync Baseline
 
-Last reconciled: 2026-08-26 (America/New_York)
+Last reconciled: 2026-08-27 (America/New_York)
 
-Merge state verified 2026-08-26:
-
-- paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation is merged on both `main` branches;
-- Roberta PR #228 autonomous source-grounded Learning Plane is merged and accepted on Roberta `main`;
-- Roberta post-merge source/roadmap synchronization PR #231 is merged on Roberta `main`.
-
-This file is the compact cross-project synchronization baseline for source-of-truth documentation. It does not replace `ROBERTA_INTEGRATION_CONTRACT.md`, `ROBERTA_CMIS_ACCEPTED_BASELINE.md`, or `docs/CMIS_PRODUCT_ROADMAP.md`.
+This file is the compact cross-project synchronization baseline. It is intentionally mirrored in both repositories. Repository-local architecture, capability, roadmap, and status documents remain authoritative for implementation details.
 
 ## Canonical authority path
 
@@ -20,25 +14,35 @@ User / transport
         -> Chain Provider / verified source
 ```
 
-- Roberta owns orchestration, policy coordination, specialist selection, learning-workflow coordination, and final synthesis.
+- Roberta owns orchestration, policy coordination, specialist selection, learning-workflow coordination, approval boundaries, and final synthesis.
 - Chain Scouts own chain-specific planning and interpretation; they do not manufacture facts.
-- CMIS owns deterministic freshness-sensitive verified facts, evidence, Proof Scores, risk, capability state, historical intelligence, and bounded analysis-only pre-trade calculations.
+- CMIS owns deterministic freshness-sensitive verified facts, evidence, Evidence Receipts, Proof Scores, risk, capability state, historical intelligence, and bounded analysis-only pre-trade calculations.
 - Providers remain beneath CMIS.
-- Fresh accepted CMIS/provider facts override remembered, checkpointed, RAG/source-mastery, retained, Pyramid, or conversational live values.
-- Missing evidence remains unknown/unavailable and is never converted into zero, false, or an LLM estimate.
+- Fresh accepted CMIS/provider facts override books, static RAG, source-mastery state, Pyramid checkpoints, retained lessons, learned concepts, HXMP/other memory, and conversational live values when freshness matters.
+- Missing evidence remains unknown/unavailable and is never converted into zero, false, or a model estimate.
 - Proof Score remains separate from risk.
 - `pre_trade_check` remains analysis-only and preserves `execution_authorized=false`.
-- The working `liquidity_scout` namespace may remain during incremental migration as a compatibility identifier only.
+- The `liquidity_scout` namespace may remain as a compatibility implementation detail; it is not a separate authority layer.
 
-## Current CMIS/Roberta capability baseline
+## Current CMIS contract baseline
 
 ```text
-CMIS capability contract = 1.9.0
-Phase 11 intelligence_foundation public_service_promoted = false
-Phase 11 intelligence_foundation scout_reliance_promoted = false
+CMIS capability contract = 1.12.0
+global existing-service minimum = 1.8.0
+concentration_change_intelligence minimum = 1.9.0
+all_available history minimum = 1.10.0
+x1_asset_identity/v1 minimum = 1.11.0
+verified provider-price backfill semantics = 1.12.0
 ```
 
-The separately accepted Phase 12 wrapper is exactly:
+Accepted milestones carried by that contract line:
+
+- CMIS `1.9.0` introduced the narrow promoted X1 `concentration_change_intelligence/v1` wrapper.
+- CMIS `1.10.0` added `historical_compare` modes `all_available` and `all_available_pair`.
+- CMIS `1.11.0` added normalized exact-mint X1 identity under `x1_asset_identity/v1`; the exact mint remains the fungible identity root.
+- CMIS `1.12.0` permits a narrow verified provider-price backfill for historical price only. It does not prove provider source independence, archive completeness, continuous coverage, historical USD-stable peg behavior, or complete asset lifetime.
+
+The core Phase 11 `intelligence_foundation` remains read-only/non-promoted as a group. The separately accepted Phase 12 wrapper remains exactly:
 
 ```text
 service = concentration_change_intelligence
@@ -54,51 +58,72 @@ execution_authorized = false
 
 Solana remains unavailable/non-promoted for this service.
 
+## Oracle V2 provider-gap status
+
+Oracle V2 has advanced beyond repository-only candidate research, but it is still not a promoted CMIS current-price source.
+
+Accepted/read-only evidence on CMIS `main` now establishes:
+
+- the declared X1 program/state contract shape is live and structurally verified;
+- exact program/state ownership, PDA/layout, six-asset × five-relay shape, decimals, and stored Oracle key were verified through X1 RPC;
+- timestamp-unit semantics are promoted only under the accepted evidence-bound policy: raw batch timestamps may be interpreted as Unix milliseconds;
+- current slot ages can be calculated deterministically from the verified timestamp unit.
+
+Still false/unaccepted:
+
+```text
+freshness_policy_complete = false
+freshness_verified = false
+current_price_use_authorized = false
+source_independence_verified = false
+price_correctness_verified = false
+cmis_provider_promoted = false
+public_service_promoted = false
+scout_reliance_promoted = false
+execution_authorized = false
+```
+
+A separate explicit freshness-policy decision is required before any current Oracle V2 slot can become price-eligible. Five relay slots remain same-system redundancy, not five independent market sources.
+
 ## Roberta Learning Plane baseline
 
-Roberta Learning System Phases 1-10 are accepted on Roberta `main`. Phase 10 verified retention is implemented under its narrow deterministic retention contract. Exact active retained lessons may be classified as `verified_learned_knowledge`, but that classification keeps operational/source/live-state/CMIS-provider/governance/wallet/execution authority false.
+Roberta Learning System Phases 1-10 and the autonomous source-grounded Learning Plane controller are accepted on Roberta `main`.
 
-The accepted autonomous Learning Plane can, after explicit static-source selection:
+The controller may, after explicit static-source selection:
 
-- bind immutable original/transcript/page/chapter-map provenance;
-- create or resume a frozen source-mastery plan;
-- generate source-grounded targets and independently verify support;
+- bind immutable source provenance;
+- create/resume a frozen source-mastery plan;
+- generate and independently verify source-grounded targets;
 - build and atomically publish deterministic curriculum banks;
-- run canonical source-stage examinations;
-- diagnose/remediate failures from the selected source;
-- require separate closed-book retention and transfer checks before curriculum-scoped promotion;
-- preserve immutable failed attempts and completed-stage prefixes;
-- resume from durable state/checkpoints/locks;
-- run a final source capstone.
+- run canonical stage exams;
+- perform verified remediation/retention/transfer;
+- preserve immutable failures and completed-stage prefixes;
+- reuse only curriculum-scoped verified learned concepts;
+- resume from durable state;
+- run the final source capstone.
 
-For *Mastering Blockchain, Fourth Edition*, accepted prebuilt exercise banks are present through Stage 8 / Market Structure. Stages 9-14 are not yet separately accepted prebuilt repository banks. Bank availability is not mastery, and the source is not mastered until every required frozen stage and final capstone pass in the authoritative ledger.
+Learning remains a separate authority plane. It cannot self-authorize CMIS contracts, provider trust, Scout promotion, fresh chain truth, governance changes, wallet permissions, transaction construction/signing/broadcasting, trading, custody, bridge transfer, or Controlled Execution.
 
-Learning remains a separate authority plane. It cannot self-authorize CMIS contracts, provider trust, Scout promotion, fresh chain truth, wallet permissions, transaction construction/signing/broadcasting, trading, custody, bridge transfer, or Controlled Execution.
+For *Mastering Blockchain, Fourth Edition*, accepted prebuilt repository banks remain through Stage 8 / Market Structure. Runtime-generated later-stage banks are valid only through the autonomous controller's exact provenance/verification gates; bank existence is not mastery.
 
 ## Internal non-promoted CMIS foundations
 
-Accepted on CMIS `main` and safe for documentation/source synchronization, but not Scout-callable by implication:
+Accepted on CMIS `main` but not Scout-callable by implication:
 
 - deterministic descriptive concentration-direction classification;
 - direct wallet-relationship evidence with explicit non-ownership/non-beneficial-owner semantics;
 - concentration-threshold alert evidence.
 
-All remain internal/read-only/non-promoted and do not create public-service, Scout-reliance, behavioral/ownership, risk, or execution authority.
+No broader public intelligence/alert promotion is accepted by implication.
 
 ## Provider-gap state
 
-X1 provider-gap Issue #30 remains open under read-only/fail-closed contracts. Current open research branches include:
-
-- PR #242 — Warp Bridge exact provenance/origin binding;
-- PR #229 — bounded authenticated X1Scroll `getHealth` / `getSlot` access classification;
-- PR #227 — FortiBlox provider-contract research.
-
-None is accepted provider capability merely because the branch exists or tests pass. Exact evidence/contract/review/merge gates remain required.
-
-## Current promotion state
-
-There is currently **no accepted next public intelligence/alert service, Scout-reliance promotion, or broader Verified Intelligence promotion**. Any future promotion requires a separate CMIS contract/roadmap acceptance gate and a separate Roberta/Scout adoption-readiness gate.
+The X1 provider-gap track remains read-only/fail-closed. Open research/draft work includes Warp Bridge provenance binding, X1Scroll bounded authenticated RPC access classification, and FortiBlox provider-contract research. Open/green/mergeable state does not equal accepted provider capability.
 
 ## Execution boundary
 
-Roberta Controlled Execution remains locked/not started. No current source material, autonomous learning state, retained lesson, Pyramid state, CMIS result, Scout report, Proof Score, risk result, alert state, pre-trade `PASS`, policy decision, or human approval authorizes transaction construction as an execution path, signing, broadcasting, custody, trading, bridge transfer, or autonomous value movement.
+Controlled Execution remains locked/not started. No Learning Plane result, source material, retained lesson, learned concept, CMIS result, Scout report, Evidence Receipt, Proof Score, risk result, alert, pre-trade `PASS`, policy decision, or human approval authorizes transaction construction as an execution path, signing, broadcasting, custody, trading, bridge transfer, or autonomous value movement.
+
+## Core sync rule
+
+**Roberta may learn from static evidence and CMIS may verify changing chain facts, but neither learning nor analysis self-promotes into a new authority boundary. Fresh accepted CMIS/provider evidence wins for freshness-sensitive state, and every public-service, operational-trust, wallet, or execution promotion remains separately gated.**
