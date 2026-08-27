@@ -168,6 +168,14 @@ No live provider-access result is accepted until the required credential-backed 
 
 The branch records provider-owned Explorer documentation and supporting Nexus RPC discovery evidence without promoting FortiBlox into CMIS. Exact Explorer endpoint/response semantics, current Nexus RPC behavior, source independence, freshness/history/finality semantics, and CMIS promotion remain unverified. No adapter should be built from guessed endpoint paths.
 
+### Issue #272 — Oracle V2 read-only price evidence ⚠️ Candidate research
+
+Public repository review of `jacklevin74/oracle-v2` at pinned commit `97177f772689e44ca4eed9bb95be32ffdf0c5e66` shows a structurally distinct X1 price path: Pyth/CEX aggregation -> OpenBao-signed relays -> an on-chain Oracle Vault with five relay slots for six assets.
+
+This is **not accepted CMIS capability**. The repository-declared X1 program/state must first be independently verified through X1 RPC, including exact program/state identity, ownership, PDA/layout, timestamp units, freshness behavior, and eligible-slot semantics.
+
+If accepted later, CMIS should consume Oracle V2 as a read-only X1 Provider evidence source. CMIS must not import its signing/submission infrastructure, and five relay slots must not be treated as five independent market sources because the reviewed relays consume a common aggregated feed.
+
 ### Existing non-promotional observations
 
 Recent bounded evidence still shows:
@@ -249,7 +257,8 @@ Near-term provider-gap candidates:
 - Warp Bridge exact read-source provenance;
 - alternate X1 provider access/verification such as X1Scroll under bounded read-only contracts;
 - historical redundancy/source-independence evidence;
-- holder-semantics/completeness evidence without relabeling token accounts/authorities as beneficial owners.
+- holder-semantics/completeness evidence without relabeling token accounts/authorities as beneficial owners;
+- Oracle V2 read-only X1 price-evidence verification under #272, with exact on-chain identity/layout/freshness proof and source-independence discipline.
 
 ### Verified Intelligence
 
@@ -302,15 +311,16 @@ Current parallel work:
 13. continue Issue #30 provider-gap hardening under read-only/fail-closed contracts;
 14. resolve/accept or close PR #242 based on exact Warp Bridge provenance evidence;
 15. resolve/accept or close PR #229 based on bounded X1Scroll credential-backed access evidence;
-16. resolve/accept or close PR #227 based on reproducible FortiBlox provider-contract evidence.
+16. resolve/accept or close PR #227 based on reproducible FortiBlox provider-contract evidence;
+17. verify or reject Oracle V2 as a bounded read-only X1 price-evidence source under #272, beginning with deterministic X1 RPC verification of the repository-declared program/state and exact account/freshness semantics.
 
 Future candidates — **not active milestones until separately accepted**:
 
-17. any public alert/Scout-reliance promotion;
-18. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-19. further field-by-field Solana maturity;
-20. Ethereum under an explicit capability/acceptance plan;
-21. investigation/evidence export and premium access.
+18. any public alert/Scout-reliance promotion;
+19. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+20. further field-by-field Solana maturity;
+21. Ethereum under an explicit capability/acceptance plan;
+22. investigation/evidence export and premium access.
 
 None authorizes execution.
 
