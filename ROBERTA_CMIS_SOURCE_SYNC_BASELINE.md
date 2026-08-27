@@ -118,7 +118,7 @@ No broader public intelligence/alert promotion is accepted by implication.
 
 ## Provider-gap state
 
-The X1 provider-gap track remains read-only/fail-closed. Open research/draft work includes Warp Bridge provenance binding, X1Scroll bounded authenticated RPC access classification, and FortiBlox provider-contract research. Open/green/mergeable state does not equal accepted provider capability.
+The X1 provider-gap track remains read-only/fail-closed. Warp Bridge and FortiBlox research branches are closed as not currently verifiable/candidate research. X1Scroll PR #229 is closed and X1Scroll is removed from CMIS integration scope because no repository API key was available for the required credential-backed probe; no provider request was made and no X1Scroll capability is accepted on `main`. A future secondary provider requires a new explicit verification gate.
 
 ## Execution boundary
 
