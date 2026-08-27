@@ -322,7 +322,7 @@ class CMISGateway:
     ) -> None:
         """Persist bounded verified market facts for future historical analysis."""
 
-        if not self.auto_record_history:
+        if not getattr(self, "auto_record_history", False):
             return
 
         data = market_envelope.get("data")
