@@ -253,10 +253,16 @@ def _structured_public_field(
         holders = report.get("holders")
         if _complete(report, "holders") and holders is not None:
             return f"• Holders: {int(holders):,}"
+        reported = report.get("holders_reported")
+        if reported is not None:
+            return (
+                f"• Holders: Not verified — provider reports {int(reported):,}; "
+                "counted-entity and coverage semantics are unverified"
+            )
         if report.get("holders_observed"):
             return (
-                "• Holders: Not verified — conflicting or incomplete "
-                "XDEX pool observations"
+                "• Holders: Not verified — provider observations conflict or are incomplete; "
+                "counted-entity and coverage semantics are unverified"
             )
         return "• Holders: Not available from verified data"
 
@@ -431,6 +437,9 @@ def format_field_line(
         structured_line = _structured_public_field(field, snap, report, format_usd)
         if structured_line is not None:
             return structured_line
+
+    if field == "holders":
+        return "• Holders: Not available from verified data"
 
     labels = {
         "price": "Price",
