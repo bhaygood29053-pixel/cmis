@@ -21,8 +21,8 @@ A public webpage, UI, release note, or advertised feature is not automatically a
 | General indexing | Partial | X1.Ninja publicly demonstrates deep XDEX trade/wallet indexing, but the published API surface does not yet establish a complete general wallet-indexer contract for CMIS. |
 | DEX market data | Available | X1.Ninja documents pools, pool detail, trades, and OHLCV endpoints. Existing direct XDEX transport remains useful as an independent/provider-native source. |
 | Historical market data | Available candidate | X1.Ninja exposes OHLCV and trade history. Both require deterministic contract testing before CMIS promotion. |
-| Real-time streams | Available candidate | X1.Ninja documents an SSE trade stream; X1Scroll advertises Yellowstone gRPC/Geyser. Access and semantics require live verification. |
-| Independent verification | Improving | Official X1 RPC, X1.Ninja, direct XDEX, self-hosted nodes, X1Scroll, and FortiBlox create potential redundancy, but same-fact deterministic cross-checks are not yet fully implemented. |
+| Real-time streams | Available candidate | X1.Ninja documents an SSE trade stream; general X1 PubSub/self-hosted streaming remains a separate verification path. Access and semantics require live verification. |
+| Independent verification | Improving | Official X1 RPC, X1.Ninja, direct XDEX, and self-hosted nodes provide current verification paths. Additional third-party redundancy requires separately verified contracts; same-fact deterministic cross-checks are not yet fully implemented. |
 | Bridge Intelligence | Clearest remaining X1 gap | Official Warp Bridge and X1 Prism expose bridge-related UI/status metrics, but no stable documented public read-only bridge API was established by this research. |
 | Oracle V2 price evidence | Candidate (supplemental research 2026-08-26) | Public repository evidence describes a multi-source external price feed, OpenBao-signed relays, and an X1 Oracle Vault. Current deployed program/state identity and live slot semantics remain unverified by CMIS. |
 
@@ -69,21 +69,20 @@ Engineering implication: the X1 data stack does not have to depend exclusively o
 
 Source: `https://docs.x1.xyz/validating/create-a-read-only-node`
 
-## X1Scroll
+## X1Scroll — removed integration candidate
 
-Classification: **THIRD-PARTY CANDIDATE — MUST CONTRACT-TEST**.
+Classification: **REMOVED FROM CMIS INTEGRATION SCOPE / HISTORICAL RESEARCH RECORD ONLY**.
 
-X1Scroll advertises archival RPC, historical queries, WebSocket/streaming support, and a Yellowstone gRPC/Geyser endpoint at `grpc.x1scroll.io:10000`.
+Earlier public research recorded advertised archival RPC and streaming capabilities. CMIS later prepared bounded authenticated read-only verification in PR #229, but the required `X1SCROLL_API_KEY` was not available to the repository workflow. The verification run failed at the credential gate before any provider request was sent.
 
-Potential use beneath X1 Provider:
+Consequences:
 
-- archive/history provider;
-- backup RPC;
-- real-time Geyser provider.
+- no X1Scroll provider adapter is accepted on `main`;
+- no X1Scroll live-verification workflow is accepted on `main`;
+- X1Scroll is not an active archive, backup-RPC, streaming, or source-independence candidate for CMIS;
+- historical advertised claims remain research history only and must not be interpreted as current capability.
 
-Required checks include authentication, supported RPC methods, retention depth, commitment/finality, reconnect behavior, latency, quotas, and errors.
-
-Source: `https://x1scroll.io/`
+A future reconsideration would require a new explicit issue, reproducible provider-owned access contract, available credentials where required, bounded read-only evidence, and normal CMIS promotion gates.
 
 ## Official Warp Bridge
 
@@ -236,7 +235,7 @@ Roberta -> X1 Scout -> CMIS -> X1 Provider
 3. Contract-test X1.Ninja `/v1/ohlcv/{address}`.
 4. Cross-check X1.Ninja reserves/holders against X1 RPC evidence.
 5. Probe X1.Ninja SSE access without assuming advertised Pro access is live.
-6. Evaluate self-hosted X1 read-only node vs X1Scroll for history/streaming redundancy.
+6. Evaluate the self-hosted X1 read-only node for history/streaming redundancy; any additional secondary provider requires a new explicit verification gate.
 7. Perform read-only Warp Bridge source discovery and contract verification.
 8. Verify Oracle V2's repository-declared X1 program/state through X1 RPC and prove exact layout/freshness semantics under #272 before any provider promotion.
 9. Investigate X1 Prism only as an independent bridge-flow cross-check until provenance is proven.
