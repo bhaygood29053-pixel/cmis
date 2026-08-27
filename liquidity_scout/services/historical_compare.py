@@ -11,6 +11,16 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 SupplyLookup = Callable[[str], Optional[str]]
 
+DEFAULT_PROFILE_METRICS = (
+    "price",
+    "liquidity",
+    "volume",
+    "transactions",
+    "holders",
+    "supply",
+)
+SUPPORTED_PROFILE_METRICS = frozenset(DEFAULT_PROFILE_METRICS)
+
 
 def _number(value: Any) -> Optional[float]:
     if value is None or isinstance(value, bool):
@@ -38,6 +48,7 @@ def _verified_market_values(snapshot: Dict[str, Any]) -> Dict[str, Optional[floa
             "price": _number(snapshot.get("price_usd_value")),
             "liquidity": _number(snapshot.get("liquidity")),
             "volume": _number(snapshot.get("vol24")),
+            "transactions": _number(snapshot.get("transactions_24h")),
             "holders": _number(snapshot.get("holders")),
         }
 
@@ -52,6 +63,7 @@ def _verified_market_values(snapshot: Dict[str, Any]) -> Dict[str, Optional[floa
         "price": exact("price_usd", "price"),
         "liquidity": exact("liquidity_usd", "liquidity"),
         "volume": exact("volume_24h_usd", "volume_24h"),
+        "transactions": exact("transactions_24h", "transactions_24h"),
         "holders": exact("holders", "holders"),
     }
 
@@ -97,9 +109,552 @@ def _current_metric_verified(snapshot: Dict[str, Any], metric: str) -> bool:
         "price": "price",
         "liquidity": "liquidity",
         "volume": "volume_24h",
+        "transactions": "transactions_24h",
         "holders": "holders",
     }.get(metric)
     return bool(completeness_key and completeness.get(completeness_key) is True)
+
+
+
+def _normalize_profile_metrics(metrics: Any) -> tuple[str, ...]:
+    if metrics is None:
+        return DEFAULT_PROFILE_METRICS
+    if isinstance(metrics, (str, bytes)):
+        raw = [metrics]
+    else:
+        try:
+            raw = list(metrics)
+        except TypeError as exc:
+            raise ValueError("profile metrics must be an iterable of metric names") from exc
+
+    result: list[str] = []
+    for value in raw:
+        name = str(value or "").strip().lower()
+        if not name:
+            continue
+        if name not in SUPPORTED_PROFILE_METRICS:
+            raise ValueError(
+                "unsupported historical profile metric: "
+                f"{name}; supported={sorted(SUPPORTED_PROFILE_METRICS)!r}"
+            )
+        if name not in result:
+            result.append(name)
+    return tuple(result) or DEFAULT_PROFILE_METRICS
+
+
+def _current_profile_values(
+    snapshot: Dict[str, Any],
+    *,
+    get_total_supply: Optional[SupplyLookup] = None,
+) -> tuple[str, str, Dict[str, Optional[float]], Dict[str, bool], Any]:
+    mint, symbol = _identity(snapshot)
+    symbol = symbol or "Unknown"
+    values = _verified_market_values(snapshot)
+    verified = {
+        metric: (
+            values.get(metric) is not None
+            and _current_metric_verified(snapshot, metric)
+        )
+        for metric in ("price", "liquidity", "volume", "transactions", "holders")
+    }
+
+    supply_value = None
+    if get_total_supply is not None and mint:
+        supply_value = _number(get_total_supply(mint))
+    values["supply"] = supply_value
+    verified["supply"] = supply_value is not None and get_total_supply is not None
+    return mint, symbol, values, verified, _current_observed_at(snapshot)
+
+
+def _record_profile_snapshot(
+    snapshot: Dict[str, Any],
+    *,
+    history_backend: Any,
+    get_total_supply: Optional[SupplyLookup] = None,
+) -> None:
+    mint, symbol, values, verified, observed_at = _current_profile_values(
+        snapshot,
+        get_total_supply=get_total_supply,
+    )
+    if not mint:
+        return
+
+    report = _structured_report(snapshot) or {}
+    kwargs = {
+        "mint": mint,
+        "symbol": symbol,
+        "price": values.get("price") if verified.get("price") else None,
+        "liquidity": values.get("liquidity") if verified.get("liquidity") else None,
+        "volume24": values.get("volume") if verified.get("volume") else None,
+        "transactions24": (
+            values.get("transactions") if verified.get("transactions") else None
+        ),
+        "holders": values.get("holders") if verified.get("holders") else None,
+        "total_supply": values.get("supply") if verified.get("supply") else None,
+        "pool_count": report.get("lp_count"),
+        "timestamp": observed_at,
+    }
+
+    writer = getattr(history_backend, "record_snapshot_if_due", None)
+    if callable(writer):
+        writer(**kwargs)
+        return
+
+    writer = getattr(history_backend, "record_snapshot", None)
+    if callable(writer):
+        # Legacy injected backends may not support the newer optional fields.
+        legacy_kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if key not in {"transactions24", "timestamp"}
+        }
+        try:
+            writer(**kwargs)
+        except TypeError:
+            writer(**legacy_kwargs)
+
+
+def _normalized_series(
+    history_backend: Any,
+    mint: str,
+    metric: str,
+    *,
+    current_value: Optional[float],
+    current_verified: bool,
+    current_observed_at: Any,
+) -> list[Dict[str, float]]:
+    reader = getattr(history_backend, "historical_series", None)
+    if not callable(reader):
+        return []
+
+    raw = reader(mint, metric)
+    result: list[Dict[str, float]] = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        timestamp = _number(item.get("timestamp"))
+        value = _number(item.get("value"))
+        if timestamp is None or value is None:
+            continue
+        result.append({"timestamp": int(timestamp), "value": float(value)})
+
+    if (
+        current_verified
+        and current_value is not None
+        and _number(current_observed_at) is not None
+    ):
+        current_point = {
+            "timestamp": int(float(current_observed_at)),
+            "value": float(current_value),
+        }
+        if not result or result[-1] != current_point:
+            result.append(current_point)
+
+    result.sort(key=lambda item: item["timestamp"])
+    deduped: list[Dict[str, float]] = []
+    for item in result:
+        if deduped and item["timestamp"] == deduped[-1]["timestamp"]:
+            deduped[-1] = item
+        else:
+            deduped.append(item)
+    return deduped
+
+
+def _sampled_max_drawdown_pct(series: list[Dict[str, float]]) -> Optional[float]:
+    if len(series) < 2:
+        return None
+    peak = series[0]["value"]
+    worst = 0.0
+    for item in series[1:]:
+        value = item["value"]
+        if value > peak:
+            peak = value
+            continue
+        if peak == 0:
+            continue
+        drawdown = ((value - peak) / peak) * 100.0
+        if drawdown < worst:
+            worst = drawdown
+    return float(worst)
+
+
+def _metric_profile(
+    history_backend: Any,
+    mint: str,
+    metric: str,
+    *,
+    current_value: Optional[float],
+    current_verified: bool,
+    current_observed_at: Any,
+    gap_threshold_seconds: int,
+) -> Dict[str, Any]:
+    series = _normalized_series(
+        history_backend,
+        mint,
+        metric,
+        current_value=current_value,
+        current_verified=current_verified,
+        current_observed_at=current_observed_at,
+    )
+    if not series:
+        return {
+            "status": "unavailable",
+            "reason": "verified_history_unavailable",
+            "observation_count": 0,
+            "current_value": current_value,
+            "current_verified": bool(current_verified),
+            "first_observed_at": None,
+            "last_observed_at": None,
+            "coverage_seconds": None,
+            "total_change_pct": None,
+            "minimum_value": None,
+            "maximum_value": None,
+            "sampled_max_drawdown_pct": None,
+            "observed_gap_count": None,
+            "largest_observed_gap_seconds": None,
+            "continuous_coverage_verified": False,
+        }
+
+    first = series[0]
+    last = series[-1]
+    gaps = [
+        right["timestamp"] - left["timestamp"]
+        for left, right in zip(series, series[1:])
+        if right["timestamp"] >= left["timestamp"]
+    ]
+    flagged_gaps = [
+        gap for gap in gaps if gap > max(0, int(gap_threshold_seconds))
+    ]
+    change = None
+    if len(series) >= 2:
+        calculator = getattr(history_backend, "percent_change", None)
+        if callable(calculator):
+            change = calculator(first["value"], last["value"])
+        elif first["value"] != 0:
+            change = ((last["value"] - first["value"]) / first["value"]) * 100.0
+
+    minimum = min(series, key=lambda item: item["value"])
+    maximum = max(series, key=lambda item: item["value"])
+
+    return {
+        "status": "ok" if len(series) >= 2 else "partial",
+        "reason": None if len(series) >= 2 else "single_verified_observation_only",
+        "observation_count": len(series),
+        "current_value": current_value,
+        "current_verified": bool(current_verified),
+        "first_value": first["value"],
+        "first_observed_at": first["timestamp"],
+        "last_value": last["value"],
+        "last_observed_at": last["timestamp"],
+        "coverage_seconds": max(0, last["timestamp"] - first["timestamp"]),
+        "total_change_pct": None if change is None else float(change),
+        "minimum_value": minimum["value"],
+        "minimum_observed_at": minimum["timestamp"],
+        "maximum_value": maximum["value"],
+        "maximum_observed_at": maximum["timestamp"],
+        "sampled_max_drawdown_pct": (
+            _sampled_max_drawdown_pct(series) if metric == "price" else None
+        ),
+        "observed_gap_count": len(flagged_gaps),
+        "largest_observed_gap_seconds": max(gaps) if gaps else 0,
+        "gap_threshold_seconds": max(0, int(gap_threshold_seconds)),
+        "continuous_coverage_verified": False,
+    }
+
+
+def build_all_available_history_profile(
+    snapshot: Dict[str, Any],
+    *,
+    history_backend: Any,
+    get_total_supply: Optional[SupplyLookup] = None,
+    metrics: Any = None,
+    gap_threshold_seconds: int = 129600,
+) -> Dict[str, Any]:
+    """Summarize every verified local historical observation available to CMIS.
+
+    "All available" is intentionally not relabeled as the asset's full lifetime.
+    The profile reports the exact stored observation bounds and keeps continuous
+    coverage/lifetime completeness false until separately proven.
+    """
+
+    if not isinstance(snapshot, dict):
+        raise TypeError("snapshot must be a mapping")
+
+    selected = _normalize_profile_metrics(metrics)
+    mint, symbol, values, verified, current_observed_at = _current_profile_values(
+        snapshot,
+        get_total_supply=get_total_supply,
+    )
+
+    _record_profile_snapshot(
+        snapshot,
+        history_backend=history_backend,
+        get_total_supply=get_total_supply,
+    )
+
+    profiles = {
+        metric: _metric_profile(
+            history_backend,
+            mint,
+            metric,
+            current_value=values.get(metric),
+            current_verified=verified.get(metric, False),
+            current_observed_at=current_observed_at,
+            gap_threshold_seconds=gap_threshold_seconds,
+        )
+        for metric in selected
+    }
+    available = [
+        item for item in profiles.values()
+        if item.get("observation_count", 0) > 0
+    ]
+    multi_point = [
+        item for item in profiles.values()
+        if item.get("observation_count", 0) >= 2
+    ]
+
+    starts = [
+        item.get("first_observed_at")
+        for item in available
+        if item.get("first_observed_at") is not None
+    ]
+    ends = [
+        item.get("last_observed_at")
+        for item in available
+        if item.get("last_observed_at") is not None
+    ]
+
+    status = "unavailable"
+    reason = "verified_history_unavailable"
+    if available:
+        status = "partial"
+        reason = "asset_lifetime_coverage_unverified"
+        if multi_point:
+            reason = "all_available_verified_observations_summarized"
+
+    return {
+        "status": status,
+        "mode": "all_available",
+        "asset": {"symbol": symbol or None, "mint": mint or None},
+        "current_observed_at": current_observed_at,
+        "source": "historical_db",
+        "coverage_scope": "cmis_stored_verified_observations",
+        "first_verified_observed_at": min(starts) if starts else None,
+        "last_verified_observed_at": max(ends) if ends else None,
+        "coverage_seconds": (
+            max(ends) - min(starts) if starts and ends else None
+        ),
+        "available_metric_count": len(available),
+        "multi_point_metric_count": len(multi_point),
+        "requested_metrics": list(selected),
+        "metrics": profiles,
+        "asset_lifetime_start_verified": False,
+        "full_asset_lifetime_verified": False,
+        "continuous_coverage_verified": False,
+        "provider_history_imported": False,
+        "reason": reason,
+        "limitations": [
+            "all_available_means_all_verified_observations_currently_stored_by_cmis",
+            "asset_creation_or_first_trade_time_not_verified",
+            "continuous_historical_coverage_not_verified",
+            "external_ohlcv_or_archive_history_not_promoted_into_this_profile",
+            "sampled_max_drawdown_uses_stored_price_observations_only",
+        ],
+    }
+
+
+def _common_window_metric(
+    history_backend: Any,
+    metric: str,
+    primary_mint: str,
+    secondary_mint: str,
+    primary_metric: Dict[str, Any],
+    secondary_metric: Dict[str, Any],
+    *,
+    anchor_tolerance_seconds: int,
+) -> Dict[str, Any]:
+    starts = [
+        primary_metric.get("first_observed_at"),
+        secondary_metric.get("first_observed_at"),
+    ]
+    ends = [
+        primary_metric.get("last_observed_at"),
+        secondary_metric.get("last_observed_at"),
+    ]
+    if any(value is None for value in starts + ends):
+        return {
+            "status": "unavailable",
+            "reason": "common_verified_window_unavailable",
+        }
+
+    start = max(int(value) for value in starts)
+    end = min(int(value) for value in ends)
+    if end <= start:
+        return {
+            "status": "unavailable",
+            "reason": "verified_history_does_not_overlap",
+            "start_observed_at": start,
+            "end_observed_at": end,
+        }
+
+    reader = getattr(history_backend, "historical_value_at", None)
+    if not callable(reader):
+        return {
+            "status": "unavailable",
+            "reason": "aligned_history_lookup_unavailable",
+            "start_observed_at": start,
+            "end_observed_at": end,
+        }
+
+    anchors = {
+        "primary_start": reader(
+            primary_mint,
+            metric,
+            start,
+            tolerance_seconds=anchor_tolerance_seconds,
+        ),
+        "secondary_start": reader(
+            secondary_mint,
+            metric,
+            start,
+            tolerance_seconds=anchor_tolerance_seconds,
+        ),
+        "primary_end": reader(
+            primary_mint,
+            metric,
+            end,
+            tolerance_seconds=anchor_tolerance_seconds,
+        ),
+        "secondary_end": reader(
+            secondary_mint,
+            metric,
+            end,
+            tolerance_seconds=anchor_tolerance_seconds,
+        ),
+    }
+    if not all(isinstance(value, dict) for value in anchors.values()):
+        return {
+            "status": "unavailable",
+            "reason": "aligned_common_window_anchors_unavailable",
+            "start_observed_at": start,
+            "end_observed_at": end,
+            "anchor_tolerance_seconds": int(anchor_tolerance_seconds),
+        }
+
+    calculator = getattr(history_backend, "percent_change", None)
+    if not callable(calculator):
+        calculator = lambda old, new: None if old == 0 else ((new - old) / old) * 100.0
+
+    primary_change = calculator(
+        anchors["primary_start"]["value"],
+        anchors["primary_end"]["value"],
+    )
+    secondary_change = calculator(
+        anchors["secondary_start"]["value"],
+        anchors["secondary_end"]["value"],
+    )
+
+    if primary_change is None or secondary_change is None:
+        return {
+            "status": "partial",
+            "reason": "common_window_change_unavailable",
+            "start_observed_at": start,
+            "end_observed_at": end,
+            "anchors": anchors,
+        }
+
+    return {
+        "status": "ok",
+        "reason": None,
+        "start_observed_at": start,
+        "end_observed_at": end,
+        "coverage_seconds": end - start,
+        "anchor_tolerance_seconds": int(anchor_tolerance_seconds),
+        "primary_change_pct": float(primary_change),
+        "secondary_change_pct": float(secondary_change),
+        "performance_difference_pct_points": float(
+            primary_change - secondary_change
+        ),
+        "anchors": anchors,
+    }
+
+
+def build_all_available_pair_comparison(
+    primary_snapshot: Dict[str, Any],
+    secondary_snapshot: Dict[str, Any],
+    *,
+    history_backend: Any,
+    get_total_supply: Optional[SupplyLookup] = None,
+    metrics: Any = None,
+    gap_threshold_seconds: int = 129600,
+    anchor_tolerance_seconds: int = 21600,
+) -> Dict[str, Any]:
+    """Compare two assets over their overlapping verified CMIS history."""
+
+    selected = _normalize_profile_metrics(metrics)
+    primary = build_all_available_history_profile(
+        primary_snapshot,
+        history_backend=history_backend,
+        get_total_supply=get_total_supply,
+        metrics=selected,
+        gap_threshold_seconds=gap_threshold_seconds,
+    )
+    secondary = build_all_available_history_profile(
+        secondary_snapshot,
+        history_backend=history_backend,
+        get_total_supply=get_total_supply,
+        metrics=selected,
+        gap_threshold_seconds=gap_threshold_seconds,
+    )
+
+    primary_asset = primary["asset"]
+    secondary_asset = secondary["asset"]
+    common = {}
+    for metric in selected:
+        common[metric] = _common_window_metric(
+            history_backend,
+            metric,
+            str(primary_asset.get("mint") or ""),
+            str(secondary_asset.get("mint") or ""),
+            primary["metrics"][metric],
+            secondary["metrics"][metric],
+            anchor_tolerance_seconds=anchor_tolerance_seconds,
+        )
+
+    comparable = [
+        value for value in common.values()
+        if value.get("status") == "ok"
+    ]
+    status = "partial" if comparable else "unavailable"
+    reason = (
+        "common_verified_history_compared"
+        if comparable
+        else "common_verified_history_unavailable"
+    )
+
+    return {
+        "status": status,
+        "mode": "all_available_pair",
+        "asset": dict(primary_asset),
+        "compare_asset": dict(secondary_asset),
+        "primary_profile": primary,
+        "secondary_profile": secondary,
+        "common_window_metrics": common,
+        "comparable_metric_count": len(comparable),
+        "requested_metrics": list(selected),
+        "coverage_scope": "overlapping_cmis_stored_verified_observations",
+        "full_asset_lifetime_verified": False,
+        "continuous_coverage_verified": False,
+        "reason": reason,
+        "limitations": [
+            "assets_may_have_different_verified_history_start_times",
+            "comparison_uses_only_overlapping_verified_cmis_observation_windows",
+            "aligned_common_window_anchors_require_explicit_tolerance",
+            "external_ohlcv_or_archive_history_not_promoted_into_this_comparison",
+            "no_claim_of_complete_asset_lifetime_history",
+        ],
+        "source": "historical_db",
+    }
 
 
 def _base_result(
@@ -204,6 +759,7 @@ def build_historical_comparison(
         price=market_values.get("price"),
         liquidity=market_values.get("liquidity"),
         volume24=market_values.get("volume"),
+        transactions24=market_values.get("transactions"),
         holders=market_values.get("holders"),
         total_supply=current_value if metric == "supply" else None,
         pool_count=(
@@ -341,4 +897,11 @@ def format_historical_comparison(
     return answer
 
 
-__all__ = ["build_historical_comparison", "format_historical_comparison"]
+__all__ = [
+    "DEFAULT_PROFILE_METRICS",
+    "SUPPORTED_PROFILE_METRICS",
+    "build_all_available_history_profile",
+    "build_all_available_pair_comparison",
+    "build_historical_comparison",
+    "format_historical_comparison",
+]
