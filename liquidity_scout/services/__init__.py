@@ -20,6 +20,10 @@ from .cmis_tokenomics import build_tokenomics_response
 from .cmis_verification_evidence import build_verification_evidence_response
 from .cmis_verification_evidence_lookup import lookup_verification_evidence
 from .historical_compare import (
+    DEFAULT_PROFILE_METRICS,
+    SUPPORTED_PROFILE_METRICS,
+    build_all_available_history_profile,
+    build_all_available_pair_comparison,
     build_historical_comparison,
     format_historical_comparison,
 )
@@ -57,6 +61,7 @@ __all__ = [
     "AMBIGUOUS",
     "BLOCK",
     "DEFAULT_PRE_TRADE_POLICY",
+    "DEFAULT_PROFILE_METRICS",
     "DEFAULT_RISK_POLICY",
     "ERROR",
     "FIELD_ORDER",
@@ -64,9 +69,12 @@ __all__ = [
     "PARTIAL",
     "PASS",
     "SERVICE_STATUSES",
+    "SUPPORTED_PROFILE_METRICS",
     "SUPPORTED_RANK_METRICS",
     "UNAVAILABLE",
     "WARN",
+    "build_all_available_history_profile",
+    "build_all_available_pair_comparison",
     "build_asset_lookup_response",
     "build_historical_compare_response",
     "build_historical_comparison",
