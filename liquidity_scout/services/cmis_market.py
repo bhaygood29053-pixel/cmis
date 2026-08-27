@@ -15,13 +15,14 @@ from .cmis_contract import AMBIGUOUS, ERROR, OK, PARTIAL, UNAVAILABLE, build_ser
 from .market_report import build_market_report
 
 
-_COMPLETENESS_KEYS = (
+_REQUIRED_COMPLETENESS_KEYS = (
     "price",
     "liquidity",
     "volume_24h",
     "transactions_24h",
-    "holders",
 )
+_OPTIONAL_COMPLETENESS_KEYS = ("holders",)
+_COMPLETENESS_KEYS = _REQUIRED_COMPLETENESS_KEYS + _OPTIONAL_COMPLETENESS_KEYS
 
 
 def _text(value: Any) -> Optional[str]:
@@ -53,11 +54,20 @@ def _confidence(report: Mapping[str, Any]) -> Dict[str, Any]:
     }
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
+    required_checks = {
+        f"{key}_complete": completeness.get(key) is True
+        for key in _REQUIRED_COMPLETENESS_KEYS
+    }
+    required_verified = sum(1 for value in required_checks.values() if value)
+    required_total = len(required_checks)
     return {
-        "complete": verified == total,
+        "complete": required_verified == required_total,
+        "all_fields_complete": verified == total,
         "verified_checks": verified,
         "total_checks": total,
         "verification_ratio": round(verified / total, 6),
+        "required_verified_checks": required_verified,
+        "required_total_checks": required_total,
         "checks": checks,
     }
 
