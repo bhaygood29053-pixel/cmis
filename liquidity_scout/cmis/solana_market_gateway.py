@@ -6,8 +6,10 @@ observations. A deployment must also provide an explicit cross-source price
 tolerance. Numerical agreement remains non-promotable because shared freshness
 and observation scope are not yet verified.
 
-No pair is selected as canonical, no pair prices are averaged, and pair-scoped
-liquidity/volume are never promoted to Solana-wide asset aggregates.
+No pair is selected as canonical and no pair prices are averaged. CMIS may
+deterministically sum liquidity/24h volume across the exact eligible unique
+DEX Screener pairs observed in one response, but that bounded observed-pair
+aggregate is never promoted to a complete Solana-wide asset aggregate.
 """
 
 from __future__ import annotations
@@ -54,6 +56,149 @@ def _tolerance(value: object) -> str | None:
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return text or "0"
+
+
+def _canonical_decimal(value: Decimal) -> str:
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _nonnegative_decimal(value: object) -> Decimal | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if not parsed.is_finite() or parsed < 0:
+        return None
+    return parsed
+
+
+def _pair_contains_requested_mint(pair: Mapping[str, Any], requested_mint: str) -> bool:
+    base = pair.get("base_token")
+    quote = pair.get("quote_token")
+    if not isinstance(base, Mapping) or not isinstance(quote, Mapping):
+        return False
+    base_address = base.get("address")
+    quote_address = quote.get("address")
+    return requested_mint in {base_address, quote_address}
+
+
+def _observed_pair_aggregate(
+    record: Mapping[str, Any],
+    *,
+    requested_mint: str,
+) -> dict[str, Any]:
+    """Aggregate only the exact eligible unique pair rows in one provider response.
+
+    This is an observed-pair summary, not proof that DEX Screener returned the
+    complete Solana pair universe for the mint. Duplicate pair identities are
+    counted once only when their normalized rows agree exactly; conflicting
+    duplicates are excluded fail-closed.
+    """
+
+    if record.get("chain") != CHAIN:
+        raise ValueError("DEX Screener aggregation chain identity mismatch")
+    if record.get("mint") != requested_mint:
+        raise ValueError("DEX Screener aggregation mint identity mismatch")
+
+    raw_pairs = record.get("pairs")
+    if not isinstance(raw_pairs, list):
+        raise ValueError("DEX Screener aggregation pairs must be a list")
+
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    excluded_pair_rows = 0
+    for pair in raw_pairs:
+        if not isinstance(pair, Mapping):
+            excluded_pair_rows += 1
+            continue
+        address = pair.get("pair_address")
+        if not isinstance(address, str) or not address.strip():
+            excluded_pair_rows += 1
+            continue
+        grouped.setdefault(address.strip(), []).append(pair)
+
+    duplicate_pair_addresses: list[str] = []
+    conflicting_duplicate_pair_addresses: list[str] = []
+    eligible_pairs: list[Mapping[str, Any]] = []
+
+    for address in sorted(grouped):
+        rows = grouped[address]
+        if len(rows) > 1:
+            duplicate_pair_addresses.append(address)
+            first = dict(rows[0])
+            if any(dict(row) != first for row in rows[1:]):
+                conflicting_duplicate_pair_addresses.append(address)
+                excluded_pair_rows += len(rows)
+                continue
+        pair = rows[0]
+        if not _pair_contains_requested_mint(pair, requested_mint):
+            excluded_pair_rows += len(rows)
+            continue
+        eligible_pairs.append(pair)
+
+    liquidity_total = Decimal(0)
+    volume_total = Decimal(0)
+    liquidity_values = 0
+    volume_values = 0
+    liquidity_rows_complete = bool(eligible_pairs)
+    volume_rows_complete = bool(eligible_pairs)
+
+    for pair in eligible_pairs:
+        liquidity = _nonnegative_decimal(pair.get("liquidity_usd"))
+        if liquidity is None:
+            liquidity_rows_complete = False
+        else:
+            liquidity_total += liquidity
+            liquidity_values += 1
+
+        volume = pair.get("volume")
+        volume_24h = (
+            _nonnegative_decimal(volume.get("h24"))
+            if isinstance(volume, Mapping)
+            else None
+        )
+        if volume_24h is None:
+            volume_rows_complete = False
+        else:
+            volume_total += volume_24h
+            volume_values += 1
+
+    if conflicting_duplicate_pair_addresses:
+        liquidity_rows_complete = False
+        volume_rows_complete = False
+
+    return {
+        "observed_pair_count": len(eligible_pairs),
+        "#LPs": len(eligible_pairs),
+        "observed_pair_liquidity_usd": (
+            _canonical_decimal(liquidity_total) if liquidity_values else None
+        ),
+        "observed_pair_volume_24h_usd": (
+            _canonical_decimal(volume_total) if volume_values else None
+        ),
+        "observed_pair_aggregation": {
+            "scope": "eligible_unique_dexscreener_pairs_observed_in_response",
+            "pair_identity_deduplicated": True,
+            "pair_rows_observed": len(raw_pairs),
+            "pair_rows_excluded": excluded_pair_rows,
+            "duplicate_pair_addresses": duplicate_pair_addresses,
+            "conflicting_duplicate_pair_addresses": (
+                conflicting_duplicate_pair_addresses
+            ),
+            "liquidity_value_pair_count": liquidity_values,
+            "volume_24h_value_pair_count": volume_values,
+            "liquidity_rows_complete": liquidity_rows_complete,
+            "volume_rows_complete": volume_rows_complete,
+            "pair_universe_complete": False,
+            "asset_wide_liquidity_verified": False,
+            "asset_wide_volume_verified": False,
+            "market_source_independence_verified": False,
+        },
+    }
 
 
 def _pair_observations(record: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -242,6 +387,16 @@ class SolanaMarketReportMixin:
             else None
         )
         pair_observations = _pair_observations(dex_mapping)
+        try:
+            observed_pair_aggregate = _observed_pair_aggregate(
+                dex_mapping,
+                requested_mint=mint,
+            )
+        except (TypeError, ValueError) as exc:
+            return self._solana_market_error(
+                "solana_observed_pair_aggregation_contract_invalid",
+                f"Solana observed-pair aggregation failed ({type(exc).__name__}).",
+            )
 
         warnings = [
             {
@@ -272,7 +427,45 @@ class SolanaMarketReportMixin:
                     "asset volume total is claimed."
                 ),
             },
+            {
+                "code": "solana_observed_pair_aggregate_scope_limited",
+                "message": (
+                    "Observed-pair liquidity/volume totals cover only eligible "
+                    "unique DEX Screener pairs returned in this response; complete "
+                    "Solana pair-universe coverage is not verified."
+                ),
+            },
         ]
+        aggregate_meta = observed_pair_aggregate["observed_pair_aggregation"]
+        if (
+            observed_pair_aggregate["observed_pair_count"] > 0
+            and aggregate_meta["liquidity_rows_complete"] is not True
+        ):
+            warnings.append(
+                {
+                    "code": "solana_observed_pair_liquidity_partial",
+                    "message": (
+                        "Observed-pair liquidity is a lower-bound subtotal because "
+                        "one or more eligible observed pairs have unavailable or "
+                        "conflicting liquidity evidence."
+                    ),
+                }
+            )
+        if (
+            observed_pair_aggregate["observed_pair_count"] > 0
+            and aggregate_meta["volume_rows_complete"] is not True
+        ):
+            warnings.append(
+                {
+                    "code": "solana_observed_pair_volume_partial",
+                    "message": (
+                        "Observed-pair 24h volume is a lower-bound subtotal because "
+                        "one or more eligible observed pairs have unavailable or "
+                        "conflicting 24h volume evidence."
+                    ),
+                }
+            )
+
         if crosscheck_status == AGREEMENT:
             warnings.append(
                 {
@@ -355,6 +548,17 @@ class SolanaMarketReportMixin:
                 "price_crosscheck": dict(crosscheck),
                 "pair_observations": pair_observations,
                 "pair_count_observed": dex_mapping.get("pair_count_observed"),
+                "observed_pair_count": observed_pair_aggregate["observed_pair_count"],
+                "#LPs": observed_pair_aggregate["#LPs"],
+                "observed_pair_liquidity_usd": (
+                    observed_pair_aggregate["observed_pair_liquidity_usd"]
+                ),
+                "observed_pair_volume_24h_usd": (
+                    observed_pair_aggregate["observed_pair_volume_24h_usd"]
+                ),
+                "observed_pair_aggregation": dict(
+                    observed_pair_aggregate["observed_pair_aggregation"]
+                ),
                 "asset_wide_liquidity_usd": None,
                 "asset_wide_liquidity_verified": False,
                 "asset_wide_volume_24h_usd": None,
