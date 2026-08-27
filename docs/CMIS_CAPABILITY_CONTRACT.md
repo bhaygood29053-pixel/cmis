@@ -1,6 +1,6 @@
 # Scout ↔ CMIS Capability Contract
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-26
 
 CMIS publishes machine-readable service eligibility at:
 
@@ -16,7 +16,7 @@ Accepted baseline:
 
 - capability schema: `1`
 - global existing-service minimum: `1.8.0`
-- current CMIS contract: `1.9.0`
+- current CMIS contract: `1.10.0`
 - request path: `/v1/cmis`
 - Evidence Receipt schema: `1`
 - Proof Score schema: `1`
@@ -81,6 +81,30 @@ For this operation, Scouts require CMIS contract `>=1.9.0` and must validate the
 Solana is explicitly classified for this service as unavailable, non-callable, non-promoted, and `execution_authorized=false`.
 
 The promotion does not change the Phase 11 foundation-level non-promotion flags and does not promote wallet activity, generic history, raw concentration snapshots, behavioral labels, ownership inference, or other intelligence primitives.
+
+## Historical comparison modes — CMIS 1.10.0
+
+The existing public service name remains `historical_compare`. X1 adds deterministic mode selection without creating a new authority surface:
+
+```text
+mode = window
+  -> existing metric + explicit 24h / 7d / 30d comparison
+
+mode = all_available
+  -> summarize every verified observation currently stored by CMIS for one asset
+
+mode = all_available_pair
+  -> compare two assets only over their overlapping verified CMIS history
+```
+
+`all_available` is deliberately narrower than “complete asset lifetime.” The response exposes exact first/last verified observation times, observation counts, sampled min/max/change, sampled price drawdown, explicit observed gaps, and coverage limitations. It preserves:
+
+```text
+full_asset_lifetime_verified = false
+continuous_coverage_verified = false
+```
+
+until separate evidence proves those stronger claims. X1.Ninja OHLCV, archive-provider history, or other external historical sources are not silently promoted into this mode merely because transport exists. Pair mode requires a second exact asset and aligned overlapping anchors within the explicit tolerance policy.
 
 ## Chain boundary
 
