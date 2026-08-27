@@ -207,7 +207,7 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertEqual(jupiter.calls, [MINT])
         self.assertEqual(dex.calls, [MINT])
 
-    def test_pair_observations_preserve_scope_without_aggregation(self):
+    def test_pair_observations_preserve_scope_with_bounded_observed_pair_aggregation(self):
         dex = FakeDexProvider(
             pairs=[
                 pair_record(PAIR_A, price="1.001", liquidity="1000", volume="250"),
@@ -224,9 +224,148 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertEqual(observations[1]["liquidity_usd"], "2000")
         self.assertEqual(observations[0]["volume_24h"], "250")
         self.assertEqual(observations[1]["volume_24h"], "500")
+        self.assertEqual(response["data"]["observed_pair_count"], 2)
+        self.assertEqual(response["data"]["#LPs"], 2)
+        self.assertEqual(response["data"]["observed_pair_liquidity_usd"], "3000")
+        self.assertEqual(response["data"]["observed_pair_volume_24h_usd"], "750")
+        self.assertNotIn("liquidity_usd", response["data"])
+        self.assertNotIn("volume_24h_usd", response["data"])
+        aggregate = response["data"]["observed_pair_aggregation"]
+        self.assertTrue(aggregate["pair_identity_deduplicated"])
+        self.assertTrue(aggregate["liquidity_rows_complete"])
+        self.assertTrue(aggregate["volume_rows_complete"])
+        self.assertFalse(aggregate["pair_universe_complete"])
+        self.assertFalse(aggregate["asset_wide_liquidity_verified"])
+        self.assertFalse(aggregate["asset_wide_volume_verified"])
+        self.assertFalse(aggregate["market_source_independence_verified"])
         self.assertIsNone(response["data"]["asset_wide_liquidity_usd"])
         self.assertIsNone(response["data"]["asset_wide_volume_24h_usd"])
-        self.assertNotIn("3000", str(response["data"]["asset_wide_liquidity_usd"]))
+
+    def test_missing_pair_metric_is_not_zero_and_marks_observed_subtotal_partial(self):
+        complete = pair_record(
+            PAIR_A,
+            price="1.001",
+            liquidity="1000",
+            volume="250",
+        )
+        missing = pair_record(
+            PAIR_B,
+            price="0.999",
+            liquidity=None,
+            volume=None,
+        )
+        dex = FakeDexProvider(pairs=[complete, missing])
+        response = request(
+            gateway(jupiter=FakeJupiterProvider(price="1"), dex=dex)
+        )
+
+        self.assertEqual(response["data"]["observed_pair_count"], 2)
+        self.assertEqual(response["data"]["observed_pair_liquidity_usd"], "1000")
+        self.assertEqual(response["data"]["observed_pair_volume_24h_usd"], "250")
+        aggregate = response["data"]["observed_pair_aggregation"]
+        self.assertFalse(aggregate["liquidity_rows_complete"])
+        self.assertFalse(aggregate["volume_rows_complete"])
+        self.assertEqual(aggregate["liquidity_value_pair_count"], 1)
+        self.assertEqual(aggregate["volume_24h_value_pair_count"], 1)
+        codes = {item["code"] for item in response["warnings"]}
+        self.assertIn("solana_observed_pair_liquidity_partial", codes)
+        self.assertIn("solana_observed_pair_volume_partial", codes)
+
+    def test_exact_duplicate_pair_identity_is_counted_once(self):
+        first = pair_record(
+            PAIR_A,
+            price="1.001",
+            liquidity="1000",
+            volume="250",
+        )
+        dex = FakeDexProvider(pairs=[first, dict(first)])
+        response = request(
+            gateway(jupiter=FakeJupiterProvider(price="1"), dex=dex)
+        )
+
+        self.assertEqual(response["data"]["pair_count_observed"], 2)
+        self.assertEqual(response["data"]["observed_pair_count"], 1)
+        self.assertEqual(response["data"]["#LPs"], 1)
+        self.assertEqual(response["data"]["observed_pair_liquidity_usd"], "1000")
+        self.assertEqual(response["data"]["observed_pair_volume_24h_usd"], "250")
+        aggregate = response["data"]["observed_pair_aggregation"]
+        self.assertEqual(aggregate["duplicate_pair_addresses"], [PAIR_A])
+        self.assertEqual(aggregate["conflicting_duplicate_pair_addresses"], [])
+
+    def test_conflicting_duplicate_pair_is_excluded_fail_closed(self):
+        first = pair_record(
+            PAIR_A,
+            price="1.001",
+            liquidity="1000",
+            volume="250",
+        )
+        second = pair_record(
+            PAIR_A,
+            price="1.001",
+            liquidity="2000",
+            volume="500",
+        )
+        dex = FakeDexProvider(pairs=[first, second])
+        response = request(
+            gateway(jupiter=FakeJupiterProvider(price="1"), dex=dex)
+        )
+
+        self.assertEqual(response["data"]["observed_pair_count"], 0)
+        self.assertEqual(response["data"]["#LPs"], 0)
+        self.assertIsNone(response["data"]["observed_pair_liquidity_usd"])
+        self.assertIsNone(response["data"]["observed_pair_volume_24h_usd"])
+        aggregate = response["data"]["observed_pair_aggregation"]
+        self.assertEqual(
+            aggregate["conflicting_duplicate_pair_addresses"],
+            [PAIR_A],
+        )
+        self.assertFalse(aggregate["liquidity_rows_complete"])
+        self.assertFalse(aggregate["volume_rows_complete"])
+
+    def test_wrong_mint_pair_is_excluded_from_observed_pair_aggregate(self):
+        wrong = pair_record(PAIR_A, price="1.001", liquidity="1000", volume="250")
+        wrong["base_token"] = {
+            "address": "WrongBaseMint",
+            "name": "Wrong",
+            "symbol": "WRONG",
+        }
+        wrong["quote_token"] = {
+            "address": "WrongQuoteMint",
+            "name": "Wrong quote",
+            "symbol": "WQ",
+        }
+        dex = FakeDexProvider(pairs=[wrong])
+        response = request(
+            gateway(jupiter=FakeJupiterProvider(price="1"), dex=dex)
+        )
+
+        self.assertEqual(response["data"]["observed_pair_count"], 0)
+        self.assertEqual(response["data"]["#LPs"], 0)
+        self.assertIsNone(response["data"]["observed_pair_liquidity_usd"])
+        self.assertIsNone(response["data"]["observed_pair_volume_24h_usd"])
+        self.assertEqual(
+            response["data"]["observed_pair_aggregation"]["pair_rows_excluded"],
+            1,
+        )
+
+    def test_malformed_numeric_metric_is_not_coerced_into_aggregate(self):
+        malformed = pair_record(
+            PAIR_A,
+            price="1.001",
+            liquidity="not-a-number",
+            volume="-1",
+        )
+        dex = FakeDexProvider(pairs=[malformed])
+        response = request(
+            gateway(jupiter=FakeJupiterProvider(price="1"), dex=dex)
+        )
+
+        self.assertEqual(response["data"]["observed_pair_count"], 1)
+        self.assertIsNone(response["data"]["observed_pair_liquidity_usd"])
+        self.assertIsNone(response["data"]["observed_pair_volume_24h_usd"])
+        aggregate = response["data"]["observed_pair_aggregation"]
+        self.assertFalse(aggregate["liquidity_rows_complete"])
+        self.assertFalse(aggregate["volume_rows_complete"])
 
     def test_one_outlier_pair_makes_crosscheck_conflict_without_cherry_picking(self):
         dex = FakeDexProvider(
