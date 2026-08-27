@@ -475,6 +475,50 @@ class OracleV2TimestampGovernanceTests(unittest.TestCase):
             )
         )
 
+    def test_evidence_digest_binds_raw_proof_bearing_fields(self):
+        base = evidence()
+        changed = copy.deepcopy(base)
+        changed["samples"][0]["slot"] = 123456
+        changed["samples"][0]["oracle_instruction_index"] = 2
+        changed["samples"][0]["signed_message_sha256"] = "ab" * 32
+
+        first = evaluate_oracle_v2_timestamp_unit_promotion(
+            evidence=base,
+            policy=policy(),
+        )
+        second = evaluate_oracle_v2_timestamp_unit_promotion(
+            evidence=changed,
+            policy=policy(),
+        )
+
+        self.assertTrue(first["timestamp_unit_verified"])
+        self.assertTrue(second["timestamp_unit_verified"])
+        self.assertNotEqual(
+            first["evidence_sha256"],
+            second["evidence_sha256"],
+        )
+
+    def test_evidence_digest_distinguishes_reported_difference_presence(self):
+        base = evidence()
+        changed = copy.deepcopy(base)
+        del changed["samples"][0]["candidate_unix_ms_difference_ms"]
+
+        first = evaluate_oracle_v2_timestamp_unit_promotion(
+            evidence=base,
+            policy=policy(),
+        )
+        second = evaluate_oracle_v2_timestamp_unit_promotion(
+            evidence=changed,
+            policy=policy(),
+        )
+
+        self.assertTrue(first["timestamp_unit_verified"])
+        self.assertTrue(second["timestamp_unit_verified"])
+        self.assertNotEqual(
+            first["evidence_sha256"],
+            second["evidence_sha256"],
+        )
+
     def test_policy_and_evidence_digests_are_deterministic(self):
         first = evaluate_oracle_v2_timestamp_unit_promotion(
             evidence=evidence(),
