@@ -217,6 +217,30 @@ class CMISGatewayTests(unittest.TestCase):
         self.assertEqual(response, expected)
         _, kwargs = build.call_args
         self.assertEqual(kwargs["mode"], "all_available")
+        self.assertIs(
+            kwargs["onchain_coverage_provider"],
+            self.gateway.x1_rpc_provider,
+        )
+        self.assertEqual(kwargs["onchain_page_size"], 1000)
+        self.assertEqual(kwargs["onchain_max_signatures"], 5000)
+
+
+    def test_all_available_validates_onchain_scan_bounds(self):
+        response = self.gateway.dispatch({
+            "service": "historical_compare",
+            "chain": "x1",
+            "asset": "AGI",
+            "params": {
+                "mode": "all_available",
+                "onchain_page_size": 0,
+            },
+        })
+
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(
+            response["errors"][0]["code"],
+            "invalid_historical_tolerance",
+        )
 
     def test_all_available_pair_requires_compare_asset(self):
         response = self.gateway.dispatch({

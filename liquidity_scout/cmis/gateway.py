@@ -34,6 +34,7 @@ from liquidity_scout.market.resolver import (
     resolve_asset,
 )
 from liquidity_scout.providers.x1.market import X1Provider
+from liquidity_scout.providers.x1.rpc import X1RPCProvider
 from liquidity_scout.providers.x1.supply import X1SupplyProvider
 from liquidity_scout.services.cmis_asset_lookup import build_asset_lookup_response
 from liquidity_scout.services.cmis_contract import (
@@ -78,12 +79,14 @@ class CMISGateway:
         *,
         x1_market_provider: Optional[X1Provider] = None,
         x1_supply_provider: Optional[X1SupplyProvider] = None,
+        x1_rpc_provider: Optional[X1RPCProvider] = None,
         history_backend: Any = None,
         asset_registry: Optional[AssetRegistry] = None,
         auto_record_history: bool = False,
     ):
         self.x1_market_provider = x1_market_provider or X1Provider()
         self.x1_supply_provider = x1_supply_provider or X1SupplyProvider()
+        self.x1_rpc_provider = x1_rpc_provider or X1RPCProvider()
         self.history_backend = history_backend or default_history_backend
         self.asset_registry = asset_registry or DEFAULT_ASSET_REGISTRY
         self.auto_record_history = bool(auto_record_history)
@@ -519,6 +522,8 @@ class CMISGateway:
         metrics: Any = None,
         gap_threshold_seconds: int = 129600,
         anchor_tolerance_seconds: int = 21600,
+        onchain_page_size: int = 1000,
+        onchain_max_signatures: int = 5000,
     ) -> Dict[str, Any]:
         market_data = market_envelope.get("data")
         if not isinstance(market_data, Mapping):
@@ -554,6 +559,9 @@ class CMISGateway:
             metrics=metrics,
             gap_threshold_seconds=gap_threshold_seconds,
             anchor_tolerance_seconds=anchor_tolerance_seconds,
+            onchain_coverage_provider=self.x1_rpc_provider,
+            onchain_page_size=onchain_page_size,
+            onchain_max_signatures=onchain_max_signatures,
         )
 
     def _historical_compare(self, asset: Any, params: Mapping[str, Any]) -> Dict[str, Any]:
@@ -599,9 +607,17 @@ class CMISGateway:
 
         gap_threshold = params.get("gap_threshold_seconds", 129600)
         anchor_tolerance = params.get("anchor_tolerance_seconds", 21600)
+        onchain_page_size = params.get("onchain_page_size", 1000)
+        onchain_max_signatures = params.get("onchain_max_signatures", 5000)
         try:
             gap_threshold = max(0, int(gap_threshold))
             anchor_tolerance = max(0, int(anchor_tolerance))
+            onchain_page_size = int(onchain_page_size)
+            onchain_max_signatures = int(onchain_max_signatures)
+            if not 1 <= onchain_page_size <= 1000:
+                raise ValueError
+            if not 1 <= onchain_max_signatures <= 100000:
+                raise ValueError
         except (TypeError, ValueError):
             return self._gateway_error(
                 "historical_compare",
@@ -609,7 +625,8 @@ class CMISGateway:
                 "invalid_historical_tolerance",
                 (
                     "gap_threshold_seconds and anchor_tolerance_seconds must be "
-                    "non-negative integers."
+                    "non-negative integers; onchain_page_size must be 1..1000 "
+                    "and onchain_max_signatures must be 1..100000."
                 ),
             )
 
@@ -621,6 +638,8 @@ class CMISGateway:
             metrics=params.get("metrics"),
             gap_threshold_seconds=gap_threshold,
             anchor_tolerance_seconds=anchor_tolerance,
+            onchain_page_size=onchain_page_size,
+            onchain_max_signatures=onchain_max_signatures,
         )
         if isinstance(definition, Mapping) and response.get("status") in {"ok", "partial"}:
             response = self._canonicalize(
