@@ -103,7 +103,7 @@ class OracleV2ProbeTests(unittest.TestCase):
         self.assertEqual(decoded["assets"]["BTC"]["prices"][0], "1")
         self.assertEqual(decoded["assets"]["FARTCOIN"]["prices_raw"][4], 6_000_004)
         self.assertEqual(
-            decoded["assets"]["FARTCOIN"]["timestamps_unix_ms"][4],
+            decoded["assets"]["FARTCOIN"]["timestamps_raw"][4],
             1_780_000_000_604,
         )
 
@@ -135,10 +135,23 @@ class OracleV2ProbeTests(unittest.TestCase):
         self.assertEqual(result["summary"]["total_slots"], 30)
         self.assertEqual(result["summary"]["nonzero_price_slots"], 30)
         self.assertEqual(
-            result["summary"]["structurally_valid_slots_before_freshness"],
+            result["summary"]["structurally_valid_slots_before_timestamp_unit_and_freshness"],
             30,
         )
         self.assertEqual(result["summary"]["cmis_price_eligible_slots"], 0)
+        self.assertFalse(result["summary"]["timestamp_unit_live_verified"])
+        self.assertEqual(
+            result["summary"]["source_contract_timestamp_unit"],
+            "unix_ms",
+        )
+        self.assertEqual(
+            result["summary"]["min_relay_timestamp_raw"],
+            1_780_000_000_100,
+        )
+        self.assertEqual(
+            result["summary"]["max_relay_timestamp_raw"],
+            1_780_000_000_604,
+        )
         self.assertFalse(result["summary"]["freshness_policy_applied"])
         self.assertFalse(result["summary"]["current_price_use_authorized"])
         self.assertFalse(result["summary"]["source_independence_verified"])
@@ -165,8 +178,10 @@ class OracleV2ProbeTests(unittest.TestCase):
 
         first = result["slot_observations"][0]
         self.assertTrue(first["zero_price"])
-        self.assertFalse(first["structurally_valid_before_freshness"])
+        self.assertFalse(first["structurally_valid_before_timestamp_unit_and_freshness"])
         self.assertFalse(first["cmis_price_eligible"])
+        self.assertFalse(first["timestamp_unit_live_verified"])
+        self.assertEqual(first["source_contract_timestamp_unit"], "unix_ms")
         self.assertEqual(
             first["cmis_price_eligibility_reason"],
             "nonpositive_price_or_timestamp",
