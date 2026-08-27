@@ -1,6 +1,6 @@
 # Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-20
+Last reconciled: 2026-08-26
 
 ## Boundary
 
@@ -27,7 +27,7 @@ The `liquidity_scout` namespace is a migration compatibility identifier, not a s
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.9.0`. The promoted concentration service requires CMIS `>=1.9.0`.
+Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.10.0`. The promoted concentration service continues to require CMIS `>=1.9.0`.
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
@@ -71,6 +71,16 @@ Every request names the chain explicitly. Unsupported chains do not fall back to
 CMIS response statuses such as `ok`, `partial`, `unavailable`, `ambiguous`, conflict, or insufficient evidence are meaningful. Missing evidence remains missing; it is never converted into zero, false, or an LLM estimate.
 
 Fresh accepted CMIS/provider evidence overrides remembered live values.
+
+## Historical comparison usage
+
+Under CMIS `1.10.0`, X1 Scouts may use the existing `historical_compare` service in three modes:
+
+- `window` — existing explicit 24h / 7d / 30d metric comparison;
+- `all_available` — one asset across all verified observations currently stored by CMIS;
+- `all_available_pair` — two assets compared only across their overlapping verified CMIS observation window.
+
+Natural requests such as “entire history,” “full history,” “since inception,” or “lifetime history” may select `all_available`; pair mode still requires an explicit second asset. Scouts must preserve CMIS coverage bounds and must not relabel `all_available` as proven complete asset lifetime. `full_asset_lifetime_verified=false` and `continuous_coverage_verified=false` remain authoritative until CMIS proves otherwise.
 
 ## X1
 
