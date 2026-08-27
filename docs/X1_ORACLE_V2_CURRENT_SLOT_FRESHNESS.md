@@ -1,6 +1,6 @@
 # X1 Oracle V2 Current-Slot Freshness Evaluation
 
-Status: **live current-slot ages verified / freshness policy not yet selected**
+Status: **live current-slot ages verified / explicit freshness policy selected in the current-price freshness-governance follow-up**
 
 Tracker: **#296**
 
