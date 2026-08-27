@@ -14,6 +14,9 @@ from typing import Any, Iterable, Mapping
 from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.cmis_x1_asset_identity import (
+    IDENTITY_CONTRACT as X1_ASSET_IDENTITY_CONTRACT,
+)
 from liquidity_scout.services.cmis_verified_intelligence import (
     ACCEPTED_CONCLUSION_TYPES as CONCENTRATION_INTELLIGENCE_CONCLUSION_TYPES,
     CONTRACT_VERSION as CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
@@ -23,7 +26,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.10.0"
+CMIS_CONTRACT_VERSION = "1.11.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -117,7 +120,23 @@ def _promoted_concentration_intelligence_capability(*, available: bool) -> dict[
 
 _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
     "x1": {
-        "asset_lookup": _capability("supported"),
+        "asset_lookup": {
+            **_capability(
+                "supported",
+                limitations=(
+                    "exact_mint_is_canonical_fungible_identity_root",
+                    "metaplex_name_symbol_uri_are_descriptive_metadata",
+                    "xdex_name_symbol_are_provider_market_representation",
+                    "same_mint_descriptor_conflicts_return_partial",
+                    "symbol_or_name_never_reconciles_different_mints",
+                    "metadata_agreement_does_not_imply_risk_or_legitimacy",
+                ),
+            ),
+            "identity_contract_version": X1_ASSET_IDENTITY_CONTRACT,
+            "exact_mint_normalization": True,
+            "normalized_identity_root": "mint",
+            "metaplex_xdex_reconciliation": True,
+        },
         "market_report": _capability("supported"),
         "rank": _capability("supported"),
         "historical_compare": _capability(
