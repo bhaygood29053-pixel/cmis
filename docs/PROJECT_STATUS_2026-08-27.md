@@ -39,11 +39,20 @@ Accepted/read-only evidence now establishes:
 - timestamp-unit semantics promoted as Unix milliseconds under the accepted evidence-bound policy;
 - deterministic current-slot age calculation from the verified timestamp unit.
 
-Still not accepted:
+Freshness governance is now accepted and applied:
 
 ```text
-freshness_policy_complete = false
-freshness_verified = false
+max_age_ms = 60000
+max_future_skew_ms = 5000
+minimum_eligible_slots = 3
+freshness_policy_complete = true
+freshness_policy_applied = true
+freshness_verified = true
+```
+
+The latest live run classified all 30 observed relay slots as stale, so no current-price median was eligible. Still not accepted:
+
+```text
 current_price_use_authorized = false
 source_independence_verified = false
 price_correctness_verified = false
@@ -53,19 +62,20 @@ scout_reliance_promoted = false
 execution_authorized = false
 ```
 
-The next gate is an explicit freshness-policy decision with provenance for `max_age_ms`, `max_future_skew_ms`, and `minimum_eligible_slots`. Observed slot ages must not be used to back-fit those thresholds. Five relay slots remain same-system redundancy rather than five independent market sources.
+The next Oracle gate is conditional on new policy-eligible live slots. If they appear, rerun the accepted freshness evidence and then perform exact same-fact identity/unit/time price comparison. Five relay slots remain same-system redundancy rather than five independent market sources.
 
 ## Active provider-gap work
 
 Issue #30 remains the read-only/fail-closed provider-gap track.
 
-Open branches:
+Recent cleanup is complete:
 
-- PR #242 — Warp Bridge proof-origin binding;
-- PR #229 — bounded authenticated X1Scroll `getHealth`/`getSlot` access classification;
-- PR #227 — FortiBlox provider-contract research.
+- PR #242 — Warp Bridge closed as not currently verifiable;
+- PR #229 — X1Scroll closed and removed from CMIS integration scope;
+- PR #227 — FortiBlox closed/archive candidate research;
+- PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-These remain unaccepted until their exact evidence, contract, review, and merge gates pass.
+The next new technical item is bounded verification of the official/self-hosted X1 read-only node for history and streaming redundancy. This must not be mislabeled as independent market-price evidence merely because it is a separate node deployment.
 
 ## Roberta dependency/status
 
@@ -77,11 +87,11 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ## Roadmap now
 
-### 1. Finish Oracle V2 freshness governance
+### 1. Verify self-hosted X1 history/streaming redundancy
 
-- choose explicit freshness thresholds with provenance;
-- keep timestamp semantics, freshness, price correctness, and source independence as separate facts;
-- promote no current price until every downstream gate passes.
+- verify exact node configuration/identity and bounded read-only RPC history methods;
+- verify block subscription commitment/finality, reconnect, ordering, duplicates, gaps, and backfill behavior;
+- preserve infrastructure redundancy separately from market-source independence.
 
 ### 2. Continue evidence-depth work
 

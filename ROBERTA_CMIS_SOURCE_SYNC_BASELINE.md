@@ -67,13 +67,16 @@ Accepted/read-only evidence on CMIS `main` now establishes:
 - the declared X1 program/state contract shape is live and structurally verified;
 - exact program/state ownership, PDA/layout, six-asset × five-relay shape, decimals, and stored Oracle key were verified through X1 RPC;
 - timestamp-unit semantics are promoted only under the accepted evidence-bound policy: raw batch timestamps may be interpreted as Unix milliseconds;
-- current slot ages can be calculated deterministically from the verified timestamp unit.
+- current slot ages can be calculated deterministically from the verified timestamp unit;
+- the explicit freshness policy is selected/applied with `max_age_ms=60000`, `max_future_skew_ms=5000`, and `minimum_eligible_slots=3`;
+- the latest live run classified all 30 observed relay slots stale, so no current-price median was eligible.
 
-Still false/unaccepted:
+Current freshness-governance state:
 
 ```text
-freshness_policy_complete = false
-freshness_verified = false
+freshness_policy_complete = true
+freshness_policy_applied = true
+freshness_verified = true
 current_price_use_authorized = false
 source_independence_verified = false
 price_correctness_verified = false
@@ -83,7 +86,7 @@ scout_reliance_promoted = false
 execution_authorized = false
 ```
 
-A separate explicit freshness-policy decision is required before any current Oracle V2 slot can become price-eligible. Five relay slots remain same-system redundancy, not five independent market sources.
+No current slot is price-eligible in the latest live evidence because all observed relay slots were stale. Five relay slots remain same-system redundancy, not five independent market sources. The next Oracle gate resumes only when new policy-eligible live slots appear.
 
 ## Roberta Learning Plane baseline
 
