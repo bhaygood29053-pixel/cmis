@@ -1,4 +1,4 @@
-name: X1 Oracle V2 Current Freshness Evidence
+name: X1 Oracle V2 Freshness Governance Evidence
 
 on:
   pull_request:
@@ -9,13 +9,14 @@ permissions:
   contents: read
 
 jobs:
-  oracle-v2-current-freshness:
-    name: Collect current Oracle V2 freshness evidence
-    if: github.head_ref == 'agent/oracle-v2-current-slot-freshness'
+  oracle-v2-freshness-governance:
+    name: Verify accepted Oracle V2 freshness governance
+    if: github.head_ref == 'agent/oracle-v2-freshness-governance'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      FRESHNESS_POLICY_FILE: liquidity_scout/providers/x1/oracle_v2_freshness_policy.json
 
     steps:
       - name: Check out repository
@@ -34,38 +35,72 @@ jobs:
 
       - name: Run deterministic freshness tests
         run: |
-          python -m unittest tests.test_x1_oracle_v2_current_freshness -v
+          python -m unittest \
+            tests.test_x1_oracle_v2_freshness_policy \
+            tests.test_x1_oracle_v2_current_freshness \
+            tests.test_x1_oracle_v2_production_freshness_policy \
+            -v
 
-      - name: Collect live current-slot age evidence
+      - name: Collect live current-slot evidence under accepted policy
         run: |
           python cmis_x1_oracle_v2_current_freshness.py \
-            --output x1-oracle-v2-current-freshness.json
+            --freshness-policy-file "$FRESHNESS_POLICY_FILE" \
+            --output x1-oracle-v2-freshness-governance.json
 
-      - name: Enforce fail-closed current freshness boundary
+      - name: Enforce policy and eligible-only median boundary
         run: |
           python - <<'PY'
           import json
 
           with open(
-              "x1-oracle-v2-current-freshness.json",
+              "x1-oracle-v2-freshness-governance.json",
               "r",
               encoding="utf-8",
           ) as handle:
               result = json.load(handle)
 
+          policy = result["freshness_policy"]
           assert result["timestamp_unit_verified"] is True
-          assert result["status"] == "unavailable"
-          assert result["reason"] == "freshness_policy_incomplete"
-          assert result["freshness_policy"]["policy_complete"] is False
-          assert result["freshness_policy_applied"] is False
-          assert result["freshness_verified"] is False
+          assert policy["policy_complete"] is True
+          assert policy["has_hidden_defaults"] is False
+          assert policy["max_age_ms"] == 60_000
+          assert policy["max_future_skew_ms"] == 5_000
+          assert policy["minimum_eligible_slots"] == 3
+          assert result["freshness_policy_applied"] is True
+          assert result["freshness_verified"] is True
           assert result["age_summary"]["slot_count"] == 30
           assert result["age_summary"]["positive_timestamp_age_count"] == 30
 
           for asset, value in result["assets"].items():
-              assert value["status"] == "unavailable", asset
-              assert value["eligible_slot_count"] == 0, asset
-              assert value["median_price"] is None, asset
+              eligible = sorted(
+                  slot["price_raw"]
+                  for slot in value["slot_classifications"]
+                  if slot.get("cmis_price_eligible") is True
+              )
+              assert value["eligible_slot_count"] == len(eligible), asset
+
+              if len(eligible) >= 3:
+                  assert value["status"] == "ok", asset
+                  middle = len(eligible) // 2
+                  if len(eligible) % 2:
+                      numerator = eligible[middle]
+                      denominator = 1
+                  else:
+                      numerator = eligible[middle - 1] + eligible[middle]
+                      denominator = 2
+                  assert value["median_price_raw_numerator"] == numerator, asset
+                  assert value["median_price_raw_denominator"] == denominator, asset
+                  assert value["median_price"] is not None, asset
+              elif eligible:
+                  assert value["status"] == "partial", asset
+                  assert value["median_price_raw_numerator"] is None, asset
+                  assert value["median_price_raw_denominator"] is None, asset
+                  assert value["median_price"] is None, asset
+              else:
+                  assert value["status"] == "unavailable", asset
+                  assert value["median_price_raw_numerator"] is None, asset
+                  assert value["median_price_raw_denominator"] is None, asset
+                  assert value["median_price"] is None, asset
 
           for field in (
               "current_price_use_authorized",
@@ -79,23 +114,34 @@ jobs:
               assert result[field] is False, field
 
           print("timestamp_unit_verified=true")
-          print("freshness_policy_complete=false")
-          print("freshness_verified=false")
+          print("freshness_policy_complete=true")
+          print("freshness_policy_applied=true")
+          print(f"live_status={result['status']}")
+          print("price_correctness_verified=false")
+          print("source_independence_verified=false")
           print("current_price_use_authorized=false")
           PY
 
-      - name: Upload current freshness evidence
+      - name: Record policy and evidence digests
+        run: |
+          sha256sum "$FRESHNESS_POLICY_FILE"
+          sha256sum x1-oracle-v2-freshness-governance.json
+
+      - name: Upload freshness governance evidence
         uses: actions/upload-artifact@v4
         with:
-          name: x1-oracle-v2-current-freshness-${{ github.run_id }}
-          path: x1-oracle-v2-current-freshness.json
+          name: x1-oracle-v2-freshness-governance-${{ github.run_id }}
+          path: |
+            x1-oracle-v2-freshness-governance.json
+            liquidity_scout/providers/x1/oracle_v2_freshness_policy.json
           if-no-files-found: error
           retention-days: 30
 
       - name: Safety boundary
         if: always()
         run: |
-          echo "Read-only current-state evidence collection only."
-          echo "No freshness thresholds are supplied by CI."
-          echo "Verified timestamp semantics do not imply fresh prices."
-          echo "No provider, public-service, Scout, or execution promotion."
+          echo "Read-only Oracle V2 freshness-governance evidence only."
+          echo "Policy values are explicit and provenance-bearing; live slot ages did not select them."
+          echo "Freshness is separate from price correctness and source independence."
+          echo "Five relay slots are same-system redundancy, not five independent market sources."
+          echo "No current-price, provider, public-service, Scout, or execution promotion."
