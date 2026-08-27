@@ -448,6 +448,7 @@ def verified_price_import_summary(mint):
         return {
             "available": False,
             "observation_count": 0,
+            "stored_row_count": 0,
             "usable_observation_count": 0,
             "conflicting_timestamp_count": 0,
             "first_observed_at": None,
@@ -463,24 +464,28 @@ def verified_price_import_summary(mint):
         grouped.setdefault(row["timestamp"], []).append(row["value"])
 
     conflicts = 0
-    usable = 0
-    for values in grouped.values():
+    usable_timestamps = []
+    for timestamp, values in grouped.items():
         reference = values[0]
         if all(
             math.isclose(reference, value, rel_tol=1e-9, abs_tol=1e-15)
             for value in values[1:]
         ):
-            usable += 1
+            usable_timestamps.append(int(timestamp))
         else:
             conflicts += 1
 
+    usable_timestamps.sort()
+    usable = len(usable_timestamps)
+
     return {
-        "available": True,
-        "observation_count": len(rows),
+        "available": usable > 0,
+        "observation_count": usable,
+        "stored_row_count": len(rows),
         "usable_observation_count": usable,
         "conflicting_timestamp_count": conflicts,
-        "first_observed_at": rows[0]["timestamp"],
-        "last_observed_at": rows[-1]["timestamp"],
+        "first_observed_at": usable_timestamps[0] if usable_timestamps else None,
+        "last_observed_at": usable_timestamps[-1] if usable_timestamps else None,
         "last_imported_at": max(row["imported_at"] for row in rows),
         "sources": sorted({row["source"] for row in rows}),
         "provider_pairs": sorted({row["provider_pair"] for row in rows}),
