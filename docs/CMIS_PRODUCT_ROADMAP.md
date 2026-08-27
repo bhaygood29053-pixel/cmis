@@ -37,7 +37,7 @@ Accepted milestones on `main`:
 - **X1 all-available verified historical profiles and overlapping pair comparison: COMPLETE under `historical_compare` modes in CMIS `1.10.0`.**
 - **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
 - **X1 verified-provider historical price backfill: COMPLETE under the bounded CMIS `1.12.0` contract.** Backfill is price-only and preserves non-independence, non-archive-completeness, non-continuity, historical stable-quote uncertainty, and non-lifetime-completeness limits.
-- **Oracle V2 structural X1 contract verification: COMPLETE for the exact declared program/state shape.** Timestamp-unit semantics are verified as Unix milliseconds under an evidence-bound policy; current-slot ages are measurable, but no production freshness policy or current-price authority is accepted.
+- **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
 - **CMIS capability contract: `1.12.0`.**
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
@@ -167,39 +167,42 @@ This remains **partial provider-history coverage**, not complete lifetime histor
 
 ## Active X1 provider-gap track — Issue #30
 
-Provider-gap work remains read-only and fail-closed. Open branches must not be interpreted as accepted provider capability.
+Provider-gap work remains read-only and fail-closed. Closed research branches and historical provider claims do not create accepted capability.
 
-### PR #242 — Warp Bridge proof-origin binding ⚠️ Open draft
+### Closed provider-candidate cleanup
 
-The branch hardens provenance eligibility for any future machine-readable Warp Bridge read contract:
+- **PR #242 — Warp Bridge:** closed as not currently verifiable. No exact provenance-approved machine-readable read contract is accepted.
+- **PR #229 — X1Scroll:** closed and removed from CMIS integration scope because the required API key was unavailable; the verification job stopped before any provider request.
+- **PR #227 — FortiBlox:** closed/archive candidate research. No exact reproducible provider-owned endpoint/response contract is accepted.
 
-- X1-owned documentation/application proof must originate from accepted X1-owned web/GitHub boundaries;
-- official-app network observation must bind specifically to `app.bridge.x1.xyz`;
-- exact candidate read URL binding remains required;
-- unrelated third-party “Warp Bridge” documentation cannot establish X1 ownership/provenance;
-- on-chain configuration remains a distinct non-web proof path.
+### Issue #272 — Oracle V2 read-only price evidence ⚠️ Freshness governance complete; current price still unavailable
 
-This does **not** approve `bridge-api.x1.xyz`, guess an operational path, prepare a transfer, sign, broadcast, or promote bridge capability.
+CMIS has independently verified the declared X1 program/state contract shape through X1 RPC, including executable program identity, state ownership, PDA/layout, six-asset × five-relay structure, decimals, stored Oracle key, and Unix-ms timestamp semantics.
 
-### PR #229 — X1Scroll RPC access contract refresh ⚠️ Open draft
+The accepted production freshness policy is explicit and provenance-bearing:
 
-The branch defines a bounded authenticated read-only access classifier for provider-published API-key path shape and only `getHealth` / `getSlot`.
+```text
+max_age_ms = 60000
+max_future_skew_ms = 5000
+minimum_eligible_slots = 3
+```
 
-No live provider-access result is accepted until the required credential-backed probe is executed and accepted. Source independence, historical coverage, retention, finality semantics, archival completeness, and CMIS promotion remain false/unproven.
+The latest live governance run applied that policy successfully and classified all 30 observed relay slots as stale. Therefore no Oracle V2 current-price median was eligible and:
 
-### PR #227 — FortiBlox provider contract research ⚠️ Open candidate research
+```text
+freshness_policy_complete = true
+freshness_policy_applied = true
+freshness_verified = true
+current_price_use_authorized = false
+price_correctness_verified = false
+source_independence_verified = false
+cmis_provider_promoted = false
+public_service_promoted = false
+scout_reliance_promoted = false
+execution_authorized = false
+```
 
-The branch records provider-owned Explorer documentation and supporting Nexus RPC discovery evidence without promoting FortiBlox into CMIS. Exact Explorer endpoint/response semantics, current Nexus RPC behavior, source independence, freshness/history/finality semantics, and CMIS promotion remain unverified. No adapter should be built from guessed endpoint paths.
-
-### Issue #272 — Oracle V2 read-only price evidence ⚠️ Structural verification advanced; price authority still unpromoted
-
-Public repository review of `jacklevin74/oracle-v2` at pinned commit `97177f772689e44ca4eed9bb95be32ffdf0c5e66` identified a structurally distinct X1 price path: Pyth/CEX aggregation -> OpenBao-signed relays -> an on-chain Oracle Vault with five relay slots for six assets.
-
-CMIS has now independently verified the declared X1 program/state contract shape through X1 RPC, including executable program identity, state ownership, PDA/layout, six-asset × five-relay structure, decimals, and stored Oracle key. A separate accepted evidence-bound promotion verifies the raw batch timestamp unit as Unix milliseconds, and current-slot ages can be computed deterministically.
-
-This still does **not** make Oracle V2 an accepted CMIS current-price provider. No production freshness policy is selected, `freshness_verified=false`, `current_price_use_authorized=false`, source independence and price correctness remain unverified, and CMIS/public/Scout promotion remain false. Five relay slots are same-system redundancy, not five independent market sources.
-
-The next gate is an explicit freshness-policy decision with provenance for `max_age_ms`, `max_future_skew_ms`, and `minimum_eligible_slots`, followed by the remaining evidence/promotion gates. CMIS must not import Oracle V2 signing/submission infrastructure.
+Five relay slots remain same-system redundancy, not five independent market sources. The next Oracle gate occurs only when policy-eligible live slots appear: rerun the freshness evidence, then perform exact same-fact identity/unit/time comparison against accepted CMIS X1 evidence. Do not weaken the policy to manufacture eligibility.
 
 ### Existing non-promotional observations
 
@@ -277,13 +280,13 @@ This Learning Plane is upstream reasoning/knowledge capability, not a new CMIS a
 
 Continue field-level X1 and Solana verification without weakening truth standards.
 
-Near-term provider-gap candidates:
+Near-term provider-gap priorities:
 
-- Warp Bridge exact read-source provenance;
-- alternate X1 provider access/verification such as X1Scroll under bounded read-only contracts;
-- historical redundancy/source-independence evidence;
+- self-hosted official X1 read-only node verification for bounded history and streaming redundancy;
+- historical redundancy/source-independence evidence, keeping infrastructure redundancy separate from market-source independence;
 - holder-semantics/completeness evidence without relabeling token accounts/authorities as beneficial owners;
-- Oracle V2 read-only X1 price-evidence hardening under #272: structural identity/layout and Unix-ms timestamp semantics are verified; next is explicit freshness-policy selection plus remaining price-correctness/source-independence/promotion gates.
+- deeper field-by-field Solana maturity under the same CMIS contracts;
+- Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
 ### Verified Intelligence
 
@@ -331,13 +334,13 @@ Completed:
 11. paired Roberta #226 / CMIS #269 architecture/source-of-truth reconciliation;
 12. reconcile CMIS documentation with accepted Roberta PR #228 / PR #231 Learning Plane state.
 
-Current parallel work:
+Current implementation sequence:
 
-13. continue Issue #30 provider-gap hardening under read-only/fail-closed contracts;
-14. resolve/accept or close PR #242 based on exact Warp Bridge provenance evidence;
-15. resolve/accept or close PR #229 based on bounded X1Scroll credential-backed access evidence;
-16. resolve/accept or close PR #227 based on reproducible FortiBlox provider-contract evidence;
-17. verify or reject Oracle V2 as a bounded read-only X1 price-evidence source under #272, beginning with deterministic X1 RPC verification of the repository-declared program/state and exact account/freshness semantics.
+13. reconcile provider-gap and Oracle status after #298/#299 and close completed timestamp-governance issues;
+14. verify the self-hosted official X1 read-only node as a bounded history/streaming redundancy source;
+15. deepen holder/token-account/authority semantics without beneficial-owner overclaim;
+16. mature Solana evidence field-by-field under shared CMIS contracts;
+17. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
 
 Future candidates — **not active milestones until separately accepted**:
 
