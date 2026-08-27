@@ -105,7 +105,7 @@ class MarketPresentationUncertaintyTests(unittest.TestCase):
         )
         self.assertEqual(
             format_field_line("holders", snap, format_usd=usd),
-            "• Holders: Not verified — conflicting or incomplete XDEX pool observations",
+            "• Holders: Not verified — provider observations conflict or are incomplete; counted-entity and coverage semantics are unverified",
         )
 
 
