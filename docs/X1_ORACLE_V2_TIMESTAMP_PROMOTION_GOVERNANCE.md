@@ -267,6 +267,12 @@ Oracle V2 freshness policy:
 Policy and evidence SHA-256 digests are included so later Evidence Receipts can
 preserve the exact governance inputs.
 
+The evidence digest is computed over the canonical **raw evidence bundle**, not
+the reduced sample-evaluation records. This keeps proof-bearing fields such as
+transaction slots, instruction indexes, signed-message/signature hashes, and the
+presence or absence of reported correlation values bound to provenance even
+when those fields do not change the promotion decision itself.
+
 ## What timestamp-unit verification does not prove
 
 Even a successful timestamp-unit governance decision keeps all of these
