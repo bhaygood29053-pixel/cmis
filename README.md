@@ -79,6 +79,7 @@ Current open branches include:
 - **PR #242 — Warp Bridge proof-origin binding:** draft/open. It hardens provenance eligibility for any future machine-readable bridge read contract; it does **not** approve `bridge-api.x1.xyz`, guess paths, prepare transfers, or promote bridge capability.
 - **PR #229 — X1Scroll RPC access contract refresh:** draft/open. It defines a bounded authenticated `getHealth`/`getSlot` access classifier but does not claim live provider access until the required credential-backed probe is run and accepted.
 - **PR #227 — FortiBlox provider contract research:** open/candidate research only. Exact Explorer REST and current Nexus RPC contracts remain unverified; no FortiBlox adapter or CMIS promotion is accepted.
+- **Issue #272 — Oracle V2 read-only X1 price evidence:** candidate research only. Public repository evidence describes a Pyth/CEX aggregated feed, OpenBao-signed relays, and an X1 Oracle Vault, but CMIS has not independently verified the current deployed program/state, account layout, relay-slot freshness, or signing-key identity. Relay count is not treated as independent-source count.
 
 These branches are discovery/provenance work only. Open/mergeable status does not make their provider evidence accepted on `main`.
 
