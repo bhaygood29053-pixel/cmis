@@ -230,6 +230,37 @@ class CMISGatewayTests(unittest.TestCase):
             "metadata_unavailable",
         )
 
+    def test_exact_mint_xdex_outage_is_not_reported_as_metaplex_only(self):
+        metadata = FakeTokenMetadataProvider()
+
+        class FailingMarketProvider(FakeX1MarketProvider):
+            def refresh_if_needed(self):
+                raise RuntimeError("offline")
+
+        gateway = CMISGateway(
+            x1_market_provider=FailingMarketProvider([]),
+            x1_token_metadata_provider=metadata,
+        )
+        response = gateway.dispatch({
+            "service": "asset_lookup",
+            "chain": "x1",
+            "asset": XENCAT_MINT,
+        })
+        self.assertEqual(response["status"], "partial")
+        self.assertEqual(
+            response["data"]["identity_reconciliation"]["state"],
+            "xdex_unavailable",
+        )
+        self.assertFalse(
+            response["data"]["identity_reconciliation"]["xdex"]["available"]
+        )
+        self.assertTrue(
+            any(
+                warning.get("code") == "x1_market_provider_unavailable"
+                for warning in response["warnings"]
+            )
+        )
+
     def test_symbol_lookup_does_not_call_token_metadata_provider(self):
         metadata = FakeTokenMetadataProvider()
         gateway = CMISGateway(
