@@ -448,6 +448,8 @@ def verified_price_import_summary(mint):
         return {
             "available": False,
             "observation_count": 0,
+            "usable_observation_count": 0,
+            "conflicting_timestamp_count": 0,
             "first_observed_at": None,
             "last_observed_at": None,
             "last_imported_at": None,
@@ -456,9 +458,27 @@ def verified_price_import_summary(mint):
             "quote_mints": [],
         }
 
+    grouped = {}
+    for row in rows:
+        grouped.setdefault(row["timestamp"], []).append(row["value"])
+
+    conflicts = 0
+    usable = 0
+    for values in grouped.values():
+        reference = values[0]
+        if all(
+            math.isclose(reference, value, rel_tol=1e-9, abs_tol=1e-15)
+            for value in values[1:]
+        ):
+            usable += 1
+        else:
+            conflicts += 1
+
     return {
         "available": True,
         "observation_count": len(rows),
+        "usable_observation_count": usable,
+        "conflicting_timestamp_count": conflicts,
         "first_observed_at": rows[0]["timestamp"],
         "last_observed_at": rows[-1]["timestamp"],
         "last_imported_at": max(row["imported_at"] for row in rows),
@@ -609,12 +629,29 @@ def historical_series(mint, metric, *, start_ts=None, end_ts=None):
 
     merged = {}
     if metric == "price":
+        provider_by_time = {}
         for item in verified_price_observations(
             mint,
             start_ts=start_ts,
             end_ts=end_ts,
         ):
-            merged[int(item["timestamp"])] = float(item["value"])
+            provider_by_time.setdefault(
+                int(item["timestamp"]),
+                [],
+            ).append(float(item["value"]))
+
+        for ts, values in provider_by_time.items():
+            reference = values[0]
+            if all(
+                math.isclose(
+                    reference,
+                    value,
+                    rel_tol=1e-9,
+                    abs_tol=1e-15,
+                )
+                for value in values[1:]
+            ):
+                merged[ts] = reference
 
     for ts, value in rows:
         if value is not None:
