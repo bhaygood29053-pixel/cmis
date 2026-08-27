@@ -10,6 +10,10 @@ from liquidity_scout.providers.x1.historical_comparison_evidence import Historic
 
 _ALLOWED_STATUSES = frozenset({"AGREEMENT", "CONFLICT", "INSUFFICIENT_EVIDENCE"})
 _ALLOWED_QUALITIES = frozenset({"HIGH", "LOW"})
+_SUPPORTED_EVIDENCE_SCHEMA_VERSIONS = frozenset({
+    "x1_historical_comparison_evidence.v1",
+    "x1_historical_comparison_evidence.v2",
+})
 _REQUIRED_BLOCK_IDENTITY_FIELDS = frozenset({"blockhash", "previous_blockhash", "parent_slot"})
 _ALLOWED_COMPARED_FIELDS = _REQUIRED_BLOCK_IDENTITY_FIELDS | {"block_height"}
 
@@ -48,7 +52,7 @@ def _validate_source_identity(value: object, *, field_name: str) -> str:
 
 
 def _validate_sample_integrity(sample: HistoricalComparisonEvidence) -> None:
-    if sample.schema_version != "x1_historical_comparison_evidence.v1":
+    if sample.schema_version not in _SUPPORTED_EVIDENCE_SCHEMA_VERSIONS:
         raise ValueError("unsupported historical evidence schema version")
     if sample.chain != "x1":
         raise ValueError("all samples must be X1 evidence")
