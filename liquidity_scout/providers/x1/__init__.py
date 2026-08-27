@@ -84,6 +84,9 @@ from .oracle_v2_policy import (
 from .oracle_v2_timestamp_promotion_policy import (
     accepted_oracle_v2_timestamp_promotion_policy,
 )
+from .oracle_v2_timestamp_unit_evidence import (
+    accepted_oracle_v2_timestamp_unit_evidence,
+)
 from .oracle_v2_timestamp_governance import (
     TEMPORAL_MODE_MINIMUM_SPAN as ORACLE_V2_TEMPORAL_MODE_MINIMUM_SPAN,
     TEMPORAL_MODE_SINGLE_BOUNDED_WINDOW as ORACLE_V2_TEMPORAL_MODE_SINGLE_BOUNDED_WINDOW,
@@ -226,6 +229,7 @@ __all__ = [
     "XDEX_SWAP_QUOTE_URL",
     "XDEX_TOKEN_PRICE_URL",
     "accepted_oracle_v2_timestamp_promotion_policy",
+    "accepted_oracle_v2_timestamp_unit_evidence",
     "aggregate_oracle_v2_slots",
     "assess_unix_ms_block_time_correlation",
     "classify_oracle_v2_slot",
