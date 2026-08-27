@@ -71,13 +71,17 @@ Each accepted sample had to satisfy all of the following:
 8. the signed message parsed exactly as:
    `BATCH:<relay>:<btc>:<eth>:<sol>:<hype>:<zec>:<fartcoin>:<timestamp>`;
 9. relay index, six prices, and timestamp in the signed message exactly matched the decoded batch instruction fields;
-10. the same transaction contained an Ed25519SigVerify instruction whose decoded signed message exactly matched the batch signed-message vector;
-11. the transaction block time matched the block time preserved by the history row when present;
-12. an additional X1 `getBlockTime(slot)` call returned a verified block time equal to the transaction block time.
+10. the same transaction contained a preceding Ed25519SigVerify instruction whose decoded signed message exactly matched the batch signed-message vector;
+11. the Ed25519 signature hash exactly matched the 64-byte signature argument carried by the batch instruction;
+12. the Ed25519 public-key hash exactly matched the current configured Oracle public key read fail-closed from the verified Oracle state account;
+13. the transaction block time matched the block time preserved by the history row when present;
+14. an additional X1 `getBlockTime(slot)` call returned a verified block time equal to the transaction block time.
 
 A successful sample therefore ties one raw signed Oracle timestamp to one successful X1 batch transaction and its X1 block time under the reviewed transaction-shape contract.
 
 This does **not** establish that the deployed program binary is byte-for-byte equivalent to the pinned upstream source.
+
+It also does not prove historical Oracle-key continuity. The tracer intentionally accepts only transactions signed by the key that is currently configured in the live Oracle state. If the key has rotated, earlier transactions using a prior valid key fail closed rather than being counted as verified evidence.
 
 ## Raw timestamp range
 
