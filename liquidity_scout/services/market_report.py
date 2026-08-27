@@ -92,11 +92,11 @@ def _provider_holder_summary(
     rows_complete = True
 
     for pool in pools:
-        value = _first_number(pool, ("holders",))
-        if value is None:
+        value = pool.get("holders")
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             rows_complete = False
             continue
-        values.append(int(value))
+        values.append(value)
 
     observed = sorted(set(values))
     provider_consistent = len(observed) == 1 and rows_complete
