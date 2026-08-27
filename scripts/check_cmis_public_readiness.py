@@ -138,6 +138,10 @@ def check_public_deployment(
     key = str(api_key or "").strip()
     if not key:
         raise PreflightError("CMIS_API_KEY is required for public deployment")
+    if len(key) < 32:
+        raise PreflightError(
+            "CMIS_API_KEY must be at least 32 characters for public deployment"
+        )
 
     health = _read_json(
         Request(url + "/healthz", method="GET"),
