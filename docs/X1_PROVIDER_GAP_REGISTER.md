@@ -35,11 +35,11 @@ Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-prom
 |---|---|---|---|
 | X1-RPC-01 | Core X1 RPC coverage | VERIFIED | Existing X1 RPC path is active; preserve provenance/tests. |
 | X1-RPC-02 | Historical transaction RPC | PARTIAL | Historical comparison contracts are accepted; still requires live independent retention/finality/reconnect/backfill evidence. |
-| X1-RPC-03 | RPC redundancy / failover | PARTIAL | Official RPC is accepted; self-hosted read-only node verification is the next bounded redundancy task. Methods, retention, errors, latency, failover, and independence claims remain to be proven. |
+| X1-RPC-03 | RPC redundancy / failover | DEFERRED / OPTIONAL | Official X1 RPC is the selected production RPC path. Self-hosted redundancy is not required for current CMIS operation; no redundancy or independence claim is made. |
 | X1-IDX-01 | General transaction / wallet indexer | PARTIAL | X1.Ninja indexing exists, but complete wallet/indexer semantics remain unproven. |
 | X1-DEX-01 | Pool catalog / liquidity / volume | VERIFIED | CMIS has accepted provider/direct XDEX paths within their exact scopes. |
 | X1-DEX-02 | Pool detail / reserves | VERIFIED (POOL-SPECIFIC) | XENCAT/XNT pool proof is accepted only for its exact pool/identity/unit scope. |
-| X1-DEX-03 | Holder data | PARTIAL | Same-run observational probe completed; disagreement remains insufficient evidence. Do not relabel token accounts/authorities as holders or beneficial owners. |
+| X1-DEX-03 | Holder data | PARTIAL / #304 ACTIVE | Same-run XENCAT observation found provider 116 vs RPC token accounts 180 vs unique token-account authorities 174. #304 corrects market-report semantics so none is mislabeled as verified holders without counted-entity/coverage proof. |
 | X1-HIST-01 | X1.Ninja trade history | PARTIAL | Structure/transport exists; deeper semantic/finality/pagination coverage remains bounded. |
 | X1-HIST-02 | X1.Ninja OHLCV | PARTIAL | Contract tests exist; semantics remain field/scope specific. |
 | X1-HIST-03 | Direct XDEX chart/history | BLOCKED/PARTIAL | Some field semantics are bounded/verified; remaining pair/volume/history semantics stay unpromoted where not proven. |
@@ -54,7 +54,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-prom
 | X1-BRIDGE-04 | Bridge transfer state / history | MISSING | No accepted authoritative lifecycle source. |
 | X1-BRIDGE-05 | Guardian set / health | PARTIAL | UI concepts exist; machine-readable source/identity/freshness contract remains unproven. |
 | X1-BRIDGE-06 | Bridge-flow / TVL cross-check | CANDIDATE | Independent candidate only until provenance/API semantics are verified. |
-| X1-ALT-01 | Self-hosted X1 read-only node history / streaming redundancy | PARTIAL / IMPLEMENTED CONTRACT | #301 deterministic config/identity/history/PubSub contract and probes exist; live node evidence is still unavailable until explicit endpoint/configuration evidence is supplied. Node redundancy remains separate from independent market-source evidence. |
+| X1-ALT-01 | Self-hosted X1 read-only node history / streaming redundancy | OPTIONAL / DEFERRED | #301 contract/probes exist, but live deployment verification is deferred after selecting Official X1 RPC as the production path. Node redundancy remains separate from independent market-source evidence. |
 | X1-ALT-02 | FortiBlox explorer / RPC ecosystem | ARCHIVED / UNVERIFIED | PR #227 closed as candidate research; no reproducible provider-owned endpoint/response contract is accepted. Reopen only with new exact evidence. |
 
 ## Promotion rules
@@ -73,9 +73,9 @@ Before any PARTIAL, CANDIDATE, BLOCKED, or MISSING capability is promoted:
 
 ## Immediate work order
 
-1. **Self-hosted X1 read-only node verification** — prove exact configuration/identity plus bounded history and PubSub behavior for redundancy without claiming independent market-price evidence.
-2. **Holder semantics evidence** — investigate counted-entity and coverage semantics; do not repeat the already-completed observational comparison unless new evidence/source conditions justify it.
-3. **Deeper Solana field maturity** — strengthen exact field/source/freshness semantics under shared CMIS contracts.
+1. **Holder semantics correction (#304)** — keep X1.Ninja provider holder-looking values, RPC token-account counts, and unique token-account-authority counts semantically distinct; do not expose any as verified holders without counted-entity/coverage proof.
+2. **Deeper Solana field maturity** — strengthen exact field/source/freshness semantics under shared CMIS contracts.
+3. **Optional RPC redundancy** — #301 self-hosted verification may resume later if operational redundancy becomes a requirement; Official X1 RPC remains the selected primary path.
 4. **Oracle V2 #272 conditional recheck** — only when new policy-eligible live slots appear, rerun freshness and then exact same-fact price-correctness/source-independence gates.
 5. **Warp Bridge** — remains missing/not currently verifiable until an exact provenance-approved machine-readable read contract appears.
 6. **X1.Ninja SSE** — current credential access is denied; only after authenticated access is established should event schema/order/finality/reconnect/backfill semantics be tested.
