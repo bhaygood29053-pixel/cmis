@@ -36,7 +36,12 @@ from liquidity_scout.market.resolver import (
 from liquidity_scout.providers.x1.market import X1Provider
 from liquidity_scout.providers.x1.rpc import X1RPCProvider
 from liquidity_scout.providers.x1.supply import X1SupplyProvider
+from liquidity_scout.providers.x1.token_metadata import X1TokenMetadataProvider
 from liquidity_scout.services.cmis_asset_lookup import build_asset_lookup_response
+from liquidity_scout.services.cmis_x1_asset_identity import (
+    build_exact_mint_identity_response,
+    is_exact_x1_public_key,
+)
 from liquidity_scout.services.cmis_contract import (
     AMBIGUOUS,
     ERROR,
@@ -80,6 +85,7 @@ class CMISGateway:
         x1_market_provider: Optional[X1Provider] = None,
         x1_supply_provider: Optional[X1SupplyProvider] = None,
         x1_rpc_provider: Optional[X1RPCProvider] = None,
+        x1_token_metadata_provider: Optional[X1TokenMetadataProvider] = None,
         history_backend: Any = None,
         asset_registry: Optional[AssetRegistry] = None,
         auto_record_history: bool = False,
@@ -87,6 +93,9 @@ class CMISGateway:
         self.x1_market_provider = x1_market_provider or X1Provider()
         self.x1_supply_provider = x1_supply_provider or X1SupplyProvider()
         self.x1_rpc_provider = x1_rpc_provider or X1RPCProvider()
+        self.x1_token_metadata_provider = (
+            x1_token_metadata_provider or X1TokenMetadataProvider()
+        )
         self.history_backend = history_backend or default_history_backend
         self.asset_registry = asset_registry or DEFAULT_ASSET_REGISTRY
         self.auto_record_history = bool(auto_record_history)
@@ -255,8 +264,69 @@ class CMISGateway:
         )
 
     def _asset_lookup(self, asset: Any) -> Dict[str, Any]:
-        if not self._text(asset):
+        query_text = self._text(asset)
+        if not query_text:
             return build_asset_lookup_response(asset, [], chain="x1")
+
+        if is_exact_x1_public_key(query_text):
+            metadata_evidence = None
+            metadata_warning = None
+            try:
+                metadata_evidence = self.x1_token_metadata_provider.get_metadata(
+                    query_text
+                )
+            except Exception as exc:
+                metadata_warning = {
+                    "code": "x1_token_metadata_provider_unavailable",
+                    "message": (
+                        "Exact-mint Token Metadata verification failed: "
+                        f"{type(exc).__name__}: {exc}"
+                    ),
+                }
+
+            catalog = None
+            catalog_failure = None
+            try:
+                catalog, catalog_failure = self._collect_x1_catalog("asset_lookup")
+            except Exception as exc:  # pragma: no cover - defensive provider boundary
+                catalog_failure = build_service_envelope(
+                    "asset_lookup",
+                    "x1",
+                    UNAVAILABLE,
+                    warnings=[{
+                        "code": "x1_market_provider_unavailable",
+                        "message": f"X1 market collection failed: {exc}",
+                    }],
+                )
+
+            pools = (
+                catalog.get("pools")
+                if isinstance(catalog, Mapping)
+                else []
+            )
+            response = build_exact_mint_identity_response(
+                query_text,
+                metadata_evidence=metadata_evidence,
+                xdex_pools=pools,
+                xdex_available=catalog_failure is None,
+                xdex_source=(
+                    catalog.get("source")
+                    if isinstance(catalog, Mapping)
+                    else None
+                ),
+                xdex_observed_at=(
+                    catalog.get("observed_at")
+                    if isinstance(catalog, Mapping)
+                    else None
+                ),
+            )
+            if metadata_warning is not None:
+                response["warnings"].append(metadata_warning)
+            if catalog_failure is not None:
+                response["warnings"].extend(
+                    catalog_failure.get("warnings") or []
+                )
+            return response
 
         definition = self._canonical_definition(asset)
         query = self._market_query(asset, definition)

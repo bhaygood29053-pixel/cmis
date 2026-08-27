@@ -54,6 +54,44 @@ class FakeX1MarketProvider:
         }
 
 
+XENCAT_MINT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
+
+class FakeTokenMetadataProvider:
+    def __init__(self, *, symbol="XENCAT", name="XENCAT", available=True):
+        self.symbol = symbol
+        self.name = name
+        self.available = available
+        self.calls = []
+
+    def get_metadata(self, mint):
+        self.calls.append(mint)
+        if not self.available:
+            return {
+                "identity_verified": False,
+                "program": {"program_executable_verified": True},
+                "metadata": {"identity_verified": False, "mint": mint},
+            }
+        return {
+            "identity_verified": True,
+            "program": {
+                "program_executable_verified": True,
+                "context_slot": 100,
+            },
+            "metadata": {
+                "identity_verified": True,
+                "mint": mint,
+                "symbol": self.symbol,
+                "name": self.name,
+                "uri": "https://example.invalid/token.json",
+                "metadata_account": "Metadata111",
+                "metadata_update_authority": "Update111",
+                "is_mutable": True,
+                "token_standard": "Fungible",
+                "context_slot": 101,
+                "program_id": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+            },
+        }
+
 class CMISGatewayTests(unittest.TestCase):
     def setUp(self):
         self.agi = token("AGI", "MINT_AGI", "Artificial General Intelligence")
@@ -90,6 +128,152 @@ class CMISGatewayTests(unittest.TestCase):
         self.assertEqual(response["asset"]["mint"], "MINT_AGI")
         self.assertEqual(response["observed_at"], 123.0)
         self.assertEqual(self.provider.refresh_calls, 1)
+
+    def test_exact_mint_resolves_metaplex_only_without_xdex_presence(self):
+        metadata = FakeTokenMetadataProvider()
+        gateway = CMISGateway(
+            x1_market_provider=FakeX1MarketProvider([]),
+            x1_token_metadata_provider=metadata,
+        )
+        response = gateway.dispatch({
+            "service": "asset_lookup",
+            "chain": "x1",
+            "asset": XENCAT_MINT,
+        })
+        self.assertEqual(response["status"], "ok")
+        self.assertEqual(response["asset"]["mint"], XENCAT_MINT)
+        self.assertEqual(response["asset"]["symbol"], "XENCAT")
+        self.assertEqual(
+            response["data"]["identity_reconciliation"]["state"],
+            "metaplex_only",
+        )
+        self.assertTrue(
+            response["data"]["normalized_identity"][
+                "normalized_onchain_identity_verified"
+            ]
+        )
+        self.assertEqual(metadata.calls, [XENCAT_MINT])
+
+    def test_exact_mint_reconciles_matching_metaplex_and_xdex_descriptors(self):
+        metadata = FakeTokenMetadataProvider()
+        xdex_token = token("XENCAT", XENCAT_MINT, "XENCAT")
+        gateway = CMISGateway(
+            x1_market_provider=FakeX1MarketProvider([
+                pool("PX", xdex_token, self.usdc),
+            ]),
+            x1_token_metadata_provider=metadata,
+        )
+        response = gateway.dispatch({
+            "service": "asset_lookup",
+            "chain": "x1",
+            "asset": XENCAT_MINT,
+        })
+        self.assertEqual(response["status"], "ok")
+        reconciliation = response["data"]["identity_reconciliation"]
+        self.assertEqual(reconciliation["state"], "agreement")
+        self.assertEqual(reconciliation["conflicting_fields"], [])
+        self.assertEqual(
+            response["data"]["normalized_identity"]["identity_root"],
+            "mint",
+        )
+        self.assertEqual(
+            response["data"]["normalized_identity"]["descriptor_source"],
+            "metaplex_token_metadata",
+        )
+
+    def test_exact_mint_descriptor_conflict_is_partial_not_ambiguous(self):
+        metadata = FakeTokenMetadataProvider(symbol="XENCAT", name="XENCAT")
+        xdex_token = token("CATX", XENCAT_MINT, "Different Name")
+        gateway = CMISGateway(
+            x1_market_provider=FakeX1MarketProvider([
+                pool("PX", xdex_token, self.usdc),
+            ]),
+            x1_token_metadata_provider=metadata,
+        )
+        response = gateway.dispatch({
+            "service": "asset_lookup",
+            "chain": "x1",
+            "asset": XENCAT_MINT,
+        })
+        self.assertEqual(response["status"], "partial")
+        self.assertEqual(response["asset"]["mint"], XENCAT_MINT)
+        self.assertEqual(response["asset"]["symbol"], "XENCAT")
+        reconciliation = response["data"]["identity_reconciliation"]
+        self.assertEqual(reconciliation["state"], "descriptor_conflict")
+        self.assertEqual(
+            set(reconciliation["conflicting_fields"]),
+            {"symbol", "name"},
+        )
+
+    def test_exact_mint_metadata_unavailable_preserves_xdex_as_partial_only(self):
+        metadata = FakeTokenMetadataProvider(available=False)
+        xdex_token = token("XENCAT", XENCAT_MINT, "XENCAT")
+        gateway = CMISGateway(
+            x1_market_provider=FakeX1MarketProvider([
+                pool("PX", xdex_token, self.usdc),
+            ]),
+            x1_token_metadata_provider=metadata,
+        )
+        response = gateway.dispatch({
+            "service": "asset_lookup",
+            "chain": "x1",
+            "asset": XENCAT_MINT,
+        })
+        self.assertEqual(response["status"], "partial")
+        self.assertFalse(
+            response["data"]["normalized_identity"][
+                "normalized_onchain_identity_verified"
+            ]
+        )
+        self.assertEqual(
+            response["data"]["identity_reconciliation"]["state"],
+            "metadata_unavailable",
+        )
+
+    def test_exact_mint_xdex_outage_is_not_reported_as_metaplex_only(self):
+        metadata = FakeTokenMetadataProvider()
+
+        class FailingMarketProvider(FakeX1MarketProvider):
+            def refresh_if_needed(self):
+                raise RuntimeError("offline")
+
+        gateway = CMISGateway(
+            x1_market_provider=FailingMarketProvider([]),
+            x1_token_metadata_provider=metadata,
+        )
+        response = gateway.dispatch({
+            "service": "asset_lookup",
+            "chain": "x1",
+            "asset": XENCAT_MINT,
+        })
+        self.assertEqual(response["status"], "partial")
+        self.assertEqual(
+            response["data"]["identity_reconciliation"]["state"],
+            "xdex_unavailable",
+        )
+        self.assertFalse(
+            response["data"]["identity_reconciliation"]["xdex"]["available"]
+        )
+        self.assertTrue(
+            any(
+                warning.get("code") == "x1_market_provider_unavailable"
+                for warning in response["warnings"]
+            )
+        )
+
+    def test_symbol_lookup_does_not_call_token_metadata_provider(self):
+        metadata = FakeTokenMetadataProvider()
+        gateway = CMISGateway(
+            x1_market_provider=self.provider,
+            x1_token_metadata_provider=metadata,
+        )
+        response = gateway.dispatch({
+            "service": "asset_lookup",
+            "chain": "x1",
+            "asset": "AGI",
+        })
+        self.assertEqual(response["status"], "ok")
+        self.assertEqual(metadata.calls, [])
 
     def test_market_report_request_does_not_require_external_pool_rows(self):
         response = self.gateway.dispatch({
