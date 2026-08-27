@@ -241,4 +241,4 @@ Roberta -> X1 Scout -> CMIS -> X1 Provider
 8. Verify Oracle V2's repository-declared X1 program/state through X1 RPC and prove exact layout/freshness semantics under #272 before any provider promotion.
 9. Investigate X1 Prism only as an independent bridge-flow cross-check until provenance is proven.
 
-Research boundary: this file summarizes publicly accessible information observed for planning on 2026-08-16. It does not certify current provider uptime, live endpoint access, response semantics, data accuracy, or contractual stability. Those must be established through deterministic provider tests before CMIS relies on them.
+Research boundary: this file contains the original 2026-08-16 public-source research plus explicitly dated supplemental Oracle V2 repository research from 2026-08-26. It does not certify current provider uptime, live endpoint access, deployed on-chain identity/state, response semantics, data accuracy, or contractual stability. Those must be established through deterministic provider tests before CMIS relies on them.
