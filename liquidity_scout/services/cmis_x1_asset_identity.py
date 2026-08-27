@@ -207,6 +207,7 @@ def build_exact_mint_identity_response(
     *,
     metadata_evidence: Any,
     xdex_pools: Any = None,
+    xdex_available: bool = True,
     xdex_source: Any = None,
     xdex_observed_at: Any = None,
 ) -> dict[str, Any]:
@@ -215,8 +216,15 @@ def build_exact_mint_identity_response(
     if not mint_text or not is_exact_x1_public_key(mint_text):
         raise ValueError("exact X1 mint must be a valid 32-byte base58 public key")
 
+    if not isinstance(xdex_available, bool):
+        raise ValueError("xdex_available must be boolean")
+
     metaplex = _metadata_record(metadata_evidence, mint=mint_text)
-    xdex_variants = exact_xdex_descriptors(mint_text, xdex_pools)
+    xdex_variants = (
+        exact_xdex_descriptors(mint_text, xdex_pools)
+        if xdex_available
+        else []
+    )
 
     if metaplex is None:
         selected = xdex_variants[0] if len(xdex_variants) == 1 else {}
@@ -256,6 +264,7 @@ def build_exact_mint_identity_response(
                     ),
                     "metaplex": None,
                     "xdex": {
+                        "available": xdex_available,
                         "present": bool(xdex_variants),
                         "variants": xdex_variants,
                     },
@@ -283,7 +292,9 @@ def build_exact_mint_identity_response(
         )
 
     comparable, conflicting = _reconcile_fields(metaplex, xdex_variants)
-    if not xdex_variants:
+    if not xdex_available:
+        state = "xdex_unavailable"
+    elif not xdex_variants:
         state = "metaplex_only"
     elif conflicting:
         state = "descriptor_conflict"
@@ -305,7 +316,7 @@ def build_exact_mint_identity_response(
     return build_service_envelope(
         "asset_lookup",
         "x1",
-        PARTIAL if conflicting else OK,
+        PARTIAL if (conflicting or not xdex_available) else OK,
         asset={
             "mint": mint_text,
             "symbol": metaplex.get("symbol"),
@@ -331,6 +342,7 @@ def build_exact_mint_identity_response(
                 "conflicting_fields": conflicting,
                 "metaplex": metaplex,
                 "xdex": {
+                    "available": xdex_available,
                     "present": bool(xdex_variants),
                     "variants": xdex_variants,
                 },
@@ -338,7 +350,7 @@ def build_exact_mint_identity_response(
         },
         confidence=_confidence(
             metaplex_verified=True,
-            descriptor_conflict=bool(conflicting),
+            descriptor_conflict=bool(conflicting) or not xdex_available,
         ),
         sources=_sources(
             metaplex=metaplex,
