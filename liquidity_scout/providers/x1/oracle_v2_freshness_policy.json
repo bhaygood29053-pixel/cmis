@@ -1,0 +1,9 @@
+{
+  "policy_id": "cmis.x1.oracle_v2.current_price_freshness.v1",
+  "max_age_ms": 60000,
+  "max_age_provenance": "CMIS current-price evidence contract: a candidate observation older than one minute at the post-read CMIS observation clock is not current. This is an operator governance bound selected independently of the observed Oracle V2 slot ages and independently of the relay loop cadence.",
+  "max_future_skew_ms": 5000,
+  "future_skew_provenance": "CMIS clock-reference contract: allow at most five seconds of positive source-clock skew relative to the post-read CMIS UTC clock; larger future offsets fail closed. This is an operator governance bound, not derived from observed Oracle V2 slot ages.",
+  "minimum_eligible_slots": 3,
+  "minimum_eligible_slots_provenance": "Oracle V2 stores five same-system relay slots per asset. Requiring three eligible slots establishes a strict majority quorum while preserving that relay redundancy is not independent market-source evidence."
+}
