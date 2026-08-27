@@ -54,7 +54,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) is now tracked under issue #272 as a candida
 | X1-BRIDGE-04 | Bridge transfer state / history | MISSING | No accepted authoritative lifecycle source. |
 | X1-BRIDGE-05 | Guardian set / health | PARTIAL | UI concepts exist; machine-readable source/identity/freshness contract remains unproven. |
 | X1-BRIDGE-06 | Bridge-flow / TVL cross-check | CANDIDATE | Independent candidate only until provenance/API semantics are verified. |
-| X1-ALT-01 | X1Scroll archival RPC / streaming | CANDIDATE | Must prove actual independence, methods, retention, finality, quotas, reconnect, and errors. |
+| X1-ALT-01 | Secondary archival RPC / streaming redundancy | MISSING | X1Scroll is removed from CMIS integration scope after credential-backed verification could not run without an available API key. Any future secondary provider requires a new explicit contract/evidence gate. |
 | X1-ALT-02 | FortiBlox explorer / RPC ecosystem | CANDIDATE | Verify each endpoint independently before any promotion. |
 
 ## Promotion rules
