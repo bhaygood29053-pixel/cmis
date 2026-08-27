@@ -74,6 +74,18 @@ class CMISCapabilityContractTests(unittest.TestCase):
             history["limitations"],
         )
         self.assertIn(
+            "all_available_onchain_coverage_is_mint_address_scope",
+            history["limitations"],
+        )
+        self.assertIn(
+            "rpc_visible_mint_history_does_not_imply_asset_wide_activity",
+            history["limitations"],
+        )
+        self.assertIn(
+            "rpc_block_boundary_does_not_prove_archive_completeness",
+            history["limitations"],
+        )
+        self.assertIn(
             "pair_mode_requires_compare_asset_and_overlapping_verified_history",
             history["limitations"],
         )
