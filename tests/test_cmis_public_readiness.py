@@ -134,7 +134,7 @@ class CMISPublicReadinessTests(unittest.TestCase):
 
         result = check_public_deployment(
             base_url="https://cmis.example.com",
-            api_key="s".repeat(32),
+            api_key="s" * 32,
         )
 
         self.assertEqual(result["status"], "pass")
@@ -165,7 +165,7 @@ class CMISPublicReadinessTests(unittest.TestCase):
         with self.assertRaisesRegex(PreflightError, "limitations are malformed"):
             check_public_deployment(
                 base_url="https://cmis.example.com",
-                api_key="s".repeat(32),
+                api_key="s" * 32,
             )
 
     @patch(
@@ -193,7 +193,7 @@ class CMISPublicReadinessTests(unittest.TestCase):
         with self.assertRaisesRegex(PreflightError, "limitations are missing"):
             check_public_deployment(
                 base_url="https://cmis.example.com",
-                api_key="s".repeat(32),
+                api_key="s" * 32,
             )
 
 
