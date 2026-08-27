@@ -44,23 +44,23 @@ This establishes that the repository-declared deployed Oracle V2 contract shape 
 
 It does **not** establish current price correctness, upstream Pyth/CEX provenance for each stored value, source independence, or CMIS promotion.
 
-## Timestamp / freshness finding
+## Timestamp-unit and freshness finding
 
-The decoded relay timestamps were not current.
+The live account exposes raw signed integer timestamp fields, but this verification pass did **not** independently prove the deployed program binary's timestamp unit.
 
-Across the five relay slots, the embedded Unix-ms timestamps ranged from:
+Observed raw timestamp values ranged from:
+
+- minimum raw value: `1774600419350`
+- maximum raw value: `1774600456170`
+
+The pinned source contract documents those fields as Unix milliseconds, and the pinned relay client populates them with JavaScript `Date.now()`. If the live values are interpreted according to that pinned source contract, they correspond to approximately:
 
 - earliest: **2026-03-27T08:33:39.350Z**
 - latest: **2026-03-27T08:34:16.170Z**
 
-The live probe ran on **2026-08-27T03:30:40.558913Z**.
+The live probe ran on **2026-08-27T03:30:40.558913Z**. Under that source-contract interpretation, the newest value would be about **152.789 days old**.
 
-Therefore the newest stored relay timestamp was approximately:
-
-- `13,200,984,389 ms` old;
-- about **152.789 days** old.
-
-No CMIS freshness threshold was applied by this tracer bullet. Because freshness has not been accepted and the observations are roughly five months old, **current price use remains unauthorized**.
+That conversion is **not promoted as an independently verified live timestamp fact**. Until the timestamp unit is verified and a CMIS freshness policy is accepted, **current price use remains unauthorized**.
 
 The probe must remain fail-closed:
 
@@ -108,6 +108,7 @@ Relay agreement may be useful as same-system consistency evidence, but source in
 deployment_verified = true
 contract_shape_verified = true
 account_layout_verified = true
+timestamp_unit_live_verified = false
 current_price_use_authorized = false
 freshness_policy_applied = false
 source_independence_verified = false
@@ -122,12 +123,13 @@ execution_authorized = false
 
 Before Oracle V2 can supply live CMIS price evidence:
 
-1. define and accept an explicit deterministic freshness policy;
-2. require eligible slots to pass that policy;
-3. compute a deterministic median only from eligible fresh slots;
-4. establish exact same-fact identity/unit/time gates for comparison with existing X1 evidence;
-5. keep relay redundancy separate from source-independence proof;
-6. add Evidence Receipt / Proof Score integration only after the above passes;
-7. complete normal CI and the independent Spec/Contract, Code/Architecture, and Authority/Evidence Safety review gates.
+1. independently verify the deployed timestamp-unit semantics or retain the unit as unresolved;
+2. define and accept an explicit deterministic freshness policy;
+3. require eligible slots to pass both timestamp-unit and freshness gates;
+4. compute a deterministic median only from eligible fresh slots;
+5. establish exact same-fact identity/unit/time gates for comparison with existing X1 evidence;
+6. keep relay redundancy separate from source-independence proof;
+7. add Evidence Receipt / Proof Score integration only after the above passes;
+8. complete normal CI and the independent Spec/Contract, Code/Architecture, and Authority/Evidence Safety review gates.
 
 No signing, submission, transaction construction, broadcast, custody, or execution authority is introduced by this verification.
