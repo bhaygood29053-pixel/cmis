@@ -63,6 +63,7 @@ Deterministic reconciliation states are:
 - `metaplex_only` — verified on-chain metadata exists and XDEX has no exact-mint representation;
 - `agreement` — the exact mint exists in both sources and comparable descriptors agree;
 - `descriptor_conflict` — the exact mint is the same but comparable descriptors disagree; service state is partial and the mint is not changed;
+- `xdex_unavailable` — Metaplex identity is verified but the XDEX provider/catalog could not be observed, so CMIS does not mislabel the mint as absent from XDEX;
 - `metadata_unavailable` — accepted normalized on-chain descriptors are unavailable; any XDEX-only result remains explicitly partial/provider-scoped.
 
 Symbol or name equality never reconciles different mints. URI contents are not verified merely because the URI string is stored on-chain. Metadata update authority/mutability remain separate from SPL mint/freeze authority.
