@@ -10,10 +10,25 @@ from liquidity_scout.services import (
 
 
 class FakeHistory:
-    def __init__(self, series=None):
+    def __init__(self, series=None, provider_summary=None):
         self.series = {
             (mint, metric): [dict(item) for item in rows]
             for (mint, metric), rows in (series or {}).items()
+        }
+        self.provider_summary = dict(provider_summary or {})
+
+    def verified_price_import_summary(self, _mint):
+        if self.provider_summary:
+            return dict(self.provider_summary)
+        return {
+            "available": False,
+            "observation_count": 0,
+            "first_observed_at": None,
+            "last_observed_at": None,
+            "last_imported_at": None,
+            "sources": [],
+            "provider_pairs": [],
+            "quote_mints": [],
         }
 
     def record_snapshot_if_due(self, **kwargs):
@@ -279,6 +294,56 @@ class AllAvailableHistoryTests(unittest.TestCase):
         ]
         self.assertEqual(len(onchain_sources), 1)
         self.assertEqual(onchain_sources[0]["source"], "X1 RPC")
+
+
+    def test_verified_provider_price_backfill_expands_market_history_without_lifetime_promotion(self):
+        history = FakeHistory(
+            {
+                ("AGI_MINT", "price"): [
+                    {"timestamp": 500, "value": 0.5},
+                    {"timestamp": 1000, "value": 1.0},
+                ]
+            },
+            provider_summary={
+                "available": True,
+                "observation_count": 1,
+                "first_observed_at": 500,
+                "last_observed_at": 500,
+                "last_imported_at": 1500,
+                "sources": ["XDEX public API + X1.Ninja OHLCV"],
+                "provider_pairs": ["AGI_MINT/USDCX"],
+                "quote_mints": ["USDCX"],
+            },
+        )
+
+        response = build_historical_compare_response(
+            None,
+            snapshot("AGI", "AGI_MINT", observed_at=2000, price=2.0),
+            history_backend=history,
+            mode="all_available",
+            metrics=["price"],
+        )
+
+        data = response["data"]
+        self.assertEqual(response["status"], PARTIAL)
+        self.assertTrue(data["provider_history_imported"])
+        self.assertEqual(data["first_verified_observed_at"], 500)
+        self.assertEqual(
+            data["metrics"]["price"]["provider_backfill_observation_count"],
+            1,
+        )
+        self.assertTrue(
+            data["coverage"]["market"]["provider_history_imported"]
+        )
+        self.assertFalse(data["full_asset_lifetime_verified"])
+        self.assertFalse(data["continuous_coverage_verified"])
+
+        roles = {item.get("role") for item in response["sources"]}
+        self.assertIn("historical_compare.provider_price_backfill", roles)
+        warning_codes = {item["code"] for item in response["warnings"]}
+        self.assertIn("verified_provider_price_backfill_is_price_only", warning_codes)
+        self.assertIn("provider_source_independence_not_verified", warning_codes)
+        self.assertIn("asset_lifetime_coverage_unverified", warning_codes)
 
     def test_pair_comparison_uses_only_overlapping_verified_window(self):
         history = FakeHistory(
