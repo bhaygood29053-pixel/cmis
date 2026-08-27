@@ -1,0 +1,101 @@
+name: X1 Oracle V2 Current Freshness Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-v2-current-freshness:
+    name: Collect current Oracle V2 freshness evidence
+    if: github.head_ref == 'agent/oracle-v2-current-slot-freshness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run deterministic freshness tests
+        run: |
+          python -m unittest tests.test_x1_oracle_v2_current_freshness -v
+
+      - name: Collect live current-slot age evidence
+        run: |
+          python cmis_x1_oracle_v2_current_freshness.py \
+            --output x1-oracle-v2-current-freshness.json
+
+      - name: Enforce fail-closed current freshness boundary
+        run: |
+          python - <<'PY'
+          import json
+
+          with open(
+              "x1-oracle-v2-current-freshness.json",
+              "r",
+              encoding="utf-8",
+          ) as handle:
+              result = json.load(handle)
+
+          assert result["timestamp_unit_verified"] is True
+          assert result["status"] == "unavailable"
+          assert result["reason"] == "freshness_policy_incomplete"
+          assert result["freshness_policy"]["policy_complete"] is False
+          assert result["freshness_policy_applied"] is False
+          assert result["freshness_verified"] is False
+          assert result["age_summary"]["slot_count"] == 30
+          assert result["age_summary"]["positive_timestamp_age_count"] == 30
+
+          for asset, value in result["assets"].items():
+              assert value["status"] == "unavailable", asset
+              assert value["eligible_slot_count"] == 0, asset
+              assert value["median_price"] is None, asset
+
+          for field in (
+              "current_price_use_authorized",
+              "cmis_provider_promoted",
+              "public_service_promoted",
+              "scout_reliance_promoted",
+              "source_independence_verified",
+              "price_correctness_verified",
+              "execution_authorized",
+          ):
+              assert result[field] is False, field
+
+          print("timestamp_unit_verified=true")
+          print("freshness_policy_complete=false")
+          print("freshness_verified=false")
+          print("current_price_use_authorized=false")
+          PY
+
+      - name: Upload current freshness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-oracle-v2-current-freshness-${{ github.run_id }}
+          path: x1-oracle-v2-current-freshness.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only current-state evidence collection only."
+          echo "No freshness thresholds are supplied by CI."
+          echo "Verified timestamp semantics do not imply fresh prices."
+          echo "No provider, public-service, Scout, or execution promotion."
