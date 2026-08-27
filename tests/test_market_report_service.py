@@ -191,6 +191,30 @@ class MarketReportServiceTests(unittest.TestCase):
         self.assertFalse(report["completeness"]["holders"])
         self.assertIsNone(report["provenance"]["catalog_last_refresh_unix"])
 
+    def test_fractional_provider_holder_value_is_not_coerced(self):
+        primary = pool(
+            "P1",
+            self.agi,
+            self.xnt,
+            liquidity=1000,
+            volume24h=10,
+            txns24h=1,
+            price=0.10,
+        )
+        primary["holders"] = 100.5
+
+        report = build_market_report(
+            "AGI",
+            [(primary, "base", self.agi, 90)],
+            SimpleNamespace(xnt_price_usd=None, last_refresh=1),
+        )
+
+        self.assertIsNone(report["holders"])
+        self.assertIsNone(report["holders_reported"])
+        self.assertEqual(report["holders_observed"], [])
+        self.assertFalse(report["holder_semantics"]["provider_rows_complete"])
+        self.assertFalse(report["completeness"]["holders"])
+
     def test_empty_matches_are_rejected(self):
         with self.assertRaises(ValueError):
             build_market_report(
