@@ -62,14 +62,20 @@ executable flags, state layout, discriminator, decimals, bump, and exact
 
 The CLI does not accept an `observed_at_ms` argument.
 
-The runtime injects the current timezone-aware UTC clock internally and derives:
+For live evaluation, the runtime captures the current timezone-aware UTC clock
+**after** the Oracle state RPC read completes, then derives:
 
 ```text
 observed_at_ms = UTC Unix milliseconds
 ```
 
-The pure evaluation function accepts a timezone-aware injected datetime only so
-tests can be deterministic.
+Capturing the live clock after the state read prevents an Oracle update that
+lands during the RPC call from being compared against a pre-read timestamp and
+appearing spuriously future.
+
+The pure evaluation function still accepts a timezone-aware injected datetime
+for deterministic tests. An injected observation time is passed through to the
+structural probe and preserved exactly.
 
 A naive datetime is rejected.
 
