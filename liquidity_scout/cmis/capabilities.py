@@ -128,6 +128,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
                     "metaplex_name_symbol_uri_are_descriptive_metadata",
                     "xdex_name_symbol_are_provider_market_representation",
                     "same_mint_descriptor_conflicts_return_partial",
+                    "xdex_unavailable_is_not_metaplex_only",
                     "symbol_or_name_never_reconciles_different_mints",
                     "metadata_agreement_does_not_imply_risk_or_legitimacy",
                 ),
