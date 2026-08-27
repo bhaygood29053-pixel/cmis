@@ -2,6 +2,9 @@ name: X1Scroll RPC Access Verification
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -9,6 +12,7 @@ permissions:
 jobs:
   x1scroll-rpc-access:
     name: Read-only X1Scroll authenticated RPC access probe
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/refresh-x1scroll-rpc-access'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
