@@ -24,6 +24,7 @@ A public webpage, UI, release note, or advertised feature is not automatically a
 | Real-time streams | Available candidate | X1.Ninja documents an SSE trade stream; X1Scroll advertises Yellowstone gRPC/Geyser. Access and semantics require live verification. |
 | Independent verification | Improving | Official X1 RPC, X1.Ninja, direct XDEX, self-hosted nodes, X1Scroll, and FortiBlox create potential redundancy, but same-fact deterministic cross-checks are not yet fully implemented. |
 | Bridge Intelligence | Clearest remaining X1 gap | Official Warp Bridge and X1 Prism expose bridge-related UI/status metrics, but no stable documented public read-only bridge API was established by this research. |
+| Oracle V2 price evidence | Candidate (supplemental research 2026-08-26) | Public repository evidence describes a multi-source external price feed, OpenBao-signed relays, and an X1 Oracle Vault. Current deployed program/state identity and live slot semantics remain unverified by CMIS. |
 
 ## X1.Ninja Developer API
 
@@ -128,6 +129,45 @@ Sources:
 - `https://docs.fortiblox.com/docs/explorer/intro`
 - `https://docs.fortiblox.com/docs/nexus/security/rpc-proxy`
 
+## Oracle V2 — supplemental research 2026-08-26
+
+Classification: **PUBLIC IMPLEMENTATION EVIDENCE / X1 READ-ONLY PROVIDER CANDIDATE**.
+
+Repository: `https://github.com/jacklevin74/oracle-v2`
+
+Pinned research commit: `97177f772689e44ca4eed9bb95be32ffdf0c5e66`
+
+A review of the public repository at that commit found:
+
+- a Python price-feed server collecting Pyth plus CEX observations from Coinbase, Kraken, MEXC, and KuCoin in the active aggregation path;
+- weighted-median aggregation with Pyth weighted `2.0` and each reviewed active CEX source weighted `1.0`;
+- five TypeScript relay clients consuming the common aggregated feed;
+- OpenBao Transit Ed25519 signing;
+- X1 submission using an Ed25519 verification pre-instruction plus the Oracle Vault instruction;
+- an Anchor/Solana-compatible Oracle Vault storing five relay slots for each of six on-chain assets: BTC, ETH, SOL, HYPE, ZEC, and FARTCOIN;
+- repository-declared X1 program ID `9mPmjK8NxJadYDiHiYAQH4WFCnKJr7ZV8ria63ZkMtv2`;
+- repository-declared state PDA `8XZBqbKhFXHqNGzxV3Tt6gEs9r8ZrNghsRg7zBwLMGJf`.
+
+The reviewed price-feed also includes Pyth mappings for TSLA, NVDA, MSTR, GOLD, and SILVER. Those feed-server mappings must not be interpreted as on-chain Oracle Vault asset support; the reviewed on-chain program stores only six assets.
+
+The repository claims X1 mainnet deployment, but this research pass did **not** independently verify through X1 RPC:
+
+- current program account identity/executable state;
+- state-account owner;
+- PDA derivation against the deployed program;
+- deployed account layout;
+- current relay-slot prices/timestamps/freshness;
+- current oracle signing-key identity;
+- current correctness or availability of the upstream feed.
+
+CMIS architecture implication: if accepted later, Oracle V2 should be consumed as read-only on-chain evidence through the X1 Provider/X1 RPC boundary. CMIS should not run OpenBao, hold relay keys, submit oracle prices, or add a signing/broadcast path merely to consume the source.
+
+Evidence-quality warning: the five relay clients consume a common aggregated feed in the reviewed implementation. Five relay slots therefore do not establish five independent market-price sources. Relay redundancy, underlying source diversity, same-fact agreement, and actual source independence must remain separate proof dimensions.
+
+Detailed research and acceptance requirements: `docs/X1_ORACLE_V2_SOURCE_RESEARCH.md`
+
+Tracking issue: **#272**.
+
 ## Required verification before CMIS promotion
 
 For any new provider/source, record:
@@ -198,6 +238,7 @@ Roberta -> X1 Scout -> CMIS -> X1 Provider
 5. Probe X1.Ninja SSE access without assuming advertised Pro access is live.
 6. Evaluate self-hosted X1 read-only node vs X1Scroll for history/streaming redundancy.
 7. Perform read-only Warp Bridge source discovery and contract verification.
-8. Investigate X1 Prism only as an independent bridge-flow cross-check until provenance is proven.
+8. Verify Oracle V2's repository-declared X1 program/state through X1 RPC and prove exact layout/freshness semantics under #272 before any provider promotion.
+9. Investigate X1 Prism only as an independent bridge-flow cross-check until provenance is proven.
 
 Research boundary: this file summarizes publicly accessible information observed for planning on 2026-08-16. It does not certify current provider uptime, live endpoint access, response semantics, data accuracy, or contractual stability. Those must be established through deterministic provider tests before CMIS relies on them.
