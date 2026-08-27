@@ -29,7 +29,7 @@ Roberta Learning System sources, autonomous source-mastery plans, Pyramid traini
 ```text
 schema_version = 1
 global existing-service minimum = 1.8.0
-current CMIS contract = 1.9.0
+current CMIS contract = 1.10.0
 ```
 
 Accepted manifest semantics include:
@@ -39,6 +39,7 @@ Accepted manifest semantics include:
 - Proof Score schema `1`;
 - risk/proof separation;
 - missing-evidence-is-unknown semantics;
+- X1 `historical_compare` supports bounded `window`, `all_available`, and `all_available_pair` modes; all-available history is explicitly scoped to verified CMIS observations and does not imply complete asset lifetime;
 - read-only Phase 11 `intelligence_foundation` with public-service/Scout-reliance promotion false;
 - one separately promoted read-only X1 intelligence service: `concentration_change_intelligence/v1`.
 
