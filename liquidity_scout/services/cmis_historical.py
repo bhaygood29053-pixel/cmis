@@ -129,6 +129,25 @@ def _sources(
         if record not in result:
             result.append(record)
 
+    provider_price_history = comparison.get("provider_price_history")
+    if isinstance(provider_price_history, Mapping):
+        for raw_source in provider_price_history.get("sources") or []:
+            provider_source = _text(raw_source)
+            if not provider_source:
+                continue
+            record = {
+                "source": provider_source,
+                "role": "historical_compare.provider_price_backfill",
+            }
+            first = provider_price_history.get("first_observed_at")
+            last = provider_price_history.get("last_observed_at")
+            if first is not None:
+                record["first_observed_at"] = first
+            if last is not None:
+                record["last_observed_at"] = last
+            if record not in result:
+                result.append(record)
+
     coverage = comparison.get("coverage")
     if isinstance(coverage, Mapping):
         onchain = coverage.get("onchain")
@@ -234,6 +253,14 @@ def _attach_x1_all_available_coverage(
         ),
         "continuous_coverage_verified": (
             result.get("continuous_coverage_verified") is True
+        ),
+        "provider_history_imported": (
+            result.get("provider_history_imported") is True
+        ),
+        "provider_price_history": (
+            dict(result.get("provider_price_history"))
+            if isinstance(result.get("provider_price_history"), Mapping)
+            else None
         ),
     }
 
