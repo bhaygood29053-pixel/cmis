@@ -216,6 +216,16 @@ def _pair_observations(record: Mapping[str, Any]) -> list[dict[str, Any]]:
             {
                 "pair_address": pair.get("pair_address"),
                 "dex_id": pair.get("dex_id"),
+                "base_token_address": (
+                    pair.get("base_token", {}).get("address")
+                    if isinstance(pair.get("base_token"), Mapping)
+                    else None
+                ),
+                "quote_token_address": (
+                    pair.get("quote_token", {}).get("address")
+                    if isinstance(pair.get("quote_token"), Mapping)
+                    else None
+                ),
                 "requested_mint_role": pair.get("requested_mint_role"),
                 "price_subject_address": pair.get("price_subject_address"),
                 "price_is_for_requested_mint": pair.get(
