@@ -1,6 +1,6 @@
 # X1 Provider Gap Register
 
-Status date: **2026-08-26**
+Status date: **2026-08-27**
 
 This register tracks capability gaps beneath CMIS for the X1 Provider. It is a planning and verification document, not a source of live market facts.
 
@@ -27,7 +27,7 @@ Those observations are non-promotional. They prove neither current stream usabil
 
 Warp Bridge remains unpromoted because no exact provenance-approved machine-readable operational read URL/contract has been accepted.
 
-Oracle V2 (`jacklevin74/oracle-v2`) is now tracked under issue #272 as a candidate read-only X1 price-evidence source. Public repository evidence describes a multi-source price feed, five signed relay submissions, and an X1 Oracle Vault program/state PDA, but CMIS has not independently verified the current deployed program/state, account layout, slot freshness, or signing-key identity. Relay-slot agreement must not be treated as five-source independence because the reviewed relays consume a common aggregated feed.
+Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-promoted read-only X1 price evidence. CMIS has verified deployed program/state identity, exact layout, stored key, Unix-ms timestamp semantics, and the explicit freshness policy. The latest live run classified all 30 observed relay slots stale, so current-price use and price correctness remain unavailable/unverified. Relay-slot agreement must not be treated as five-source independence because the reviewed relays consume a common aggregated feed.
 
 ## Capability register
 
@@ -35,7 +35,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) is now tracked under issue #272 as a candida
 |---|---|---|---|
 | X1-RPC-01 | Core X1 RPC coverage | VERIFIED | Existing X1 RPC path is active; preserve provenance/tests. |
 | X1-RPC-02 | Historical transaction RPC | PARTIAL | Historical comparison contracts are accepted; still requires live independent retention/finality/reconnect/backfill evidence. |
-| X1-RPC-03 | RPC redundancy / failover | PARTIAL | Candidate redundant sources exist; independence, methods, retention, errors, latency, and failover remain to be proven. |
+| X1-RPC-03 | RPC redundancy / failover | PARTIAL | Official RPC is accepted; self-hosted read-only node verification is the next bounded redundancy task. Methods, retention, errors, latency, failover, and independence claims remain to be proven. |
 | X1-IDX-01 | General transaction / wallet indexer | PARTIAL | X1.Ninja indexing exists, but complete wallet/indexer semantics remain unproven. |
 | X1-DEX-01 | Pool catalog / liquidity / volume | VERIFIED | CMIS has accepted provider/direct XDEX paths within their exact scopes. |
 | X1-DEX-02 | Pool detail / reserves | VERIFIED (POOL-SPECIFIC) | XENCAT/XNT pool proof is accepted only for its exact pool/identity/unit scope. |
@@ -45,17 +45,17 @@ Oracle V2 (`jacklevin74/oracle-v2`) is now tracked under issue #272 as a candida
 | X1-HIST-03 | Direct XDEX chart/history | BLOCKED/PARTIAL | Some field semantics are bounded/verified; remaining pair/volume/history semantics stay unpromoted where not proven. |
 | X1-QUOTE-01 | Direct XDEX read-only quote | PARTIAL | Exact route/config and selected price-impact/slippage parameter semantics are bounded; expected execution slippage/route quality remain unavailable. |
 | X1-STREAM-01 | X1.Ninja real-time trades | PARTIAL / ACCESS DENIED CURRENTLY | Bounded handshake probe completed with HTTP 403/access_denied for current credential. No stream semantics promoted. |
-| X1-STREAM-02 | General chain real-time stream | PARTIAL | PubSub/candidate sources require commitment/finality/reconnect/order/backfill validation. |
+| X1-STREAM-02 | General chain real-time stream | PARTIAL | Official/self-hosted X1 PubSub is the next bounded candidate; commitment/finality/reconnect/order/duplicate/gap/backfill semantics remain to be validated. |
 | X1-XCHECK-01 | Same-fact independent verification | VERIFIED (FRAMEWORK) | Framework is accepted; each fact still requires proven source independence and fact-specific gates. |
-| X1-ORACLE-01 | Oracle V2 on-chain price evidence | CANDIDATE | Issue #272. Repository-declared program/PDA and 6-asset × 5-slot layout are documented; current X1 deployment/account identity/layout/freshness must be RPC-verified before any CMIS use. Relay redundancy is not source independence. |
+| X1-ORACLE-01 | Oracle V2 on-chain price evidence | CANDIDATE / CURRENTLY STALE | Issue #272. Deployment identity/layout, timestamp unit, and freshness policy are verified. Latest live evidence found all 30 slots stale, so no current-price median is eligible; price correctness/source independence/promotion remain false. Relay redundancy is not source independence. |
 | X1-BRIDGE-01 | Bridge operational state | MISSING | Exact-URL provenance gate exists, but no approved machine-readable operational endpoint is accepted yet. |
 | X1-BRIDGE-02 | Supported bridged assets / representations | PARTIAL | Canonical representation modeling exists; exact machine-readable bridge configuration remains to be verified. |
 | X1-BRIDGE-03 | Bridge fees / route capacity | MISSING | No verified machine-readable contract. |
 | X1-BRIDGE-04 | Bridge transfer state / history | MISSING | No accepted authoritative lifecycle source. |
 | X1-BRIDGE-05 | Guardian set / health | PARTIAL | UI concepts exist; machine-readable source/identity/freshness contract remains unproven. |
 | X1-BRIDGE-06 | Bridge-flow / TVL cross-check | CANDIDATE | Independent candidate only until provenance/API semantics are verified. |
-| X1-ALT-01 | Secondary archival RPC / streaming redundancy | MISSING | X1Scroll is removed from CMIS integration scope after credential-backed verification could not run without an available API key. Any future secondary provider requires a new explicit contract/evidence gate. |
-| X1-ALT-02 | FortiBlox explorer / RPC ecosystem | CANDIDATE | Verify each endpoint independently before any promotion. |
+| X1-ALT-01 | Self-hosted X1 read-only node history / streaming redundancy | MISSING / NEXT | Verify the official read-only node configuration and bounded history/PubSub semantics. Treat node redundancy separately from independent market-source evidence. |
+| X1-ALT-02 | FortiBlox explorer / RPC ecosystem | ARCHIVED / UNVERIFIED | PR #227 closed as candidate research; no reproducible provider-owned endpoint/response contract is accepted. Reopen only with new exact evidence. |
 
 ## Promotion rules
 
@@ -73,11 +73,11 @@ Before any PARTIAL, CANDIDATE, BLOCKED, or MISSING capability is promoted:
 
 ## Immediate work order
 
-1. **Warp Bridge source discovery** — obtain one exact provenance-approved machine-readable read URL and bounded response contract.
-2. **Oracle V2 read-contract verification (#272)** — verify the repository-declared X1 program/state through X1 RPC, prove the exact account layout/timestamp semantics, and define fail-closed freshness/median behavior before any provider implementation or promotion.
-3. **Historical redundancy live evidence** — prove source independence and retention/finality/reconnect/backfill behavior for a selected secondary source.
-4. **Holder semantics evidence** — investigate counted-entity and coverage semantics; do not repeat the already-completed observational comparison unless new evidence/source conditions justify it.
-5. **SSE access remediation / alternate source** — current credential access is denied; only after authenticated access is established should event schema/order/finality/reconnect/backfill semantics be tested.
-6. **Independent bridge cross-check** — evaluate candidates only after their own machine-readable provenance/contracts are verified.
+1. **Self-hosted X1 read-only node verification** — prove exact configuration/identity plus bounded history and PubSub behavior for redundancy without claiming independent market-price evidence.
+2. **Holder semantics evidence** — investigate counted-entity and coverage semantics; do not repeat the already-completed observational comparison unless new evidence/source conditions justify it.
+3. **Deeper Solana field maturity** — strengthen exact field/source/freshness semantics under shared CMIS contracts.
+4. **Oracle V2 #272 conditional recheck** — only when new policy-eligible live slots appear, rerun freshness and then exact same-fact price-correctness/source-independence gates.
+5. **Warp Bridge** — remains missing/not currently verifiable until an exact provenance-approved machine-readable read contract appears.
+6. **X1.Ninja SSE** — current credential access is denied; only after authenticated access is established should event schema/order/finality/reconnect/backfill semantics be tested.
 
 All work remains read-only/fail-closed and does not authorize execution.
