@@ -74,7 +74,7 @@ Before any PARTIAL, CANDIDATE, BLOCKED, or MISSING capability is promoted:
 ## Immediate work order
 
 1. **Holder semantics correction (#304)** — complete via PR #305; keep provider holder-looking values, RPC token-account counts, and unique token-account-authority counts semantically distinct.
-2. **Solana observed-pair aggregation (#306)** — deterministically aggregate only eligible unique observed pairs for liquidity/24h volume while preserving incomplete pair-universe scope.
+2. **Solana observed-pair aggregation (#306)** — implemented in PR #307; deterministically aggregate only eligible unique observed pairs for liquidity/24h volume while preserving incomplete pair-universe scope.
 3. **Optional RPC redundancy** — #301 self-hosted verification may resume later if operational redundancy becomes a requirement; Official X1 RPC remains the selected primary path.
 4. **Oracle V2 #272 conditional recheck** — only when new policy-eligible live slots appear, rerun freshness and then exact same-fact price-correctness/source-independence gates.
 5. **Warp Bridge** — remains missing/not currently verifiable until an exact provenance-approved machine-readable read contract appears.
