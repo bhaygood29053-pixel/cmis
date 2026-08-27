@@ -110,6 +110,17 @@ class CMISPublicReadinessTests(unittest.TestCase):
         "scripts.check_cmis_public_readiness._base_url",
         return_value="https://cmis.example.com",
     )
+    def test_public_deployment_rejects_weak_bearer_key(self, _):
+        with self.assertRaisesRegex(PreflightError, "at least 32"):
+            check_public_deployment(
+                base_url="https://cmis.example.com",
+                api_key="too-short",
+            )
+
+    @patch(
+        "scripts.check_cmis_public_readiness._base_url",
+        return_value="https://cmis.example.com",
+    )
     @patch("scripts.check_cmis_public_readiness._read_json")
     def test_public_deployment_accepts_exact_identity_contract(self, read_json, _):
         read_json.side_effect = [
@@ -123,7 +134,7 @@ class CMISPublicReadinessTests(unittest.TestCase):
 
         result = check_public_deployment(
             base_url="https://cmis.example.com",
-            api_key="secret",
+            api_key="s".repeat(32),
         )
 
         self.assertEqual(result["status"], "pass")
@@ -154,7 +165,7 @@ class CMISPublicReadinessTests(unittest.TestCase):
         with self.assertRaisesRegex(PreflightError, "limitations are malformed"):
             check_public_deployment(
                 base_url="https://cmis.example.com",
-                api_key="secret",
+                api_key="s".repeat(32),
             )
 
     @patch(
@@ -182,7 +193,7 @@ class CMISPublicReadinessTests(unittest.TestCase):
         with self.assertRaisesRegex(PreflightError, "limitations are missing"):
             check_public_deployment(
                 base_url="https://cmis.example.com",
-                api_key="secret",
+                api_key="s".repeat(32),
             )
 
 
