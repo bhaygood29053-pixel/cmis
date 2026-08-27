@@ -39,7 +39,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-prom
 | X1-IDX-01 | General transaction / wallet indexer | PARTIAL | X1.Ninja indexing exists, but complete wallet/indexer semantics remain unproven. |
 | X1-DEX-01 | Pool catalog / liquidity / volume | VERIFIED | CMIS has accepted provider/direct XDEX paths within their exact scopes. |
 | X1-DEX-02 | Pool detail / reserves | VERIFIED (POOL-SPECIFIC) | XENCAT/XNT pool proof is accepted only for its exact pool/identity/unit scope. |
-| X1-DEX-03 | Holder data | PARTIAL / #304 ACTIVE | Same-run XENCAT observation found provider 116 vs RPC token accounts 180 vs unique token-account authorities 174. #304 corrects market-report semantics so none is mislabeled as verified holders without counted-entity/coverage proof. |
+| X1-DEX-03 | Holder data | PARTIAL / SEMANTICS CORRECTED | Same-run XENCAT observation found provider 116 vs RPC token accounts 180 vs unique token-account authorities 174. #304/PR #305 corrected market-report semantics so none is mislabeled as verified holders without counted-entity/coverage proof. |
 | X1-HIST-01 | X1.Ninja trade history | PARTIAL | Structure/transport exists; deeper semantic/finality/pagination coverage remains bounded. |
 | X1-HIST-02 | X1.Ninja OHLCV | PARTIAL | Contract tests exist; semantics remain field/scope specific. |
 | X1-HIST-03 | Direct XDEX chart/history | BLOCKED/PARTIAL | Some field semantics are bounded/verified; remaining pair/volume/history semantics stay unpromoted where not proven. |
@@ -73,8 +73,8 @@ Before any PARTIAL, CANDIDATE, BLOCKED, or MISSING capability is promoted:
 
 ## Immediate work order
 
-1. **Holder semantics correction (#304)** — keep X1.Ninja provider holder-looking values, RPC token-account counts, and unique token-account-authority counts semantically distinct; do not expose any as verified holders without counted-entity/coverage proof.
-2. **Deeper Solana field maturity** — strengthen exact field/source/freshness semantics under shared CMIS contracts.
+1. **Holder semantics correction (#304)** — complete via PR #305; keep provider holder-looking values, RPC token-account counts, and unique token-account-authority counts semantically distinct.
+2. **Solana observed-pair aggregation (#306)** — deterministically aggregate only eligible unique observed pairs for liquidity/24h volume while preserving incomplete pair-universe scope.
 3. **Optional RPC redundancy** — #301 self-hosted verification may resume later if operational redundancy becomes a requirement; Official X1 RPC remains the selected primary path.
 4. **Oracle V2 #272 conditional recheck** — only when new policy-eligible live slots appear, rerun freshness and then exact same-fact price-correctness/source-independence gates.
 5. **Warp Bridge** — remains missing/not currently verifiable until an exact provenance-approved machine-readable read contract appears.
