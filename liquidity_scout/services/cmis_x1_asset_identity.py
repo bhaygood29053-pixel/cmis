@@ -154,11 +154,209 @@ def _reconcile_fields(
     return comparable, conflicting
 
 
+def _sources(
+    *,
+    metaplex: Mapping[str, Any] | None,
+    xdex_source: Any,
+    xdex_observed_at: Any,
+) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    if metaplex is not None:
+        sources.append(
+            {
+                "source": "X1 RPC / Metaplex Token Metadata",
+                "role": "descriptive_identity_metadata",
+                "context_slot": metaplex.get("context_slot"),
+                "program_id": metaplex.get("program_id"),
+            }
+        )
+    source = _text(xdex_source)
+    if source:
+        record: dict[str, Any] = {
+            "source": source,
+            "role": "market_representation",
+        }
+        if xdex_observed_at is not None:
+            record["observed_at"] = xdex_observed_at
+        sources.append(record)
+    return sources
+
+
+def _confidence(
+    *,
+    metaplex_verified: bool,
+    descriptor_conflict: bool,
+) -> dict[str, Any]:
+    checks = {
+        "exact_mint_identity": True,
+        "metaplex_mint_bound": metaplex_verified,
+        "descriptor_conflict_absent": not descriptor_conflict,
+    }
+    verified = sum(1 for value in checks.values() if value is True)
+    return {
+        "complete": bool(metaplex_verified and not descriptor_conflict),
+        "verified_checks": verified,
+        "total_checks": len(checks),
+        "verification_ratio": verified / len(checks),
+        "checks": checks,
+    }
+
+
+def build_exact_mint_identity_response(
+    mint: Any,
+    *,
+    metadata_evidence: Any,
+    xdex_pools: Any = None,
+    xdex_source: Any = None,
+    xdex_observed_at: Any = None,
+) -> dict[str, Any]:
+    """Return one mint-rooted CMIS identity response."""
+    mint_text = _text(mint)
+    if not mint_text or not is_exact_x1_public_key(mint_text):
+        raise ValueError("exact X1 mint must be a valid 32-byte base58 public key")
+
+    metaplex = _metadata_record(metadata_evidence, mint=mint_text)
+    xdex_variants = exact_xdex_descriptors(mint_text, xdex_pools)
+
+    if metaplex is None:
+        selected = xdex_variants[0] if len(xdex_variants) == 1 else {}
+        status = PARTIAL if xdex_variants else UNAVAILABLE
+        return build_service_envelope(
+            "asset_lookup",
+            "x1",
+            status,
+            asset={
+                "mint": mint_text,
+                "symbol": selected.get("symbol"),
+                "name": selected.get("name"),
+            },
+            data={
+                "query": mint_text,
+                "resolved_term": mint_text,
+                "resolved_by": "mint",
+                "identity_key": mint_text,
+                "identity_contract": IDENTITY_CONTRACT,
+                "normalized_identity": {
+                    "mint": mint_text,
+                    "symbol": selected.get("symbol"),
+                    "name": selected.get("name"),
+                    "identity_root": IDENTITY_ROOT,
+                    "descriptor_source": (
+                        XDEX_DESCRIPTOR_SOURCE if len(xdex_variants) == 1 else None
+                    ),
+                    "normalized_onchain_identity_verified": False,
+                },
+                "identity_reconciliation": {
+                    "state": "metadata_unavailable",
+                    "comparable_fields": [],
+                    "conflicting_fields": (
+                        ["xdex_descriptor_variants"]
+                        if len(xdex_variants) > 1
+                        else []
+                    ),
+                    "metaplex": None,
+                    "xdex": {
+                        "present": bool(xdex_variants),
+                        "variants": xdex_variants,
+                    },
+                },
+            },
+            confidence=_confidence(
+                metaplex_verified=False,
+                descriptor_conflict=len(xdex_variants) > 1,
+            ),
+            sources=_sources(
+                metaplex=None,
+                xdex_source=xdex_source,
+                xdex_observed_at=xdex_observed_at,
+            ),
+            observed_at=xdex_observed_at,
+            warnings=[
+                {
+                    "code": "x1_metadata_identity_unavailable",
+                    "message": (
+                        "CMIS could not verify normalized on-chain Metaplex "
+                        "descriptors for the exact mint."
+                    ),
+                }
+            ],
+        )
+
+    comparable, conflicting = _reconcile_fields(metaplex, xdex_variants)
+    if not xdex_variants:
+        state = "metaplex_only"
+    elif conflicting:
+        state = "descriptor_conflict"
+    else:
+        state = "agreement"
+
+    warnings = []
+    if conflicting:
+        warnings.append(
+            {
+                "code": "x1_asset_descriptor_conflict",
+                "message": (
+                    "Metaplex and XDEX refer to the same exact mint but expose "
+                    "conflicting descriptive identity fields."
+                ),
+            }
+        )
+
+    return build_service_envelope(
+        "asset_lookup",
+        "x1",
+        PARTIAL if conflicting else OK,
+        asset={
+            "mint": mint_text,
+            "symbol": metaplex.get("symbol"),
+            "name": metaplex.get("name"),
+        },
+        data={
+            "query": mint_text,
+            "resolved_term": mint_text,
+            "resolved_by": "mint",
+            "identity_key": mint_text,
+            "identity_contract": IDENTITY_CONTRACT,
+            "normalized_identity": {
+                "mint": mint_text,
+                "symbol": metaplex.get("symbol"),
+                "name": metaplex.get("name"),
+                "identity_root": IDENTITY_ROOT,
+                "descriptor_source": METAPLEX_DESCRIPTOR_SOURCE,
+                "normalized_onchain_identity_verified": True,
+            },
+            "identity_reconciliation": {
+                "state": state,
+                "comparable_fields": comparable,
+                "conflicting_fields": conflicting,
+                "metaplex": metaplex,
+                "xdex": {
+                    "present": bool(xdex_variants),
+                    "variants": xdex_variants,
+                },
+            },
+        },
+        confidence=_confidence(
+            metaplex_verified=True,
+            descriptor_conflict=bool(conflicting),
+        ),
+        sources=_sources(
+            metaplex=metaplex,
+            xdex_source=xdex_source,
+            xdex_observed_at=xdex_observed_at,
+        ),
+        observed_at=xdex_observed_at,
+        warnings=warnings,
+        errors=[],
+    )
+
+
 __all__ = [
     "IDENTITY_CONTRACT",
     "IDENTITY_ROOT",
     "METAPLEX_DESCRIPTOR_SOURCE",
     "XDEX_DESCRIPTOR_SOURCE",
+    "build_exact_mint_identity_response",
     "decode_base58_pubkey",
     "exact_xdex_descriptors",
     "is_exact_x1_public_key",
