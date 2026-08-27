@@ -19,6 +19,7 @@ The returned value is always a standard CMIS service envelope.
 
 from collections.abc import Mapping
 from typing import Any, Dict, Optional, Tuple
+import time
 
 import historical_metrics as default_history_backend
 
@@ -37,6 +38,9 @@ from liquidity_scout.providers.x1.market import X1Provider
 from liquidity_scout.providers.x1.rpc import X1RPCProvider
 from liquidity_scout.providers.x1.supply import X1SupplyProvider
 from liquidity_scout.providers.x1.token_metadata import X1TokenMetadataProvider
+from liquidity_scout.providers.x1.xdex_price_history_import import (
+    backfill_verified_xdex_usd_price_history,
+)
 from liquidity_scout.services.cmis_asset_lookup import build_asset_lookup_response
 from liquidity_scout.services.cmis_x1_asset_identity import (
     build_exact_mint_identity_response,
@@ -99,6 +103,7 @@ class CMISGateway:
         self.history_backend = history_backend or default_history_backend
         self.asset_registry = asset_registry or DEFAULT_ASSET_REGISTRY
         self.auto_record_history = bool(auto_record_history)
+        self._provider_history_backfill_attempts = {}
 
     @staticmethod
     def _text(value: Any) -> Optional[str]:
@@ -451,6 +456,108 @@ class CMISGateway:
         )
 
 
+    def _maybe_backfill_verified_xdex_price_history(
+        self,
+        market_envelope: Mapping[str, Any],
+        *,
+        lookback_days: int,
+        min_refresh_seconds: int,
+        rel_tolerance: float,
+    ) -> Dict[str, Any]:
+        """Attempt bounded verified provider price backfill for one resolved asset."""
+
+        data = market_envelope.get("data")
+        if not isinstance(data, Mapping):
+            return {
+                "status": "unavailable",
+                "reason": "market_report_data_unavailable_for_provider_backfill",
+                "provider_history_imported": False,
+            }
+
+        mint = self._text(data.get("mint"))
+        symbol = self._text(data.get("symbol")) or "Unknown"
+        if not mint:
+            return {
+                "status": "unavailable",
+                "reason": "market_mint_unavailable_for_provider_backfill",
+                "provider_history_imported": False,
+            }
+
+        now = int(time.time())
+        summary_reader = getattr(
+            self.history_backend,
+            "verified_price_import_summary",
+            None,
+        )
+        summary = summary_reader(mint) if callable(summary_reader) else None
+        if isinstance(summary, Mapping) and summary.get("available") is True:
+            last_imported = summary.get("last_imported_at")
+            if (
+                last_imported is not None
+                and now - int(last_imported) < int(min_refresh_seconds)
+            ):
+                return {
+                    "status": "partial",
+                    "reason": "verified_provider_price_history_recently_backfilled",
+                    "provider_history_imported": True,
+                    "imported_observation_count": 0,
+                    "stored_verified_provider_observation_count": int(
+                        summary.get(
+                            "usable_observation_count",
+                            summary.get("observation_count") or 0,
+                        )
+                        or 0
+                    ),
+                    "conflicting_provider_timestamp_count": int(
+                        summary.get("conflicting_timestamp_count") or 0
+                    ),
+                    "first_imported_observed_at": summary.get(
+                        "first_observed_at"
+                    ),
+                    "last_imported_observed_at": summary.get(
+                        "last_observed_at"
+                    ),
+                    "full_asset_lifetime_verified": False,
+                    "continuous_coverage_verified": False,
+                }
+
+        last_attempt = self._provider_history_backfill_attempts.get(mint)
+        if (
+            last_attempt is not None
+            and now - int(last_attempt) < int(min_refresh_seconds)
+        ):
+            return {
+                "status": "unavailable",
+                "reason": "provider_price_history_backfill_attempt_recent",
+                "provider_history_imported": bool(
+                    isinstance(summary, Mapping)
+                    and summary.get("available") is True
+                ),
+            }
+
+        self._provider_history_backfill_attempts[mint] = now
+        try:
+            return backfill_verified_xdex_usd_price_history(
+                mint,
+                symbol,
+                catalog_pools=list(self.x1_market_provider.pools),
+                history_backend=self.history_backend,
+                time_from=max(1, now - int(lookback_days) * 86400),
+                time_to=now,
+                rel_tolerance=float(rel_tolerance),
+                imported_at=now,
+            )
+        except Exception as exc:
+            return {
+                "status": "unavailable",
+                "reason": "provider_price_history_backfill_failed",
+                "details": f"{type(exc).__name__}: {exc}",
+                "provider_history_imported": False,
+                "full_asset_lifetime_verified": False,
+                "continuous_coverage_verified": False,
+            }
+
+
     def _rank(self, params: Mapping[str, Any]) -> Dict[str, Any]:
         catalog, failure = self._collect_x1_catalog("rank")
         if failure is not None:
@@ -679,6 +786,19 @@ class CMISGateway:
         anchor_tolerance = params.get("anchor_tolerance_seconds", 21600)
         onchain_page_size = params.get("onchain_page_size", 1000)
         onchain_max_signatures = params.get("onchain_max_signatures", 5000)
+        provider_history_backfill = params.get("provider_history_backfill", True)
+        provider_history_lookback_days = params.get(
+            "provider_history_lookback_days",
+            300,
+        )
+        provider_history_min_refresh_seconds = params.get(
+            "provider_history_min_refresh_seconds",
+            21600,
+        )
+        provider_history_rel_tolerance = params.get(
+            "provider_history_rel_tolerance",
+            0.005,
+        )
         try:
             gap_threshold = max(0, int(gap_threshold))
             anchor_tolerance = max(0, int(anchor_tolerance))
@@ -688,6 +808,23 @@ class CMISGateway:
                 raise ValueError
             if not 1 <= onchain_max_signatures <= 100000:
                 raise ValueError
+            if not isinstance(provider_history_backfill, bool):
+                raise ValueError
+            provider_history_lookback_days = int(
+                provider_history_lookback_days
+            )
+            provider_history_min_refresh_seconds = int(
+                provider_history_min_refresh_seconds
+            )
+            provider_history_rel_tolerance = float(
+                provider_history_rel_tolerance
+            )
+            if not 1 <= provider_history_lookback_days <= 3650:
+                raise ValueError
+            if not 0 <= provider_history_min_refresh_seconds <= 604800:
+                raise ValueError
+            if not 0 <= provider_history_rel_tolerance <= 0.05:
+                raise ValueError
         except (TypeError, ValueError):
             return self._gateway_error(
                 "historical_compare",
@@ -695,10 +832,36 @@ class CMISGateway:
                 "invalid_historical_tolerance",
                 (
                     "gap_threshold_seconds and anchor_tolerance_seconds must be "
-                    "non-negative integers; onchain_page_size must be 1..1000 "
-                    "and onchain_max_signatures must be 1..100000."
+                    "non-negative integers; onchain_page_size must be 1..1000; "
+                    "onchain_max_signatures must be 1..100000; "
+                    "provider_history_backfill must be boolean; "
+                    "provider_history_lookback_days must be 1..3650; "
+                    "provider_history_min_refresh_seconds must be 0..604800; "
+                    "provider_history_rel_tolerance must be 0..0.05."
                 ),
             )
+
+        provider_backfill = None
+        compare_provider_backfill = None
+        if (
+            provider_history_backfill
+            and mode in {"all_available", "all_available_pair"}
+        ):
+            provider_backfill = self._maybe_backfill_verified_xdex_price_history(
+                market,
+                lookback_days=provider_history_lookback_days,
+                min_refresh_seconds=provider_history_min_refresh_seconds,
+                rel_tolerance=provider_history_rel_tolerance,
+            )
+            if mode == "all_available_pair" and isinstance(compare_market, Mapping):
+                compare_provider_backfill = (
+                    self._maybe_backfill_verified_xdex_price_history(
+                        compare_market,
+                        lookback_days=provider_history_lookback_days,
+                        min_refresh_seconds=provider_history_min_refresh_seconds,
+                        rel_tolerance=provider_history_rel_tolerance,
+                    )
+                )
 
         response = self._historical_from_market(
             params.get("question"),
@@ -718,6 +881,14 @@ class CMISGateway:
                 provider_asset=self._provider_asset_from_data(market.get("data")),
                 role="market",
             )
+
+        if isinstance(response.get("data"), dict):
+            if provider_backfill is not None:
+                response["data"]["provider_history_backfill"] = provider_backfill
+            if compare_provider_backfill is not None:
+                response["data"][
+                    "compare_provider_history_backfill"
+                ] = compare_provider_backfill
 
         if compare_asset and isinstance(response.get("data"), dict):
             response["data"].setdefault("compare_asset_request", compare_asset)

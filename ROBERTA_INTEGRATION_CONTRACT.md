@@ -26,7 +26,7 @@ CMIS publishes deployed eligibility at:
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` remains required. Existing accepted services retain the global minimum compatible contract `1.8.0`, while the current CMIS contract is `1.10.0` and the promoted concentration service continues to require `>=1.9.0`.
+Capability schema `1` remains required. Existing accepted services retain the global minimum compatible contract `1.8.0`, while the current CMIS contract is `1.12.0` and the promoted concentration service continues to require `>=1.9.0`.
 
 Scouts fail closed on malformed/incompatible manifests, non-callable services, unknown chains, weakened Evidence Receipt / Proof Score declarations, or promotion metadata that does not exactly match the accepted service contract.
 
@@ -117,7 +117,7 @@ For “entire/full/lifetime history” requests, X1 Scout should preserve the ex
 - the asset's actual lifetime, which remains unverified unless CMIS explicitly proves it;
 - pairwise common-window results, which must use only overlapping verified history with accepted aligned anchors.
 
-A missing earlier asset period is not zero-filled, interpolated, or inferred from model knowledge. External OHLCV/archive history is not accepted merely because a provider can return it; CMIS promotion and semantic/range gates remain authoritative.
+A missing earlier asset period is not zero-filled, interpolated, or inferred from model knowledge. CMIS `1.12.0` may extend the X1 price series with a narrow verified provider backfill: XDEX historical close observations must match the exact provider pair/time scope and cross-check against the corresponding X1.Ninja OHLCV close before persistence. The backfill is price-only, retains provider evidence/provenance, and does not establish source independence, archive completeness, continuous coverage, historical stable-quote peg behavior, or complete asset lifetime. Other external OHLCV/archive history remains unaccepted unless its own CMIS gates pass.
 
 ## Chain boundaries
 
