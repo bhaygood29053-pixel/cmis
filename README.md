@@ -40,7 +40,7 @@ Chain Provider -> CMIS -> Chain Scout -> Roberta
 
 CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, learning-workflow coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
 
-## Current roadmap position — reconciled 2026-08-26
+## Current roadmap position — reconciled 2026-08-27
 
 Accepted on `main`:
 
@@ -55,6 +55,7 @@ Accepted on `main`:
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
 - **CMIS capability contract:** `1.12.0`.
+- **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics verified under bounded evidence contracts; current freshness policy/current-price authority remain unpromoted.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
 - **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main` via PR #228; its post-merge source/roadmap state is synchronized through Roberta PR #231.
@@ -68,7 +69,7 @@ Not accepted/promoted:
 - no Ethereum provider milestone without a separate accepted gate;
 - no Controlled Execution or value movement.
 
-The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-08-26.md`](./docs/PROJECT_STATUS_2026-08-26.md).
+The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-08-27.md`](./docs/PROJECT_STATUS_2026-08-27.md).
 
 ## Active provider-gap work — not accepted capability
 
@@ -79,7 +80,7 @@ Current open branches include:
 - **PR #242 — Warp Bridge proof-origin binding:** draft/open. It hardens provenance eligibility for any future machine-readable bridge read contract; it does **not** approve `bridge-api.x1.xyz`, guess paths, prepare transfers, or promote bridge capability.
 - **PR #229 — X1Scroll RPC access contract refresh:** draft/open. It defines a bounded authenticated `getHealth`/`getSlot` access classifier but does not claim live provider access until the required credential-backed probe is run and accepted.
 - **PR #227 — FortiBlox provider contract research:** open/candidate research only. Exact Explorer REST and current Nexus RPC contracts remain unverified; no FortiBlox adapter or CMIS promotion is accepted.
-- **Issue #272 — Oracle V2 read-only X1 price evidence:** candidate research only. Public repository evidence describes a Pyth/CEX aggregated feed, OpenBao-signed relays, and an X1 Oracle Vault, but CMIS has not independently verified the current deployed program/state, account layout, relay-slot freshness, or signing-key identity. Relay count is not treated as independent-source count.
+- **Issue #272 — Oracle V2 read-only X1 price evidence:** structural verification has advanced. CMIS has verified the declared X1 program/state contract shape and promoted Unix-ms timestamp semantics under a bounded evidence policy. Current slot ages are measurable, but no production freshness policy is selected, current price use is unauthorized, source independence/price correctness remain unverified, and CMIS/public/Scout promotion remain false. Relay count is not treated as independent-source count.
 
 These branches are discovery/provenance work only. Open/mergeable status does not make their provider evidence accepted on `main`.
 
