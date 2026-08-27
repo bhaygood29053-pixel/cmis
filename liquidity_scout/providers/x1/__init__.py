@@ -43,6 +43,10 @@ from .network import (
     fetch_network_snapshot,
     parse_network_snapshot,
 )
+from .onchain_history_coverage import (
+    COVERAGE_SCOPE as X1_ONCHAIN_HISTORY_COVERAGE_SCOPE,
+    build_rpc_visible_mint_history_coverage,
+)
 from .network_history import (
     CLUSTER_HISTORY_URL,
     DEFAULT_GROUP_BY as HISTORY_DEFAULT_GROUP_BY,
@@ -177,6 +181,7 @@ __all__ = [
     "X1HealthAPIError",
     "X1HealthProvider",
     "X1NetworkAPIError",
+    "X1_ONCHAIN_HISTORY_COVERAGE_SCOPE",
     "X1NetworkHistoryAPIError",
     "X1NetworkHistoryProvider",
     "X1NetworkProvider",
@@ -203,6 +208,7 @@ __all__ = [
     "aggregate_oracle_v2_slots",
     "assess_unix_ms_block_time_correlation",
     "classify_oracle_v2_slot",
+    "build_rpc_visible_mint_history_coverage",
     "fetch_all_pools",
     "fetch_cluster_history",
     "fetch_health",
