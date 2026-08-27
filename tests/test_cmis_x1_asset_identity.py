@@ -118,6 +118,18 @@ class CMISX1AssetIdentityTests(unittest.TestCase):
             {"symbol", "name"},
         )
 
+    def test_xdex_unavailable_is_partial_not_metaplex_only(self):
+        response = build_exact_mint_identity_response(
+            XENCAT_MINT,
+            metadata_evidence=metadata_evidence(),
+            xdex_pools=[],
+            xdex_available=False,
+        )
+        self.assertEqual(response["status"], "partial")
+        reconciliation = response["data"]["identity_reconciliation"]
+        self.assertEqual(reconciliation["state"], "xdex_unavailable")
+        self.assertFalse(reconciliation["xdex"]["available"])
+
     def test_decoded_metaplex_mint_mismatch_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "does not equal requested"):
             build_exact_mint_identity_response(
