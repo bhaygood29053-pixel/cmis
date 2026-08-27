@@ -88,7 +88,7 @@ class CMISMarketContractTests(unittest.TestCase):
             (secondary, "base", self.agi, 90),
         ]
 
-    def test_provider_complete_market_report_is_ok_with_holder_semantics_warning(self):
+    def test_provider_complete_market_report_is_partial_until_holder_semantics_are_verified(self):
         response = build_market_report_response(
             "AGI",
             self._complete_matches(),
@@ -97,7 +97,7 @@ class CMISMarketContractTests(unittest.TestCase):
 
         self.assertEqual(response["service"], "market_report")
         self.assertEqual(response["chain"], "x1")
-        self.assertEqual(response["status"], OK)
+        self.assertEqual(response["status"], PARTIAL)
         self.assertEqual(response["asset"]["mint"], "MINT_AGI")
         self.assertEqual(response["data"]["lp_count"], 2)
         self.assertEqual(response["data"]["liquidity_usd"], 6000)
@@ -107,8 +107,9 @@ class CMISMarketContractTests(unittest.TestCase):
         self.assertEqual(response["data"]["holders_reported"], 1000)
         self.assertFalse(response["data"]["completeness"]["holders"])
         self.assertEqual(response["confidence"]["verified_checks"], 4)
-        self.assertTrue(response["confidence"]["complete"])
+        self.assertFalse(response["confidence"]["complete"])
         self.assertFalse(response["confidence"]["all_fields_complete"])
+        self.assertTrue(response["confidence"]["core_market_complete"])
         self.assertEqual(response["confidence"]["required_verified_checks"], 4)
         self.assertEqual(response["confidence"]["required_total_checks"], 4)
         self.assertEqual(response["observed_at"], 123.0)
@@ -233,7 +234,7 @@ class CMISMarketContractTests(unittest.TestCase):
         )
 
         self.assertEqual(response["chain"], "solana")
-        self.assertEqual(response["status"], OK)
+        self.assertEqual(response["status"], PARTIAL)
 
     def test_explicit_observed_at_overrides_catalog_refresh_without_mutating_source(self):
         response = build_market_report_response(
