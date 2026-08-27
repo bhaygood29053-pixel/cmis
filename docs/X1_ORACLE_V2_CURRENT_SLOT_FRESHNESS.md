@@ -1,6 +1,6 @@
 # X1 Oracle V2 Current-Slot Freshness Evaluation
 
-Status: **timestamp unit verified / freshness policy not yet selected**
+Status: **live current-slot ages verified / freshness policy not yet selected**
 
 Tracker: **#296**
 
@@ -197,6 +197,50 @@ It must demonstrate:
 7. all downstream authority flags remain false.
 
 The live age range from that workflow should be recorded after CI succeeds.
+
+## Live current-slot evidence
+
+The branch-scoped live workflow succeeded:
+
+```text
+workflow_run = 33039263626
+artifact_id = 9633216049
+artifact_sha256 =
+825abf6c971066ce48b41a9c765846d7544091f17acdafcb89a195deb29da972
+
+observed_at = 2026-08-27T04:23:36.206641+00:00
+observed_at_ms = 1787804616206
+
+slot_count = 30
+positive_timestamp_age_count = 30
+
+minimum_signed_age_ms = 13204160036
+maximum_signed_age_ms = 13204196856
+
+minimum_timestamp_raw = 1774600419350
+maximum_timestamp_raw = 1774600456170
+```
+
+The live result also enforced:
+
+```text
+timestamp_unit_verified = true
+freshness_policy_complete = false
+freshness_policy_applied = false
+freshness_verified = false
+status = unavailable
+reason = freshness_policy_incomplete
+```
+
+For every asset:
+
+```text
+eligible_slot_count = 0
+median_price = null
+```
+
+These ages are evidence only. They do not justify selecting a production
+freshness threshold by themselves.
 
 ## Next governance decision
 
