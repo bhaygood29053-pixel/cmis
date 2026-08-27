@@ -424,13 +424,20 @@ def build_all_available_history_profile(
         if isinstance(candidate, dict):
             provider_price_history.update(candidate)
 
+    provider_usable_count = int(
+        provider_price_history.get(
+            "usable_observation_count",
+            provider_price_history.get("observation_count") or 0,
+        )
+        or 0
+    )
     provider_history_imported = (
         provider_price_history.get("available") is True
-        and int(provider_price_history.get("observation_count") or 0) > 0
+        and provider_usable_count > 0
     )
     if "price" in profiles:
-        profiles["price"]["provider_backfill_observation_count"] = int(
-            provider_price_history.get("observation_count") or 0
+        profiles["price"]["provider_backfill_observation_count"] = (
+            provider_usable_count
         )
         profiles["price"]["provider_history_imported"] = provider_history_imported
     available = [
