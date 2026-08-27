@@ -308,6 +308,7 @@ class CMISGateway:
                 query_text,
                 metadata_evidence=metadata_evidence,
                 xdex_pools=pools,
+                xdex_available=catalog_failure is None,
                 xdex_source=(
                     catalog.get("source")
                     if isinstance(catalog, Mapping)
