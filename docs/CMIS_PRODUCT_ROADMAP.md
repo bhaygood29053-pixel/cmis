@@ -35,7 +35,8 @@ Accepted milestones on `main`:
 - **Deterministic concentration-threshold alert evidence (#263/#264): COMPLETE, internal/read-only/non-promoted.**
 - **CMIS deterministic engineering workflow / three-axis review: ADOPTED and repository-authoritative.**
 - **X1 all-available verified historical profiles and overlapping pair comparison: COMPLETE under `historical_compare` modes in CMIS `1.10.0`.**
-- **CMIS capability contract: `1.9.0`.**
+- **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
+- **CMIS capability contract: `1.11.0`.**
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
 - **Roberta autonomous Learning Plane upstream dependency: ACCEPTED on Roberta `main` via PR #228; post-merge Roberta source/roadmap reconciliation is accepted via PR #231.**
@@ -115,6 +116,7 @@ They do not change the capability manifest and do not grant Roberta or a Chain S
 X1 is the mature CMIS surface. Accepted capabilities include, where exact evidence contracts permit:
 
 - asset/pool identity;
+- exact-mint X1 identity normalization using verified Metaplex Token Metadata plus separately preserved exact-mint XDEX market representation under `x1_asset_identity/v1`;
 - market reporting/ranking;
 - tokenomics/authority evidence;
 - transaction/trade verification tooling;
@@ -125,6 +127,8 @@ X1 is the mature CMIS surface. Accepted capabilities include, where exact eviden
 - trade-size analysis;
 - selected exact-route price-impact/fee facts;
 - fail-closed quote/history semantic gates.
+
+For fungible X1 tokens, exact mint remains the canonical identity root. Metaplex name/symbol/URI are descriptive on-chain metadata; XDEX name/symbol are provider market representation. Agreement does not establish legitimacy or safety, different mints are never reconciled by labels, and provider outage remains distinct from proven absence.
 
 Program-, pool-, route-, provider-, token-account-, or sample-scoped evidence remains distinct from asset-wide/global truth.
 
