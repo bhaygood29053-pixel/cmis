@@ -1,0 +1,90 @@
+name: X1 Oracle V2 Timestamp Promotion
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-v2-timestamp-promotion:
+    name: Verify accepted Oracle V2 timestamp-unit promotion
+    if: github.head_ref == 'agent/oracle-v2-timestamp-unit-promotion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run deterministic promotion tests
+        run: |
+          python -m unittest tests.test_x1_oracle_v2_timestamp_unit_promotion -v
+
+      - name: Recollect and evaluate live timestamp evidence
+        run: |
+          python cmis_x1_oracle_v2_timestamp_unit_promote.py \
+            --history-limit 25 \
+            --output x1-oracle-v2-timestamp-promotion.json
+
+      - name: Enforce narrow promotion boundary
+        run: |
+          python - <<'PY'
+          import json
+
+          with open(
+              "x1-oracle-v2-timestamp-promotion.json",
+              "r",
+              encoding="utf-8",
+          ) as handle:
+              result = json.load(handle)
+
+          assert result["status"] == "ok"
+          assert result["timestamp_unit_verified"] is True
+          assert result["all_governance_gates_passed"] is True
+
+          for field in (
+              "freshness_verified",
+              "price_correctness_verified",
+              "source_independence_verified",
+              "current_price_use_authorized",
+              "cmis_provider_promoted",
+              "public_service_promoted",
+              "scout_reliance_promoted",
+              "execution_authorized",
+          ):
+              assert result[field] is False, field
+
+          print("timestamp_unit_verified=true")
+          print("all downstream authority flags remain false")
+          PY
+
+      - name: Upload promotion evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-oracle-v2-timestamp-promotion-${{ github.run_id }}
+          path: x1-oracle-v2-timestamp-promotion.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only evidence recollection and deterministic governance only."
+          echo "No signing, submission, transaction construction, broadcast, custody, or execution."
+          echo "timestamp_unit_verified does not imply freshness or current-price authority."
