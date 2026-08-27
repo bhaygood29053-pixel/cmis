@@ -18,7 +18,7 @@ def evidence(
     insufficient = status == "INSUFFICIENT_EVIDENCE"
     conflicts = ("blockhash",) if status == "CONFLICT" else ()
     return HistoricalComparisonEvidence(
-        schema_version="x1_historical_comparison_evidence.v1",
+        schema_version="x1_historical_comparison_evidence.v2",
         fact_type="historical_block_identity_comparison",
         subject_id=f"x1:block:{slot}",
         chain="x1",
@@ -101,6 +101,18 @@ class HistoricalRetentionSamplesTests(unittest.TestCase):
             build_historical_retention_sample_set(
                 (replace(evidence(100), fact_type="holder_count"),)
             )
+
+    def test_v1_evidence_remains_backward_compatible(self):
+        result = build_historical_retention_sample_set(
+            (
+                replace(
+                    evidence(100),
+                    schema_version="x1_historical_comparison_evidence.v1",
+                ),
+            )
+        )
+        self.assertEqual(result.sample_count, 1)
+        self.assertEqual(result.requested_slots, (100,))
 
     def test_subject_identity_schema_and_slot_must_match(self):
         with self.assertRaisesRegex(ValueError, "subject_id"):
