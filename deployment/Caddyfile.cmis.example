@@ -1,0 +1,30 @@
+# Hardened public HTTPS edge for CMIS.
+#
+# Replace cmis.example.com with the real DNS name. Caddy obtains and renews
+# TLS certificates automatically once DNS points at this host and ports 80/443
+# are reachable.
+#
+# CMIS itself must continue listening only on 127.0.0.1:8765.
+# Authorization headers are forwarded by reverse_proxy and CMIS remains the
+# authoritative Bearer-token validator for /v1/cmis and /v1/cmis/capabilities.
+
+cmis.example.com {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Cache-Control "no-store"
+		-Server
+	}
+
+	@cmis_paths path /healthz /v1/cmis /v1/cmis/capabilities
+	handle @cmis_paths {
+		reverse_proxy 127.0.0.1:8765
+	}
+
+	handle {
+		respond 404
+	}
+}
