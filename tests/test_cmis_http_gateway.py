@@ -221,6 +221,26 @@ class CMISHTTPGatewayTests(unittest.TestCase):
             solana[CONCENTRATION_INTELLIGENCE_SERVICE]["scout_reliance_promoted"]
         )
 
+    def test_capabilities_require_bearer_auth_when_configured(self):
+        with RunningServer(api_key="test-secret") as running:
+            with self.assertRaises(HTTPError) as unauthorized:
+                urlopen(
+                    running.base_url + "/v1/cmis/capabilities",
+                    timeout=2,
+                )
+            self.assertEqual(unauthorized.exception.code, 401)
+
+            request = Request(
+                running.base_url + "/v1/cmis/capabilities",
+                headers={"Authorization": "Bearer test-secret"},
+                method="GET",
+            )
+            with urlopen(request, timeout=2) as raw:
+                response = json.loads(raw.read().decode("utf-8"))
+
+        self.assertEqual(response["service"], "cmis_gateway")
+        self.assertEqual(response["contract_version"], "1.12.0")
+
     def test_bearer_auth_is_enforced_when_configured(self):
         with RunningServer(api_key="test-secret") as running:
             with self.assertRaises(HTTPError) as unauthorized:
