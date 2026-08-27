@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import struct
 import unittest
@@ -84,9 +85,14 @@ def _batch_instruction(
     }
 
 
-def _ed25519_instruction(message):
-    pubkey = bytes([7]) * 32
-    signature = bytes([9]) * 64
+def _ed25519_instruction(
+    message,
+    *,
+    pubkey_byte=7,
+    signature_byte=17,
+):
+    pubkey = bytes([pubkey_byte]) * 32
+    signature = bytes([signature_byte]) * 64
 
     header_end = 16
     pubkey_offset = header_end
@@ -126,21 +132,34 @@ def _transaction(
     err=None,
     include_batch=True,
     include_ed25519=True,
+    ed_after_batch=False,
+    ed_pubkey_byte=7,
+    ed_signature_byte=17,
 ):
     message = _batch_message(
         relay_index=relay_index,
         timestamp_raw=timestamp_raw,
     )
     instructions = []
-    if include_ed25519:
-        instructions.append(_ed25519_instruction(message))
-    if include_batch:
-        instructions.append(
-            _batch_instruction(
-                relay_index=relay_index,
-                timestamp_raw=timestamp_raw,
-            )
-        )
+    ed_instruction = _ed25519_instruction(
+        message,
+        pubkey_byte=ed_pubkey_byte,
+        signature_byte=ed_signature_byte,
+    )
+    batch_instruction = _batch_instruction(
+        relay_index=relay_index,
+        timestamp_raw=timestamp_raw,
+    )
+    if ed_after_batch:
+        if include_batch:
+            instructions.append(batch_instruction)
+        if include_ed25519:
+            instructions.append(ed_instruction)
+    else:
+        if include_ed25519:
+            instructions.append(ed_instruction)
+        if include_batch:
+            instructions.append(batch_instruction)
 
     return {
         "signature": signature,
@@ -185,6 +204,27 @@ def _history_row(
     }
 
 
+def _oracle_state_result(*, pubkey_byte=7, context_slot=999):
+    account_data = bytearray(probe.ORACLE_STATE_ALLOCATED_BYTES)
+    account_data[:8] = probe.ORACLE_STATE_DISCRIMINATOR
+    start = probe.ORACLE_PUBKEY_OFFSET
+    account_data[start : start + probe.ORACLE_PUBKEY_BYTES] = (
+        bytes([pubkey_byte]) * probe.ORACLE_PUBKEY_BYTES
+    )
+    return {
+        "context": {"slot": context_slot},
+        "value": {
+            "owner": probe.PROGRAM_ID,
+            "executable": False,
+            "lamports": 1,
+            "data": [
+                base64.b64encode(bytes(account_data)).decode("ascii"),
+                "base64",
+            ],
+        },
+    }
+
+
 class _FakeRPCProvider:
     def __init__(
         self,
@@ -192,6 +232,7 @@ class _FakeRPCProvider:
         history=None,
         transactions=None,
         block_times=None,
+        oracle_state=None,
     ):
         self.history = history or [_history_row()]
         self.transactions = transactions or [_transaction()]
@@ -203,7 +244,14 @@ class _FakeRPCProvider:
                 "source": "X1 RPC getBlockTime",
             }
         }
+        self.oracle_state = oracle_state or _oracle_state_result()
         self.calls = []
+
+    def request(self, method, params):
+        self.calls.append(("request", method, params))
+        if method != "getAccountInfo":
+            raise AssertionError(f"unexpected RPC method: {method}")
+        return self.oracle_state
 
     def get_signatures_for_address(self, address, *, limit=1000):
         self.calls.append(("history", address, limit))
@@ -385,7 +433,78 @@ class OracleV2TimestampUnitProbeTests(unittest.TestCase):
         self.assertEqual(result["status"], "unavailable")
         self.assertEqual(
             result["rejected_transactions"][0]["reason"],
-            "matching_ed25519_message_not_found",
+            "matching_ed25519_preinstruction_not_found",
+        )
+
+    def test_signature_mismatch_rejects_candidate(self):
+        provider = _FakeRPCProvider(
+            transactions=[
+                _transaction(ed_signature_byte=9)
+            ]
+        )
+
+        result = probe.probe_timestamp_unit_evidence(
+            rpc_provider=provider,
+        )
+
+        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(
+            result["rejected_transactions"][0]["reason"],
+            "matching_ed25519_preinstruction_not_found",
+        )
+
+    def test_oracle_pubkey_mismatch_rejects_candidate(self):
+        provider = _FakeRPCProvider(
+            transactions=[
+                _transaction(ed_pubkey_byte=8)
+            ]
+        )
+
+        result = probe.probe_timestamp_unit_evidence(
+            rpc_provider=provider,
+        )
+
+        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(
+            result["rejected_transactions"][0]["reason"],
+            "matching_ed25519_preinstruction_not_found",
+        )
+
+    def test_ed25519_after_oracle_instruction_rejects_candidate(self):
+        provider = _FakeRPCProvider(
+            transactions=[
+                _transaction(ed_after_batch=True)
+            ]
+        )
+
+        result = probe.probe_timestamp_unit_evidence(
+            rpc_provider=provider,
+        )
+
+        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(
+            result["rejected_transactions"][0]["reason"],
+            "matching_ed25519_preinstruction_not_found",
+        )
+
+    def test_current_oracle_pubkey_is_preserved_as_hash_only(self):
+        result = probe.probe_timestamp_unit_evidence(
+            rpc_provider=_FakeRPCProvider(),
+        )
+
+        expected = hashlib.sha256(bytes([7]) * 32).hexdigest()
+        self.assertEqual(
+            result["oracle_key_evidence"]["oracle_pubkey_sha256"],
+            expected,
+        )
+        self.assertNotIn("oracle_pubkey", result["oracle_key_evidence"])
+        sample = result["samples"][0]
+        self.assertTrue(sample["ed25519_signature_matches_batch_argument"])
+        self.assertTrue(sample["ed25519_pubkey_matches_current_state"])
+        self.assertTrue(sample["ed25519_precedes_oracle_instruction"])
+        self.assertEqual(
+            sample["configured_oracle_pubkey_sha256"],
+            expected,
         )
 
     def test_get_block_time_mismatch_rejects_candidate(self):
