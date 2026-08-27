@@ -30,6 +30,8 @@ class CMISSolanaMarketPairSubjectTests(unittest.TestCase):
 
         self.assertEqual(len(observations), 1)
         observation = observations[0]
+        self.assertEqual(observation["base_token_address"], base_mint)
+        self.assertIsNone(observation["quote_token_address"])
         self.assertEqual(observation["requested_mint_role"], "quote")
         self.assertEqual(observation["price_subject_address"], base_mint)
         self.assertFalse(observation["price_is_for_requested_mint"])
