@@ -71,6 +71,43 @@ class FakeHistory:
         return ((float(new_value) - float(old_value)) / float(old_value)) * 100.0
 
 
+
+class FakeX1RPCProvider:
+    def __init__(self):
+        self.calls = []
+
+    def get_first_available_block(self):
+        return {
+            "first_available_block": 5,
+            "history_boundary_verified": True,
+            "archival_completeness_verified": False,
+        }
+
+    def request(self, method, params):
+        self.calls.append((method, params))
+        if method != "getSignaturesForAddress":
+            raise AssertionError(method)
+        before = params[1].get("before")
+        if before is None:
+            return [
+                {
+                    "signature": "sig2",
+                    "slot": 20,
+                    "err": None,
+                    "blockTime": 2000,
+                    "confirmationStatus": "finalized",
+                },
+                {
+                    "signature": "sig1",
+                    "slot": 10,
+                    "err": None,
+                    "blockTime": 1000,
+                    "confirmationStatus": "finalized",
+                },
+            ]
+        return []
+
+
 def snapshot(
     symbol,
     mint,
@@ -187,6 +224,61 @@ class AllAvailableHistoryTests(unittest.TestCase):
             "all_available_means_all_verified_observations_currently_stored_by_cmis",
             warning_codes,
         )
+
+
+    def test_all_available_response_separates_market_and_onchain_coverage(self):
+        history = FakeHistory(
+            {
+                ("AGI_MINT", "price"): [
+                    {"timestamp": 1000, "value": 1.0},
+                    {"timestamp": 2000, "value": 2.0},
+                ]
+            }
+        )
+        rpc = FakeX1RPCProvider()
+
+        response = build_historical_compare_response(
+            None,
+            snapshot("AGI", "AGI_MINT", observed_at=3000, price=3.0),
+            history_backend=history,
+            mode="all_available",
+            metrics=["price"],
+            onchain_coverage_provider=rpc,
+            onchain_page_size=1000,
+            onchain_max_signatures=5000,
+        )
+
+        coverage = response["data"]["coverage"]
+        self.assertEqual(
+            coverage["market"]["coverage_scope"],
+            "cmis_stored_verified_observations",
+        )
+        self.assertEqual(coverage["onchain"]["status"], "full")
+        self.assertEqual(
+            coverage["onchain"]["coverage_scope"],
+            "x1_rpc_visible_mint_address_history",
+        )
+        self.assertTrue(
+            coverage["onchain"]["rpc_visible_mint_history_complete"]
+        )
+        self.assertFalse(coverage["onchain"]["asset_wide_activity_verified"])
+        self.assertFalse(coverage["onchain"]["full_asset_lifetime_verified"])
+
+        warning_codes = {item["code"] for item in response["warnings"]}
+        self.assertIn(
+            "mint_address_history_is_not_asset_wide_transfer_history",
+            warning_codes,
+        )
+        self.assertIn(
+            "asset_lifetime_coverage_unverified",
+            warning_codes,
+        )
+        onchain_sources = [
+            item for item in response["sources"]
+            if item.get("role") == "historical_compare.onchain_coverage"
+        ]
+        self.assertEqual(len(onchain_sources), 1)
+        self.assertEqual(onchain_sources[0]["source"], "X1 RPC")
 
     def test_pair_comparison_uses_only_overlapping_verified_window(self):
         history = FakeHistory(
