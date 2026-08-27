@@ -4,6 +4,7 @@ import unittest
 from liquidity_scout.providers.x1.token_metadata import (
     METADATA_MINT_OFFSET,
     SOURCE,
+    TOKEN_METADATA_EXPECTED_LOADER,
     TOKEN_METADATA_PROGRAM_ID,
     X1TokenMetadataProvider,
     get_token_metadata_for_mint,
@@ -61,12 +62,18 @@ def metadata_rpc_row(raw=None, *, owner=TOKEN_METADATA_PROGRAM_ID, executable=Fa
     }
 
 
-def program_result(*, exists=True, executable=True):
+def program_result(
+    *,
+    exists=True,
+    executable=True,
+    owner=TOKEN_METADATA_EXPECTED_LOADER,
+    context_slot=12345,
+):
     return {
-        "context": {"slot": 12345},
+        "context": {"slot": context_slot} if context_slot is not None else {},
         "value": (
             {
-                "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+                "owner": owner,
                 "executable": executable,
                 "lamports": 1,
                 "data": ["", "base64"],
@@ -123,10 +130,26 @@ class X1TokenMetadataProviderTests(unittest.TestCase):
         self.assertTrue(parsed["program_executable_verified"])
         self.assertEqual(
             parsed["loader_owner"],
-            "BPFLoaderUpgradeab1e11111111111111111111111",
+            TOKEN_METADATA_EXPECTED_LOADER,
         )
+        self.assertTrue(parsed["loader_owner_verified"])
+        self.assertTrue(parsed["context_slot_verified"])
         self.assertEqual(parsed["context_slot"], 12345)
         self.assertEqual(parsed["source"], SOURCE)
+
+    def test_program_account_parser_rejects_missing_context_slot(self):
+        with self.assertRaisesRegex(ValueError, "context slot"):
+            parse_token_metadata_program_account_result(
+                program_result(context_slot=None)
+            )
+
+    def test_program_loader_mismatch_is_not_verified(self):
+        parsed = parse_token_metadata_program_account_result(
+            program_result(owner="WrongLoader111")
+        )
+
+        self.assertFalse(parsed["loader_owner_verified"])
+        self.assertFalse(parsed["program_executable_verified"])
 
     def test_program_account_parser_preserves_missing_program_as_unverified(self):
         parsed = parse_token_metadata_program_account_result(
@@ -169,6 +192,7 @@ class X1TokenMetadataProviderTests(unittest.TestCase):
 
     def test_duplicate_exact_mint_metadata_fails_closed(self):
         result = {
+            "context": {"slot": 2},
             "value": [
                 metadata_rpc_row(),
                 {**metadata_rpc_row(), "pubkey": "MetadataAccount222"},
@@ -180,6 +204,7 @@ class X1TokenMetadataProviderTests(unittest.TestCase):
 
     def test_wrong_metadata_account_owner_fails_closed(self):
         result = {
+            "context": {"slot": 3},
             "value": [metadata_rpc_row(owner="WrongProgram111")],
         }
 
@@ -188,11 +213,19 @@ class X1TokenMetadataProviderTests(unittest.TestCase):
 
     def test_executable_metadata_state_account_fails_closed(self):
         result = {
+            "context": {"slot": 4},
             "value": [metadata_rpc_row(executable=True)],
         }
 
         with self.assertRaisesRegex(ValueError, "executable"):
             parse_metadata_accounts_result(result, mint=ZERO_PUBKEY)
+
+    def test_metadata_result_rejects_missing_context_slot(self):
+        with self.assertRaisesRegex(ValueError, "context slot"):
+            parse_metadata_accounts_result(
+                {"context": {}, "value": [metadata_rpc_row()]},
+                mint=ZERO_PUBKEY,
+            )
 
     def test_provider_uses_exact_mint_filter_at_canonical_offset(self):
         calls = []
@@ -246,7 +279,22 @@ class X1TokenMetadataProviderTests(unittest.TestCase):
             calls.append(method)
             return program_result(executable=False)
 
-        with self.assertRaisesRegex(ValueError, "non-executable"):
+        with self.assertRaisesRegex(ValueError, "identity is not verified"):
+            get_token_metadata_for_mint(
+                ZERO_PUBKEY,
+                requester=requester,
+            )
+
+        self.assertEqual(calls, ["getAccountInfo"])
+
+    def test_provider_refuses_wrong_program_loader(self):
+        calls = []
+
+        def requester(method, params, **kwargs):
+            calls.append(method)
+            return program_result(owner="WrongLoader111")
+
+        with self.assertRaisesRegex(ValueError, "identity is not verified"):
             get_token_metadata_for_mint(
                 ZERO_PUBKEY,
                 requester=requester,
