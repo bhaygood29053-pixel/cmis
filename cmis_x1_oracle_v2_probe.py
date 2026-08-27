@@ -206,7 +206,7 @@ def decode_oracle_state(account_data):
         assets[asset] = {
             "prices_raw": prices,
             "prices": [_scaled_i64(price, decimals) for price in prices],
-            "timestamps_unix_ms": timestamps,
+            "timestamps_raw": timestamps,
         }
 
     if offset != SERIALIZED_STATE_BYTES:
@@ -265,22 +265,17 @@ def _parse_account_result(result, address):
     }
 
 
-def _slot_observations(decoded_state, observed_at_ms):
+def _slot_observations(decoded_state):
     observations = []
     for asset in ASSETS:
         asset_state = decoded_state["assets"][asset]
-        for index, (raw_price, timestamp_ms) in enumerate(
+        for index, (raw_price, timestamp_raw) in enumerate(
             zip(
                 asset_state["prices_raw"],
-                asset_state["timestamps_unix_ms"],
+                asset_state["timestamps_raw"],
             ),
             start=1,
         ):
-            age_ms = (
-                observed_at_ms - timestamp_ms
-                if isinstance(timestamp_ms, int) and timestamp_ms > 0
-                else None
-            )
             observations.append(
                 {
                     "asset": asset,
@@ -290,17 +285,18 @@ def _slot_observations(decoded_state, observed_at_ms):
                         raw_price,
                         decoded_state["decimals"],
                     ),
-                    "timestamp_unix_ms": timestamp_ms,
-                    "age_ms_relative_to_probe_clock": age_ms,
+                    "timestamp_raw": timestamp_raw,
+                    "timestamp_unit_live_verified": False,
+                    "source_contract_timestamp_unit": "unix_ms",
                     "zero_price": raw_price == 0,
-                    "timestamp_positive": timestamp_ms > 0,
-                    "structurally_valid_before_freshness": (
-                        raw_price > 0 and timestamp_ms > 0
+                    "timestamp_positive": timestamp_raw > 0,
+                    "structurally_valid_before_timestamp_unit_and_freshness": (
+                        raw_price > 0 and timestamp_raw > 0
                     ),
                     "cmis_price_eligible": False,
                     "cmis_price_eligibility_reason": (
-                        "freshness_policy_not_applied"
-                        if raw_price > 0 and timestamp_ms > 0
+                        "timestamp_unit_and_freshness_not_verified"
+                        if raw_price > 0 and timestamp_raw > 0
                         else "nonpositive_price_or_timestamp"
                     ),
                     "freshness_classification": "not_applied",
@@ -318,8 +314,6 @@ def probe_oracle_v2(
     """Perform the bounded live X1 RPC contract-shape verification."""
     provider = rpc_provider or X1RPCProvider(rpc_url=rpc_url)
     observed_at = observed_at or datetime.now(timezone.utc)
-    observed_at_ms = int(observed_at.timestamp() * 1000)
-
     derived = derive_program_address()
     derived_match = derived["address"] == STATE_PDA
 
@@ -370,7 +364,7 @@ def probe_oracle_v2(
 
     required_checks_pass = all(checks.values())
     observations = (
-        _slot_observations(decoded_state, observed_at_ms)
+        _slot_observations(decoded_state)
         if decoded_state is not None
         else []
     )
@@ -384,19 +378,18 @@ def probe_oracle_v2(
     structurally_valid_slots = sum(
         1
         for item in observations
-        if item["structurally_valid_before_freshness"]
+        if item["structurally_valid_before_timestamp_unit_and_freshness"]
     )
-    timestamp_values = [
-        item["timestamp_unix_ms"]
+    timestamp_values_raw = [
+        item["timestamp_raw"]
         for item in observations
         if item["timestamp_positive"]
     ]
-    latest_timestamp_ms = max(timestamp_values) if timestamp_values else None
-    oldest_timestamp_ms = min(timestamp_values) if timestamp_values else None
-    latest_timestamp_age_ms = (
-        observed_at_ms - latest_timestamp_ms
-        if latest_timestamp_ms is not None
-        else None
+    max_timestamp_raw = (
+        max(timestamp_values_raw) if timestamp_values_raw else None
+    )
+    min_timestamp_raw = (
+        min(timestamp_values_raw) if timestamp_values_raw else None
     )
 
     warnings = [
@@ -414,6 +407,12 @@ def probe_oracle_v2(
             "The pinned upstream program accepts zero prices. CMIS treats "
             "zero-price slots as ineligible candidate evidence, not as a "
             "verified market price."
+        ),
+        (
+            "The pinned source contract documents Unix-ms timestamps, but "
+            "this probe has not independently verified the deployed program "
+            "binary or live timestamp unit. Live timestamps are preserved as "
+            "raw integers and no age/freshness calculation is promoted."
         ),
         (
             "This probe verifies on-chain contract shape only. It does not "
@@ -458,6 +457,7 @@ def probe_oracle_v2(
             "serialized_state_bytes": SERIALIZED_STATE_BYTES,
             "allocated_state_bytes": ALLOCATED_STATE_BYTES,
             "anchor_discriminator_hex": ORACLE_STATE_DISCRIMINATOR.hex(),
+            "source_contract_timestamp_unit": "unix_ms",
         },
         "decoded_state": decoded_state,
         "slot_observations": observations,
@@ -465,15 +465,16 @@ def probe_oracle_v2(
             "total_slots": len(observations),
             "nonzero_price_slots": nonzero_price_slots,
             "positive_timestamp_slots": positive_timestamp_slots,
-            "structurally_valid_slots_before_freshness": structurally_valid_slots,
+            "structurally_valid_slots_before_timestamp_unit_and_freshness": (
+                structurally_valid_slots
+            ),
             "cmis_price_eligible_slots": 0,
+            "timestamp_unit_live_verified": False,
+            "source_contract_timestamp_unit": "unix_ms",
+            "min_relay_timestamp_raw": min_timestamp_raw,
+            "max_relay_timestamp_raw": max_timestamp_raw,
             "freshness_policy_applied": False,
             "current_price_use_authorized": False,
-            "latest_relay_timestamp_unix_ms": latest_timestamp_ms,
-            "oldest_relay_timestamp_unix_ms": oldest_timestamp_ms,
-            "latest_relay_timestamp_age_ms_relative_to_probe_clock": (
-                latest_timestamp_age_ms
-            ),
             "source_independence_verified": False,
             "price_correctness_verified": False,
             "cmis_provider_promoted": False,
