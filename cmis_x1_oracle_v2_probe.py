@@ -294,7 +294,15 @@ def _slot_observations(decoded_state, observed_at_ms):
                     "age_ms_relative_to_probe_clock": age_ms,
                     "zero_price": raw_price == 0,
                     "timestamp_positive": timestamp_ms > 0,
-                    "cmis_price_eligible": raw_price > 0 and timestamp_ms > 0,
+                    "structurally_valid_before_freshness": (
+                        raw_price > 0 and timestamp_ms > 0
+                    ),
+                    "cmis_price_eligible": False,
+                    "cmis_price_eligibility_reason": (
+                        "freshness_policy_not_applied"
+                        if raw_price > 0 and timestamp_ms > 0
+                        else "nonpositive_price_or_timestamp"
+                    ),
                     "freshness_classification": "not_applied",
                 }
             )
@@ -373,6 +381,23 @@ def probe_oracle_v2(
     positive_timestamp_slots = sum(
         1 for item in observations if item["timestamp_positive"]
     )
+    structurally_valid_slots = sum(
+        1
+        for item in observations
+        if item["structurally_valid_before_freshness"]
+    )
+    timestamp_values = [
+        item["timestamp_unix_ms"]
+        for item in observations
+        if item["timestamp_positive"]
+    ]
+    latest_timestamp_ms = max(timestamp_values) if timestamp_values else None
+    oldest_timestamp_ms = min(timestamp_values) if timestamp_values else None
+    latest_timestamp_age_ms = (
+        observed_at_ms - latest_timestamp_ms
+        if latest_timestamp_ms is not None
+        else None
+    )
 
     warnings = [
         (
@@ -440,7 +465,15 @@ def probe_oracle_v2(
             "total_slots": len(observations),
             "nonzero_price_slots": nonzero_price_slots,
             "positive_timestamp_slots": positive_timestamp_slots,
+            "structurally_valid_slots_before_freshness": structurally_valid_slots,
+            "cmis_price_eligible_slots": 0,
             "freshness_policy_applied": False,
+            "current_price_use_authorized": False,
+            "latest_relay_timestamp_unix_ms": latest_timestamp_ms,
+            "oldest_relay_timestamp_unix_ms": oldest_timestamp_ms,
+            "latest_relay_timestamp_age_ms_relative_to_probe_clock": (
+                latest_timestamp_age_ms
+            ),
             "source_independence_verified": False,
             "price_correctness_verified": False,
             "cmis_provider_promoted": False,
