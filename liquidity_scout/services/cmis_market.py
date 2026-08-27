@@ -61,8 +61,9 @@ def _confidence(report: Mapping[str, Any]) -> Dict[str, Any]:
     required_verified = sum(1 for value in required_checks.values() if value)
     required_total = len(required_checks)
     return {
-        "complete": required_verified == required_total,
+        "complete": verified == total,
         "all_fields_complete": verified == total,
+        "core_market_complete": required_verified == required_total,
         "verified_checks": verified,
         "total_checks": total,
         "verification_ratio": round(verified / total, 6),
