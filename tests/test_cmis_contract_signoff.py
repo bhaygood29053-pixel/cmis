@@ -241,10 +241,13 @@ class CMISCrossServiceContractSignoffTests(unittest.TestCase):
             [response["service"] for response in responses],
             ["market_report", "tokenomics", "historical_compare", "risk_check"],
         )
+        self.assertEqual(
+            [response["status"] for response in responses],
+            [PARTIAL, OK, OK, OK],
+        )
         for response in responses:
             self.assertEqual(list(response), CANONICAL_ENVELOPE_KEYS)
             self.assertEqual(response["chain"], "x1")
-            self.assertEqual(response["status"], OK)
             self.assertEqual(response["asset"]["mint"], MINT)
             self.assertIsInstance(response["confidence"], dict)
             self.assertIsInstance(response["sources"], list)
@@ -333,7 +336,8 @@ class CMISCrossServiceContractSignoffTests(unittest.TestCase):
             secondary_liquidity=0.0,
         )
         self.assertEqual(market["data"]["liquidity_usd"], 0.0)
-        self.assertEqual(market["status"], OK)
+        self.assertEqual(market["status"], PARTIAL)
+        self.assertFalse(market["data"]["completeness"]["holders"])
 
         tokenomics = self._tokenomics_response()
         historical = self._historical_response(market)

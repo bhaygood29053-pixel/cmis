@@ -81,14 +81,14 @@ Current provider-gap state:
 - **PR #242 — Warp Bridge proof-origin binding:** closed as not currently verifiable because no exact X1-owned machine-readable read contract was established. No guessed bridge endpoint is accepted.
 - **PR #227 — FortiBlox provider contract research:** closed/archive candidate research. Exact provider-owned Explorer/Nexus endpoint and response contracts remain unverified; no FortiBlox adapter is accepted.
 - **Issue #272 — Oracle V2 read-only X1 price evidence:** structural identity/layout and Unix-ms timestamp semantics are verified, and the explicit current-price freshness policy is now selected/applied. The latest live policy run classified all 30 relay slots stale, so current price use, price correctness, source independence, CMIS-provider promotion, public-service promotion, and Scout reliance remain false. Relay count is not independent-source count.
-- **Issue #301 — self-hosted X1 read-only node history/streaming redundancy:** deterministic contract, RPC probe, PubSub reconnect/backfill probe, focused tests, and opt-in live workflow are merged on `main` via PR #302. Live deployment identity/history/streaming evidence remains unavailable until explicit self-hosted endpoint/configuration evidence is supplied. Separate node infrastructure is not independent market-price evidence.
+- **Issue #301 — self-hosted X1 read-only node history/streaming redundancy:** deterministic contract/probes remain available on `main` via PR #302, but live self-hosted deployment verification is deferred because the selected production path uses the Official X1 RPC. No RPC redundancy or independent market-source claim is inferred.
 
 Closed research branches and failed verification attempts do not create provider capability on `main`.
 
 Other current X1 provider-gap observations remain non-promotional:
 
 - the tested X1.Ninja SSE credential returned HTTP 403 / access denied;
-- holder-looking X1.Ninja, RPC token-account, and unique token-account-authority counts disagreed in the bounded XENCAT observation;
+- **Issue #304 — holder semantics correction:** X1.Ninja holder-looking values, official X1 RPC token-account counts, and unique token-account-authority counts remain distinct evidence classes; raw provider `holders` values must not become verified asset-wide holder counts without counted-entity and coverage proof;
 - those observations do not establish holder totals, wallet identity, beneficial ownership, provider completeness, or stream semantics;
 - Warp Bridge machine-readable operational state remains unavailable until an exact provenance-approved read contract is accepted.
 
