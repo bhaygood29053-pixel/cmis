@@ -261,7 +261,30 @@ def build_verified_asset_activity_response(
         and asset_scope_mismatches == 0
         and gated_non_swap == 0
     )
-    market_complete = market_envelope.get("status") == OK
+    market_data_for_completeness = market_envelope.get("data")
+    market_data_for_completeness = (
+        market_data_for_completeness
+        if isinstance(market_data_for_completeness, Mapping)
+        else {}
+    )
+    market_completeness = market_data_for_completeness.get("completeness")
+    market_completeness = (
+        market_completeness if isinstance(market_completeness, Mapping) else {}
+    )
+    # Verified Asset Activity does not consume holder identity/count semantics.
+    # A market_report that is partial only because holder semantics are
+    # unverified must not silently downgrade otherwise complete trade/activity
+    # evidence. Preserve the pre-#304 activity contract by evaluating only the
+    # market fields this service actually carries in its snapshot.
+    activity_market_keys = (
+        "price",
+        "liquidity",
+        "volume_24h",
+        "transactions_24h",
+    )
+    market_complete = all(
+        market_completeness.get(key) is True for key in activity_market_keys
+    )
 
     complete = bool(
         pool_selection_complete
@@ -299,10 +322,13 @@ def build_verified_asset_activity_response(
                 "guaranteed latest activity."
             ),
         })
-    if market_envelope.get("status") == PARTIAL:
+    if not market_complete:
         warnings.append({
             "code": "market_snapshot_partial",
-            "message": "The market snapshot is partial.",
+            "message": (
+                "One or more market fields required by Verified Asset Activity "
+                "are partial or unavailable."
+            ),
         })
     if gated_non_swap:
         warnings.append({
