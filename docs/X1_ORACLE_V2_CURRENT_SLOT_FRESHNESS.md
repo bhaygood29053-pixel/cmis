@@ -209,19 +209,20 @@ The live age range from that workflow should be recorded after CI succeeds.
 The branch-scoped live workflow succeeded:
 
 ```text
-workflow_run = 33039263626
-artifact_id = 9633216049
+workflow_run = 33039661704
+artifact_id = 9633357650
 artifact_sha256 =
-825abf6c971066ce48b41a9c765846d7544091f17acdafcb89a195deb29da972
+2aa0d210959e6667b19c571ff816f1246c2f6468c7ff49c11de80438c91b22fb
 
-observed_at = 2026-08-27T04:23:36.206641+00:00
-observed_at_ms = 1787804616206
+observed_at = 2026-08-27T04:31:32.120308+00:00
+observed_at_ms = 1787805092120
+observation_clock_source = post_rpc_runtime
 
 slot_count = 30
 positive_timestamp_age_count = 30
 
-minimum_signed_age_ms = 13204160036
-maximum_signed_age_ms = 13204196856
+minimum_signed_age_ms = 13204635950
+maximum_signed_age_ms = 13204672770
 
 minimum_timestamp_raw = 1774600419350
 maximum_timestamp_raw = 1774600456170
