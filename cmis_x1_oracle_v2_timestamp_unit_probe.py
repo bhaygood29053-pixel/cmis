@@ -14,6 +14,7 @@ timestamp_unit_verified=false.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -38,6 +39,10 @@ PROGRAM_ID = "9mPmjK8NxJadYDiHiYAQH4WFCnKJr7ZV8ria63ZkMtv2"
 STATE_PDA = "8XZBqbKhFXHqNGzxV3Tt6gEs9r8ZrNghsRg7zBwLMGJf"
 ED25519_PROGRAM_ID = "Ed25519SigVerify111111111111111111111111111"
 BATCH_SUBMIT_PRICES_DISCRIMINATOR = bytes.fromhex("116224b954f96553")
+ORACLE_STATE_DISCRIMINATOR = bytes.fromhex("619c9dbdc249080f")
+ORACLE_STATE_ALLOCATED_BYTES = 618
+ORACLE_PUBKEY_OFFSET = 8 + 32
+ORACLE_PUBKEY_BYTES = 32
 NUM_ASSETS = 6
 NUM_RELAY_SLOTS = 5
 DEFAULT_HISTORY_LIMIT = 25
@@ -95,6 +100,78 @@ def _b58decode(value: Any) -> bytes:
 
 def batch_submit_prices_discriminator() -> bytes:
     return hashlib.sha256(b"global:batch_submit_prices").digest()[:8]
+
+
+def _current_oracle_pubkey_evidence(
+    provider: X1RPCProvider,
+) -> dict[str, Any]:
+    """Read the current configured Oracle Ed25519 public key fail-closed."""
+    result = provider.request(
+        "getAccountInfo",
+        [
+            STATE_PDA,
+            {
+                "encoding": "base64",
+                "commitment": "confirmed",
+            },
+        ],
+    )
+    if not isinstance(result, Mapping):
+        raise OracleV2TimestampProbeError(
+            "Oracle state getAccountInfo result is malformed"
+        )
+    context = result.get("context")
+    context = context if isinstance(context, Mapping) else {}
+    value = result.get("value")
+    if not isinstance(value, Mapping):
+        raise OracleV2TimestampProbeError(
+            "Oracle state account is unavailable"
+        )
+    if value.get("owner") != PROGRAM_ID or value.get("executable") is not False:
+        raise OracleV2TimestampProbeError(
+            "Oracle state owner/executable binding mismatch"
+        )
+
+    encoded = value.get("data")
+    if (
+        not isinstance(encoded, list)
+        or len(encoded) < 2
+        or encoded[1] != "base64"
+        or not isinstance(encoded[0], str)
+    ):
+        raise OracleV2TimestampProbeError(
+            "Oracle state base64 account data is malformed"
+        )
+    try:
+        account_data = base64.b64decode(encoded[0], validate=True)
+    except Exception as exc:
+        raise OracleV2TimestampProbeError(
+            "Oracle state base64 decode failed"
+        ) from exc
+
+    if len(account_data) != ORACLE_STATE_ALLOCATED_BYTES:
+        raise OracleV2TimestampProbeError(
+            "Oracle state allocated length mismatch"
+        )
+    if account_data[:8] != ORACLE_STATE_DISCRIMINATOR:
+        raise OracleV2TimestampProbeError(
+            "Oracle state discriminator mismatch"
+        )
+
+    start = ORACLE_PUBKEY_OFFSET
+    end = start + ORACLE_PUBKEY_BYTES
+    oracle_pubkey = account_data[start:end]
+    if len(oracle_pubkey) != ORACLE_PUBKEY_BYTES:
+        raise OracleV2TimestampProbeError(
+            "Oracle state public key is truncated"
+        )
+
+    return {
+        "context_slot": context.get("slot"),
+        "oracle_pubkey_sha256": hashlib.sha256(oracle_pubkey).hexdigest(),
+        "source": "X1 RPC getAccountInfo(base64 Oracle state)",
+        "historical_key_continuity_verified": False,
+    }
 
 
 def _instruction_program_id(instruction: Mapping[str, Any]) -> str | None:
@@ -432,16 +509,28 @@ def _decode_candidate_from_transaction(
         )
 
     batch = batch_candidates[0]
+    expected_oracle_pubkey_sha256 = _text(
+        transaction_record.get("expected_oracle_pubkey_sha256")
+    )
+    if expected_oracle_pubkey_sha256 is None:
+        return None, "expected_oracle_pubkey_missing"
+
     matching_ed = [
         entry
         for entry in ed25519_entries
-        if entry["message"] == batch["message"]
+        if (
+            entry["message"] == batch["message"]
+            and entry["signature_sha256"]
+            == batch["instruction_signature_sha256"]
+            and entry["pubkey_sha256"] == expected_oracle_pubkey_sha256
+            and entry["instruction_index"] < batch["instruction_index"]
+        )
     ]
     if len(matching_ed) != 1:
         return None, (
-            "matching_ed25519_message_not_found"
+            "matching_ed25519_preinstruction_not_found"
             if not matching_ed
-            else "multiple_matching_ed25519_messages_ambiguous"
+            else "multiple_matching_ed25519_preinstructions_ambiguous"
         )
 
     ed = matching_ed[0]
@@ -498,6 +587,10 @@ def _decode_candidate_from_transaction(
         ],
         "ed25519_signature_sha256": ed["signature_sha256"],
         "ed25519_pubkey_sha256": ed["pubkey_sha256"],
+        "configured_oracle_pubkey_sha256": expected_oracle_pubkey_sha256,
+        "ed25519_signature_matches_batch_argument": True,
+        "ed25519_pubkey_matches_current_state": True,
+        "ed25519_precedes_oracle_instruction": True,
         "source_contract_timestamp_unit": "unix_ms",
         "source_contract_log_observed": source_contract_log_observed,
         "deployed_binary_source_equivalence_verified": False,
@@ -596,6 +689,7 @@ def probe_timestamp_unit_evidence(
     )
     provider = rpc_provider or X1RPCProvider(rpc_url=rpc_url)
     observed_at = observed_at or datetime.now(timezone.utc)
+    oracle_key_evidence = _current_oracle_pubkey_evidence(provider)
 
     history = provider.get_signatures_for_address(
         STATE_PDA,
@@ -622,6 +716,17 @@ def probe_timestamp_unit_evidence(
         if signatures
         else []
     )
+    transaction_records = [
+        {
+            **record,
+            "expected_oracle_pubkey_sha256": oracle_key_evidence[
+                "oracle_pubkey_sha256"
+            ],
+        }
+        if isinstance(record, Mapping)
+        else record
+        for record in transaction_records
+    ]
     by_signature = {
         row["signature"]: row
         for row in successful_history
@@ -719,6 +824,7 @@ def probe_timestamp_unit_evidence(
             "source_contract_timestamp_unit": "unix_ms",
             "deployed_binary_source_equivalence_verified": False,
         },
+        "oracle_key_evidence": oracle_key_evidence,
         "correlation_policy": correlation_policy,
         "samples": samples,
         "rejected_transactions": rejected,
@@ -757,6 +863,12 @@ def probe_timestamp_unit_evidence(
                 "candidate_unix_ms_difference_ms is raw correlation evidence, "
                 "not timestamp-unit verification unless an explicit tolerance "
                 "and provenance are supplied."
+            ),
+            (
+                "Historical Oracle-key continuity is not independently proven. "
+                "The probe accepts only sampled transactions whose Ed25519 "
+                "public key matches the current configured Oracle state key; "
+                "older transactions from a rotated key fail closed."
             ),
             (
                 "Even when every sampled correlation passes an explicit "
