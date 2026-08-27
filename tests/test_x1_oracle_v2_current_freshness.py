@@ -295,6 +295,63 @@ class OracleV2CurrentFreshnessTests(unittest.TestCase):
         self.assertIsNone(btc_result["median_price"])
         self.assertEqual(result["status"], "partial")
 
+    def test_live_observation_clock_is_captured_after_state_read(self):
+        call_order = []
+
+        class FakeDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                call_order.append("clock")
+                return OBSERVED_AT
+
+        def fake_probe(**kwargs):
+            call_order.append("probe")
+            self.assertIsNone(kwargs["observed_at"])
+            return _structural_fixture(age_ms=500)
+
+        with patch.object(
+            current,
+            "probe_oracle_v2",
+            side_effect=fake_probe,
+        ), patch.object(
+            current,
+            "datetime",
+            FakeDateTime,
+        ):
+            result = current.evaluate_current_oracle_v2_freshness(
+                freshness_policy=None,
+            )
+
+        self.assertEqual(call_order[:2], ["probe", "clock"])
+        self.assertEqual(
+            result["observation_clock_source"],
+            "post_rpc_runtime",
+        )
+        self.assertEqual(
+            result["age_summary"]["minimum_signed_age_ms"],
+            500,
+        )
+
+    def test_explicit_observation_clock_remains_deterministic(self):
+        with patch.object(
+            current,
+            "probe_oracle_v2",
+            return_value=_structural_fixture(age_ms=500),
+        ) as probe:
+            result = current.evaluate_current_oracle_v2_freshness(
+                freshness_policy=None,
+                observed_at=OBSERVED_AT,
+            )
+
+        self.assertEqual(
+            probe.call_args.kwargs["observed_at"],
+            OBSERVED_AT,
+        )
+        self.assertEqual(
+            result["observation_clock_source"],
+            "explicit_injected",
+        )
+
     def test_structural_failure_blocks_freshness_evaluation(self):
         with patch.object(
             current,
@@ -314,6 +371,8 @@ class OracleV2CurrentFreshnessTests(unittest.TestCase):
         self.assertTrue(result["timestamp_unit_verified"])
         self.assertFalse(result["freshness_policy_applied"])
         self.assertFalse(result["freshness_verified"])
+        self.assertFalse(result["price_correctness_verified"])
+        self.assertFalse(result["current_price_use_authorized"])
         self.assertEqual(result["assets"], {})
 
     def test_naive_observation_time_is_rejected(self):
