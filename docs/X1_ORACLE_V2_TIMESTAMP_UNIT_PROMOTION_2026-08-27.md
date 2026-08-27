@@ -1,6 +1,6 @@
 # X1 Oracle V2 Timestamp-Unit Promotion — 2026-08-27
 
-Status: **promotion policy accepted / live verification required**
+Status: **timestamp unit verified / freshness and price authority not promoted**
 
 Tracker: **#293**
 
@@ -155,6 +155,56 @@ public_service_promoted = false
 scout_reliance_promoted = false
 execution_authorized = false
 ```
+
+## Live promotion result
+
+The branch-scoped live promotion workflow completed successfully:
+
+```text
+workflow_run = 33038921907
+artifact_id = 9633092384
+artifact_sha256 =
+32ec5e8d46326900d881da4162177b29b68b829e1ca82337db22f6a5bd94ad07
+
+policy_sha256 =
+0a91fbc4a6d4b8befe728419e661e9eea4ad189a48b746a2ea7f18c5f86d05ab
+
+evidence_sha256 =
+984f3208ae17043880407cdc85964e87ee42cee54d50c322ac065d0fb135c135
+```
+
+The live governance summary was:
+
+```text
+unique_signature_count = 25
+distinct_relay_count = 5
+minimum_recomputed_difference_ms = 576
+maximum_recomputed_difference_ms = 1604
+```
+
+Every promotion gate passed:
+
+```text
+source_identity = true
+sample_integrity = true
+all_samples_within_explicit_tolerance = true
+minimum_sample_count = true
+minimum_distinct_relay_count = true
+temporal_coverage = true
+deployed_binary_equivalence_requirement = true
+```
+
+The resulting verified fact is:
+
+```text
+timestamp_unit_verified = true
+```
+
+The binary-equivalence gate is true because the accepted policy explicitly does
+not require deployed binary/source equivalence for timestamp semantics. The
+underlying binary-equivalence fact itself remains unverified.
+
+All downstream authority fields remained false in the same live artifact.
 
 ## What this promotion authorizes
 
