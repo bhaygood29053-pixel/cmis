@@ -75,7 +75,7 @@ Recent cleanup is complete:
 - PR #227 — FortiBlox closed/archive candidate research;
 - PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-The next new technical item is bounded verification of the official/self-hosted X1 read-only node for history and streaming redundancy. This must not be mislabeled as independent market-price evidence merely because it is a separate node deployment.
+Issue #301 is now the active bounded verification item for the official/self-hosted X1 read-only node. The deterministic contract, sanitized RPC probe, finalized block PubSub reconnect/backfill probe, tests, and opt-in live workflow are implemented; live deployment evidence remains blocked until an explicit self-hosted RPC/WebSocket endpoint and configuration evidence are available. This must not be mislabeled as independent market-price evidence merely because it is a separate node deployment.
 
 ## Roberta dependency/status
 

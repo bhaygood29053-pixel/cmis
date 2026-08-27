@@ -1,0 +1,201 @@
+name: X1 Self-Hosted Read-Only Node Evidence
+
+on:
+  pull_request:
+    paths:
+      - "liquidity_scout/providers/x1/self_hosted_readonly_node.py"
+      - "cmis_x1_self_hosted_node_probe.py"
+      - "cmis_x1_self_hosted_block_pubsub_probe.py"
+      - "tests/test_x1_self_hosted_readonly_node.py"
+      - "docs/X1_SELF_HOSTED_READONLY_NODE_EVIDENCE.md"
+      - ".github/workflows/x1-self-hosted-readonly-node-evidence.yml"
+      - "requirements.txt"
+  workflow_dispatch:
+    inputs:
+      run_rpc_probe:
+        description: Run bounded live RPC comparison against configured self-hosted X1 node
+        required: true
+        default: false
+        type: boolean
+      run_pubsub_probe:
+        description: Run finalized blockSubscribe reconnect/backfill probe
+        required: true
+        default: false
+        type: boolean
+      probe_address:
+        description: Finalized-history X1 address used for bounded same-fact RPC comparison
+        required: false
+        type: string
+      notifications_per_session:
+        description: Finalized block notifications to collect per PubSub session
+        required: true
+        default: "3"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tests:
+    name: Self-hosted X1 node contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run focused deterministic tests
+        run: |
+          python -m unittest tests.test_x1_self_hosted_readonly_node -v
+
+      - name: Safety boundary
+        run: |
+          echo "Contract tests only."
+          echo "No live node access, signing, broadcast, custody, voting, staking, or execution."
+
+  live-rpc-probe:
+    name: Bounded self-hosted X1 RPC evidence
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_rpc_probe }}
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_SELF_HOSTED_RPC_URL: ${{ secrets.X1_SELF_HOSTED_RPC_URL }}
+      X1_CANONICAL_RPC_URL: ${{ secrets.X1_CANONICAL_RPC_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Require explicit live configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${X1_SELF_HOSTED_RPC_URL:-}" ]; then
+            echo "X1_SELF_HOSTED_RPC_URL repository secret is not configured."
+            exit 1
+          fi
+          if [ -z "${{ inputs.probe_address }}" ]; then
+            echo "workflow_dispatch probe_address is required for the live RPC probe."
+            exit 1
+          fi
+
+      - name: Run bounded sanitized RPC probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          canonical="${X1_CANONICAL_RPC_URL:-https://rpc.mainnet.x1.xyz}"
+          python cmis_x1_self_hosted_node_probe.py             --rpc-url "$X1_SELF_HOSTED_RPC_URL"             --canonical-rpc-url "$canonical"             --probe-address "${{ inputs.probe_address }}"             --history-limit 25             --output x1-self-hosted-rpc-evidence.json
+
+      - name: Assert non-promotion boundary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          data = json.load(open("x1-self-hosted-rpc-evidence.json", encoding="utf-8"))
+          scope = data["scope"]
+          assert scope["archival_completeness_verified"] is False
+          assert scope["continuous_coverage_verified"] is False
+          assert scope["retention_verified"] is False
+          assert scope["streaming_verified"] is False
+          assert scope["market_source_independence_verified"] is False
+          assert scope["cmis_provider_promoted"] is False
+          assert scope["public_service_promoted"] is False
+          assert scope["scout_reliance_promoted"] is False
+          assert scope["execution_authorized"] is False
+          assert data["endpoint_url_redacted"] is True
+          PY
+
+      - name: Upload sanitized RPC evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-self-hosted-rpc-evidence-${{ github.run_id }}
+          path: x1-self-hosted-rpc-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+  live-pubsub-probe:
+    name: Self-hosted X1 finalized block PubSub evidence
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_pubsub_probe }}
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_SELF_HOSTED_WS_URL: ${{ secrets.X1_SELF_HOSTED_WS_URL }}
+      X1_CANONICAL_RPC_URL: ${{ secrets.X1_CANONICAL_RPC_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Require explicit WebSocket configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${X1_SELF_HOSTED_WS_URL:-}" ]; then
+            echo "X1_SELF_HOSTED_WS_URL repository secret is not configured."
+            exit 1
+          fi
+
+      - name: Run finalized reconnect/backfill probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          canonical="${X1_CANONICAL_RPC_URL:-https://rpc.mainnet.x1.xyz}"
+          python cmis_x1_self_hosted_block_pubsub_probe.py             --ws-url "$X1_SELF_HOSTED_WS_URL"             --canonical-rpc-url "$canonical"             --notifications-per-session "${{ inputs.notifications_per_session }}"             --maximum-backfill-span 64             --output x1-self-hosted-pubsub-evidence.json
+
+      - name: Assert non-promotion boundary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          data = json.load(open("x1-self-hosted-pubsub-evidence.json", encoding="utf-8"))
+          scope = data["scope"]
+          assert scope["retention_verified"] is False
+          assert scope["archival_completeness_verified"] is False
+          assert scope["market_source_independence_verified"] is False
+          assert scope["cmis_provider_promoted"] is False
+          assert scope["public_service_promoted"] is False
+          assert scope["scout_reliance_promoted"] is False
+          assert scope["execution_authorized"] is False
+          assert data["endpoint_url_redacted"] is True
+          PY
+
+      - name: Upload sanitized PubSub evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-self-hosted-pubsub-evidence-${{ github.run_id }}
+          path: x1-self-hosted-pubsub-evidence.json
+          if-no-files-found: error
+          retention-days: 14
