@@ -121,6 +121,12 @@ from .supply import (
     get_total_supply as get_x1_network_total_supply,
     parse_supply_text,
 )
+from .xdex_price_history_import import (
+    SOURCE as XDEX_VERIFIED_PRICE_HISTORY_SOURCE,
+    USDC_X_MINT,
+    WRAPPED_XNT_MINT,
+    backfill_verified_xdex_usd_price_history,
+)
 from .xdex import (
     PRICE_HISTORY_URL as XDEX_PRICE_HISTORY_URL,
     SWAP_QUOTE_URL as XDEX_SWAP_QUOTE_URL,
@@ -203,6 +209,9 @@ __all__ = [
     "XDEX_NETWORK_X1_MAINNET",
     "XDEX_PRICE_HISTORY_URL",
     "XDEX_SOURCE",
+    "XDEX_VERIFIED_PRICE_HISTORY_SOURCE",
+    "USDC_X_MINT",
+    "WRAPPED_XNT_MINT",
     "XDEX_SWAP_QUOTE_URL",
     "XDEX_TOKEN_PRICE_URL",
     "aggregate_oracle_v2_slots",
@@ -215,6 +224,7 @@ __all__ = [
     "fetch_network_snapshot",
     "fetch_supply",
     "fetch_x1_ninja_pool_trades_raw",
+    "backfill_verified_xdex_usd_price_history",
     "fetch_xdex_price_history",
     "fetch_xdex_swap_quote",
     "fetch_xdex_token_price",
