@@ -17,9 +17,8 @@ DEFAULT_PROFILE_METRICS = (
     "volume",
     "transactions",
     "holders",
-    "supply",
 )
-SUPPORTED_PROFILE_METRICS = frozenset(DEFAULT_PROFILE_METRICS)
+SUPPORTED_PROFILE_METRICS = frozenset((*DEFAULT_PROFILE_METRICS, "supply"))
 
 
 def _number(value: Any) -> Optional[float]:
