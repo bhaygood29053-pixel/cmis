@@ -38,6 +38,12 @@ git pull --ff-only origin main
 sudo systemctl restart cmis-gateway.service
 ```
 
+## Public HTTPS deployment
+
+The systemd service should remain bound to `127.0.0.1:8765` even when CMIS must be reachable by a remote Roberta or GitHub Actions runner. Use the reverse-proxy profile in [`CMIS_PUBLIC_HTTPS.md`](./CMIS_PUBLIC_HTTPS.md) rather than changing the Python service to `0.0.0.0`.
+
+That public profile requires a non-empty `CMIS_API_KEY` in the deployment environment and verifies that unauthenticated capability requests fail with HTTP 401.
+
 ## Local dependency chain
 
 A production-style local stack starts the CMIS and Roberta bridge services before the MoltGrid listener:
