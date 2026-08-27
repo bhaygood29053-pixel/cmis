@@ -13,6 +13,8 @@ class CMISSolanaMarketPairSubjectTests(unittest.TestCase):
                     {
                         "pair_address": "pair-1",
                         "dex_id": "testdex",
+                        "base_token": {"address": base_mint},
+                        "quote_token": {"address": requested_mint},
                         "requested_mint_role": "quote",
                         "price_subject_address": base_mint,
                         "price_is_for_requested_mint": False,
@@ -31,7 +33,7 @@ class CMISSolanaMarketPairSubjectTests(unittest.TestCase):
         self.assertEqual(len(observations), 1)
         observation = observations[0]
         self.assertEqual(observation["base_token_address"], base_mint)
-        self.assertIsNone(observation["quote_token_address"])
+        self.assertEqual(observation["quote_token_address"], requested_mint)
         self.assertEqual(observation["requested_mint_role"], "quote")
         self.assertEqual(observation["price_subject_address"], base_mint)
         self.assertFalse(observation["price_is_for_requested_mint"])
