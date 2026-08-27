@@ -1,0 +1,73 @@
+name: X1 Oracle V2 Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-v2-rpc-probe:
+    name: Read-only Oracle V2 X1 RPC verification
+    if: github.head_ref == 'agent/issue272-oracle-v2-rpc-verification'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run deterministic Oracle V2 probe tests
+        run: |
+          python -m unittest tests.test_x1_oracle_v2_probe -v
+
+      - name: Run live read-only Oracle V2 X1 RPC probe
+        id: live_probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python cmis_x1_oracle_v2_probe.py \
+            --output x1-oracle-v2-evidence.json \
+            | tee x1-oracle-v2-evidence.log
+
+      - name: Upload sanitized Oracle V2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-oracle-v2-evidence-${{ github.run_id }}
+          path: |
+            x1-oracle-v2-evidence.json
+            x1-oracle-v2-evidence.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce live verification result
+        if: steps.live_probe.outcome != 'success'
+        run: |
+          echo "Oracle V2 live X1 RPC contract-shape verification did not pass."
+          exit 1
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1 JSON-RPC getAccountInfo requests only."
+          echo "No transaction construction, signing, broadcasting, custody, or oracle submission."
+          echo "Contract-shape verification does not declare relay-slot freshness or price correctness."
+          echo "Five relay slots are not treated as five independent market sources."
+          echo "No CMIS provider, public service, Scout reliance, or execution authority is promoted."
