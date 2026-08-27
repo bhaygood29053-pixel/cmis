@@ -75,7 +75,7 @@ Recent cleanup is complete:
 - PR #227 — FortiBlox closed/archive candidate research;
 - PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 is the active Solana field-maturity item for bounded observed-pair liquidity and 24h-volume aggregation.
+The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is implemented in PR #307.
 
 ## Roberta dependency/status
 
