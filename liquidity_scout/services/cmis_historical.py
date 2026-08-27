@@ -8,6 +8,10 @@ injected backend and this layer performs no live market collection.
 from collections.abc import Mapping
 from typing import Any, Dict, Optional
 
+from liquidity_scout.providers.x1.onchain_history_coverage import (
+    build_rpc_visible_mint_history_coverage,
+)
+
 from .cmis_contract import ERROR, OK, PARTIAL, UNAVAILABLE, build_service_envelope
 from .historical_compare import (
     build_all_available_history_profile,
@@ -124,6 +128,24 @@ def _sources(
             record["last_observed_at"] = last
         if record not in result:
             result.append(record)
+
+    coverage = comparison.get("coverage")
+    if isinstance(coverage, Mapping):
+        onchain = coverage.get("onchain")
+        if isinstance(onchain, Mapping):
+            onchain_source = _text(onchain.get("source"))
+            if onchain_source:
+                record = {
+                    "source": onchain_source,
+                    "role": "historical_compare.onchain_coverage",
+                    "coverage_scope": onchain.get("coverage_scope"),
+                }
+                if onchain.get("first_available_block") is not None:
+                    record["first_available_block"] = onchain.get(
+                        "first_available_block"
+                    )
+                if record not in result:
+                    result.append(record)
     return result
 
 
@@ -152,6 +174,30 @@ def _warnings(comparison: Mapping[str, Any], confidence: Mapping[str, Any]) -> l
                     "it is not proof of the asset's complete lifetime."
                 ),
             })
+
+        coverage = comparison.get("coverage")
+        if isinstance(coverage, Mapping):
+            onchain = coverage.get("onchain")
+            if isinstance(onchain, Mapping):
+                onchain_reason = _text(onchain.get("reason"))
+                if (
+                    onchain.get("status") != "full"
+                    and onchain_reason
+                    and not any(
+                        item.get("code") == onchain_reason
+                        for item in warnings
+                    )
+                ):
+                    warnings.append({"code": onchain_reason})
+                onchain_limitations = onchain.get("limitations")
+                if isinstance(onchain_limitations, list):
+                    for item in onchain_limitations:
+                        code = _text(item)
+                        if code and not any(
+                            warning.get("code") == code
+                            for warning in warnings
+                        ):
+                            warnings.append({"code": code})
         return warnings
 
     messages = {
@@ -163,6 +209,67 @@ def _warnings(comparison: Mapping[str, Any], confidence: Mapping[str, Any]) -> l
         if checks.get(key) is not True and not any(item.get("code") == key for item in warnings):
             warnings.append({"code": key, "message": message})
     return warnings
+
+
+
+def _attach_x1_all_available_coverage(
+    comparison: Mapping[str, Any],
+    *,
+    rpc_provider: Any,
+    page_size: int,
+    max_signatures: int,
+) -> Dict[str, Any]:
+    result = dict(comparison)
+    asset = result.get("asset")
+    mint = _text(asset.get("mint")) if isinstance(asset, Mapping) else None
+
+    market_coverage = {
+        "status": _text(result.get("status")) or "unavailable",
+        "coverage_scope": result.get("coverage_scope"),
+        "first_verified_observed_at": result.get("first_verified_observed_at"),
+        "last_verified_observed_at": result.get("last_verified_observed_at"),
+        "coverage_seconds": result.get("coverage_seconds"),
+        "full_asset_lifetime_verified": (
+            result.get("full_asset_lifetime_verified") is True
+        ),
+        "continuous_coverage_verified": (
+            result.get("continuous_coverage_verified") is True
+        ),
+    }
+
+    if mint:
+        onchain_coverage = build_rpc_visible_mint_history_coverage(
+            mint,
+            rpc_provider=rpc_provider,
+            page_size=page_size,
+            max_signatures=max_signatures,
+        )
+    else:
+        onchain_coverage = {
+            "chain": "x1",
+            "status": "unavailable",
+            "reason": "historical_asset_mint_unavailable",
+            "coverage_scope": "x1_rpc_visible_mint_address_history",
+            "subject_kind": "mint_address",
+            "mint": None,
+            "source": None,
+            "rpc_visible_mint_history_complete": False,
+            "asset_wide_activity_verified": False,
+            "asset_lifetime_start_verified": False,
+            "full_asset_lifetime_verified": False,
+            "continuous_coverage_verified": False,
+            "archival_completeness_verified": False,
+            "limitations": [
+                "mint_address_required_for_onchain_coverage",
+                "mint_address_history_is_not_asset_wide_transfer_history",
+            ],
+        }
+
+    result["coverage"] = {
+        "market": market_coverage,
+        "onchain": onchain_coverage,
+    }
+    return result
 
 
 def _service_status(comparison: Mapping[str, Any]) -> str:
@@ -189,6 +296,9 @@ def build_historical_compare_response(
     metrics: Any = None,
     gap_threshold_seconds: int = 129600,
     anchor_tolerance_seconds: int = 21600,
+    onchain_coverage_provider: Any = None,
+    onchain_page_size: int = 1000,
+    onchain_max_signatures: int = 5000,
 ) -> Dict[str, Any]:
     """Return deterministic window or all-available history through CMIS."""
 
@@ -284,6 +394,39 @@ def build_historical_compare_response(
             }],
             observed_at=observed_at,
         )
+
+    if comparison is not None and normalized_mode == "all_available" and chain == "x1":
+        try:
+            comparison = _attach_x1_all_available_coverage(
+                comparison,
+                rpc_provider=onchain_coverage_provider,
+                page_size=onchain_page_size,
+                max_signatures=onchain_max_signatures,
+            )
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            comparison = dict(comparison)
+            comparison["coverage"] = {
+                "market": {
+                    "status": _text(comparison.get("status")) or "unavailable",
+                    "coverage_scope": comparison.get("coverage_scope"),
+                    "first_verified_observed_at": comparison.get("first_verified_observed_at"),
+                    "last_verified_observed_at": comparison.get("last_verified_observed_at"),
+                    "full_asset_lifetime_verified": False,
+                    "continuous_coverage_verified": False,
+                },
+                "onchain": {
+                    "chain": "x1",
+                    "status": "unavailable",
+                    "reason": "x1_onchain_coverage_validation_error",
+                    "details": str(exc),
+                    "coverage_scope": "x1_rpc_visible_mint_address_history",
+                    "source": "X1 RPC",
+                    "rpc_visible_mint_history_complete": False,
+                    "asset_wide_activity_verified": False,
+                    "full_asset_lifetime_verified": False,
+                    "archival_completeness_verified": False,
+                },
+            }
 
     if comparison is None:
         return build_service_envelope(
