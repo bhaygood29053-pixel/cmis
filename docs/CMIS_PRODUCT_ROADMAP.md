@@ -34,6 +34,7 @@ Accepted milestones on `main`:
 - **Deterministic direct wallet-relationship evidence with explicit non-ownership semantics: COMPLETE, internal/read-only/non-promoted.**
 - **Deterministic concentration-threshold alert evidence (#263/#264): COMPLETE, internal/read-only/non-promoted.**
 - **CMIS deterministic engineering workflow / three-axis review: ADOPTED and repository-authoritative.**
+- **X1 all-available verified historical profiles and overlapping pair comparison: COMPLETE under `historical_compare` modes in CMIS `1.10.0`.**
 - **CMIS capability contract: `1.9.0`.**
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
@@ -119,7 +120,7 @@ X1 is the mature CMIS surface. Accepted capabilities include, where exact eviden
 - transaction/trade verification tooling;
 - persisted verification evidence;
 - deterministic risk;
-- historical comparison;
+- historical comparison, including explicit-window, all-available verified-observation profiles, and overlapping pair comparison;
 - bounded activity;
 - trade-size analysis;
 - selected exact-route price-impact/fee facts;
@@ -141,6 +142,18 @@ Solana Phase 10 remains a bounded read-only provider/runtime foundation beneath 
 - bounded/partial market/tokenomics/risk/history services.
 
 Solana does not inherit X1 capabilities or promotion state.
+
+## CMIS 1.10.0 historical intelligence extension
+
+The existing `historical_compare` public service now supports:
+
+- `window` — existing explicit 24h / 7d / 30d deterministic metric comparison;
+- `all_available` — one asset summarized across every verified observation currently stored by CMIS;
+- `all_available_pair` — two assets compared only over their overlapping verified CMIS observation window with aligned-anchor tolerance.
+
+The runtime CMIS gateway accumulates verified price, liquidity, 24h volume, 24h transaction count, and holder observations with duplicate throttling. Full-history output includes exact stored start/end times, observation counts, sampled minima/maxima/change, sampled price drawdown, and observed gap diagnostics.
+
+This does **not** close the X1 provider-history gap. The following remain separate open evidence work: complete asset-lifetime provenance, continuous coverage, X1.Ninja OHLCV range/semantic promotion, archival provider completeness, and independent historical redundancy. `full_asset_lifetime_verified=false` and `continuous_coverage_verified=false` remain authoritative unless separate gates prove otherwise.
 
 ## Active X1 provider-gap track — Issue #30
 
