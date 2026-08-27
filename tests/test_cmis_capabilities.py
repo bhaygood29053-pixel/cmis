@@ -96,7 +96,27 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertTrue(history["callable"])
         self.assertIn("verified_current_market_snapshot", history["requirements"])
         self.assertIn(
-            "all_available_mode_uses_cmis_stored_verified_observations_only",
+            "all_available_mode_uses_cmis_stored_verified_observations",
+            history["limitations"],
+        )
+        self.assertIn(
+            "verified_provider_price_backfill_may_extend_price_history",
+            history["limitations"],
+        )
+        self.assertIn(
+            "verified_provider_backfill_is_price_only",
+            history["limitations"],
+        )
+        self.assertIn(
+            "provider_source_independence_not_verified",
+            history["limitations"],
+        )
+        self.assertIn(
+            "provider_archive_completeness_not_verified",
+            history["limitations"],
+        )
+        self.assertIn(
+            "configured_usd_stable_quote_does_not_prove_historical_one_dollar_peg",
             history["limitations"],
         )
         self.assertIn(
