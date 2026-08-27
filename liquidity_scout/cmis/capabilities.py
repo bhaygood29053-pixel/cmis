@@ -23,7 +23,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.9.0"
+CMIS_CONTRACT_VERSION = "1.10.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -120,7 +120,18 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         "asset_lookup": _capability("supported"),
         "market_report": _capability("supported"),
         "rank": _capability("supported"),
-        "historical_compare": _capability("supported"),
+        "historical_compare": _capability(
+            "supported",
+            requirements=("verified_current_market_snapshot",),
+            limitations=(
+                "window_mode_requires_supported_period",
+                "all_available_mode_uses_cmis_stored_verified_observations_only",
+                "all_available_does_not_imply_complete_asset_lifetime",
+                "continuous_historical_coverage_not_implied",
+                "external_ohlcv_or_archive_history_not_promoted_by_this_mode",
+                "pair_mode_requires_compare_asset_and_overlapping_verified_history",
+            ),
+        ),
         "tokenomics": _capability("supported"),
         "risk_check": _capability("supported"),
         "pre_trade_check": _capability(
