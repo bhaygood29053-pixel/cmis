@@ -569,7 +569,14 @@ def backfill_verified_xdex_usd_price_history(
         "candidate_verified_observation_count": len(derived),
         "imported_observation_count": inserted,
         "stored_verified_provider_observation_count": int(
-            summary.get("observation_count") or 0
+            summary.get(
+                "usable_observation_count",
+                summary.get("observation_count") or 0,
+            )
+            or 0
+        ),
+        "conflicting_provider_timestamp_count": int(
+            summary.get("conflicting_timestamp_count") or 0
         ),
         "first_imported_observed_at": summary.get("first_observed_at"),
         "last_imported_observed_at": summary.get("last_observed_at"),
