@@ -16,7 +16,7 @@ Accepted baseline:
 
 - capability schema: `1`
 - global existing-service minimum: `1.8.0`
-- current CMIS contract: `1.10.0`
+- current CMIS contract: `1.11.0`
 - request path: `/v1/cmis`
 - Evidence Receipt schema: `1`
 - Proof Score schema: `1`
@@ -42,6 +42,30 @@ The manifest preserves:
 - missing evidence remains unknown/unavailable rather than fabricated false/zero.
 
 A Scout fails closed if these declarations are missing, malformed, or weakened.
+
+## X1 normalized exact-mint identity — CMIS 1.11.0
+
+The existing X1 `asset_lookup` service now publishes the bounded identity contract:
+
+```text
+identity_contract_version = x1_asset_identity/v1
+exact_mint_normalization = true
+normalized_identity_root = mint
+metaplex_xdex_reconciliation = true
+```
+
+For syntactically valid exact X1 mint addresses, CMIS uses the accepted read-only Token Metadata provider and separately observes any exact-mint XDEX representation. The mint remains the canonical fungible identity root.
+
+Metaplex `name`, `symbol`, and `uri` are on-chain descriptive metadata. XDEX `name` and `symbol` are provider-reported market representation. Agreement does not establish safety, legitimacy, ownership, or project truth.
+
+Deterministic reconciliation states are:
+
+- `metaplex_only` — verified on-chain metadata exists and XDEX has no exact-mint representation;
+- `agreement` — the exact mint exists in both sources and comparable descriptors agree;
+- `descriptor_conflict` — the exact mint is the same but comparable descriptors disagree; service state is partial and the mint is not changed;
+- `metadata_unavailable` — accepted normalized on-chain descriptors are unavailable; any XDEX-only result remains explicitly partial/provider-scoped.
+
+Symbol or name equality never reconciles different mints. URI contents are not verified merely because the URI string is stored on-chain. Metadata update authority/mutability remain separate from SPL mint/freeze authority.
 
 ## Phase 11 `intelligence_foundation`
 
