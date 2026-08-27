@@ -403,6 +403,43 @@ def build_all_available_history_profile(
         )
         for metric in selected
     }
+
+    provider_price_history = {
+        "available": False,
+        "observation_count": 0,
+        "first_observed_at": None,
+        "last_observed_at": None,
+        "last_imported_at": None,
+        "sources": [],
+        "provider_pairs": [],
+        "quote_mints": [],
+    }
+    provider_summary_reader = getattr(
+        history_backend,
+        "verified_price_import_summary",
+        None,
+    )
+    if callable(provider_summary_reader) and mint:
+        candidate = provider_summary_reader(mint)
+        if isinstance(candidate, dict):
+            provider_price_history.update(candidate)
+
+    provider_usable_count = int(
+        provider_price_history.get(
+            "usable_observation_count",
+            provider_price_history.get("observation_count") or 0,
+        )
+        or 0
+    )
+    provider_history_imported = (
+        provider_price_history.get("available") is True
+        and provider_usable_count > 0
+    )
+    if "price" in profiles:
+        profiles["price"]["provider_backfill_observation_count"] = (
+            provider_usable_count
+        )
+        profiles["price"]["provider_history_imported"] = provider_history_imported
     available = [
         item for item in profiles.values()
         if item.get("observation_count", 0) > 0
@@ -450,14 +487,26 @@ def build_all_available_history_profile(
         "asset_lifetime_start_verified": False,
         "full_asset_lifetime_verified": False,
         "continuous_coverage_verified": False,
-        "provider_history_imported": False,
+        "provider_history_imported": provider_history_imported,
+        "provider_price_history": provider_price_history,
         "reason": reason,
         "limitations": [
             "all_available_means_all_verified_observations_currently_stored_by_cmis",
             "asset_creation_or_first_trade_time_not_verified",
             "continuous_historical_coverage_not_verified",
-            "external_ohlcv_or_archive_history_not_promoted_into_this_profile",
-            "sampled_max_drawdown_uses_stored_price_observations_only",
+            *(
+                [
+                    "verified_provider_price_backfill_is_price_only",
+                    "provider_source_independence_not_verified",
+                    "provider_archive_completeness_not_verified",
+                    "configured_usd_stable_quote_does_not_prove_historical_one_dollar_peg",
+                ]
+                if provider_history_imported
+                else [
+                    "external_ohlcv_or_archive_history_not_promoted_into_this_profile"
+                ]
+            ),
+            "sampled_max_drawdown_uses_stored_verified_price_observations_only",
         ],
     }
 
