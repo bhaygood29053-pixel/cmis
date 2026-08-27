@@ -9,6 +9,7 @@ remains authoritative for that higher layer.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import socket
@@ -61,6 +62,25 @@ def _base_url(value: str) -> str:
         raise PreflightError(f"CMIS hostname does not resolve: {hostname}") from exc
     if not resolved:
         raise PreflightError(f"CMIS hostname does not resolve: {hostname}")
+
+    addresses = []
+    for item in resolved:
+        sockaddr = item[4]
+        if not sockaddr:
+            continue
+        try:
+            address = ipaddress.ip_address(sockaddr[0])
+        except ValueError as exc:
+            raise PreflightError(
+                f"CMIS hostname resolved to an invalid address: {sockaddr[0]!r}"
+            ) from exc
+        addresses.append(address)
+    if not addresses or any(not address.is_global for address in addresses):
+        rendered = ", ".join(str(address) for address in addresses) or "none"
+        raise PreflightError(
+            "CMIS public hostname must resolve only to globally routable addresses: "
+            + rendered
+        )
     return text
 
 
@@ -72,6 +92,11 @@ def _read_json(
 ) -> dict[str, Any]:
     try:
         with urlopen(request, timeout=timeout) as response:
+            final_url = str(getattr(response, "geturl", lambda: request.full_url)())
+            if final_url != request.full_url:
+                raise PreflightError(
+                    f"{request.full_url} redirected to {final_url}; redirects are not accepted"
+                )
             status = int(getattr(response, "status", 200))
             body = response.read().decode("utf-8")
     except HTTPError as exc:
@@ -176,7 +201,10 @@ def check_public_deployment(
         raise PreflightError("CMIS Metaplex/XDEX reconciliation is not enabled")
 
     limitations = lookup.get("limitations")
-    if not isinstance(limitations, list):
+    if (
+        not isinstance(limitations, list)
+        or any(not isinstance(item, str) for item in limitations)
+    ):
         raise PreflightError("CMIS X1 asset_lookup limitations are malformed")
     missing = sorted(REQUIRED_IDENTITY_LIMITATIONS - set(limitations))
     if missing:
