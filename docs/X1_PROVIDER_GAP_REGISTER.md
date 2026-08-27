@@ -45,7 +45,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-prom
 | X1-HIST-03 | Direct XDEX chart/history | BLOCKED/PARTIAL | Some field semantics are bounded/verified; remaining pair/volume/history semantics stay unpromoted where not proven. |
 | X1-QUOTE-01 | Direct XDEX read-only quote | PARTIAL | Exact route/config and selected price-impact/slippage parameter semantics are bounded; expected execution slippage/route quality remain unavailable. |
 | X1-STREAM-01 | X1.Ninja real-time trades | PARTIAL / ACCESS DENIED CURRENTLY | Bounded handshake probe completed with HTTP 403/access_denied for current credential. No stream semantics promoted. |
-| X1-STREAM-02 | General chain real-time stream | PARTIAL | Official/self-hosted X1 PubSub is the next bounded candidate; commitment/finality/reconnect/order/duplicate/gap/backfill semantics remain to be validated. |
+| X1-STREAM-02 | General chain real-time stream | PARTIAL / CONTRACT IMPLEMENTED | #301 defines finalized block PubSub acknowledgement/order/duplicate/reconnect/discontinuity/backfill semantics. Live stream verification remains unavailable until an explicit self-hosted WebSocket endpoint is supplied. |
 | X1-XCHECK-01 | Same-fact independent verification | VERIFIED (FRAMEWORK) | Framework is accepted; each fact still requires proven source independence and fact-specific gates. |
 | X1-ORACLE-01 | Oracle V2 on-chain price evidence | CANDIDATE / CURRENTLY STALE | Issue #272. Deployment identity/layout, timestamp unit, and freshness policy are verified. Latest live evidence found all 30 slots stale, so no current-price median is eligible; price correctness/source independence/promotion remain false. Relay redundancy is not source independence. |
 | X1-BRIDGE-01 | Bridge operational state | MISSING | Exact-URL provenance gate exists, but no approved machine-readable operational endpoint is accepted yet. |
@@ -54,7 +54,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-prom
 | X1-BRIDGE-04 | Bridge transfer state / history | MISSING | No accepted authoritative lifecycle source. |
 | X1-BRIDGE-05 | Guardian set / health | PARTIAL | UI concepts exist; machine-readable source/identity/freshness contract remains unproven. |
 | X1-BRIDGE-06 | Bridge-flow / TVL cross-check | CANDIDATE | Independent candidate only until provenance/API semantics are verified. |
-| X1-ALT-01 | Self-hosted X1 read-only node history / streaming redundancy | MISSING / NEXT | Verify the official read-only node configuration and bounded history/PubSub semantics. Treat node redundancy separately from independent market-source evidence. |
+| X1-ALT-01 | Self-hosted X1 read-only node history / streaming redundancy | PARTIAL / IMPLEMENTED CONTRACT | #301 deterministic config/identity/history/PubSub contract and probes exist; live node evidence is still unavailable until explicit endpoint/configuration evidence is supplied. Node redundancy remains separate from independent market-source evidence. |
 | X1-ALT-02 | FortiBlox explorer / RPC ecosystem | ARCHIVED / UNVERIFIED | PR #227 closed as candidate research; no reproducible provider-owned endpoint/response contract is accepted. Reopen only with new exact evidence. |
 
 ## Promotion rules

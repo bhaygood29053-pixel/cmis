@@ -81,6 +81,7 @@ Current provider-gap state:
 - **PR #242 — Warp Bridge proof-origin binding:** closed as not currently verifiable because no exact X1-owned machine-readable read contract was established. No guessed bridge endpoint is accepted.
 - **PR #227 — FortiBlox provider contract research:** closed/archive candidate research. Exact provider-owned Explorer/Nexus endpoint and response contracts remain unverified; no FortiBlox adapter is accepted.
 - **Issue #272 — Oracle V2 read-only X1 price evidence:** structural identity/layout and Unix-ms timestamp semantics are verified, and the explicit current-price freshness policy is now selected/applied. The latest live policy run classified all 30 relay slots stale, so current price use, price correctness, source independence, CMIS-provider promotion, public-service promotion, and Scout reliance remain false. Relay count is not independent-source count.
+- **Issue #301 — self-hosted X1 read-only node history/streaming redundancy:** deterministic contract, RPC probe, PubSub reconnect/backfill probe, focused tests, and opt-in live workflow are implemented on this branch. Live deployment identity/history/streaming evidence remains unavailable until explicit self-hosted endpoint/configuration evidence is supplied. Separate node infrastructure is not independent market-price evidence.
 
 Closed research branches and failed verification attempts do not create provider capability on `main`.
 
