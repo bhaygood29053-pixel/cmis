@@ -66,6 +66,31 @@ def _token_mint(value: Any) -> str | None:
     return _text(value)
 
 
+def _token_identity_values(value: Any) -> set[str]:
+    values = set()
+    if isinstance(value, Mapping):
+        for key in ("mint", "address", "tokenAddress", "id", "symbol", "name"):
+            text = _text(value.get(key))
+            if text:
+                values.add(text.casefold())
+        return values
+    text = _text(value)
+    if text:
+        values.add(text.casefold())
+    return values
+
+
+def _provider_token_scope_matches(
+    provider_value: Any,
+    catalog_value: Any,
+    expected_mint: str,
+) -> bool:
+    catalog_values = _token_identity_values(catalog_value)
+    catalog_values.add(expected_mint.casefold())
+    provider_values = _token_identity_values(provider_value)
+    return bool(provider_values and catalog_values & provider_values)
+
+
 def _pool_address(pool: Mapping[str, Any]) -> str | None:
     for key in ("address", "poolAddress", "pool_address", "id"):
         text = _text(pool.get(key))
@@ -171,6 +196,7 @@ def _normalized_xdex_bars(
 def _ninja_pair_scope(
     observation: Any,
     *,
+    pool: Mapping[str, Any],
     pool_address: str,
     base_mint: str,
     quote_mint: str,
@@ -196,9 +222,17 @@ def _ninja_pair_scope(
         return None
     if body.get("poolAddress") != pool_address:
         return None
-    if _token_mint(body.get("baseToken")) != base_mint:
+    if not _provider_token_scope_matches(
+        body.get("baseToken"),
+        pool.get("baseToken"),
+        base_mint,
+    ):
         return None
-    if _token_mint(body.get("quoteToken")) != quote_mint:
+    if not _provider_token_scope_matches(
+        body.get("quoteToken"),
+        pool.get("quoteToken"),
+        quote_mint,
+    ):
         return None
 
     candles = body.get("ohlcv")
@@ -266,6 +300,7 @@ def _cross_verified_pair_closes(
 
     scope = _ninja_pair_scope(
         ninja,
+        pool=pool,
         pool_address=pool_address,
         base_mint=base_mint,
         quote_mint=quote_mint,
