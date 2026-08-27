@@ -68,12 +68,20 @@ def _warnings(report: Mapping[str, Any]) -> list:
     warnings = []
     for key in _COMPLETENESS_KEYS:
         if completeness.get(key) is not True:
-            warnings.append({
-                "code": f"{key}_incomplete",
-                "message": (
+            if key == "holders":
+                message = (
+                    "Provider holder-looking values are preserved as unverified observations; "
+                    "counted-entity, asset-binding, uniqueness, coverage, and beneficial-owner "
+                    "semantics are not verified."
+                )
+            else:
+                message = (
                     f"Market report {key.replace('_', ' ')} is missing, malformed, "
                     "conflicting, or only partially covered."
-                ),
+                )
+            warnings.append({
+                "code": f"{key}_incomplete",
+                "message": message,
             })
 
     if report.get("market_cap_usd_reported") is not None and report.get("market_cap_verified") is not True:
