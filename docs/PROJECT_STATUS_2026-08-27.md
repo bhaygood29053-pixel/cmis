@@ -75,7 +75,7 @@ Recent cleanup is complete:
 - PR #227 — FortiBlox closed/archive candidate research;
 - PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 is now the active X1 provider-gap correction for holder semantics.
+The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is implemented in PR #307.
 
 ## Roberta dependency/status
 
@@ -87,11 +87,11 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ## Roadmap now
 
-### 1. Correct X1 holder semantics
+### 1. Mature Solana observed-pair market fields
 
-- preserve X1.Ninja holder-looking values only as provider-reported observations until counted-entity and coverage semantics are proven;
-- keep official X1 RPC token-account counts and unique token-account-authority counts explicitly distinct;
-- do not relabel token accounts, authority addresses, wallets, or beneficial owners as equivalent entities.
+- aggregate liquidity and 24h volume only across exact eligible unique DEX Screener pairs observed for the verified mint;
+- expose the result only as an observed-pair aggregate with explicit #LPs;
+- keep pair-universe completeness, Solana-wide liquidity/volume verification, and source independence false until separately proven.
 
 ### 2. Continue evidence-depth work
 
