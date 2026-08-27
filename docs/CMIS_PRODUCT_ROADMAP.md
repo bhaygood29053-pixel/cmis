@@ -285,7 +285,7 @@ Near-term provider-gap priorities:
 - holder-semantics/completeness correction #304 is complete via PR #305 without relabeling token accounts/authorities as holders or beneficial owners;
 - Official X1 RPC remains the selected production RPC path; self-hosted redundancy is optional/deferred and does not establish market-source independence;
 - historical redundancy/source-independence remains a future evidence-depth option rather than a blocker;
-- #306 is the active Solana field-maturity tracer bullet: observed eligible-pair liquidity/24h-volume aggregation with pair-universe completeness explicitly unverified;
+- #306 observed eligible-pair liquidity/24h-volume aggregation is implemented in PR #307 with pair-universe completeness explicitly unverified;
 - Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
 ### Verified Intelligence
@@ -339,7 +339,7 @@ Current implementation sequence:
 13. reconcile provider-gap and Oracle status after #298/#299 and close completed timestamp-governance issues;
 14. retain #301 self-hosted-node verification as optional/deferred infrastructure after selecting Official X1 RPC as the production path;
 15. correct holder/token-account/authority semantics under #304 without beneficial-owner overclaim — complete via PR #305;
-16. aggregate Solana observed eligible-pair liquidity/24h volume under #306 while preserving incomplete pair-universe scope;
+16. aggregate Solana observed eligible-pair liquidity/24h volume under #306 while preserving incomplete pair-universe scope — implemented in PR #307;
 17. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
 
 Future candidates — **not active milestones until separately accepted**:
