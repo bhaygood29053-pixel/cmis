@@ -1,6 +1,6 @@
 # X1 Provider Source Research
 
-Research date: **2026-08-16**
+Research dates: **2026-08-16** (original provider research); **2026-08-26** (Oracle V2 supplemental research)
 
 This document records public-source findings relevant to current X1 Provider gaps beneath CMIS. It supports `docs/X1_PROVIDER_GAP_REGISTER.md` and future deterministic provider integration work.
 
