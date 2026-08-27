@@ -91,7 +91,7 @@ Where exact contracts permit, accepted X1 building blocks include identity/suppl
 
 Scope remains explicit. Program-, pool-, route-, provider-, token-account-, or sample-scoped evidence is not silently widened to asset/global truth.
 
-Current provider-gap work remains non-promotional. Issue #30 is still open; draft PR #242 (Warp Bridge provenance), draft PR #229 (X1Scroll authenticated RPC access), and candidate-research PR #227 (FortiBlox) are not accepted provider capability by virtue of existing as branches.
+Current provider-gap work remains non-promotional. Issue #30 is still open. PR #242 (Warp Bridge) and PR #227 (FortiBlox) are closed as not currently verifiable/candidate research. PR #229 is closed and X1Scroll is removed from CMIS integration scope because the required API key was unavailable and no credential-backed provider request could be executed. No X1Scroll provider module or live workflow is accepted on `main`.
 
 ## Solana boundary
 

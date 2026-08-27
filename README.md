@@ -55,7 +55,7 @@ Accepted on `main`:
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
 - **CMIS capability contract:** `1.12.0`.
-- **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics verified under bounded evidence contracts; current freshness policy/current-price authority remain unpromoted.
+- **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
 - **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main` via PR #228; its post-merge source/roadmap state is synchronized through Roberta PR #231.
@@ -75,14 +75,14 @@ The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUC
 
 Issue #30 remains the parallel read-only/fail-closed X1 provider-gap track.
 
-Current open branches include:
+Current provider-gap state:
 
-- **PR #242 — Warp Bridge proof-origin binding:** draft/open. It hardens provenance eligibility for any future machine-readable bridge read contract; it does **not** approve `bridge-api.x1.xyz`, guess paths, prepare transfers, or promote bridge capability.
-- **PR #229 — X1Scroll RPC access contract refresh:** draft/open. It defines a bounded authenticated `getHealth`/`getSlot` access classifier but does not claim live provider access until the required credential-backed probe is run and accepted.
-- **PR #227 — FortiBlox provider contract research:** open/candidate research only. Exact Explorer REST and current Nexus RPC contracts remain unverified; no FortiBlox adapter or CMIS promotion is accepted.
-- **Issue #272 — Oracle V2 read-only X1 price evidence:** structural verification has advanced. CMIS has verified the declared X1 program/state contract shape and promoted Unix-ms timestamp semantics under a bounded evidence policy. Current slot ages are measurable, but no production freshness policy is selected, current price use is unauthorized, source independence/price correctness remain unverified, and CMIS/public/Scout promotion remain false. Relay count is not treated as independent-source count.
+- **X1Scroll — removed from CMIS integration scope.** PR #229 is closed. The credential-backed verification workflow failed at the missing `X1SCROLL_API_KEY` repository-secret gate before any provider request was sent. No X1Scroll provider module or live workflow exists on `main`, and X1Scroll is no longer an active provider candidate. Reconsideration requires a new explicit verification issue with reproducible access evidence.
+- **PR #242 — Warp Bridge proof-origin binding:** closed as not currently verifiable because no exact X1-owned machine-readable read contract was established. No guessed bridge endpoint is accepted.
+- **PR #227 — FortiBlox provider contract research:** closed/archive candidate research. Exact provider-owned Explorer/Nexus endpoint and response contracts remain unverified; no FortiBlox adapter is accepted.
+- **Issue #272 — Oracle V2 read-only X1 price evidence:** structural identity/layout and Unix-ms timestamp semantics are verified, and the explicit current-price freshness policy is now selected/applied. The latest live policy run classified all 30 relay slots stale, so current price use, price correctness, source independence, CMIS-provider promotion, public-service promotion, and Scout reliance remain false. Relay count is not independent-source count.
 
-These branches are discovery/provenance work only. Open/mergeable status does not make their provider evidence accepted on `main`.
+Closed research branches and failed verification attempts do not create provider capability on `main`.
 
 Other current X1 provider-gap observations remain non-promotional:
 
