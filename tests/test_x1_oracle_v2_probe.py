@@ -134,7 +134,13 @@ class OracleV2ProbeTests(unittest.TestCase):
         self.assertTrue(all(result["checks"].values()))
         self.assertEqual(result["summary"]["total_slots"], 30)
         self.assertEqual(result["summary"]["nonzero_price_slots"], 30)
+        self.assertEqual(
+            result["summary"]["structurally_valid_slots_before_freshness"],
+            30,
+        )
+        self.assertEqual(result["summary"]["cmis_price_eligible_slots"], 0)
         self.assertFalse(result["summary"]["freshness_policy_applied"])
+        self.assertFalse(result["summary"]["current_price_use_authorized"])
         self.assertFalse(result["summary"]["source_independence_verified"])
         self.assertFalse(result["promotion"]["cmis_promotable"])
         self.assertFalse(result["promotion"]["execution_authorized"])
@@ -159,9 +165,15 @@ class OracleV2ProbeTests(unittest.TestCase):
 
         first = result["slot_observations"][0]
         self.assertTrue(first["zero_price"])
+        self.assertFalse(first["structurally_valid_before_freshness"])
         self.assertFalse(first["cmis_price_eligible"])
+        self.assertEqual(
+            first["cmis_price_eligibility_reason"],
+            "nonpositive_price_or_timestamp",
+        )
         self.assertEqual(first["freshness_classification"], "not_applied")
         self.assertEqual(result["summary"]["nonzero_price_slots"], 29)
+        self.assertEqual(result["summary"]["cmis_price_eligible_slots"], 0)
 
 
 if __name__ == "__main__":
