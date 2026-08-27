@@ -23,6 +23,13 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
 
+from dotenv import load_dotenv
+
+# Load repository/deployment .env explicitly for transport-owned settings such
+# as CMIS_API_KEY. Existing process environment variables remain authoritative
+# because python-dotenv does not override them by default.
+load_dotenv()
+
 from .capabilities import build_capability_manifest
 from .gateway import KNOWN_CHAINS, SUPPORTED_CHAINS
 from .runtime_gateway import SUPPORTED_SERVICES, RuntimeCMISGateway
