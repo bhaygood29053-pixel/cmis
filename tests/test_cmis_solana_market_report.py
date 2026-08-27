@@ -228,6 +228,8 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertEqual(response["data"]["#LPs"], 2)
         self.assertEqual(response["data"]["observed_pair_liquidity_usd"], "3000")
         self.assertEqual(response["data"]["observed_pair_volume_24h_usd"], "750")
+        self.assertNotIn("liquidity_usd", response["data"])
+        self.assertNotIn("volume_24h_usd", response["data"])
         aggregate = response["data"]["observed_pair_aggregation"]
         self.assertTrue(aggregate["pair_identity_deduplicated"])
         self.assertTrue(aggregate["liquidity_rows_complete"])
