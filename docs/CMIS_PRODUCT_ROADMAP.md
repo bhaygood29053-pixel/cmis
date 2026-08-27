@@ -35,7 +35,8 @@ Accepted milestones on `main`:
 - **Deterministic concentration-threshold alert evidence (#263/#264): COMPLETE, internal/read-only/non-promoted.**
 - **CMIS deterministic engineering workflow / three-axis review: ADOPTED and repository-authoritative.**
 - **X1 all-available verified historical profiles and overlapping pair comparison: COMPLETE under `historical_compare` modes in CMIS `1.10.0`.**
-- **CMIS capability contract: `1.9.0`.**
+- **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
+- **CMIS capability contract: `1.11.0`.**
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
 - **Roberta autonomous Learning Plane upstream dependency: ACCEPTED on Roberta `main` via PR #228; post-merge Roberta source/roadmap reconciliation is accepted via PR #231.**
@@ -115,6 +116,7 @@ They do not change the capability manifest and do not grant Roberta or a Chain S
 X1 is the mature CMIS surface. Accepted capabilities include, where exact evidence contracts permit:
 
 - asset/pool identity;
+- exact-mint X1 identity normalization using verified Metaplex Token Metadata plus separately preserved exact-mint XDEX market representation under `x1_asset_identity/v1`;
 - market reporting/ranking;
 - tokenomics/authority evidence;
 - transaction/trade verification tooling;
@@ -125,6 +127,8 @@ X1 is the mature CMIS surface. Accepted capabilities include, where exact eviden
 - trade-size analysis;
 - selected exact-route price-impact/fee facts;
 - fail-closed quote/history semantic gates.
+
+For fungible X1 tokens, exact mint remains the canonical identity root. Metaplex name/symbol/URI are descriptive on-chain metadata; XDEX name/symbol are provider market representation. Agreement does not establish legitimacy or safety, different mints are never reconciled by labels, and provider outage remains distinct from proven absence.
 
 Program-, pool-, route-, provider-, token-account-, or sample-scoped evidence remains distinct from asset-wide/global truth.
 
@@ -153,7 +157,9 @@ The existing `historical_compare` public service now supports:
 
 The runtime CMIS gateway accumulates verified price, liquidity, 24h volume, 24h transaction count, and holder observations with duplicate throttling. Full-history output includes exact stored start/end times, observation counts, sampled minima/maxima/change, sampled price drawdown, and observed gap diagnostics.
 
-This does **not** close the X1 provider-history gap. Complete asset-lifetime provenance, continuous coverage, X1.Ninja OHLCV range/semantic promotion, archival provider completeness, and independent historical redundancy remain separate open evidence work. `full_asset_lifetime_verified=false` and `continuous_coverage_verified=false` remain authoritative unless separate gates prove otherwise.
+A bounded verified-provider price backfill may now extend the stored price series. CMIS accepts only XDEX historical close observations that match the exact provider pair/time scope and cross-check against the corresponding X1.Ninja OHLCV close. Direct configured USD-stable quote pools are preferred; an asset/XNT plus XNT/USD-stable two-leg path is allowed only when both legs pass the same checks. Imported observations retain source, pair, quote-unit, and evidence metadata in a dedicated store; conflicting same-timestamp provider prices fail closed.
+
+This remains **partial provider-history coverage**, not complete lifetime history. Liquidity and volume history are not imported. Provider source independence, archive/range completeness, continuous coverage, and historical stable-quote one-dollar behavior remain unverified. `full_asset_lifetime_verified=false` and `continuous_coverage_verified=false` remain authoritative unless separate gates prove otherwise.
 
 ## Active X1 provider-gap track — Issue #30
 
