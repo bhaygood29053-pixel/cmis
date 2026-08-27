@@ -242,6 +242,101 @@ class CMISGatewayTests(unittest.TestCase):
             "invalid_historical_tolerance",
         )
 
+
+    def test_all_available_attempts_bounded_verified_provider_price_backfill(self):
+        expected = build_service_envelope(
+            "historical_compare",
+            "x1",
+            "partial",
+            data={"mode": "all_available"},
+        )
+        backfill_result = {
+            "status": "partial",
+            "reason": "verified_provider_price_history_backfilled",
+            "provider_history_imported": True,
+            "imported_observation_count": 3,
+        }
+
+        with patch(
+            "liquidity_scout.cmis.gateway.time.time",
+            return_value=1_000_000,
+        ), patch(
+            "liquidity_scout.cmis.gateway.backfill_verified_xdex_usd_price_history",
+            return_value=backfill_result,
+        ) as backfill, patch(
+            "liquidity_scout.cmis.gateway.build_historical_compare_response",
+            return_value=expected,
+        ):
+            response = self.gateway.dispatch({
+                "service": "historical_compare",
+                "chain": "x1",
+                "asset": "AGI",
+                "params": {
+                    "mode": "all_available",
+                    "provider_history_lookback_days": 10,
+                    "provider_history_min_refresh_seconds": 0,
+                    "provider_history_rel_tolerance": 0.01,
+                },
+            })
+
+        backfill.assert_called_once()
+        args, kwargs = backfill.call_args
+        self.assertEqual(args[0], "MINT_AGI")
+        self.assertEqual(args[1], "AGI")
+        self.assertEqual(kwargs["catalog_pools"], self.provider.pools)
+        self.assertIs(kwargs["history_backend"], self.gateway.history_backend)
+        self.assertEqual(kwargs["time_from"], 136000)
+        self.assertEqual(kwargs["time_to"], 1_000_000)
+        self.assertEqual(kwargs["rel_tolerance"], 0.01)
+        self.assertEqual(kwargs["imported_at"], 1_000_000)
+        self.assertEqual(
+            response["data"]["provider_history_backfill"],
+            backfill_result,
+        )
+
+    def test_all_available_provider_backfill_can_be_explicitly_disabled(self):
+        expected = build_service_envelope(
+            "historical_compare",
+            "x1",
+            "partial",
+            data={"mode": "all_available"},
+        )
+        with patch(
+            "liquidity_scout.cmis.gateway.backfill_verified_xdex_usd_price_history",
+        ) as backfill, patch(
+            "liquidity_scout.cmis.gateway.build_historical_compare_response",
+            return_value=expected,
+        ):
+            response = self.gateway.dispatch({
+                "service": "historical_compare",
+                "chain": "x1",
+                "asset": "AGI",
+                "params": {
+                    "mode": "all_available",
+                    "provider_history_backfill": False,
+                },
+            })
+
+        backfill.assert_not_called()
+        self.assertNotIn("provider_history_backfill", response["data"])
+
+    def test_all_available_validates_provider_backfill_bounds(self):
+        response = self.gateway.dispatch({
+            "service": "historical_compare",
+            "chain": "x1",
+            "asset": "AGI",
+            "params": {
+                "mode": "all_available",
+                "provider_history_lookback_days": 0,
+            },
+        })
+
+        self.assertEqual(response["status"], "error")
+        self.assertEqual(
+            response["errors"][0]["code"],
+            "invalid_historical_tolerance",
+        )
+
     def test_all_available_pair_requires_compare_asset(self):
         response = self.gateway.dispatch({
             "service": "historical_compare",
