@@ -63,8 +63,10 @@ def evaluate_current_oracle_v2_freshness(
     observed_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Evaluate current Oracle V2 slots with verified timestamp semantics."""
-    observed_at = observed_at or datetime.now(timezone.utc)
-    observed_at_ms = _utc_unix_ms(observed_at)
+    explicit_observed_at = observed_at is not None
+    if explicit_observed_at:
+        # Validate deterministic test/caller injection before any RPC work.
+        _utc_unix_ms(observed_at)
 
     timestamp_unit_evidence = accepted_oracle_v2_timestamp_unit_evidence()
     policy = normalize_oracle_v2_freshness_policy(freshness_policy)
@@ -72,8 +74,15 @@ def evaluate_current_oracle_v2_freshness(
     structural = probe_oracle_v2(
         rpc_url=rpc_url,
         rpc_provider=rpc_provider,
-        observed_at=observed_at,
+        observed_at=observed_at if explicit_observed_at else None,
     )
+
+    # For live evaluation, capture the observation clock only after the state
+    # RPC read completes. Otherwise an Oracle update landing during the read
+    # could be compared against a pre-read clock and appear spuriously future.
+    if not explicit_observed_at:
+        observed_at = datetime.now(timezone.utc)
+    observed_at_ms = _utc_unix_ms(observed_at)
 
     if structural.get("status") != "verified_contract_shape":
         return {
@@ -96,6 +105,7 @@ def evaluate_current_oracle_v2_freshness(
             "public_service_promoted": False,
             "scout_reliance_promoted": False,
             "source_independence_verified": False,
+            "price_correctness_verified": False,
             "execution_authorized": False,
             "warnings": [],
             "errors": ["oracle_contract_shape_not_verified"],
@@ -190,6 +200,11 @@ def evaluate_current_oracle_v2_freshness(
         "reason": reason,
         "observed_at": observed_at.isoformat(),
         "observed_at_ms": observed_at_ms,
+        "observation_clock_source": (
+            "explicit_injected"
+            if explicit_observed_at
+            else "post_rpc_runtime"
+        ),
         "timestamp_unit_evidence": timestamp_unit_evidence,
         "timestamp_unit_verified": True,
         "freshness_policy": policy,
