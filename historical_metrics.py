@@ -1,3 +1,5 @@
+import json
+import math
 import os
 import re
 import sqlite3
@@ -206,6 +208,27 @@ def open_db():
         ON snapshots (mint, ts)
     """)
 
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS verified_price_observations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mint TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            ts INTEGER NOT NULL,
+            price_usd REAL NOT NULL,
+            source TEXT NOT NULL,
+            provider_pair TEXT NOT NULL,
+            quote_mint TEXT NOT NULL,
+            quote_unit TEXT NOT NULL,
+            evidence_json TEXT NOT NULL,
+            imported_at INTEGER NOT NULL,
+            UNIQUE (mint, ts, source, provider_pair)
+        )
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_verified_price_mint_ts
+        ON verified_price_observations (mint, ts)
+    """)
+
     db.commit()
     return db
 
@@ -261,6 +284,190 @@ def record_snapshot(
     db.close()
 
 
+def record_verified_price_observation(
+    *,
+    mint,
+    symbol,
+    timestamp,
+    price_usd,
+    source,
+    provider_pair,
+    quote_mint,
+    quote_unit="configured_usd_stable",
+    evidence=None,
+    imported_at=None,
+):
+    """Persist one externally backfilled USD price with explicit provenance.
+
+    This table is intentionally separate from current CMIS snapshots. Imported
+    provider history must never lose its source/evidence boundary merely because
+    historical consumers read it through the shared price metric.
+    """
+
+    mint = str(mint or "").strip()
+    symbol = str(symbol or "").strip() or "Unknown"
+    source = str(source or "").strip()
+    provider_pair = str(provider_pair or "").strip()
+    quote_mint = str(quote_mint or "").strip()
+    quote_unit = str(quote_unit or "").strip()
+    if not all((mint, source, provider_pair, quote_mint, quote_unit)):
+        raise ValueError(
+            "mint, source, provider_pair, quote_mint, and quote_unit are required"
+        )
+
+    if isinstance(timestamp, bool):
+        raise ValueError("timestamp must be a non-negative integer")
+    try:
+        ts = int(timestamp)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("timestamp must be a non-negative integer") from exc
+    if ts < 0:
+        raise ValueError("timestamp must be a non-negative integer")
+
+    if isinstance(price_usd, bool):
+        raise ValueError("price_usd must be a positive finite number")
+    try:
+        price = float(price_usd)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("price_usd must be a positive finite number") from exc
+    if not math.isfinite(price) or price <= 0:
+        raise ValueError("price_usd must be a positive finite number")
+
+    imported = int(time.time()) if imported_at is None else int(imported_at)
+    if imported < 0:
+        raise ValueError("imported_at must be non-negative")
+
+    payload = evidence if isinstance(evidence, dict) else {}
+    evidence_json = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    db = open_db()
+    cursor = db.execute(
+        """
+        INSERT OR IGNORE INTO verified_price_observations (
+            mint,
+            symbol,
+            ts,
+            price_usd,
+            source,
+            provider_pair,
+            quote_mint,
+            quote_unit,
+            evidence_json,
+            imported_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            mint,
+            symbol,
+            ts,
+            price,
+            source,
+            provider_pair,
+            quote_mint,
+            quote_unit,
+            evidence_json,
+            imported,
+        ),
+    )
+    inserted = cursor.rowcount > 0
+    db.commit()
+    db.close()
+    return inserted
+
+
+def verified_price_observations(mint, *, start_ts=None, end_ts=None):
+    """Return verified provider-price rows with provenance intact."""
+
+    clauses = ["mint = ?"]
+    params = [mint]
+    if start_ts is not None:
+        clauses.append("ts >= ?")
+        params.append(int(start_ts))
+    if end_ts is not None:
+        clauses.append("ts <= ?")
+        params.append(int(end_ts))
+
+    db = open_db()
+    rows = db.execute(
+        f"""
+        SELECT
+            ts,
+            price_usd,
+            source,
+            provider_pair,
+            quote_mint,
+            quote_unit,
+            evidence_json,
+            imported_at
+        FROM verified_price_observations
+        WHERE {" AND ".join(clauses)}
+        ORDER BY ts ASC, id ASC
+        """,
+        tuple(params),
+    ).fetchall()
+    db.close()
+
+    result = []
+    for (
+        ts,
+        price_usd,
+        source,
+        provider_pair,
+        quote_mint,
+        quote_unit,
+        evidence_json,
+        imported_at,
+    ) in rows:
+        try:
+            evidence = json.loads(evidence_json or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            evidence = {}
+        result.append({
+            "timestamp": int(ts),
+            "value": float(price_usd),
+            "source": source,
+            "provider_pair": provider_pair,
+            "quote_mint": quote_mint,
+            "quote_unit": quote_unit,
+            "evidence": evidence if isinstance(evidence, dict) else {},
+            "imported_at": int(imported_at),
+        })
+    return result
+
+
+def verified_price_import_summary(mint):
+    """Return bounded provenance/coverage metadata for imported price rows."""
+
+    rows = verified_price_observations(mint)
+    if not rows:
+        return {
+            "available": False,
+            "observation_count": 0,
+            "first_observed_at": None,
+            "last_observed_at": None,
+            "last_imported_at": None,
+            "sources": [],
+            "provider_pairs": [],
+            "quote_mints": [],
+        }
+
+    return {
+        "available": True,
+        "observation_count": len(rows),
+        "first_observed_at": rows[0]["timestamp"],
+        "last_observed_at": rows[-1]["timestamp"],
+        "last_imported_at": max(row["imported_at"] for row in rows),
+        "sources": sorted({row["source"] for row in rows}),
+        "provider_pairs": sorted({row["provider_pair"] for row in rows}),
+        "quote_mints": sorted({row["quote_mint"] for row in rows}),
+    }
+
+
 def earliest_snapshot_time(mint):
     db = open_db()
 
@@ -288,38 +495,18 @@ def historical_value(mint, metric, period_seconds):
         return None
 
     target = int(time.time()) - period_seconds
-
-    db = open_db()
-
-    row = db.execute(
-        f"""
-        SELECT ts, {column}
-        FROM snapshots
-        WHERE mint = ?
-          AND {column} IS NOT NULL
-        ORDER BY ABS(ts - ?) ASC
-        LIMIT 1
-        """,
-        (mint, target),
-    ).fetchone()
-
-    db.close()
-
-    if not row:
+    point = historical_value_at(
+        mint,
+        metric,
+        target,
+        tolerance_seconds=6 * 3600,
+    )
+    if not isinstance(point, dict):
         return None
-
-    ts, value = row
-
-    # Historical point must be reasonably close to target.
-    # 6-hour tolerance keeps 24h/7d/30d comparisons honest.
-    if abs(int(ts) - target) > 6 * 3600:
-        return None
-
     return {
-        "timestamp": int(ts),
-        "value": float(value),
+        "timestamp": point["timestamp"],
+        "value": point["value"],
     }
-
 
 
 def latest_snapshot_time(mint):
@@ -387,7 +574,12 @@ def record_snapshot_if_due(
 
 
 def historical_series(mint, metric, *, start_ts=None, end_ts=None):
-    """Return every locally stored verified observation for one metric."""
+    """Return every locally stored verified observation for one metric.
+
+    For price this merges current CMIS snapshot prices with explicitly verified
+    provider-price backfill rows. Provider provenance remains stored in the
+    dedicated table and is available through verified_price_observations.
+    """
 
     column = METRIC_COLUMNS.get(metric)
     if not column:
@@ -415,49 +607,53 @@ def historical_series(mint, metric, *, start_ts=None, end_ts=None):
     ).fetchall()
     db.close()
 
+    merged = {}
+    if metric == "price":
+        for item in verified_price_observations(
+            mint,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        ):
+            merged[int(item["timestamp"])] = float(item["value"])
+
+    for ts, value in rows:
+        if value is not None:
+            merged[int(ts)] = float(value)
+
     return [
-        {"timestamp": int(ts), "value": float(value)}
-        for ts, value in rows
-        if value is not None
+        {"timestamp": ts, "value": merged[ts]}
+        for ts in sorted(merged)
     ]
 
 
 def historical_value_at(mint, metric, target_timestamp, *, tolerance_seconds=21600):
-    """Return the closest stored observation to an explicit target time."""
+    """Return the closest verified observation to an explicit target time."""
 
-    column = METRIC_COLUMNS.get(metric)
-    if not column or target_timestamp is None:
+    if metric not in METRIC_COLUMNS or target_timestamp is None:
         return None
 
     target = int(target_timestamp)
     tolerance = max(0, int(tolerance_seconds))
-
-    db = open_db()
-    row = db.execute(
-        f"""
-        SELECT ts, {column}
-        FROM snapshots
-        WHERE mint = ?
-          AND {column} IS NOT NULL
-        ORDER BY ABS(ts - ?) ASC, ts ASC
-        LIMIT 1
-        """,
-        (mint, target),
-    ).fetchone()
-    db.close()
-
-    if not row:
+    rows = historical_series(mint, metric)
+    if not rows:
         return None
 
-    ts, value = row
-    if abs(int(ts) - target) > tolerance:
+    row = min(
+        rows,
+        key=lambda item: (
+            abs(int(item["timestamp"]) - target),
+            int(item["timestamp"]),
+        ),
+    )
+    distance = abs(int(row["timestamp"]) - target)
+    if distance > tolerance:
         return None
 
     return {
-        "timestamp": int(ts),
-        "value": float(value),
+        "timestamp": int(row["timestamp"]),
+        "value": float(row["value"]),
         "target_timestamp": target,
-        "distance_seconds": abs(int(ts) - target),
+        "distance_seconds": distance,
     }
 
 
