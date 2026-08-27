@@ -584,13 +584,12 @@ def evaluate_oracle_v2_timestamp_unit_promotion(
         status = "unavailable"
         reason = "timestamp_unit_promotion_gates_not_satisfied"
 
-    evidence_core = {
-        "source": evidence.get("source"),
-        "contract": evidence.get("contract"),
-        "oracle_key_evidence": evidence.get("oracle_key_evidence"),
-        "samples": sample_evaluations,
-    }
-    evidence_sha256 = _sha256_json(evidence_core)
+    # Bind provenance to the canonical raw evidence input, not the reduced
+    # sample evaluations. Proof-bearing fields such as transaction slot,
+    # instruction indexes, signed-message/signature hashes, and the presence
+    # or absence of reported correlation values must remain distinguishable
+    # to later Evidence Receipts.
+    evidence_sha256 = _sha256_json(evidence)
 
     provenance = (
         "oracle_v2_timestamp_unit_promotion_governance/v1;"
