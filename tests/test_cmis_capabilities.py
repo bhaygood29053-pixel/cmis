@@ -36,7 +36,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.10.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.11.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -49,6 +49,36 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertIn(CONCENTRATION_INTELLIGENCE_SERVICE, SUPPORTED_SERVICES)
         self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
         self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])
+
+    def test_x1_asset_lookup_advertises_normalized_identity_contract(self):
+        manifest = build_capability_manifest(
+            runtime_services=SUPPORTED_SERVICES,
+            legacy_supported_chains=SUPPORTED_CHAINS,
+            known_chains=KNOWN_CHAINS,
+        )
+        lookup = service_capability(
+            manifest,
+            chain="x1",
+            service="asset_lookup",
+        )
+
+        self.assertEqual(lookup["state"], "supported")
+        self.assertTrue(lookup["callable"])
+        self.assertEqual(
+            lookup["identity_contract_version"],
+            "x1_asset_identity/v1",
+        )
+        self.assertTrue(lookup["exact_mint_normalization"])
+        self.assertEqual(lookup["normalized_identity_root"], "mint")
+        self.assertTrue(lookup["metaplex_xdex_reconciliation"])
+        self.assertIn(
+            "same_mint_descriptor_conflicts_return_partial",
+            lookup["limitations"],
+        )
+        self.assertIn(
+            "symbol_or_name_never_reconciles_different_mints",
+            lookup["limitations"],
+        )
 
     def test_x1_historical_compare_advertises_all_available_boundary(self):
         manifest = build_capability_manifest(
