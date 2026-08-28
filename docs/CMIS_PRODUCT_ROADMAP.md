@@ -286,7 +286,9 @@ Near-term provider-gap priorities:
 - Official X1 RPC remains the selected production RPC path; self-hosted redundancy is optional/deferred and does not establish market-source independence;
 - historical redundancy/source-independence remains a future evidence-depth option rather than a blocker;
 - #306 observed eligible-pair liquidity/24h-volume aggregation is complete via PR #307 with pair-universe completeness explicitly unverified;
-- #308 Solana market observation freshness semantics is implemented in PR #310: Jupiter blockId may be anchored to canonical Solana block time, while DEX Screener market-fact time and shared cross-source freshness remain unavailable;
+- #308 Solana market observation freshness semantics is complete via PR #310: Jupiter blockId may be anchored to canonical Solana block time;
+- #311 Solana Jupiter current-price freshness policy is implemented in PR #312 with explicit CMIS operator bounds of 60 seconds max age and 5 seconds future skew; DEX Screener fact-time, shared cross-source time identity, current-price promotion, and source independence remain false;
+- the next Solana gate is verification of a timestamped secondary price source with compatible exact mint/unit/time semantics;
 - Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
 ### Verified Intelligence
@@ -341,16 +343,18 @@ Current implementation sequence:
 14. retain #301 self-hosted-node verification as optional/deferred infrastructure after selecting Official X1 RPC as the production path;
 15. correct holder/token-account/authority semantics under #304 without beneficial-owner overclaim — complete via PR #305;
 16. aggregate Solana observed eligible-pair liquidity/24h volume under #306 while preserving incomplete pair-universe scope — complete via PR #307;
-17. verify Solana market observation freshness semantics under #308 without treating token/pair creation timestamps or collection time as market-fact freshness — implemented in PR #310;
-18. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
+17. verify Solana market observation freshness semantics under #308 without treating token/pair creation timestamps or collection time as market-fact freshness — complete via PR #310;
+18. define/apply the source-specific Jupiter current-price freshness policy under #311 — implemented in PR #312 with 60-second max age / 5-second future skew CMIS governance;
+19. verify a timestamped secondary Solana price source with compatible exact subject/unit/time identity before any current-price promotion gate;
+20. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
 
 Future candidates — **not active milestones until separately accepted**:
 
-19. any public alert/Scout-reliance promotion;
-20. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-21. further field-by-field Solana maturity after #308, including any separately accepted freshness-policy or alternate timestamped comparison-source gate;
-22. Ethereum under an explicit capability/acceptance plan;
-23. investigation/evidence export and premium access.
+21. any public alert/Scout-reliance promotion;
+22. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+23. further field-by-field Solana maturity after secondary-source time-identity work;
+24. Ethereum under an explicit capability/acceptance plan;
+25. investigation/evidence export and premium access.
 
 None authorizes execution.
 

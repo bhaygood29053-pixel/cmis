@@ -258,7 +258,16 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertFalse(freshness["jupiter"]["finality_verified"])
         self.assertFalse(freshness["dexscreener"]["provider_fact_time_verified"])
         self.assertFalse(freshness["cross_source_time_identity_verified"])
-        self.assertFalse(freshness["freshness_policy_complete"])
+        self.assertTrue(freshness["freshness_policy_complete"])
+        self.assertEqual(freshness["max_age_seconds"], 60)
+        self.assertEqual(freshness["max_future_skew_seconds"], 5)
+        self.assertEqual(freshness["jupiter_freshness"]["classification"], "STALE")
+        self.assertTrue(
+            freshness["jupiter_freshness"]["jupiter_freshness_verified"]
+        )
+        self.assertFalse(
+            freshness["jupiter_freshness"]["jupiter_current_price_eligible"]
+        )
         self.assertFalse(freshness["freshness_verified"])
         self.assertFalse(freshness["current_price_promotable"])
         self.assertFalse(response["data"]["price_verified"])

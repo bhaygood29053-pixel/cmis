@@ -1,0 +1,7 @@
+{
+  "policy_id": "cmis.solana.jupiter.current_price_freshness.v1",
+  "max_age_seconds": 60,
+  "max_age_provenance": "CMIS current-price evidence contract: a candidate market observation older than one minute at the post-read CMIS collection clock is not current. This is an operator governance bound selected independently of observed Jupiter Price V3 ages and matches the accepted cross-chain CMIS current-price horizon used for X1 Oracle V2.",
+  "max_future_skew_seconds": 5,
+  "future_skew_provenance": "CMIS clock-reference contract: allow at most five seconds of positive provider-fact time skew relative to the post-read CMIS UTC collection clock; larger future offsets fail closed. This is an operator governance bound, not a Jupiter or Solana SLA and not derived from observed ages."
+}

@@ -96,11 +96,42 @@ class SolanaMarketFreshnessTests(unittest.TestCase):
         self.assertTrue(result["jupiter"]["block_at_or_before_reference_slot"])
         self.assertFalse(result["jupiter"]["finality_verified"])
 
-        self.assertFalse(result["freshness_policy_complete"])
+        self.assertTrue(result["freshness_policy_complete"])
+        self.assertEqual(result["max_age_seconds"], 60)
+        self.assertEqual(result["max_future_skew_seconds"], 5)
+        self.assertEqual(result["jupiter_freshness"]["classification"], "STALE")
+        self.assertTrue(result["jupiter_freshness"]["classification_verified"])
+        self.assertTrue(result["jupiter_freshness"]["jupiter_freshness_verified"])
+        self.assertFalse(
+            result["jupiter_freshness"]["jupiter_current_price_eligible"]
+        )
         self.assertFalse(result["freshness_verified"])
         self.assertFalse(result["current_price_promotable"])
-        self.assertIsNone(result["max_age_seconds"])
-        self.assertIsNone(result["max_future_skew_seconds"])
+
+    def test_fresh_jupiter_fact_is_source_eligible_without_shared_market_promotion(self):
+        result = build_solana_market_freshness_evidence(
+            jupiter(
+                collection_started_at_unix=2055.0,
+                collection_completed_at_unix=2056.0,
+            ),
+            dex(),
+            block_time_record=block_time(timestamp=2000),
+            reference_slot_record=reference_slot(),
+        )
+
+        self.assertEqual(result["jupiter_freshness"]["classification"], "FRESH")
+        self.assertTrue(
+            result["jupiter_freshness"]["jupiter_freshness_verified"]
+        )
+        self.assertTrue(
+            result["jupiter_freshness"]["jupiter_current_price_eligible"]
+        )
+        self.assertFalse(
+            result["jupiter_freshness"]["dexscreener_freshness_verified"]
+        )
+        self.assertFalse(result["cross_source_time_identity_verified"])
+        self.assertFalse(result["freshness_verified"])
+        self.assertFalse(result["current_price_promotable"])
 
     def test_token_and_pair_creation_times_are_never_used_for_freshness(self):
         result = build_solana_market_freshness_evidence(
@@ -139,6 +170,10 @@ class SolanaMarketFreshnessTests(unittest.TestCase):
         self.assertFalse(result["jupiter"]["chain_block_identity_verified"])
         self.assertFalse(result["jupiter"]["provider_fact_time_verified"])
         self.assertIsNone(result["jupiter"]["provider_fact_time_unix"])
+        self.assertEqual(
+            result["jupiter_freshness"]["classification"],
+            "UNAVAILABLE",
+        )
         self.assertFalse(result["freshness_verified"])
 
     def test_missing_rpc_time_evidence_remains_explicitly_unverified(self):
@@ -149,6 +184,10 @@ class SolanaMarketFreshnessTests(unittest.TestCase):
         self.assertFalse(result["jupiter"]["reference_slot_verified"])
         self.assertFalse(result["jupiter"]["provider_fact_time_verified"])
         self.assertIn("solana_reference_slot_unavailable", result["limitations"])
+        self.assertEqual(
+            result["jupiter_freshness"]["classification"],
+            "UNAVAILABLE",
+        )
         self.assertFalse(result["freshness_verified"])
 
     def test_block_after_reference_slot_is_not_silently_accepted(self):
@@ -161,6 +200,7 @@ class SolanaMarketFreshnessTests(unittest.TestCase):
 
         self.assertFalse(result["jupiter"]["block_at_or_before_reference_slot"])
         self.assertIn("jupiter_block_after_reference_slot", result["limitations"])
+        self.assertEqual(result["jupiter_freshness"]["classification"], "INVALID")
         self.assertFalse(result["freshness_verified"])
 
     def test_future_block_time_relative_to_collection_does_not_create_negative_age(self):
@@ -178,6 +218,13 @@ class SolanaMarketFreshnessTests(unittest.TestCase):
             "jupiter_block_time_after_collection_clock",
             result["limitations"],
         )
+        self.assertEqual(result["jupiter_freshness"]["classification"], "FUTURE")
+        self.assertTrue(
+            result["jupiter_freshness"]["jupiter_freshness_verified"]
+        )
+        self.assertFalse(
+            result["jupiter_freshness"]["jupiter_current_price_eligible"]
+        )
         self.assertFalse(result["freshness_verified"])
 
     def test_invalid_collection_order_is_not_verified(self):
@@ -193,6 +240,7 @@ class SolanaMarketFreshnessTests(unittest.TestCase):
 
         self.assertFalse(result["jupiter"]["collection_time_verified"])
         self.assertFalse(result["jupiter"]["fact_age_computable"])
+        self.assertEqual(result["jupiter_freshness"]["classification"], "INVALID")
 
 
 if __name__ == "__main__":
