@@ -6,7 +6,7 @@ CMIS is the deterministic blockchain-intelligence backend used by chain-specific
 
 ## Product identity
 
-**Roberta** is the canonical public-facing product name. **CMIS** remains the deterministic backend/repository identity and is not being renamed. The former working product name **X1 Intelligence Service** is retired. X1 Scout and Solana Scout remain specialist component names beneath Roberta. This naming decision does not change CMIS authority, contracts, evidence semantics, or execution boundaries.
+**ROBERTA — Verified On-Chain Intelligence** is the canonical public-facing product name. **CMIS** remains the deterministic backend/repository identity and is not being renamed. The former working product name **X1 Intelligence Service** is retired. X1 Scout and Solana Scout remain specialist component names beneath Roberta. This naming decision does not change CMIS authority, contracts, evidence semantics, or execution boundaries.
 
 Canonical product naming rules live in `bhaygood29053-pixel/roberta-langgraph/docs/PRODUCT_IDENTITY.md`.
 
