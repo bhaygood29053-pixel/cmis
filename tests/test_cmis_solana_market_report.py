@@ -20,6 +20,7 @@ class FakeRPCProvider:
 
     def __init__(self):
         self.calls = []
+        self.freshness_calls = []
 
     def get_mint_account(self, mint):
         self.calls.append(mint)
@@ -40,6 +41,30 @@ class FakeRPCProvider:
             "is_initialized": True,
             "extension_names": [],
             "mint_state_verified": True,
+        }
+
+    def get_block_time(self, block_id):
+        self.freshness_calls.append(("getBlockTime", block_id))
+        return {
+            "chain": "solana",
+            "source": "solana_rpc",
+            "method": "getBlockTime",
+            "block_id": block_id,
+            "block_time_available": True,
+            "block_time_unix": 1900,
+            "block_time_verified": True,
+            "finality_verified": False,
+        }
+
+    def get_slot(self):
+        self.freshness_calls.append(("getSlot", "confirmed"))
+        return {
+            "chain": "solana",
+            "source": "solana_rpc",
+            "method": "getSlot",
+            "slot": 2100,
+            "commitment": "confirmed",
+            "slot_verified": True,
         }
 
 
@@ -78,6 +103,9 @@ class FakeJupiterProvider:
             "liquidity_usd_source_value": "999999",
             "price_change_24h_percent_source_value": "3.5",
             "scope": "jupiter_price_v3",
+            "collection_started_at_unix": 2000.0,
+            "collection_completed_at_unix": 2001.0,
+            "collection_time_verified": True,
             "observed_at": None,
             "freshness_verified": False,
         }
@@ -103,6 +131,9 @@ class FakeDexProvider:
             "pairs": [dict(item) for item in self.pairs],
             "pair_count_observed": len(self.pairs),
             "scope": "pair_scoped_dexscreener_observations",
+            "collection_started_at_unix": 2001.0,
+            "collection_completed_at_unix": 2002.0,
+            "collection_time_verified": True,
             "freshness_verified": False,
             "solana_wide_coverage_verified": False,
             "aggregate_price_selected": False,
@@ -206,6 +237,35 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertEqual(rpc.calls, [MINT])
         self.assertEqual(jupiter.calls, [MINT])
         self.assertEqual(dex.calls, [MINT])
+
+    def test_jupiter_block_time_is_exposed_without_shared_freshness_promotion(self):
+        rpc = FakeRPCProvider()
+        response = request(
+            gateway(
+                rpc=rpc,
+                jupiter=FakeJupiterProvider(price="1"),
+                dex=FakeDexProvider(),
+            )
+        )
+
+        freshness = response["data"]["market_freshness"]
+        self.assertTrue(freshness["jupiter"]["block_id_semantics_verified"])
+        self.assertTrue(freshness["jupiter"]["block_time_verified"])
+        self.assertTrue(freshness["jupiter"]["provider_fact_time_verified"])
+        self.assertEqual(freshness["jupiter"]["provider_fact_time_unix"], 1900)
+        self.assertEqual(freshness["jupiter"]["fact_age_seconds_candidate"], 101.0)
+        self.assertEqual(freshness["jupiter"]["reference_commitment"], "confirmed")
+        self.assertFalse(freshness["jupiter"]["finality_verified"])
+        self.assertFalse(freshness["dexscreener"]["provider_fact_time_verified"])
+        self.assertFalse(freshness["cross_source_time_identity_verified"])
+        self.assertFalse(freshness["freshness_policy_complete"])
+        self.assertFalse(freshness["freshness_verified"])
+        self.assertFalse(freshness["current_price_promotable"])
+        self.assertFalse(response["data"]["price_verified"])
+        self.assertEqual(
+            rpc.freshness_calls,
+            [("getBlockTime", 2000), ("getSlot", "confirmed")],
+        )
 
     def test_pair_observations_preserve_scope_with_bounded_observed_pair_aggregation(self):
         dex = FakeDexProvider(
