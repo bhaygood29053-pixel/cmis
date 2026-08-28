@@ -11,7 +11,7 @@ Controlled Execution remains locked/not started.
 
 ## Strategic roadmap update — 2026-08-28
 
-CMIS is reprioritized toward the deterministic X1 services needed by Roberta's flagship product: Instant X1 Scan fields, a fresh X1.Ninja developer-API verification track, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a future developer intelligence API. X1 is the flagship CMIS surface; Solana remains maintained for accepted read-only capability and portability testing.
+CMIS is reprioritized toward the deterministic X1 services needed by Roberta's flagship product: Instant X1 Scan fields, a fresh X1.Ninja developer-API verification track, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a future developer intelligence API. X1 is the flagship CMIS surface. Solana remains maintained for accepted read-only capability and portability testing, while Solana product expansion and release are deferred to a future phase.
 
 This is a **priority/product-direction update only**. It does not change accepted capability, promotion, evidence, risk, authority, or execution state on its own. Roadmap ownership: issue #318.
 
@@ -94,20 +94,24 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ## Roadmap now
 
-### 1. Evaluate Jupiter–Pyth source independence and price-construction compatibility
+### 1. Productize X1 for Roberta
 
-- #315 defines the five-second same-time policy and allows `cross_source_time_identity_verified=true` only when both source freshness gates are FRESH;
-- Jupiter uses a last-qualifying-swap/reference-price methodology while Pyth is a publisher/oracle aggregate, so same-time numerical agreement does not yet establish equivalent fact construction;
-- provider count does not prove independent upstream market evidence;
-- verify independence/overlap and methodology compatibility before any separate Solana current-price promotion gate is considered.
+- stabilize the deterministic field contract for Instant X1 Scan;
+- validate the documented X1.Ninja developer API as a fresh candidate provider under normal CMIS evidence/freshness/scope/independence rules;
+- then advance holder/wallet intelligence promotion, Discovery Ledger, Early Warning, Compare, X1 Daily Brief inputs, and the later developer intelligence API through separate accepted gates.
 
-### 2. Continue evidence-depth work
+### 2. Maintain Solana; release later
 
-- provider/source independence;
+- preserve the accepted read-only Solana provider/runtime/test surface and regression coverage;
+- defer broad Solana product expansion and release to a future phase;
+- retain #317 Jupiter/Pyth source-independence and price-construction compatibility as future evidence work rather than the active implementation priority.
+
+### 3. Continue evidence-depth work
+
+- provider/source independence where required by active X1 services;
 - historical redundancy/completeness diagnostics;
 - holder/token-account semantics without beneficial-owner overclaim;
-- exact route/pool/provider scope preservation;
-- field-by-field Solana maturity.
+- exact route/pool/provider scope preservation.
 
 ### 3. Keep public-service promotion separately gated
 
