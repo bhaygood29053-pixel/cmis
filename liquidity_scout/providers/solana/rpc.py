@@ -9,6 +9,8 @@ accounts list as total holder coverage.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import base64
+import binascii
 import os
 from typing import Any, Callable
 
@@ -187,6 +189,60 @@ class SolanaRPCProvider:
         if not isinstance(result, Mapping):
             raise SolanaRPCError(f"{method} returned a malformed result")
         return result
+
+    def get_account_data(self, address: str) -> dict[str, Any]:
+        """Return one exact account's base64-decoded bytes with RPC provenance."""
+
+        address = _text(address, field="account address")
+        result = self._request(
+            "getAccountInfo",
+            [
+                address,
+                {
+                    "commitment": self.commitment,
+                    "encoding": "base64",
+                },
+            ],
+        )
+        slot = _context_slot(result)
+        value = result.get("value")
+        if value is None:
+            raise SolanaRPCNotFound("Solana account not found")
+        if not isinstance(value, Mapping):
+            raise SolanaRPCError("getAccountInfo result.value must be an object")
+
+        owner = _text(value.get("owner"), field="account owner")
+        executable = value.get("executable")
+        if not isinstance(executable, bool):
+            raise SolanaRPCError("account executable must be boolean")
+        lamports = _nonnegative_int(value.get("lamports"), field="account lamports")
+
+        data_field = value.get("data")
+        if (
+            not isinstance(data_field, list)
+            or len(data_field) != 2
+            or data_field[1] != "base64"
+            or not isinstance(data_field[0], str)
+        ):
+            raise SolanaRPCError("account data must be [base64, 'base64']")
+        try:
+            data = base64.b64decode(data_field[0], validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise SolanaRPCError("account data is invalid base64") from exc
+
+        return {
+            "chain": CHAIN,
+            "source": SOURCE,
+            "method": "getAccountInfo(base64)",
+            "address": address,
+            "context_slot": slot,
+            "owner": owner,
+            "executable": executable,
+            "lamports": lamports,
+            "data": data,
+            "data_length": len(data),
+            "commitment": self.commitment,
+        }
 
     def get_block_time(self, block_id: int) -> dict[str, Any]:
         """Resolve one Solana slot/block reference to estimated Unix production time."""
