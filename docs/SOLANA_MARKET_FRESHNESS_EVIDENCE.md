@@ -78,18 +78,26 @@ market-fact time.
 
 ## Policy boundary
 
-Issue #308 does not select numerical freshness thresholds.
+Issue #311 / the Solana Jupiter current-price freshness governance now selects
+explicit CMIS operator thresholds:
 
-Until separate governance provides explicit threshold values and provenance:
+    max_age_seconds = 60
+    max_future_skew_seconds = 5
+    freshness_policy_complete = true
 
-    freshness_policy_complete = false
+These are CMIS governance bounds, not Jupiter or Solana SLAs and not values
+derived from observed live ages.
+
+CMIS may therefore produce a deterministic Jupiter source-specific freshness
+classification. A computed fact age becomes policy-qualified evidence, but
+shared Solana market freshness remains separately gated:
+
+    dexscreener_freshness_verified = false
+    cross_source_time_identity_verified = false
     freshness_verified = false
     current_price_promotable = false
-    max_age_seconds = null
-    max_future_skew_seconds = null
 
-A computed Jupiter fact-age candidate is evidence only. It is not a freshness
-classification.
+See `SOLANA_JUPITER_CURRENT_PRICE_FRESHNESS_GOVERNANCE.md`.
 
 ## Cross-source boundary
 
