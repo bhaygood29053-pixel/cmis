@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 import math
 import os
+import time
 from typing import Any, Callable
 
 import requests
@@ -113,6 +114,7 @@ class JupiterSourceProvider:
         api_key: str | None = None,
         timeout: int = 20,
         get: Callable[..., Any] = requests.get,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self._base_url = _text(base_url, field="Jupiter base URL").rstrip("/")
         configured_key = api_key if api_key is not None else os.getenv("JUPITER_API_KEY")
@@ -123,6 +125,7 @@ class JupiterSourceProvider:
             raise ValueError("timeout must be a positive integer")
         self.timeout = timeout
         self._get = get
+        self._clock = clock
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -158,7 +161,16 @@ class JupiterSourceProvider:
         """Return one Price V3 source observation or explicit unavailability."""
 
         mint = _text(mint, field="mint")
+        collection_started_at = float(self._clock())
+        if not math.isfinite(collection_started_at) or collection_started_at < 0:
+            raise JupiterSourceError("collection start time must be a finite non-negative timestamp")
         body = self._request("/price/v3", params={"ids": mint})
+        collection_completed_at = float(self._clock())
+        if (
+            not math.isfinite(collection_completed_at)
+            or collection_completed_at < collection_started_at
+        ):
+            raise JupiterSourceError("collection completion time must be finite and not precede start time")
         if not isinstance(body, Mapping):
             raise JupiterSourceError("Price V3 response must be an object")
         if mint not in body or body.get(mint) is None:
@@ -168,6 +180,9 @@ class JupiterSourceProvider:
                 "mint": mint,
                 "price_available": False,
                 "reason": "jupiter_price_unavailable",
+                "collection_started_at_unix": collection_started_at,
+                "collection_completed_at_unix": collection_completed_at,
+                "collection_time_verified": True,
                 "freshness_verified": False,
             }
 
@@ -203,6 +218,9 @@ class JupiterSourceProvider:
             "liquidity_usd_source_value": liquidity,
             "price_change_24h_percent_source_value": price_change_24h,
             "scope": "jupiter_price_v3",
+            "collection_started_at_unix": collection_started_at,
+            "collection_completed_at_unix": collection_completed_at,
+            "collection_time_verified": True,
             "observed_at": None,
             "freshness_verified": False,
         }

@@ -21,6 +21,9 @@ from typing import Any
 from liquidity_scout.cmis.evidence import AGREEMENT, CONFLICT, INSUFFICIENT_EVIDENCE
 from liquidity_scout.providers.solana.dexscreener import DexScreenerSourceError
 from liquidity_scout.providers.solana.jupiter import JupiterSourceError
+from liquidity_scout.providers.solana.market_freshness import (
+    build_solana_market_freshness_evidence,
+)
 from liquidity_scout.providers.solana.market_verification import (
     verify_jupiter_vs_dexscreener_prices,
 )
@@ -391,6 +394,55 @@ class SolanaMarketReportMixin:
 
         jupiter_mapping = jupiter if isinstance(jupiter, Mapping) else {}
         dex_mapping = dexscreener if isinstance(dexscreener, Mapping) else {}
+
+        block_time_record = None
+        reference_slot_record = None
+        freshness_rpc_limitations = []
+        rpc_provider = getattr(self, "solana_rpc_provider", None)
+        block_id = jupiter_mapping.get("block_id")
+        if isinstance(block_id, int) and not isinstance(block_id, bool) and block_id >= 0:
+            get_block_time = getattr(rpc_provider, "get_block_time", None)
+            if callable(get_block_time):
+                try:
+                    block_time_record = get_block_time(block_id)
+                except Exception as exc:
+                    freshness_rpc_limitations.append(
+                        f"solana_get_block_time_failed:{type(exc).__name__}"
+                    )
+            else:
+                freshness_rpc_limitations.append("solana_get_block_time_not_supported")
+
+            get_slot = getattr(rpc_provider, "get_slot", None)
+            if callable(get_slot):
+                try:
+                    reference_slot_record = get_slot()
+                except Exception as exc:
+                    freshness_rpc_limitations.append(
+                        f"solana_get_slot_failed:{type(exc).__name__}"
+                    )
+            else:
+                freshness_rpc_limitations.append("solana_get_slot_not_supported")
+
+        try:
+            market_freshness = build_solana_market_freshness_evidence(
+                jupiter_mapping,
+                dex_mapping,
+                block_time_record=block_time_record,
+                reference_slot_record=reference_slot_record,
+            )
+        except (TypeError, ValueError) as exc:
+            return self._solana_market_error(
+                "solana_market_freshness_contract_invalid",
+                f"Solana market freshness evidence failed ({type(exc).__name__}).",
+            )
+        if freshness_rpc_limitations:
+            market_freshness["limitations"] = list(
+                dict.fromkeys(
+                    list(market_freshness.get("limitations") or [])
+                    + freshness_rpc_limitations
+                )
+            )
+
         jupiter_price = (
             jupiter_mapping.get("usd_price")
             if jupiter_mapping.get("price_available") is True
@@ -412,8 +464,10 @@ class SolanaMarketReportMixin:
             {
                 "code": "solana_market_freshness_unverified",
                 "message": (
-                    "The accepted market sources do not yet establish shared "
-                    "wall-clock freshness."
+                    "Jupiter blockId can anchor its provider fact to a Solana block "
+                    "time when RPC evidence is available, but DEX Screener exposes no "
+                    "documented market-update timestamp and no shared freshness policy "
+                    "is accepted."
                 ),
             },
             {
@@ -514,6 +568,9 @@ class SolanaMarketReportMixin:
                     "source": "jupiter_price_v3",
                     "role": "market_report.price_source",
                     "block_id": jupiter.get("block_id"),
+                    "collection_completed_at_unix": jupiter.get(
+                        "collection_completed_at_unix"
+                    ),
                 }
             )
         if isinstance(dexscreener, Mapping):
@@ -522,6 +579,21 @@ class SolanaMarketReportMixin:
                     "source": "dexscreener_token_pairs_v1",
                     "role": "market_report.pair_observations",
                     "pair_count_observed": dexscreener.get("pair_count_observed"),
+                    "collection_completed_at_unix": dexscreener.get(
+                        "collection_completed_at_unix"
+                    ),
+                }
+            )
+        if (
+            isinstance(block_time_record, Mapping)
+            and block_time_record.get("block_time_verified") is True
+        ):
+            sources.append(
+                {
+                    "source": "solana_rpc",
+                    "role": "market_report.jupiter_block_time",
+                    "block_id": block_time_record.get("block_id"),
+                    "block_time_unix": block_time_record.get("block_time_unix"),
                 }
             )
 
@@ -529,7 +601,7 @@ class SolanaMarketReportMixin:
             "identity_verified": True,
             "price_semantics_verified": crosscheck.get("semantics_verified") is True,
             "price_cross_source_agreement": crosscheck_status == AGREEMENT,
-            "price_freshness_verified": crosscheck.get("freshness_verified") is True,
+            "price_freshness_verified": market_freshness.get("freshness_verified") is True,
             "observation_scope_verified": (
                 crosscheck.get("observation_scope_verified") is True
             ),
@@ -556,6 +628,7 @@ class SolanaMarketReportMixin:
                 ),
                 "price_verified": False,
                 "price_crosscheck": dict(crosscheck),
+                "market_freshness": dict(market_freshness),
                 "pair_observations": pair_observations,
                 "pair_count_observed": dex_mapping.get("pair_count_observed"),
                 "observed_pair_count": observed_pair_aggregate["observed_pair_count"],

@@ -137,7 +137,7 @@ class SolanaRPCProvider:
         self._post = post
         self._request_id = 0
 
-    def _request(self, method: str, params: list[Any]) -> Mapping[str, Any]:
+    def _request_result(self, method: str, params: list[Any]) -> Any:
         method = _text(method, field="RPC method")
         self._request_id += 1
         payload = {
@@ -178,10 +178,60 @@ class SolanaRPCProvider:
             error = body.get("error")
             code = error.get("code") if isinstance(error, Mapping) else None
             raise SolanaRPCError(f"{method} returned JSON-RPC error code {code!r}")
-        result = body.get("result")
+        if "result" not in body:
+            raise SolanaRPCError(f"{method} returned a malformed result")
+        return body.get("result")
+
+    def _request(self, method: str, params: list[Any]) -> Mapping[str, Any]:
+        result = self._request_result(method, params)
         if not isinstance(result, Mapping):
             raise SolanaRPCError(f"{method} returned a malformed result")
         return result
+
+    def get_block_time(self, block_id: int) -> dict[str, Any]:
+        """Resolve one Solana slot/block reference to estimated Unix production time."""
+
+        block_id = _nonnegative_int(block_id, field="block id")
+        result = self._request_result("getBlockTime", [block_id])
+        if result is None:
+            return {
+                "chain": CHAIN,
+                "source": SOURCE,
+                "method": "getBlockTime",
+                "block_id": block_id,
+                "block_time_available": False,
+                "block_time_unix": None,
+                "block_time_verified": False,
+                "finality_verified": False,
+            }
+        block_time = _nonnegative_int(result, field="block time")
+        return {
+            "chain": CHAIN,
+            "source": SOURCE,
+            "method": "getBlockTime",
+            "block_id": block_id,
+            "block_time_available": True,
+            "block_time_unix": block_time,
+            "block_time_verified": True,
+            "finality_verified": False,
+        }
+
+    def get_slot(self) -> dict[str, Any]:
+        """Return the current slot at this provider's explicit commitment."""
+
+        result = self._request_result(
+            "getSlot",
+            [{"commitment": self.commitment}],
+        )
+        slot = _nonnegative_int(result, field="current slot")
+        return {
+            "chain": CHAIN,
+            "source": SOURCE,
+            "method": "getSlot",
+            "slot": slot,
+            "commitment": self.commitment,
+            "slot_verified": True,
+        }
 
     def get_token_supply(self, mint: str) -> dict[str, Any]:
         """Return canonical total token supply from ``getTokenSupply``."""
