@@ -6,7 +6,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 
 ## Product naming invariant
 
-The public-facing product name is **Roberta**. The former working product name **X1 Intelligence Service** is retired. **CMIS** remains the deterministic backend/repository identity, while X1 Scout and Solana Scout remain chain-specialist component names. Product naming does not change the authority path, capability promotion state, verification semantics, or execution boundary.
+The public-facing product name is **ROBERTA — Verified On-Chain Intelligence**. The former working product name **X1 Intelligence Service** is retired. **CMIS** remains the deterministic backend/repository identity, while X1 Scout and Solana Scout remain chain-specialist component names. Product naming does not change the authority path, capability promotion state, verification semantics, or execution boundary.
 
 ## Canonical architecture
 
