@@ -6,11 +6,13 @@ into those read-only provider objects without letting HTTP callers choose
 providers, policies, persistence paths, or credentials.
 
 Solana stays disabled by default.  Setting ``CMIS_SOLANA_PROVIDER_ENABLED`` to
-an explicit true value enables the canonical RPC provider, public DEX Screener
-pair source, and provenance-safe observation ledger.  Jupiter and Helius are
-constructed only when their API keys are present.  Missing optional providers
-therefore fail closed at the service that requires them instead of preventing
-CMIS/X1 startup.
+an explicit true value enables the canonical RPC provider, the exact-fixture
+read-only Pyth Core push-feed provider over that same RPC, the public DEX
+Screener pair source, and the provenance-safe observation ledger. Jupiter and
+Helius are constructed only when their API keys are present. Missing optional
+providers therefore fail closed at the service that requires them instead of
+preventing CMIS/X1 startup. The Pyth path uses no Hermes credential and never
+submits an update or transaction.
 """
 
 from __future__ import annotations
