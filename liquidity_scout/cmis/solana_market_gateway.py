@@ -23,6 +23,10 @@ from typing import Any
 from liquidity_scout.cmis.evidence import AGREEMENT, CONFLICT, INSUFFICIENT_EVIDENCE
 from liquidity_scout.providers.solana.dexscreener import DexScreenerSourceError
 from liquidity_scout.providers.solana.jupiter import JupiterSourceError
+from liquidity_scout.providers.solana.jupiter_pyth_time_identity import (
+    accepted_jupiter_pyth_time_identity_policy,
+    classify_jupiter_pyth_time_identity,
+)
 from liquidity_scout.providers.solana.market_freshness import (
     build_solana_market_freshness_evidence,
 )
@@ -456,6 +460,7 @@ class SolanaMarketReportMixin:
         pyth_record: Mapping[str, Any] | None = None
         pyth_freshness: Mapping[str, Any] | None = None
         jupiter_pyth_crosscheck: Mapping[str, Any] | None = None
+        jupiter_pyth_time_identity: Mapping[str, Any] | None = None
         pyth_collection_error: str | None = None
 
         if self.solana_pyth_provider is not None:
@@ -499,6 +504,30 @@ class SolanaMarketReportMixin:
                     pyth_collection_error = (
                         f"jupiter_pyth_crosscheck_invalid:{type(exc).__name__}"
                     )
+
+                jupiter_source_freshness = market_freshness.get(
+                    "jupiter_freshness"
+                )
+                if (
+                    isinstance(jupiter_pyth_crosscheck, Mapping)
+                    and isinstance(jupiter_source_freshness, Mapping)
+                ):
+                    try:
+                        jupiter_pyth_time_identity = (
+                            classify_jupiter_pyth_time_identity(
+                                jupiter_pyth_crosscheck,
+                                jupiter_source_freshness,
+                                pyth_freshness,
+                                policy=(
+                                    accepted_jupiter_pyth_time_identity_policy()
+                                ),
+                            )
+                        )
+                    except (TypeError, ValueError) as exc:
+                        pyth_collection_error = (
+                            "jupiter_pyth_time_identity_invalid:"
+                            f"{type(exc).__name__}"
+                        )
 
         jupiter_price = (
             jupiter_mapping.get("usd_price")
@@ -582,12 +611,48 @@ class SolanaMarketReportMixin:
                 {
                     "code": "solana_pyth_secondary_price_non_promotable",
                     "message": (
-                        "Pyth Core provides timestamped secondary price evidence, "
-                        "but Jupiter/Pyth fact-time compatibility and market-source "
-                        "independence are not yet verified."
+                        "Pyth Core provides timestamped secondary price evidence. "
+                        "Jupiter/Pyth same-time eligibility is classified separately "
+                        "and does not establish market-source independence or current-"
+                        "price authority."
                     ),
                 }
             )
+
+        if isinstance(jupiter_pyth_time_identity, Mapping):
+            time_class = jupiter_pyth_time_identity.get("classification")
+            if time_class == "SAME_TIME":
+                warnings.append(
+                    {
+                        "code": "solana_jupiter_pyth_same_time_non_promotable",
+                        "message": (
+                            "Jupiter and Pyth satisfy the explicit five-second "
+                            "same-time policy, but source independence and price-"
+                            "construction equivalence remain unverified."
+                        ),
+                    }
+                )
+            elif time_class == "TIME_MISMATCH":
+                warnings.append(
+                    {
+                        "code": "solana_jupiter_pyth_time_mismatch",
+                        "message": (
+                            "Jupiter and Pyth are individually eligible but their "
+                            "provider fact times differ by more than the accepted "
+                            "five-second same-time window."
+                        ),
+                    }
+                )
+            elif time_class in {"SOURCE_STALE", "SOURCE_FUTURE"}:
+                warnings.append(
+                    {
+                        "code": "solana_jupiter_pyth_source_time_ineligible",
+                        "message": (
+                            "At least one source is stale or future-classified, so "
+                            "cross-source same-time identity is ineligible."
+                        ),
+                    }
+                )
 
         aggregate_meta = observed_pair_aggregate["observed_pair_aggregation"]
         if (
@@ -749,9 +814,21 @@ class SolanaMarketReportMixin:
                             if jupiter_pyth_crosscheck is not None
                             else None
                         ),
+                        "time_identity": (
+                            dict(jupiter_pyth_time_identity)
+                            if jupiter_pyth_time_identity is not None
+                            else None
+                        ),
                         "collection_error": pyth_collection_error,
-                        "cross_source_time_identity_verified": False,
+                        "cross_source_time_identity_verified": (
+                            isinstance(jupiter_pyth_time_identity, Mapping)
+                            and jupiter_pyth_time_identity.get(
+                                "cross_source_time_identity_verified"
+                            )
+                            is True
+                        ),
                         "source_independence_verified": False,
+                        "price_construction_equivalence_verified": False,
                         "current_price_promotable": False,
                     }
                 ),
