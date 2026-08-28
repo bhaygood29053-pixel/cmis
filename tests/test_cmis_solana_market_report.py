@@ -18,9 +18,10 @@ QUOTE = "So11111111111111111111111111111111111111112"
 class FakeRPCProvider:
     chain = "solana"
 
-    def __init__(self):
+    def __init__(self, *, block_time=1900):
         self.calls = []
         self.freshness_calls = []
+        self.block_time = block_time
 
     def get_mint_account(self, mint):
         self.calls.append(mint)
@@ -51,7 +52,7 @@ class FakeRPCProvider:
             "method": "getBlockTime",
             "block_id": block_id,
             "block_time_available": True,
-            "block_time_unix": 1900,
+            "block_time_unix": self.block_time,
             "block_time_verified": True,
             "finality_verified": False,
         }
@@ -108,6 +109,90 @@ class FakeJupiterProvider:
             "collection_time_verified": True,
             "observed_at": None,
             "freshness_verified": False,
+        }
+
+
+class FakePythProvider:
+    chain = "solana"
+
+    def __init__(
+        self,
+        *,
+        price="1.002",
+        available=True,
+        error=None,
+        mapping=True,
+        publish_time=1990,
+        collection_completed_at=2002.0,
+    ):
+        self.price = price
+        self.available = available
+        self.error = error
+        self.mapping = mapping
+        self.publish_time = publish_time
+        self.collection_completed_at = collection_completed_at
+        self.calls = []
+
+    def get_price(self, mint):
+        self.calls.append(mint)
+        if self.error is not None:
+            raise self.error
+        if not self.mapping:
+            return {
+                "chain": "solana",
+                "source": "pyth_core_solana_push",
+                "mint": mint,
+                "mapping_verified": False,
+                "price_available": False,
+                "reason": "pyth_exact_mint_feed_mapping_unavailable",
+                "current_price_promotable": False,
+                "source_independence_verified": False,
+            }
+        return {
+            "chain": "solana",
+            "source": "pyth_core_solana_push",
+            "mint": mint,
+            "mapping_verified": True,
+            "mapping_provenance": "fixture",
+            "feed_alias": "USDC/USD",
+            "feed_id": "feed-id",
+            "feed_id_verified": True,
+            "account_address": "PythAccount111",
+            "account_owner": "Receiver111",
+            "account_owner_verified": True,
+            "account_context_slot": 2200,
+            "posted_slot": 2199,
+            "receiver_program_id": "Receiver111",
+            "push_oracle_program_id": "Push111",
+            "contract_generation": "test",
+            "write_authority_matches_feed_account": True,
+            "verification_level": "full",
+            "verification_num_signatures": None,
+            "full_verification": True,
+            "price_available": self.available,
+            "price_raw": 100200000 if self.available else 0,
+            "conf_raw": 1000,
+            "exponent": -8,
+            "price_usd": self.price if self.available else None,
+            "confidence_usd": "0.00001",
+            "publish_time_unix": self.publish_time,
+            "prev_publish_time_unix": self.publish_time - 1,
+            "ema_price_raw": 100000000,
+            "ema_conf_raw": 1000,
+            "fact_time_verified": True,
+            "collection_started_at_unix": self.collection_completed_at - 1,
+            "collection_completed_at_unix": self.collection_completed_at,
+            "collection_time_verified": True,
+            "price_integrity_verified": self.available,
+            "unit": "USD_per_USDC",
+            "price_subject": "USDC",
+            "quote_symbol": "USD",
+            "symbol_discovery_used": False,
+            "hermes_used": False,
+            "current_price_promotable": False,
+            "source_independence_verified": False,
+            "execution_authorized": False,
+            "warnings": [],
         }
 
 
@@ -189,11 +274,12 @@ class SolanaMarketGateway(
     pass
 
 
-def gateway(*, rpc=None, jupiter=None, dex=None, tolerance="0.01"):
+def gateway(*, rpc=None, jupiter=None, dex=None, pyth=None, tolerance="0.01"):
     return SolanaMarketGateway(
         solana_rpc_provider=rpc if rpc is not None else FakeRPCProvider(),
         solana_jupiter_provider=jupiter,
         solana_dexscreener_provider=dex,
+        solana_pyth_provider=pyth,
         solana_price_max_relative_difference=tolerance,
     )
 
@@ -237,6 +323,90 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertEqual(rpc.calls, [MINT])
         self.assertEqual(jupiter.calls, [MINT])
         self.assertEqual(dex.calls, [MINT])
+
+    def test_pyth_secondary_price_is_attached_but_never_promoted(self):
+        rpc = FakeRPCProvider(block_time=1995)
+        pyth = FakePythProvider(
+            price="1.002",
+            publish_time=1996,
+            collection_completed_at=2002.0,
+        )
+        response = request(
+            gateway(
+                rpc=rpc,
+                jupiter=FakeJupiterProvider(price="1"),
+                dex=FakeDexProvider(),
+                pyth=pyth,
+            )
+        )
+
+        secondary = response["data"]["pyth_secondary_price"]
+        self.assertEqual(secondary["status"], "ok")
+        self.assertEqual(pyth.calls, [MINT])
+        self.assertTrue(secondary["record"]["mapping_verified"])
+        self.assertTrue(secondary["record"]["price_integrity_verified"])
+        self.assertEqual(secondary["freshness"]["classification"], "FRESH")
+        self.assertTrue(secondary["freshness"]["pyth_current_price_eligible"])
+        self.assertEqual(secondary["jupiter_crosscheck"]["status"], AGREEMENT)
+        self.assertTrue(secondary["jupiter_crosscheck"]["within_tolerance"])
+        self.assertEqual(
+            secondary["jupiter_crosscheck"]["fact_time_delta_seconds"],
+            "1",
+        )
+        self.assertFalse(
+            secondary["jupiter_crosscheck"]["time_identity_policy_complete"]
+        )
+        self.assertFalse(
+            secondary["jupiter_crosscheck"]["time_identity_verified"]
+        )
+        self.assertFalse(secondary["cross_source_time_identity_verified"])
+        self.assertFalse(secondary["source_independence_verified"])
+        self.assertFalse(secondary["current_price_promotable"])
+        self.assertFalse(response["data"]["price_verified"])
+        self.assertIn(
+            "solana_pyth_secondary_price_non_promotable",
+            {warning["code"] for warning in response["warnings"]},
+        )
+
+    def test_pyth_missing_exact_mapping_does_not_symbol_match_or_break_market_report(self):
+        pyth = FakePythProvider(mapping=False)
+        response = request(
+            gateway(
+                jupiter=FakeJupiterProvider(price="1"),
+                dex=FakeDexProvider(),
+                pyth=pyth,
+            )
+        )
+
+        secondary = response["data"]["pyth_secondary_price"]
+        self.assertEqual(secondary["status"], "unavailable")
+        self.assertFalse(secondary["record"]["mapping_verified"])
+        self.assertIsNone(secondary["freshness"])
+        self.assertIsNone(secondary["jupiter_crosscheck"])
+        self.assertIn(
+            "solana_pyth_exact_mapping_unavailable",
+            {warning["code"] for warning in response["warnings"]},
+        )
+        self.assertEqual(response["status"], "partial")
+
+    def test_pyth_failure_is_sanitized_and_non_blocking(self):
+        from liquidity_scout.providers.solana.pyth_push import PythSolanaSourceError
+
+        secret = "https://pyth.invalid/?api-key=SECRET"
+        pyth = FakePythProvider(error=PythSolanaSourceError(secret))
+        response = request(
+            gateway(
+                jupiter=FakeJupiterProvider(price="1"),
+                dex=FakeDexProvider(),
+                pyth=pyth,
+            )
+        )
+
+        self.assertEqual(response["status"], "partial")
+        self.assertNotIn(secret, str(response))
+        secondary = response["data"]["pyth_secondary_price"]
+        self.assertEqual(secondary["status"], "unavailable")
+        self.assertIn("PythSolanaSourceError", secondary["collection_error"])
 
     def test_jupiter_block_time_is_exposed_without_shared_freshness_promotion(self):
         rpc = FakeRPCProvider()
