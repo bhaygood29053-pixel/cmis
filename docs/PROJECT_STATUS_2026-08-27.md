@@ -75,7 +75,7 @@ Recent cleanup is complete:
 - PR #227 — FortiBlox closed/archive candidate research;
 - PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is complete via PR #307. Issue #308 Solana market observation freshness semantics is complete via PR #310. Issue #311 applies the accepted CMIS Jupiter current-price freshness policy in PR #312: max age 60 seconds and future skew 5 seconds. Issue #313 is implemented in PR #314: an exact USDC/USD Pyth Core sponsored push-feed fixture is read through canonical Solana RPC and verifies feed/account/full-verification/price/confidence/exponent/Unix-second publish_time with a separate 60-second/5-second Pyth source policy. Jupiter/Pyth numerical agreement and exact fact-time delta are evidence only; cross-source time identity, source independence, and current-price promotion remain unverified.
+The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is complete via PR #307. Issue #308 Solana market observation freshness semantics is complete via PR #310. Issue #311 applies the accepted CMIS Jupiter current-price freshness policy in PR #312: max age 60 seconds and future skew 5 seconds. Issue #313 is complete via PR #314: an exact USDC/USD Pyth Core sponsored push-feed fixture is read through canonical Solana RPC and verifies feed/account/full-verification/price/confidence/exponent/Unix-second publish_time with a separate 60-second/5-second Pyth source policy. Issue #315 is implemented in PR #316 with an explicit five-second Jupiter–Pyth same-time operator window. When both source-specific freshness gates are FRESH and the exact fact-time delta is <=5 seconds, CMIS may verify cross-source time identity. Source independence, price-construction equivalence, current-price promotion, and execution authority remain false.
 
 ## Roberta dependency/status
 
@@ -87,12 +87,12 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ## Roadmap now
 
-### 1. Define Jupiter–Pyth cross-source time-identity policy
+### 1. Evaluate Jupiter–Pyth source independence and price-construction compatibility
 
-- #313 verifies timestamped Pyth Core USDC/USD secondary evidence through canonical Solana RPC without Hermes/API-key dependency;
-- Jupiter and Pyth now each have source-specific verified fact-time/freshness evidence and CMIS can calculate their exact fact-time delta;
-- no cross-source maximum fact-time delta has been accepted yet, so `time_identity_policy_complete=false` and `time_identity_verified=false`;
-- define that policy with explicit provenance before any separate current-price promotion gate is considered.
+- #315 defines the five-second same-time policy and allows `cross_source_time_identity_verified=true` only when both source freshness gates are FRESH;
+- Jupiter uses a last-qualifying-swap/reference-price methodology while Pyth is a publisher/oracle aggregate, so same-time numerical agreement does not yet establish equivalent fact construction;
+- provider count does not prove independent upstream market evidence;
+- verify independence/overlap and methodology compatibility before any separate Solana current-price promotion gate is considered.
 
 ### 2. Continue evidence-depth work
 

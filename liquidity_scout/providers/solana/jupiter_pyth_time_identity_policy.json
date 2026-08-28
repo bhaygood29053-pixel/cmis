@@ -1,0 +1,7 @@
+{
+  "policy_id": "cmis.solana.jupiter_pyth.same_time.v1",
+  "max_fact_time_delta_seconds": 5,
+  "max_fact_time_delta_provenance": "CMIS cross-source synchronization contract for the exact Jupiter/Pyth Solana comparison path. Both provider fact times are Unix-second observations; Jupiter documents popular-token prices as updating every few seconds, while Pyth USDC/USD may remain valid until its one-minute heartbeat. CMIS therefore defines same-time much more strictly than source freshness: observations must be no more than five seconds apart. Five seconds is an operator comparison window, not a Jupiter, Pyth, or Solana SLA, and was selected independently of observed passing samples.",
+  "scope": "exact_verified_solana_mint_usd_price_pairs",
+  "scope_provenance": "Initial accepted implementation is exercised on the exact USDC mint / Pyth USDC-USD fixture from issue #313. The policy is only applicable when exact mint, subject, USD unit, provider fact time, and both source-specific FRESH gates are verified."
+}
