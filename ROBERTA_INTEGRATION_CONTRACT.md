@@ -1,6 +1,6 @@
 # Roberta ↔ Chain Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-26
+Last reconciled: 2026-08-28
 
 ## Canonical hierarchy
 
@@ -26,7 +26,7 @@ CMIS publishes deployed eligibility at:
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` remains required. Existing accepted services retain the global minimum compatible contract `1.8.0`, while the current CMIS contract is `1.12.0` and the promoted concentration service continues to require `>=1.9.0`.
+Capability schema `1` remains required. Existing accepted services retain the global minimum compatible contract `1.8.0`, while the current CMIS contract is `1.13.0`; the promoted concentration service continues to require `>=1.9.0`, and `instant_x1_scan/v1` requires `>=1.13.0`.
 
 Scouts fail closed on malformed/incompatible manifests, non-callable services, unknown chains, weakened Evidence Receipt / Proof Score declarations, or promotion metadata that does not exactly match the accepted service contract.
 
@@ -50,6 +50,7 @@ Where the live manifest permits, the shared contract includes:
 - `risk_check`
 - `pre_trade_check`
 - `verification_evidence`
+- `instant_x1_scan` — bounded X1-only read-only composition service under CMIS `1.13.0`
 - `concentration_change_intelligence` — bounded X1-only promoted service under CMIS `1.9.0`
 
 A runtime service does not become an autonomous Scout action merely because it exists.
