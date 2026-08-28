@@ -6,11 +6,13 @@ into those read-only provider objects without letting HTTP callers choose
 providers, policies, persistence paths, or credentials.
 
 Solana stays disabled by default.  Setting ``CMIS_SOLANA_PROVIDER_ENABLED`` to
-an explicit true value enables the canonical RPC provider, public DEX Screener
-pair source, and provenance-safe observation ledger.  Jupiter and Helius are
-constructed only when their API keys are present.  Missing optional providers
-therefore fail closed at the service that requires them instead of preventing
-CMIS/X1 startup.
+an explicit true value enables the canonical RPC provider, the exact-fixture
+read-only Pyth Core push-feed provider over that same RPC, the public DEX
+Screener pair source, and the provenance-safe observation ledger. Jupiter and
+Helius are constructed only when their API keys are present. Missing optional
+providers therefore fail closed at the service that requires them instead of
+preventing CMIS/X1 startup. The Pyth path uses no Hermes credential and never
+submits an update or transaction.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from liquidity_scout.cmis.solana_observation_ledger import SolanaObservationLedg
 from liquidity_scout.providers.solana.dexscreener import DexScreenerSolanaProvider
 from liquidity_scout.providers.solana.helius import HeliusDASProvider
 from liquidity_scout.providers.solana.jupiter import JupiterSourceProvider
+from liquidity_scout.providers.solana.pyth_push import PythSolanaPushProvider
 from liquidity_scout.providers.solana.rpc import SolanaRPCProvider
 
 
@@ -107,6 +110,7 @@ def build_solana_runtime_dependencies(
         "rpc_configured": False,
         "jupiter_configured": False,
         "dexscreener_configured": False,
+        "pyth_configured": False,
         "helius_configured": False,
         "price_crosscheck_policy_configured": False,
         "supply_crosscheck_policy_configured": False,
@@ -123,6 +127,13 @@ def build_solana_runtime_dependencies(
     rpc_url = _text(source, "SOLANA_RPC_URL")
     dependencies["solana_rpc_provider"] = SolanaRPCProvider(rpc_url=rpc_url)
     status["rpc_configured"] = True
+
+    # Pyth Core sponsored push feeds are read through the same Solana RPC.
+    # The provider itself is exact-fixture-gated and needs no Hermes/API key.
+    dependencies["solana_pyth_provider"] = PythSolanaPushProvider(
+        dependencies["solana_rpc_provider"]
+    )
+    status["pyth_configured"] = True
 
     # DEX Screener's accepted token-pairs endpoint is public/read-only and does
     # not require a deployment secret.

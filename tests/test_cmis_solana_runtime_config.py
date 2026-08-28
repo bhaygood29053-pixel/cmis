@@ -10,6 +10,7 @@ from liquidity_scout.cmis.solana_runtime_config import (
 from liquidity_scout.providers.solana.dexscreener import DexScreenerSolanaProvider
 from liquidity_scout.providers.solana.helius import HeliusDASProvider
 from liquidity_scout.providers.solana.jupiter import JupiterSourceProvider
+from liquidity_scout.providers.solana.pyth_push import PythSolanaPushProvider
 from liquidity_scout.providers.solana.rpc import SolanaRPCProvider
 
 
@@ -21,7 +22,7 @@ class SolanaRuntimeConfigTests(unittest.TestCase):
         self.assertTrue(status["read_only"])
         self.assertFalse(status["execution_authorized"])
 
-    def test_enabled_minimal_runtime_constructs_rpc_dex_and_history_only(self):
+    def test_enabled_minimal_runtime_constructs_rpc_pyth_dex_and_history(self):
         with tempfile.TemporaryDirectory() as directory:
             db_path = os.path.join(directory, "solana.db")
             dependencies, status = build_solana_runtime_dependencies({
@@ -32,6 +33,10 @@ class SolanaRuntimeConfigTests(unittest.TestCase):
 
         self.assertIsInstance(
             dependencies["solana_rpc_provider"], SolanaRPCProvider
+        )
+        self.assertIsInstance(
+            dependencies["solana_pyth_provider"],
+            PythSolanaPushProvider,
         )
         self.assertIsInstance(
             dependencies["solana_dexscreener_provider"],
@@ -45,6 +50,7 @@ class SolanaRuntimeConfigTests(unittest.TestCase):
         self.assertNotIn("solana_price_max_relative_difference", dependencies)
         self.assertTrue(status["enabled"])
         self.assertTrue(status["rpc_configured"])
+        self.assertTrue(status["pyth_configured"])
         self.assertTrue(status["dexscreener_configured"])
         self.assertTrue(status["observation_ledger_configured"])
         self.assertFalse(status["jupiter_configured"])
@@ -132,6 +138,7 @@ class SolanaRuntimeConfigTests(unittest.TestCase):
             )
 
         self.assertIsInstance(gateway.solana_rpc_provider, SolanaRPCProvider)
+        self.assertIsInstance(gateway.solana_pyth_provider, PythSolanaPushProvider)
         self.assertIsInstance(
             gateway.solana_dexscreener_provider, DexScreenerSolanaProvider
         )
