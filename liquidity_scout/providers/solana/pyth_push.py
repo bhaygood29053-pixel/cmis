@@ -19,7 +19,8 @@ from collections.abc import Mapping
 from decimal import Decimal
 import hashlib
 import struct
-from typing import Any
+import time
+from typing import Any, Callable
 
 from liquidity_scout.providers.solana.rpc import (
     SolanaRPCError,
@@ -181,8 +182,14 @@ class PythSolanaPushProvider:
     chain = CHAIN
     source = SOURCE
 
-    def __init__(self, rpc_provider: Any) -> None:
+    def __init__(
+        self,
+        rpc_provider: Any,
+        *,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
         self._rpc = rpc_provider
+        self._clock = clock
 
     def get_price(self, mint: str) -> dict[str, Any]:
         if not isinstance(mint, str) or not mint.strip():
@@ -206,6 +213,9 @@ class PythSolanaPushProvider:
             raise PythSolanaSourceError(
                 "Solana RPC provider does not support exact account-data reads"
             )
+        collection_started_at = float(self._clock())
+        if collection_started_at < 0 or collection_started_at != collection_started_at:
+            raise PythSolanaSourceError("collection start time must be finite and non-negative")
         try:
             account = get_account_data(fixture["account_address"])
         except (SolanaRPCError, SolanaRPCNotFound) as exc:
@@ -216,6 +226,14 @@ class PythSolanaPushProvider:
             raise PythSolanaSourceError(
                 f"Pyth account read failed ({type(exc).__name__})"
             ) from None
+        collection_completed_at = float(self._clock())
+        if (
+            collection_completed_at < collection_started_at
+            or collection_completed_at != collection_completed_at
+        ):
+            raise PythSolanaSourceError(
+                "collection completion time must be finite and not precede start time"
+            )
 
         if not isinstance(account, Mapping):
             raise PythSolanaSourceError("Solana account response must be a mapping")
@@ -301,6 +319,9 @@ class PythSolanaPushProvider:
             "ema_price_raw": parsed["ema_price_raw"],
             "ema_conf_raw": parsed["ema_conf_raw"],
             "fact_time_verified": True,
+            "collection_started_at_unix": collection_started_at,
+            "collection_completed_at_unix": collection_completed_at,
+            "collection_time_verified": True,
             "price_integrity_verified": price_integrity_verified,
             "unit": fixture["unit"],
             "price_subject": fixture["price_subject"],
