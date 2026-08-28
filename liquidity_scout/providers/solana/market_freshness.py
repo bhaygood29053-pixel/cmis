@@ -10,9 +10,10 @@ Accepted provider-owned semantics:
 - The accepted DEX Screener token-pairs schema exposes pairCreatedAt but no
   documented market-fact update timestamp.
 
-No freshness thresholds live here. Until a separately accepted policy provides
-explicit max-age/future-skew provenance, freshness_verified and
-current_price_promotable remain false.
+Freshness thresholds live in the separate Jupiter policy module. The accepted
+Jupiter policy may verify a source-specific freshness classification, while
+shared Solana market freshness and current_price_promotable remain false until
+compatible secondary-source fact-time evidence is separately accepted.
 """
 
 from __future__ import annotations
