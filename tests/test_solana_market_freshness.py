@@ -108,6 +108,31 @@ class SolanaMarketFreshnessTests(unittest.TestCase):
         self.assertFalse(result["freshness_verified"])
         self.assertFalse(result["current_price_promotable"])
 
+    def test_fresh_jupiter_fact_is_source_eligible_without_shared_market_promotion(self):
+        result = build_solana_market_freshness_evidence(
+            jupiter(
+                collection_started_at_unix=2055.0,
+                collection_completed_at_unix=2056.0,
+            ),
+            dex(),
+            block_time_record=block_time(timestamp=2000),
+            reference_slot_record=reference_slot(),
+        )
+
+        self.assertEqual(result["jupiter_freshness"]["classification"], "FRESH")
+        self.assertTrue(
+            result["jupiter_freshness"]["jupiter_freshness_verified"]
+        )
+        self.assertTrue(
+            result["jupiter_freshness"]["jupiter_current_price_eligible"]
+        )
+        self.assertFalse(
+            result["jupiter_freshness"]["dexscreener_freshness_verified"]
+        )
+        self.assertFalse(result["cross_source_time_identity_verified"])
+        self.assertFalse(result["freshness_verified"])
+        self.assertFalse(result["current_price_promotable"])
+
     def test_token_and_pair_creation_times_are_never_used_for_freshness(self):
         result = build_solana_market_freshness_evidence(
             jupiter(),
