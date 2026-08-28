@@ -67,6 +67,11 @@ class InstantX1ScanMixin:
             mode="all_available",
             metrics=HISTORY_METRICS,
         )
+        risk_history = self._historical_from_market(
+            "Has price changed in the last 24 hours?",
+            market,
+            mode="window",
+        )
 
         market_data = (
             market.get("data") if isinstance(market.get("data"), Mapping) else {}
@@ -77,17 +82,17 @@ class InstantX1ScanMixin:
             and isinstance(tokenomics.get("data"), Mapping)
             else None
         )
-        history_data = (
-            history.get("data")
-            if history.get("status") != ERROR
-            and isinstance(history.get("data"), Mapping)
+        risk_history_data = (
+            risk_history.get("data")
+            if risk_history.get("status") != ERROR
+            and isinstance(risk_history.get("data"), Mapping)
             else None
         )
 
         risk = build_risk_check_response(
             market_data,
             tokenomics_data,
-            history_data,
+            risk_history_data,
             chain="x1",
             policy=risk_policy,
             observed_at=market.get("observed_at"),
