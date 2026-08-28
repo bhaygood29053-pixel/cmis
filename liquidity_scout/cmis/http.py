@@ -31,15 +31,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .capabilities import build_capability_manifest
-from .gateway import KNOWN_CHAINS, SUPPORTED_CHAINS
-from .runtime_gateway import SUPPORTED_SERVICES, RuntimeCMISGateway
+from liquidity_scout.cmis_private_core import load_runtime_contract
 
 
-# The HTTP runtime composes the accepted market/risk, trade/activity, and
-# persisted verification-evidence gateways. Runtime-only dependencies such as
-# the evidence ledger are configured inside RuntimeCMISGateway and are never
-# accepted from HTTP request payloads.
-CMISGateway = RuntimeCMISGateway
+# Phase 3 cutover: the public HTTP transport consumes one narrow runtime
+# contract. In production, CMIS_PRIVATE_CORE_REQUIRED=1 makes absence of the
+# private distribution fail closed. The public fallback is migration-only.
+_RUNTIME_CONTRACT = load_runtime_contract()
+CMISGateway = _RUNTIME_CONTRACT["gateway_class"]
+SUPPORTED_SERVICES = _RUNTIME_CONTRACT["supported_services"]
+SUPPORTED_CHAINS = _RUNTIME_CONTRACT["supported_chains"]
+KNOWN_CHAINS = _RUNTIME_CONTRACT["known_chains"]
+PRIVATE_CORE_SOURCE = _RUNTIME_CONTRACT["source"]
+PRIVATE_CORE_CONTRACT = _RUNTIME_CONTRACT["contract"]
 
 # Build this at import/startup time so a new runtime service or known chain
 # cannot silently ship without an explicit capability classification.
@@ -285,6 +289,8 @@ __all__ = [
     "DEFAULT_HOST",
     "DEFAULT_PORT",
     "MAX_REQUEST_BYTES",
+    "PRIVATE_CORE_CONTRACT",
+    "PRIVATE_CORE_SOURCE",
     "create_server",
     "make_handler",
     "serve",
