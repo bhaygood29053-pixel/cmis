@@ -359,12 +359,84 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertFalse(
             secondary["jupiter_crosscheck"]["time_identity_verified"]
         )
-        self.assertFalse(secondary["cross_source_time_identity_verified"])
+        self.assertEqual(secondary["time_identity"]["classification"], "SAME_TIME")
+        self.assertTrue(
+            secondary["time_identity"]["cross_source_time_identity_verified"]
+        )
+        self.assertEqual(
+            secondary["time_identity"]["policy"]["max_fact_time_delta_seconds"],
+            5,
+        )
+        self.assertTrue(secondary["cross_source_time_identity_verified"])
         self.assertFalse(secondary["source_independence_verified"])
+        self.assertFalse(
+            secondary["price_construction_equivalence_verified"]
+        )
         self.assertFalse(secondary["current_price_promotable"])
         self.assertFalse(response["data"]["price_verified"])
+        warning_codes = {warning["code"] for warning in response["warnings"]}
+        self.assertIn("solana_pyth_secondary_price_non_promotable", warning_codes)
+        self.assertIn("solana_jupiter_pyth_same_time_non_promotable", warning_codes)
+
+    def test_jupiter_pyth_time_mismatch_is_explicit_and_non_promotable(self):
+        rpc = FakeRPCProvider(block_time=1995)
+        pyth = FakePythProvider(
+            price="1.002",
+            publish_time=1988,
+            collection_completed_at=2002.0,
+        )
+        response = request(
+            gateway(
+                rpc=rpc,
+                jupiter=FakeJupiterProvider(price="1"),
+                dex=FakeDexProvider(),
+                pyth=pyth,
+            )
+        )
+
+        secondary = response["data"]["pyth_secondary_price"]
+        self.assertEqual(secondary["freshness"]["classification"], "FRESH")
+        self.assertEqual(
+            secondary["jupiter_crosscheck"]["fact_time_delta_seconds"],
+            "7",
+        )
+        self.assertEqual(
+            secondary["time_identity"]["classification"],
+            "TIME_MISMATCH",
+        )
+        self.assertFalse(secondary["cross_source_time_identity_verified"])
+        self.assertFalse(secondary["current_price_promotable"])
         self.assertIn(
-            "solana_pyth_secondary_price_non_promotable",
+            "solana_jupiter_pyth_time_mismatch",
+            {warning["code"] for warning in response["warnings"]},
+        )
+
+    def test_stale_pyth_source_is_ineligible_for_same_time(self):
+        rpc = FakeRPCProvider(block_time=1995)
+        pyth = FakePythProvider(
+            price="1.002",
+            publish_time=1900,
+            collection_completed_at=2002.0,
+        )
+        response = request(
+            gateway(
+                rpc=rpc,
+                jupiter=FakeJupiterProvider(price="1"),
+                dex=FakeDexProvider(),
+                pyth=pyth,
+            )
+        )
+
+        secondary = response["data"]["pyth_secondary_price"]
+        self.assertEqual(secondary["freshness"]["classification"], "STALE")
+        self.assertEqual(
+            secondary["time_identity"]["classification"],
+            "SOURCE_STALE",
+        )
+        self.assertFalse(secondary["cross_source_time_identity_verified"])
+        self.assertFalse(secondary["current_price_promotable"])
+        self.assertIn(
+            "solana_jupiter_pyth_source_time_ineligible",
             {warning["code"] for warning in response["warnings"]},
         )
 
@@ -383,6 +455,7 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
         self.assertFalse(secondary["record"]["mapping_verified"])
         self.assertIsNone(secondary["freshness"])
         self.assertIsNone(secondary["jupiter_crosscheck"])
+        self.assertIsNone(secondary["time_identity"])
         self.assertIn(
             "solana_pyth_exact_mapping_unavailable",
             {warning["code"] for warning in response["warnings"]},
