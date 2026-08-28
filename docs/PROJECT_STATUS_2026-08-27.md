@@ -75,7 +75,7 @@ Recent cleanup is complete:
 - PR #227 — FortiBlox closed/archive candidate research;
 - PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is implemented in PR #307.
+The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is complete via PR #307. Issue #308 Solana market observation freshness semantics is the active field-level tracer bullet.
 
 ## Roberta dependency/status
 
@@ -87,11 +87,12 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ## Roadmap now
 
-### 1. Mature Solana observed-pair market fields
+### 1. Verify Solana market observation freshness semantics
 
-- aggregate liquidity and 24h volume only across exact eligible unique DEX Screener pairs observed for the verified mint;
-- expose the result only as an observed-pair aggregate with explicit #LPs;
-- keep pair-universe completeness, Solana-wide liquidity/volume verification, and source independence false until separately proven.
+- preserve CMIS collection time separately from provider fact time and underlying market-fact freshness;
+- do not use Jupiter token `createdAt` or DEX Screener `pairCreatedAt` as price freshness evidence;
+- verify Jupiter `blockId` semantics from provider-owned evidence before any slot/block-time freshness mapping;
+- keep price freshness and current-price promotion false until exact fact-time evidence and an explicit freshness policy both pass.
 
 ### 2. Continue evidence-depth work
 
