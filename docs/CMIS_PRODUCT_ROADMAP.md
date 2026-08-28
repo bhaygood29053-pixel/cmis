@@ -278,7 +278,7 @@ This Learning Plane is upstream reasoning/knowledge capability, not a new CMIS a
 
 Roadmap ownership: issue #318.
 
-CMIS is now prioritized around the verified data and intelligence services required for **Roberta to become the leading X1 intelligence analyst**. X1 remains the flagship CMIS surface; Solana remains a maintained read-only portability/test surface rather than a competing product-expansion priority.
+CMIS is now prioritized around the verified data and intelligence services required for **Roberta to become the leading X1 intelligence analyst**. X1 remains the flagship CMIS surface. Solana remains a maintained read-only portability/test surface, while Solana product expansion and release are deferred to a future phase rather than competing with near-term X1 productization.
 
 ### Productization priorities
 
@@ -296,7 +296,7 @@ CMIS is now prioritized around the verified data and intelligence services requi
 - Do not rebuild complete explorers, portfolio trackers, staking interfaces, charting terminals, or generic DEX screeners inside CMIS.
 - Prefer exact machine-readable ecosystem providers when they reduce commodity indexing work, but preserve CMIS as the verification/trust boundary.
 - X1 receives the clear majority of near-term chain-specific product work.
-- Solana maintenance continues for accepted read-only capability, regression coverage, and cross-chain portability. Broad Solana feature expansion is deferred unless it materially improves shared CMIS abstractions.
+- Solana maintenance continues for accepted read-only capability, regression coverage, and cross-chain portability. Solana product expansion and release are deferred to a future phase unless bounded work materially improves shared CMIS abstractions.
 - Proof Score remains separate from risk. Unknown remains unknown. Source independence must be proven, not inferred from provider labels.
 - No roadmap item authorizes transaction construction, signing, broadcasting, custody, swaps, bridge value transfer, or autonomous value movement.
 
@@ -318,7 +318,7 @@ Near-term provider-gap priorities:
 - #311 Solana Jupiter current-price freshness policy is complete via PR #312 with explicit CMIS operator bounds of 60 seconds max age and 5 seconds future skew;
 - #313 timestamped Pyth Core secondary Solana price evidence is complete via PR #314 for one exact USDC/USD fixture through canonical Solana RPC; source-specific Pyth freshness is deterministic and Jupiter/Pyth numerical/fact-time-delta evidence is available;
 - #315 Jupiter–Pyth cross-source time-identity governance is implemented in PR #316 with an explicit five-second same-time operator window; exact same-time eligibility may now be verified while source independence, price-construction equivalence, and current-price promotion remain false;
-- the next Solana gate is provider/source-independence and price-construction compatibility analysis before any separate current-price promotion gate;
+- #317 provider/source-independence and price-construction compatibility analysis is retained as deferred Solana evidence work; it is not the active near-term implementation priority while X1 productization is underway;
 - Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
 ### Verified Intelligence
