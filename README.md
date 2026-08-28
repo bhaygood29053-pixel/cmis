@@ -60,7 +60,7 @@ Accepted on `main`:
 - **Deterministic direct wallet-relationship evidence:** complete, internal/read-only/non-promoted, explicit non-ownership semantics.
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
-- **CMIS capability contract:** `1.12.0`.
+- **CMIS capability contract:** `1.13.0`.
 - **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
@@ -131,7 +131,7 @@ The live capability manifest is authoritative:
 GET /v1/cmis/capabilities
 ```
 
-The current accepted X1 normalized-identity contract is `x1_asset_identity/v1`, introduced in CMIS 1.11.0 and retained by the current 1.12.0 contract. For an externally reachable Roberta readiness deployment, keep the CMIS Python process on loopback and use the hardened HTTPS reverse-proxy profile in [`docs/CMIS_PUBLIC_HTTPS.md`](./docs/CMIS_PUBLIC_HTTPS.md).
+The current accepted X1 normalized-identity contract is `x1_asset_identity/v1`, introduced in CMIS 1.11.0 and retained by the current 1.13.0 contract. CMIS 1.13.0 adds the bounded read-only `instant_x1_scan/v1` composition service for ROBERTA on X1; it composes accepted identity, market, tokenomics, local verified history, deterministic risk, and runtime evidence-quality metadata without inventing missing holder/concentration facts. For an externally reachable Roberta readiness deployment, keep the CMIS Python process on loopback and use the hardened HTTPS reverse-proxy profile in [`docs/CMIS_PUBLIC_HTTPS.md`](./docs/CMIS_PUBLIC_HTTPS.md).
 
 Every chain/service combination is classified explicitly. A capability available on X1 is never assumed to exist on Solana, and vice versa.
 

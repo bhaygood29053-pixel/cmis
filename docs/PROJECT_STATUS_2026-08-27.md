@@ -4,7 +4,7 @@
 
 CMIS remains the deterministic freshness-sensitive verification/intelligence backend beneath Roberta's Chain Scouts.
 
-The accepted capability contract on `main` is **1.12.0**. The project is beyond the first public Verified Intelligence promotion and is now focused on provider-gap hardening, evidence depth, historical coverage, and narrowly verified read-only X1 provider evidence.
+The accepted capability contract on `main` is **1.13.0**. The project is beyond the first public Verified Intelligence promotion and is now focused on provider-gap hardening, evidence depth, historical coverage, and narrowly verified read-only X1 provider evidence.
 
 Controlled Execution remains locked/not started.
 
@@ -28,7 +28,8 @@ This is a **priority/product-direction update only**. It does not change accepte
 - X1 `historical_compare` `all_available` and `all_available_pair`: complete from CMIS 1.10.0.
 - X1 exact-mint normalized identity `x1_asset_identity/v1`: complete from CMIS 1.11.0.
 - Verified provider historical price backfill: complete under the bounded CMIS 1.12.0 contract, price-only with explicit non-independence/non-completeness limits.
-- Current CMIS capability contract: **1.12.0**.
+- Current CMIS capability contract: **1.13.0**.
+- X1 `instant_x1_scan/v1`: bounded read-only ROBERTA-facing composition service introduced in CMIS 1.13.0. It composes accepted identity, market, tokenomics, local verified history, deterministic risk, Evidence Receipt, and Proof Score while leaving unverified holder/current-concentration facts explicit and execution unauthorized.
 
 There is still no accepted next public alert/intelligence promotion by implication.
 
@@ -96,8 +97,8 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ### 1. Productize X1 for Roberta
 
-- stabilize the deterministic field contract for Instant X1 Scan;
-- validate the documented X1.Ninja developer API as a fresh candidate provider under normal CMIS evidence/freshness/scope/independence rules;
+- Instant X1 Scan contract is implemented under #322 as `instant_x1_scan/v1` in CMIS 1.13.0;
+- next: validate the documented X1.Ninja developer API as a fresh candidate provider under normal CMIS evidence/freshness/scope/independence rules;
 - then advance holder/wallet intelligence promotion, Discovery Ledger, Early Warning, Compare, X1 Daily Brief inputs, and the later developer intelligence API through separate accepted gates.
 
 ### 2. Maintain Solana; release later
