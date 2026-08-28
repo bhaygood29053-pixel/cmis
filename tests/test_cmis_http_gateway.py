@@ -247,7 +247,7 @@ class CMISHTTPGatewayTests(unittest.TestCase):
                 response = json.loads(raw.read().decode("utf-8"))
 
         self.assertEqual(response["service"], "cmis_gateway")
-        self.assertEqual(response["contract_version"], "1.12.0")
+        self.assertEqual(response["contract_version"], "1.13.0")
 
     def test_bearer_auth_is_enforced_when_configured(self):
         with RunningServer(api_key="test-secret") as running:
