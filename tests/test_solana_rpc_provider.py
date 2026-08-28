@@ -1,3 +1,4 @@
+import base64
 import unittest
 
 from liquidity_scout.providers.registry import build_default_chain_provider_registry
@@ -71,6 +72,83 @@ def _mint_body(
 
 
 class SolanaRPCProviderTests(unittest.TestCase):
+    def test_exact_account_data_read_decodes_base64_and_preserves_owner(self):
+        raw = b"pyth-account-bytes"
+        post = _post_with(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "context": {"slot": 321},
+                    "value": {
+                        "lamports": 1000,
+                        "owner": "Receiver111",
+                        "executable": False,
+                        "data": [
+                            base64.b64encode(raw).decode("ascii"),
+                            "base64",
+                        ],
+                    },
+                },
+            }
+        )
+        provider = SolanaRPCProvider("https://rpc.example.invalid", post=post)
+
+        result = provider.get_account_data("Account111")
+
+        self.assertEqual(result["method"], "getAccountInfo(base64)")
+        self.assertEqual(result["address"], "Account111")
+        self.assertEqual(result["context_slot"], 321)
+        self.assertEqual(result["owner"], "Receiver111")
+        self.assertFalse(result["executable"])
+        self.assertEqual(result["data"], raw)
+        self.assertEqual(result["data_length"], len(raw))
+        self.assertEqual(
+            post.calls[0]["json"]["params"],
+            [
+                "Account111",
+                {"commitment": "confirmed", "encoding": "base64"},
+            ],
+        )
+
+    def test_exact_account_data_missing_account_fails_not_found(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": {"context": {"slot": 1}, "value": None},
+                }
+            ),
+        )
+
+        with self.assertRaises(SolanaRPCNotFound):
+            provider.get_account_data("MissingAccount111")
+
+    def test_exact_account_data_rejects_invalid_base64(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": {
+                        "context": {"slot": 1},
+                        "value": {
+                            "lamports": 1,
+                            "owner": "Receiver111",
+                            "executable": False,
+                            "data": ["***not-base64***", "base64"],
+                        },
+                    },
+                }
+            ),
+        )
+
+        with self.assertRaisesRegex(SolanaRPCError, "invalid base64"):
+            provider.get_account_data("Account111")
+
     def test_block_time_preserves_exact_slot_identity_without_finality_claim(self):
         post = _post_with(
             {
