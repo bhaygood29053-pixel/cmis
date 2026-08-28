@@ -94,7 +94,7 @@ Other current X1 provider-gap observations remain non-promotional:
 
 Current Solana field-maturity work:
 - **Issue #306 — observed-pair liquidity/volume aggregation: complete via PR #307.** CMIS deterministically totals only eligible unique DEX Screener pairs returned for the verified mint. The result remains explicitly observed-pair scoped; pair-universe completeness, Solana-wide liquidity/volume verification, and market-source independence remain false.
-- **Issue #308 — Solana market observation freshness semantics: active.** CMIS must keep collection time, provider fact time, chain block identity, transport latency, and underlying market-fact freshness separate. Jupiter token `createdAt` and DEX Screener `pairCreatedAt` are not price-observation timestamps.
+- **Issue #308 — Solana market observation freshness semantics: implemented in PR #310.** Jupiter `blockId` is accepted as the provider-documented Solana block reference for the computed price and may be mapped through canonical `getBlockTime`; CMIS collection time remains separate. Jupiter token `createdAt` and DEX Screener `pairCreatedAt` are not price-observation timestamps. DEX Screener exposes no accepted market-update timestamp, so shared cross-source freshness, freshness policy completion, and current-price promotion remain false.
 
 ## Roberta-facing service surface
 
