@@ -21,6 +21,11 @@ from collections.abc import Mapping
 import math
 from typing import Any
 
+from liquidity_scout.providers.solana.jupiter_freshness_policy import (
+    accepted_solana_jupiter_freshness_policy,
+    classify_solana_jupiter_freshness,
+)
+
 CHAIN = "solana"
 JUPITER_SOURCE = "jupiter_price_v3"
 DEXSCREENER_SOURCE = "dexscreener_token_pairs_v1"
@@ -181,7 +186,7 @@ def build_solana_market_freshness_evidence(
     dex_provider_fact_time_verified = False
     limitations.append("dexscreener_market_fact_timestamp_unavailable")
 
-    return {
+    evidence = {
         "service": "solana_market_freshness",
         "version": VERSION,
         "chain": CHAIN,
@@ -226,6 +231,24 @@ def build_solana_market_freshness_evidence(
         "max_future_skew_seconds": None,
         "limitations": list(dict.fromkeys(limitations)),
     }
+
+    jupiter_policy_result = classify_solana_jupiter_freshness(
+        evidence,
+        policy=accepted_solana_jupiter_freshness_policy(),
+    )
+    evidence["jupiter_freshness"] = jupiter_policy_result
+    evidence["freshness_policy_complete"] = (
+        jupiter_policy_result["policy"]["policy_complete"] is True
+    )
+    evidence["max_age_seconds"] = jupiter_policy_result["policy"]["max_age_seconds"]
+    evidence["max_future_skew_seconds"] = (
+        jupiter_policy_result["policy"]["max_future_skew_seconds"]
+    )
+    # The shared market freshness flag remains false because DEX Screener still
+    # lacks a verified market-fact timestamp and cross-source time identity.
+    evidence["freshness_verified"] = False
+    evidence["current_price_promotable"] = False
+    return evidence
 
 
 __all__ = [
