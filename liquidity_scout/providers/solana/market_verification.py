@@ -22,6 +22,7 @@ VERSION = "1.0"
 CHAIN = "solana"
 JUPITER_SOURCE = "jupiter_price_v3"
 DEXSCREENER_SOURCE = "dexscreener_token_pairs_v1"
+PYTH_SOURCE = "pyth_core_solana_push"
 USD_PER_TOKEN = "USD_PER_TOKEN"
 
 
@@ -83,6 +84,138 @@ def _insufficient(*reasons: str) -> dict[str, Any]:
         "observation_scope_verified": False,
         "comparisons": [],
         "rejection_reasons": list(dict.fromkeys(reason for reason in reasons if reason)),
+    }
+
+
+def verify_jupiter_vs_pyth_price(
+    jupiter: Mapping[str, Any],
+    pyth: Mapping[str, Any],
+    *,
+    max_relative_difference: Any,
+    jupiter_fact_time_unix: Any,
+) -> dict[str, Any]:
+    """Compare exact-mint Jupiter and Pyth USD prices without time promotion.
+
+    Both providers must independently prove exact subject/unit semantics. The
+    provider fact times are preserved and their absolute delta is calculated,
+    but this function intentionally has no hidden same-time threshold. A future
+    policy must decide what time delta is compatible for current-price
+    promotion.
+    """
+
+    if not isinstance(jupiter, Mapping) or not isinstance(pyth, Mapping):
+        raise TypeError("Jupiter/Pyth price cross-check inputs must be mappings")
+    tolerance = _tolerance(max_relative_difference)
+    reasons: list[str] = []
+
+    if jupiter.get("chain") != CHAIN or pyth.get("chain") != CHAIN:
+        reasons.append("wrong_chain")
+    if jupiter.get("source") != JUPITER_SOURCE:
+        reasons.append("jupiter_source_mismatch")
+    if pyth.get("source") != PYTH_SOURCE:
+        reasons.append("pyth_source_mismatch")
+
+    jupiter_mint = _text(jupiter.get("mint"))
+    pyth_mint = _text(pyth.get("mint"))
+    if jupiter_mint is None or pyth_mint is None:
+        reasons.append("mint_missing")
+    elif jupiter_mint != pyth_mint:
+        reasons.append("mint_mismatch")
+
+    if jupiter.get("price_available") is not True:
+        reasons.append("jupiter_price_unavailable")
+    if pyth.get("price_available") is not True:
+        reasons.append("pyth_price_unavailable")
+    if pyth.get("mapping_verified") is not True:
+        reasons.append("pyth_mapping_unverified")
+    if pyth.get("price_integrity_verified") is not True:
+        reasons.append("pyth_price_integrity_unverified")
+    if pyth.get("fact_time_verified") is not True:
+        reasons.append("pyth_fact_time_unverified")
+    if pyth.get("quote_symbol") != "USD":
+        reasons.append("pyth_quote_not_usd")
+
+    jupiter_price = _positive_decimal(jupiter.get("usd_price"))
+    pyth_price = _positive_decimal(pyth.get("price_usd"))
+    if jupiter_price is None:
+        reasons.append("jupiter_price_invalid")
+    if pyth_price is None:
+        reasons.append("pyth_price_invalid")
+    if jupiter.get("currency") != "USD":
+        reasons.append("jupiter_currency_not_usd")
+
+    try:
+        jupiter_fact_time = Decimal(str(jupiter_fact_time_unix))
+    except (InvalidOperation, ValueError, TypeError):
+        jupiter_fact_time = None
+    pyth_fact_raw = pyth.get("publish_time_unix")
+    try:
+        pyth_fact_time = Decimal(str(pyth_fact_raw))
+    except (InvalidOperation, ValueError, TypeError):
+        pyth_fact_time = None
+    if (
+        jupiter_fact_time is None
+        or not jupiter_fact_time.is_finite()
+        or jupiter_fact_time < 0
+    ):
+        reasons.append("jupiter_fact_time_unavailable")
+    if (
+        pyth_fact_time is None
+        or not pyth_fact_time.is_finite()
+        or pyth_fact_time < 0
+    ):
+        reasons.append("pyth_fact_time_invalid")
+
+    if reasons:
+        result = _insufficient(*reasons)
+        result["service"] = "solana_jupiter_pyth_price_crosscheck"
+        result["provider_pair"] = ["jupiter_price_v3", "pyth_core_solana_push"]
+        result["time_identity_verified"] = False
+        result["source_independence_verified"] = False
+        return result
+
+    assert (
+        jupiter_mint is not None
+        and jupiter_price is not None
+        and pyth_price is not None
+        and jupiter_fact_time is not None
+        and pyth_fact_time is not None
+    )
+    difference = _relative_difference(jupiter_price, pyth_price)
+    time_delta = abs(jupiter_fact_time - pyth_fact_time)
+    status = AGREEMENT if difference <= tolerance else CONFLICT
+
+    return {
+        "service": "solana_jupiter_pyth_price_crosscheck",
+        "version": VERSION,
+        "chain": CHAIN,
+        "status": status,
+        "cmis_promotable": False,
+        "mint": jupiter_mint,
+        "fact_type": "token_usd_price",
+        "unit": USD_PER_TOKEN,
+        "max_relative_difference": _canonical_decimal(tolerance),
+        "identity_verified": True,
+        "semantics_verified": True,
+        "jupiter_price": _canonical_decimal(jupiter_price),
+        "pyth_price": _canonical_decimal(pyth_price),
+        "relative_difference": _canonical_decimal(difference),
+        "within_tolerance": difference <= tolerance,
+        "jupiter_fact_time_unix": _canonical_decimal(jupiter_fact_time),
+        "pyth_fact_time_unix": _canonical_decimal(pyth_fact_time),
+        "fact_time_delta_seconds": _canonical_decimal(time_delta),
+        "time_identity_policy_complete": False,
+        "time_identity_verified": False,
+        "freshness_verified": False,
+        "source_independence_verified": False,
+        "current_price_promotable": False,
+        "execution_authorized": False,
+        "rejection_reasons": [],
+        "warnings": [
+            "numerical_agreement_does_not_establish_time_identity",
+            "no_cross_source_fact_time_delta_policy_is_accepted",
+            "provider_count_does_not_establish_market_source_independence",
+        ],
     }
 
 
@@ -243,7 +376,9 @@ __all__ = [
     "CHAIN",
     "DEXSCREENER_SOURCE",
     "JUPITER_SOURCE",
+    "PYTH_SOURCE",
     "USD_PER_TOKEN",
     "VERSION",
     "verify_jupiter_vs_dexscreener_prices",
+    "verify_jupiter_vs_pyth_price",
 ]
