@@ -702,6 +702,7 @@ class CMISGateway:
         onchain_page_size: int = 1000,
         onchain_max_signatures: int = 5000,
         include_onchain_coverage: bool = True,
+        include_supply_lookup: bool = True,
     ) -> Dict[str, Any]:
         market_data = market_envelope.get("data")
         if not isinstance(market_data, Mapping):
@@ -729,7 +730,9 @@ class CMISGateway:
             question,
             snapshot,
             history_backend=self.history_backend,
-            get_total_supply=current_total_supply,
+            get_total_supply=(
+                current_total_supply if include_supply_lookup else None
+            ),
             chain="x1",
             observed_at=market_envelope.get("observed_at"),
             mode=mode,
