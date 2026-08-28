@@ -369,11 +369,10 @@ class InstantX1ScanTests(unittest.TestCase):
         self.assertEqual(sections["risk"]["recommendation"], "WARN")
         self.assertFalse(sections["risk"]["score_verified"])
         self.assertFalse(response["data"]["execution_authorized"])
-        self.assertFalse(
+        self.assertTrue(
             response["data"]["sections"]["evidence"][
                 "proof_score_separate_from_risk"
             ]
-            is False
         )
 
     def test_runtime_composition_uses_local_history_only_and_adds_evidence_quality(self):
@@ -404,9 +403,8 @@ class InstantX1ScanTests(unittest.TestCase):
         self.assertFalse(response["proof_score"]["risk_considered"])
         self.assertTrue(response["proof_score"]["risk_separate"])
         self.assertEqual(
-            response["risk"],
-            response["data"]["sections"]["risk"]["policy"]
-            and response["risk"],
+            response["data"]["sections"]["risk"]["recommendation"],
+            response["risk"]["recommendation"],
         )
 
     def test_holder_verification_can_complete_only_existing_holder_gate(self):
