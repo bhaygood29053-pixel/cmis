@@ -214,17 +214,26 @@ Pyth publish_time
 
 The comparison exposes the exact absolute fact-time delta.
 
-However, #313 intentionally defines **no cross-source maximum fact-time delta**.
-
-Therefore even numerical agreement with both sources individually FRESH remains:
+Issue #315 adds a separate CMIS cross-source time-identity policy:
 
 ```text
-time_identity_policy_complete = false
-time_identity_verified = false
+max_fact_time_delta_seconds = 5
+```
+
+When both source-specific freshness gates are FRESH and the exact fact-time
+delta is <= 5 seconds, CMIS may now classify the pair as `SAME_TIME` and set
+`cross_source_time_identity_verified=true`.
+
+That still does not establish:
+
+```text
 source_independence_verified = false
+price_construction_equivalence_verified = false
 current_price_promotable = false
 execution_authorized = false
 ```
+
+See `SOLANA_JUPITER_PYTH_TIME_IDENTITY_GOVERNANCE.md`.
 
 ## Independence boundary
 
