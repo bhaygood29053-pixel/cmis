@@ -1,6 +1,6 @@
 # Roberta ↔ CMIS Accepted Baseline
 
-Last reconciled: 2026-08-27 (America/New_York)
+Last reconciled: 2026-08-28 (America/New_York)
 
 ## Purpose
 
@@ -29,7 +29,7 @@ Roberta Learning System sources, autonomous source-mastery plans, Pyramid traini
 ```text
 schema_version = 1
 global existing-service minimum = 1.8.0
-current CMIS contract = 1.12.0
+current CMIS contract = 1.13.0
 ```
 
 Accepted manifest semantics include:
@@ -41,7 +41,8 @@ Accepted manifest semantics include:
 - missing-evidence-is-unknown semantics;
 - X1 `historical_compare` supports bounded `window`, `all_available`, and `all_available_pair` modes; all-available history is explicitly scoped to verified CMIS observations and does not imply complete asset lifetime;
 - CMIS `1.11.0+` supports exact-mint X1 identity normalization under `x1_asset_identity/v1`, with the mint preserved as the canonical fungible identity root and Metaplex/XDEX descriptors kept separately sourced;
-- CMIS `1.12.0` may extend verified historical **price only** through the accepted provider-backfill contract while preserving source-independence, archive-completeness, continuity, historical stable-quote, and full-lifetime limitations;
+- CMIS `1.12.0+` may extend verified historical **price only** through the accepted provider-backfill contract while preserving source-independence, archive-completeness, continuity, historical stable-quote, and full-lifetime limitations;
+- CMIS `1.13.0` adds X1-only `instant_x1_scan/v1` as a bounded read-only composition service for ROBERTA; its local-history path does not trigger provider backfill or RPC coverage expansion, unverified holder/concentration facts stay unknown, Proof Score remains separate from risk, and execution remains unauthorized;
 - Oracle V2's exact deployed X1 program/state shape and Unix-ms timestamp semantics are verified under bounded evidence contracts; the explicit freshness policy is selected/applied and freshness evaluation is verified, but the latest live slots are all stale, so current-price use, source independence, price correctness, CMIS-provider promotion, public-service promotion, and Scout reliance remain false;
 - read-only Phase 11 `intelligence_foundation` with public-service/Scout-reliance promotion false;
 - one separately promoted read-only X1 intelligence service: `concentration_change_intelligence/v1`.
