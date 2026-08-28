@@ -8,6 +8,13 @@ The accepted capability contract on `main` is **1.12.0**. The project is beyond 
 
 Controlled Execution remains locked/not started.
 
+
+## Strategic roadmap update — 2026-08-28
+
+CMIS is reprioritized toward the deterministic X1 services needed by Roberta's flagship product: Instant X1 Scan fields, a fresh X1.Ninja developer-API verification track, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a future developer intelligence API. X1 is the flagship CMIS surface; Solana remains maintained for accepted read-only capability and portability testing.
+
+This is a **priority/product-direction update only**. It does not change accepted capability, promotion, evidence, risk, authority, or execution state on its own. Roadmap ownership: issue #318.
+
 ## Accepted on CMIS `main`
 
 - Phase 10 Solana read-only provider foundation: complete.
