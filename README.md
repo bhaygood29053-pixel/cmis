@@ -93,7 +93,8 @@ Other current X1 provider-gap observations remain non-promotional:
 - Warp Bridge machine-readable operational state remains unavailable until an exact provenance-approved read contract is accepted.
 
 Current Solana field-maturity work:
-- **Issue #306 — observed-pair liquidity/volume aggregation: implemented in PR #307.** CMIS deterministically totals only eligible unique DEX Screener pairs returned for the verified mint. The result remains explicitly observed-pair scoped; pair-universe completeness, Solana-wide liquidity/volume verification, and market-source independence remain false.
+- **Issue #306 — observed-pair liquidity/volume aggregation: complete via PR #307.** CMIS deterministically totals only eligible unique DEX Screener pairs returned for the verified mint. The result remains explicitly observed-pair scoped; pair-universe completeness, Solana-wide liquidity/volume verification, and market-source independence remain false.
+- **Issue #308 — Solana market observation freshness semantics: active.** CMIS must keep collection time, provider fact time, chain block identity, transport latency, and underlying market-fact freshness separate. Jupiter token `createdAt` and DEX Screener `pairCreatedAt` are not price-observation timestamps.
 
 ## Roberta-facing service surface
 

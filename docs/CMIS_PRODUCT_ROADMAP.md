@@ -285,7 +285,8 @@ Near-term provider-gap priorities:
 - holder-semantics/completeness correction #304 is complete via PR #305 without relabeling token accounts/authorities as holders or beneficial owners;
 - Official X1 RPC remains the selected production RPC path; self-hosted redundancy is optional/deferred and does not establish market-source independence;
 - historical redundancy/source-independence remains a future evidence-depth option rather than a blocker;
-- #306 observed eligible-pair liquidity/24h-volume aggregation is implemented in PR #307 with pair-universe completeness explicitly unverified;
+- #306 observed eligible-pair liquidity/24h-volume aggregation is complete via PR #307 with pair-universe completeness explicitly unverified;
+- #308 Solana market observation freshness semantics is active; collection time must remain separate from provider fact time and underlying market freshness;
 - Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
 ### Verified Intelligence
@@ -339,16 +340,17 @@ Current implementation sequence:
 13. reconcile provider-gap and Oracle status after #298/#299 and close completed timestamp-governance issues;
 14. retain #301 self-hosted-node verification as optional/deferred infrastructure after selecting Official X1 RPC as the production path;
 15. correct holder/token-account/authority semantics under #304 without beneficial-owner overclaim — complete via PR #305;
-16. aggregate Solana observed eligible-pair liquidity/24h volume under #306 while preserving incomplete pair-universe scope — implemented in PR #307;
-17. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
+16. aggregate Solana observed eligible-pair liquidity/24h volume under #306 while preserving incomplete pair-universe scope — complete via PR #307;
+17. verify Solana market observation freshness semantics under #308 without treating token/pair creation timestamps or collection time as market-fact freshness;
+18. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
 
 Future candidates — **not active milestones until separately accepted**:
 
-18. any public alert/Scout-reliance promotion;
-19. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-20. further field-by-field Solana maturity;
-21. Ethereum under an explicit capability/acceptance plan;
-22. investigation/evidence export and premium access.
+19. any public alert/Scout-reliance promotion;
+20. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+21. further field-by-field Solana maturity after #308;
+22. Ethereum under an explicit capability/acceptance plan;
+23. investigation/evidence export and premium access.
 
 None authorizes execution.
 
