@@ -1,8 +1,15 @@
 # Roberta ↔ CMIS Source Sync Baseline
 
-Last reconciled: 2026-08-27 (America/New_York)
+Last reconciled: 2026-08-28 (America/New_York)
 
 This file is the compact cross-project synchronization baseline. It is intentionally mirrored in both repositories. Repository-local architecture, capability, roadmap, and status documents remain authoritative for implementation details.
+
+## Product identity invariant
+
+- **Roberta** is the canonical public-facing product name.
+- The former working name **X1 Intelligence Service** is retired and must not be used as the current product name.
+- X1 Scout, Solana Scout, and CMIS remain component names beneath Roberta.
+- This is a naming change only; the authority, evidence, risk, capability, and execution boundaries below are unchanged.
 
 ## Canonical authority path
 
