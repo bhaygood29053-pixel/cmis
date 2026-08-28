@@ -137,6 +137,36 @@ class JupiterPythTimeIdentityPolicyTests(unittest.TestCase):
         self.assertEqual(future["classification"], SOURCE_FUTURE)
         self.assertFalse(future["cross_source_time_identity_verified"])
 
+    def test_unverified_source_policy_stays_policy_unverified(self):
+        result = classify_jupiter_pyth_time_identity(
+            crosscheck(),
+            jupiter_freshness("POLICY_UNVERIFIED", eligible=False),
+            pyth_freshness(),
+            policy=accepted_jupiter_pyth_time_identity_policy(),
+        )
+
+        self.assertEqual(result["classification"], POLICY_UNVERIFIED)
+        self.assertFalse(result["classification_verified"])
+        self.assertFalse(result["same_time_candidate"])
+
+    def test_insufficient_crosscheck_evidence_is_unavailable(self):
+        record = crosscheck()
+        record["status"] = "INSUFFICIENT_EVIDENCE"
+        record["identity_verified"] = False
+        record["semantics_verified"] = False
+        record["within_tolerance"] = False
+
+        result = classify_jupiter_pyth_time_identity(
+            record,
+            jupiter_freshness(),
+            pyth_freshness(),
+            policy=accepted_jupiter_pyth_time_identity_policy(),
+        )
+
+        self.assertEqual(result["classification"], UNAVAILABLE)
+        self.assertFalse(result["classification_verified"])
+        self.assertFalse(result["same_time_candidate"])
+
     def test_unavailable_source_freshness_cannot_be_same_time(self):
         result = classify_jupiter_pyth_time_identity(
             crosscheck(),
