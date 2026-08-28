@@ -2,9 +2,11 @@
 
 The first promoted Solana market slice requires exact mint identity plus both
 accepted read-only market sources: Jupiter Price V3 and DEX Screener token-pair
-observations. A deployment must also provide an explicit cross-source price
-tolerance. Numerical agreement remains non-promotable because shared freshness
-and observation scope are not yet verified.
+observations. Pyth Core push-feed evidence may be attached as an exact-fixture
+secondary source when an explicit mint/feed mapping exists. A deployment must
+also provide an explicit cross-source price tolerance. Numerical agreement
+remains non-promotable because shared time identity, source independence, and
+observation scope are not yet verified.
 
 No pair is selected as canonical and no pair prices are averaged. CMIS may
 deterministically sum liquidity/24h volume across the exact eligible unique
@@ -26,7 +28,13 @@ from liquidity_scout.providers.solana.market_freshness import (
 )
 from liquidity_scout.providers.solana.market_verification import (
     verify_jupiter_vs_dexscreener_prices,
+    verify_jupiter_vs_pyth_price,
 )
+from liquidity_scout.providers.solana.pyth_freshness_policy import (
+    accepted_pyth_freshness_policy,
+    classify_pyth_freshness,
+)
+from liquidity_scout.providers.solana.pyth_push import PythSolanaSourceError
 from liquidity_scout.services.cmis_contract import (
     ERROR,
     PARTIAL,
@@ -263,11 +271,13 @@ class SolanaMarketReportMixin:
         *,
         solana_jupiter_provider: Any = None,
         solana_dexscreener_provider: Any = None,
+        solana_pyth_provider: Any = None,
         solana_price_max_relative_difference: object = None,
         **kwargs: Any,
     ):
         self.solana_jupiter_provider = solana_jupiter_provider
         self.solana_dexscreener_provider = solana_dexscreener_provider
+        self.solana_pyth_provider = solana_pyth_provider
         self.solana_price_max_relative_difference = _tolerance(
             solana_price_max_relative_difference
         )
@@ -443,6 +453,53 @@ class SolanaMarketReportMixin:
                 )
             )
 
+        pyth_record: Mapping[str, Any] | None = None
+        pyth_freshness: Mapping[str, Any] | None = None
+        jupiter_pyth_crosscheck: Mapping[str, Any] | None = None
+        pyth_collection_error: str | None = None
+
+        if self.solana_pyth_provider is not None:
+            try:
+                candidate = self.solana_pyth_provider.get_price(mint)
+                if not isinstance(candidate, Mapping):
+                    pyth_collection_error = "pyth_provider_contract_invalid"
+                else:
+                    pyth_record = candidate
+            except PythSolanaSourceError as exc:
+                pyth_collection_error = f"pyth_collection_failed:{type(exc).__name__}"
+            except Exception as exc:
+                pyth_collection_error = f"pyth_collection_failed_closed:{type(exc).__name__}"
+
+        if pyth_record is not None and pyth_record.get("mapping_verified") is True:
+            try:
+                pyth_freshness = classify_pyth_freshness(
+                    pyth_record,
+                    policy=accepted_pyth_freshness_policy(),
+                )
+            except (TypeError, ValueError) as exc:
+                pyth_collection_error = (
+                    f"pyth_freshness_contract_invalid:{type(exc).__name__}"
+                )
+
+            jupiter_freshness_record = market_freshness.get("jupiter")
+            jupiter_fact_time = (
+                jupiter_freshness_record.get("provider_fact_time_unix")
+                if isinstance(jupiter_freshness_record, Mapping)
+                else None
+            )
+            if pyth_freshness is not None:
+                try:
+                    jupiter_pyth_crosscheck = verify_jupiter_vs_pyth_price(
+                        jupiter_mapping,
+                        pyth_record,
+                        max_relative_difference=tolerance,
+                        jupiter_fact_time_unix=jupiter_fact_time,
+                    )
+                except (TypeError, ValueError) as exc:
+                    pyth_collection_error = (
+                        f"jupiter_pyth_crosscheck_invalid:{type(exc).__name__}"
+                    )
+
         jupiter_price = (
             jupiter_mapping.get("usd_price")
             if jupiter_mapping.get("price_available") is True
@@ -500,6 +557,38 @@ class SolanaMarketReportMixin:
                 ),
             },
         ]
+        if pyth_collection_error is not None:
+            warnings.append(
+                {
+                    "code": "solana_pyth_secondary_evidence_unavailable",
+                    "message": (
+                        "Pyth secondary price evidence failed closed "
+                        f"({pyth_collection_error})."
+                    ),
+                }
+            )
+        elif pyth_record is not None and pyth_record.get("mapping_verified") is not True:
+            warnings.append(
+                {
+                    "code": "solana_pyth_exact_mapping_unavailable",
+                    "message": (
+                        "No repository-approved exact mint-to-Pyth-feed mapping "
+                        "exists for this Solana asset; symbol/name matching is not used."
+                    ),
+                }
+            )
+        elif pyth_freshness is not None:
+            warnings.append(
+                {
+                    "code": "solana_pyth_secondary_price_non_promotable",
+                    "message": (
+                        "Pyth Core provides timestamped secondary price evidence, "
+                        "but Jupiter/Pyth fact-time compatibility and market-source "
+                        "independence are not yet verified."
+                    ),
+                }
+            )
+
         aggregate_meta = observed_pair_aggregate["observed_pair_aggregation"]
         if (
             observed_pair_aggregate["observed_pair_count"] > 0
@@ -584,6 +673,18 @@ class SolanaMarketReportMixin:
                     ),
                 }
             )
+        if pyth_record is not None and pyth_record.get("mapping_verified") is True:
+            sources.append(
+                {
+                    "source": "pyth_core_solana_push",
+                    "role": "market_report.secondary_price_evidence",
+                    "feed_id": pyth_record.get("feed_id"),
+                    "account_address": pyth_record.get("account_address"),
+                    "publish_time_unix": pyth_record.get("publish_time_unix"),
+                    "posted_slot": pyth_record.get("posted_slot"),
+                    "contract_generation": pyth_record.get("contract_generation"),
+                }
+            )
         if (
             isinstance(block_time_record, Mapping)
             and block_time_record.get("block_time_verified") is True
@@ -629,6 +730,31 @@ class SolanaMarketReportMixin:
                 "price_verified": False,
                 "price_crosscheck": dict(crosscheck),
                 "market_freshness": dict(market_freshness),
+                "pyth_secondary_price": (
+                    {
+                        "status": (
+                            "ok"
+                            if pyth_record is not None
+                            and pyth_record.get("mapping_verified") is True
+                            else "unavailable"
+                        ),
+                        "record": dict(pyth_record) if pyth_record is not None else None,
+                        "freshness": (
+                            dict(pyth_freshness)
+                            if pyth_freshness is not None
+                            else None
+                        ),
+                        "jupiter_crosscheck": (
+                            dict(jupiter_pyth_crosscheck)
+                            if jupiter_pyth_crosscheck is not None
+                            else None
+                        ),
+                        "collection_error": pyth_collection_error,
+                        "cross_source_time_identity_verified": False,
+                        "source_independence_verified": False,
+                        "current_price_promotable": False,
+                    }
+                ),
                 "pair_observations": pair_observations,
                 "pair_count_observed": dex_mapping.get("pair_count_observed"),
                 "observed_pair_count": observed_pair_aggregate["observed_pair_count"],
