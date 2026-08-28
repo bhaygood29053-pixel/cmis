@@ -1,6 +1,6 @@
 # Scout ↔ CMIS Capability Contract
 
-Last reconciled: 2026-08-26
+Last reconciled: 2026-08-28
 
 CMIS publishes machine-readable service eligibility at:
 
@@ -16,7 +16,7 @@ Accepted baseline:
 
 - capability schema: `1`
 - global existing-service minimum: `1.8.0`
-- current CMIS contract: `1.12.0`
+- current CMIS contract: `1.13.0`
 - request path: `/v1/cmis`
 - Evidence Receipt schema: `1`
 - Proof Score schema: `1`
@@ -42,6 +42,30 @@ The manifest preserves:
 - missing evidence remains unknown/unavailable rather than fabricated false/zero.
 
 A Scout fails closed if these declarations are missing, malformed, or weakened.
+
+## Instant X1 Scan — CMIS 1.13.0
+
+CMIS 1.13.0 adds one bounded X1-only composition service:
+
+```text
+service = instant_x1_scan
+service_contract_version = instant_x1_scan/v1
+chain = x1
+read_only = true
+public_service_promoted = true
+scout_reliance_promoted = true
+execution_authorized = false
+```
+
+The service composes accepted CMIS outputs for exact identity, current market, tokenomics, CMIS-stored verified history, and deterministic risk. It does not introduce a new provider or a second truth path.
+
+The scan's history section is local-only: it does not trigger XDEX/X1.Ninja historical backfill or X1 RPC history-coverage expansion. A separate local 24h verified-price comparison may be supplied to the existing deterministic risk core.
+
+Holder-looking provider values remain unverified unless the existing holder semantic/coverage contract passes. Current top-account concentration is explicitly unavailable in `instant_x1_scan/v1`; internal Phase 11 foundations are not used as a public shortcut.
+
+The runtime EvidenceQualityMixin attaches the scan Evidence Receipt and Proof Score after the deterministic service result is complete. Proof Score remains separate from risk and cannot rewrite facts, scan status, or authority.
+
+Solana advertises `instant_x1_scan` as unavailable. Solana product expansion and release remain deferred to a future phase.
 
 ## X1 normalized exact-mint identity — CMIS 1.11.0
 

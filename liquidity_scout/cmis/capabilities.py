@@ -26,7 +26,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.12.0"
+CMIS_CONTRACT_VERSION = "1.13.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -139,6 +139,32 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             "metaplex_xdex_reconciliation": True,
         },
         "market_report": _capability("supported"),
+        "instant_x1_scan": {
+            **_capability(
+                "bounded",
+                requirements=(
+                    "verified_x1_asset_identity",
+                    "accepted_market_report",
+                    "accepted_tokenomics_service",
+                    "cmis_stored_verified_history_only",
+                    "deterministic_risk_core",
+                ),
+                limitations=(
+                    "holder_count_may_remain_unverified",
+                    "current_top_account_concentration_not_promoted_in_v1",
+                    "history_does_not_imply_complete_asset_lifetime",
+                    "proof_score_separate_from_risk",
+                    "risk_score_unavailable_until_calibrated",
+                    "execution_authorized_false",
+                    "x1_only_initial_scope",
+                ),
+            ),
+            "read_only": True,
+            "service_contract_version": "instant_x1_scan/v1",
+            "public_service_promoted": True,
+            "scout_reliance_promoted": True,
+            "execution_authorized": False,
+        },
         "rank": _capability("supported"),
         "historical_compare": _capability(
             "supported",
@@ -216,6 +242,20 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
                 "shared_absolute_freshness_unverified",
             ),
         ),
+        "instant_x1_scan": {
+            **_capability(
+                "unavailable",
+                limitations=(
+                    "instant_x1_scan_x1_only_initial_scope",
+                    "solana_product_expansion_and_release_deferred",
+                ),
+            ),
+            "read_only": True,
+            "service_contract_version": "instant_x1_scan/v1",
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "execution_authorized": False,
+        },
         "rank": _capability(
             "unavailable",
             limitations=("solana_asset_ranking_not_implemented",),

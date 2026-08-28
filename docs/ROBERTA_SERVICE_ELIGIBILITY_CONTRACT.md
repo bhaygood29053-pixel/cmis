@@ -54,6 +54,23 @@ If any required gate is unresolved, Roberta must treat the capability as unavail
 
 Passing the baseline gate does not imply that the contract or verification gates pass.
 
+## Instant X1 Scan eligibility — CMIS 1.13.0
+
+`instant_x1_scan/v1` is a bounded read-only X1 composition service for ROBERTA once CMIS 1.13.0 is deployed and advertised by the live capability manifest.
+
+Eligibility requirements remain fail-closed:
+
+- chain must be `x1`;
+- the live manifest must advertise `instant_x1_scan` as callable with service contract `instant_x1_scan/v1`;
+- exact requested asset identity and current market prerequisites must resolve through CMIS;
+- component facts retain their existing verification/partial/unavailable state;
+- holder-looking values are not promoted when holder semantics/coverage are unverified;
+- current top-account concentration remains unavailable in scan v1 rather than being synthesized from internal Phase 11 foundations;
+- the scan history profile is limited to CMIS-stored verified observations and does not trigger provider backfill or X1 RPC coverage expansion;
+- Proof Score remains evidence quality only and does not alter deterministic risk;
+- execution remains unauthorized.
+
+A `partial` Instant X1 Scan is a valid production result when one or more declared fields are unverified. ROBERTA must preserve those unknown/partial fields rather than filling them from memory or inference.
 ## Current examples
 
 ### Existing market and lookup capabilities

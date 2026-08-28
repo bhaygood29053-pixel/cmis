@@ -701,6 +701,8 @@ class CMISGateway:
         anchor_tolerance_seconds: int = 21600,
         onchain_page_size: int = 1000,
         onchain_max_signatures: int = 5000,
+        include_onchain_coverage: bool = True,
+        include_supply_lookup: bool = True,
     ) -> Dict[str, Any]:
         market_data = market_envelope.get("data")
         if not isinstance(market_data, Mapping):
@@ -728,7 +730,9 @@ class CMISGateway:
             question,
             snapshot,
             history_backend=self.history_backend,
-            get_total_supply=current_total_supply,
+            get_total_supply=(
+                current_total_supply if include_supply_lookup else None
+            ),
             chain="x1",
             observed_at=market_envelope.get("observed_at"),
             mode=mode,
@@ -736,7 +740,9 @@ class CMISGateway:
             metrics=metrics,
             gap_threshold_seconds=gap_threshold_seconds,
             anchor_tolerance_seconds=anchor_tolerance_seconds,
-            onchain_coverage_provider=self.x1_rpc_provider,
+            onchain_coverage_provider=(
+                self.x1_rpc_provider if include_onchain_coverage else None
+            ),
             onchain_page_size=onchain_page_size,
             onchain_max_signatures=onchain_max_signatures,
         )
