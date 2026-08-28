@@ -84,6 +84,24 @@ class DexScreenerSolanaProviderTests(unittest.TestCase):
         self.assertEqual(pair["pair_created_at_ms"], 1700000000000)
         self.assertTrue(get.calls[0]["url"].endswith(f"/token-pairs/v1/solana/{MINT}"))
 
+    def test_collection_time_is_separate_from_pair_creation_time(self):
+        ticks = iter([200.0, 201.5])
+        provider = DexScreenerSolanaProvider(
+            get=_get_with([_pair()]),
+            clock=lambda: next(ticks),
+        )
+
+        result = provider.get_token_pairs(MINT)
+
+        self.assertEqual(result["collection_started_at_unix"], 200.0)
+        self.assertEqual(result["collection_completed_at_unix"], 201.5)
+        self.assertTrue(result["collection_time_verified"])
+        self.assertEqual(
+            result["pairs"][0]["pair_created_at_ms"],
+            1700000000000,
+        )
+        self.assertFalse(result["freshness_verified"])
+
     def test_quote_side_requested_mint_never_inherits_base_token_price(self):
         record = _pair(token="OtherBaseMint")
         record["quoteToken"] = {"address": MINT, "name": "Requested", "symbol": "REQ"}
