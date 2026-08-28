@@ -67,12 +67,14 @@ class InstantX1ScanMixin:
             mode="all_available",
             metrics=HISTORY_METRICS,
             include_onchain_coverage=False,
+            include_supply_lookup=False,
         )
         risk_history = self._historical_from_market(
             "Has price changed in the last 24 hours?",
             market,
             mode="window",
             include_onchain_coverage=False,
+            include_supply_lookup=False,
         )
 
         market_data = (
