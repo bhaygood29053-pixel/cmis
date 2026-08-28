@@ -36,7 +36,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.12.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.13.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -49,6 +49,48 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertIn(CONCENTRATION_INTELLIGENCE_SERVICE, SUPPORTED_SERVICES)
         self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
         self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])
+
+    def test_instant_x1_scan_is_x1_only_bounded_public_service(self):
+        manifest = build_capability_manifest(
+            runtime_services=SUPPORTED_SERVICES,
+            legacy_supported_chains=SUPPORTED_CHAINS,
+            known_chains=KNOWN_CHAINS,
+        )
+        x1 = service_capability(
+            manifest,
+            chain="x1",
+            service="instant_x1_scan",
+        )
+        solana = service_capability(
+            manifest,
+            chain="solana",
+            service="instant_x1_scan",
+        )
+
+        self.assertEqual(x1["state"], "bounded")
+        self.assertTrue(x1["callable"])
+        self.assertTrue(x1["read_only"])
+        self.assertTrue(x1["public_service_promoted"])
+        self.assertTrue(x1["scout_reliance_promoted"])
+        self.assertEqual(
+            x1["service_contract_version"],
+            "instant_x1_scan/v1",
+        )
+        self.assertIn(
+            "current_top_account_concentration_not_promoted_in_v1",
+            x1["limitations"],
+        )
+        self.assertFalse(x1["execution_authorized"])
+
+        self.assertEqual(solana["state"], "unavailable")
+        self.assertFalse(solana["callable"])
+        self.assertFalse(solana["public_service_promoted"])
+        self.assertFalse(solana["scout_reliance_promoted"])
+        self.assertIn(
+            "solana_product_expansion_and_release_deferred",
+            solana["limitations"],
+        )
+        self.assertFalse(solana["execution_authorized"])
 
     def test_x1_asset_lookup_advertises_normalized_identity_contract(self):
         manifest = build_capability_manifest(
