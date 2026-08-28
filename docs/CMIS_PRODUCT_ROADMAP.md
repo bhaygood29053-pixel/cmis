@@ -274,6 +274,34 @@ For *Mastering Blockchain, Fourth Edition*, accepted prebuilt banks reach Stage 
 
 This Learning Plane is upstream reasoning/knowledge capability, not a new CMIS authority channel. Static learning state never overrides fresh accepted CMIS/provider evidence, never establishes source independence or provider trust, and never changes CMIS capability/promotion/risk/execution semantics.
 
+## Strategic product roadmap — X1 productization (adopted 2026-08-28)
+
+Roadmap ownership: issue #318.
+
+CMIS is now prioritized around the verified data and intelligence services required for **Roberta to become the leading X1 intelligence analyst**. X1 remains the flagship CMIS surface. Solana remains a maintained read-only portability/test surface, while Solana product expansion and release are deferred to a future phase rather than competing with near-term X1 productization.
+
+### Productization priorities
+
+1. **Instant X1 Scan support** — stabilize the exact identity, market, tokenomics, holder/concentration, history, evidence, and deterministic risk fields needed for a compact Roberta X1 scan. Fields that are not verified remain explicit unknown/partial values.
+2. **X1.Ninja developer API validation** — open a fresh provider-verification track for the currently available machine-readable developer API. Treat all responses as candidate evidence until identity, units, freshness, scope, reproducibility, same-fact semantics, and independence are explicitly proven. Prior SSE 403 evidence does not automatically apply to a different documented API contract.
+3. **Holder and wallet intelligence promotion** — promote useful concentration, direct-wallet-relationship, and related deterministic foundations only through explicit public/Scout-reliance contracts. Direct interactions must not be relabeled as beneficial ownership, common control, intent, fraud, or manipulation.
+4. **Discovery Ledger** — add an immutable first-observation record plus subsequent verified observations for supported X1 assets/entities, preserving exact source/fact-time/proof lineage so later performance and assessment-quality analysis can be reproduced.
+5. **Early Warning services** — advance concentration/liquidity/wallet/activity warning candidates only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
+6. **Deterministic Compare services** — support first-class current-vs-history and entity-vs-entity comparisons without recomputing facts outside the canonical evidence store.
+7. **X1 ecosystem/network brief inputs** — expose bounded verified market, network, validator, protocol, and ecosystem observations needed for a Roberta daily intelligence brief, one field at a time under exact provenance and scope.
+8. **Developer intelligence API** — after service contracts stabilize, prepare a bounded developer-facing CMIS/Roberta intelligence surface for other X1 applications. Premium/access policy must never change truth, verification, Proof Score, or risk semantics.
+
+### Scope discipline
+
+- Do not rebuild complete explorers, portfolio trackers, staking interfaces, charting terminals, or generic DEX screeners inside CMIS.
+- Prefer exact machine-readable ecosystem providers when they reduce commodity indexing work, but preserve CMIS as the verification/trust boundary.
+- X1 receives the clear majority of near-term chain-specific product work.
+- Solana maintenance continues for accepted read-only capability, regression coverage, and cross-chain portability. Solana product expansion and release are deferred to a future phase unless bounded work materially improves shared CMIS abstractions.
+- Proof Score remains separate from risk. Unknown remains unknown. Source independence must be proven, not inferred from provider labels.
+- No roadmap item authorizes transaction construction, signing, broadcasting, custody, swaps, bridge value transfer, or autonomous value movement.
+
+This roadmap update changes **priority and product direction only**. It does not promote any currently internal service, declare X1.Ninja verified, or change the accepted CMIS capability contract by itself.
+
 ## Product direction
 
 ### Verified Data
@@ -290,7 +318,7 @@ Near-term provider-gap priorities:
 - #311 Solana Jupiter current-price freshness policy is complete via PR #312 with explicit CMIS operator bounds of 60 seconds max age and 5 seconds future skew;
 - #313 timestamped Pyth Core secondary Solana price evidence is complete via PR #314 for one exact USDC/USD fixture through canonical Solana RPC; source-specific Pyth freshness is deterministic and Jupiter/Pyth numerical/fact-time-delta evidence is available;
 - #315 Jupiter–Pyth cross-source time-identity governance is implemented in PR #316 with an explicit five-second same-time operator window; exact same-time eligibility may now be verified while source independence, price-construction equivalence, and current-price promotion remain false;
-- the next Solana gate is provider/source-independence and price-construction compatibility analysis before any separate current-price promotion gate;
+- #317 provider/source-independence and price-construction compatibility analysis is retained as deferred Solana evidence work; it is not the active near-term implementation priority while X1 productization is underway;
 - Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
 ### Verified Intelligence

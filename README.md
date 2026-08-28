@@ -69,6 +69,11 @@ Not accepted/promoted:
 - no Ethereum provider milestone without a separate accepted gate;
 - no Controlled Execution or value movement.
 
+### Strategic product focus — 2026-08-28
+
+CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing, but Solana product expansion and release work are deferred to a future phase. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
+
+
 The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-08-27.md`](./docs/PROJECT_STATUS_2026-08-27.md).
 
 ## Active provider-gap work — not accepted capability
@@ -98,6 +103,7 @@ Current Solana field-maturity work:
 - **Issue #311 — Solana Jupiter current-price freshness policy: complete via PR #312.** CMIS applies an explicit 60-second max-age and 5-second future-skew operator policy to verified Jupiter block-time evidence.
 - **Issue #313 — timestamped secondary Solana price evidence: complete via PR #314.** CMIS reads one exact USDC/USD Pyth Core sponsored push-feed fixture through canonical Solana RPC, verifies account/feed/full-verification/price/exponent/confidence/`publish_time`, applies a separate Pyth 60-second/5-second source policy, and can compare Jupiter/Pyth numerical prices plus exact fact-time delta.
 - **Issue #315 — Jupiter–Pyth cross-source time identity: implemented in PR #316.** CMIS defines a separate five-second same-time operator window. Both source-specific freshness gates must be FRESH; a fact-time delta <=5 seconds may set `cross_source_time_identity_verified=true`. Source independence, price-construction equivalence, current-price promotion, and execution authority remain false.
+- **Issue #317 — Jupiter/Pyth independence and methodology compatibility: deferred with the Solana product track.** The issue remains useful future evidence work, but it is not the active implementation priority while CMIS productizes X1 first.
 
 ## Roberta-facing service surface
 
