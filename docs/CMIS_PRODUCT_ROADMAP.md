@@ -42,7 +42,8 @@ Accepted milestones on `main`:
 - **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
 - **X1 verified-provider historical price backfill: COMPLETE under the bounded CMIS `1.12.0` contract.** Backfill is price-only and preserves non-independence, non-archive-completeness, non-continuity, historical stable-quote uncertainty, and non-lifetime-completeness limits.
 - **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
-- **CMIS capability contract: `1.12.0`.**
+- **CMIS capability contract: `1.13.0`.**
+- **Instant X1 Scan: IMPLEMENTED under #322 as `instant_x1_scan/v1`.** The service is X1-only, read-only, composition-only, local-history-only, and fail-closed for unverified holder/current-concentration facts; Proof Score remains separate from deterministic risk.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
 - **Roberta autonomous Learning Plane upstream dependency: ACCEPTED on Roberta `main` via PR #228; post-merge Roberta source/roadmap reconciliation is accepted via PR #231.**
@@ -286,8 +287,8 @@ CMIS is now prioritized around the verified data and intelligence services requi
 
 ### Productization priorities
 
-1. **Instant X1 Scan support** — stabilize the exact identity, market, tokenomics, holder/concentration, history, evidence, and deterministic risk fields needed for a compact Roberta X1 scan. Fields that are not verified remain explicit unknown/partial values.
-2. **X1.Ninja developer API validation** — open a fresh provider-verification track for the currently available machine-readable developer API. Treat all responses as candidate evidence until identity, units, freshness, scope, reproducibility, same-fact semantics, and independence are explicitly proven. Prior SSE 403 evidence does not automatically apply to a different documented API contract.
+1. **Instant X1 Scan support — implemented under #322 / CMIS 1.13.0.** The compact `instant_x1_scan/v1` service composes exact identity, market, tokenomics, CMIS-stored verified history, deterministic risk, and runtime evidence quality. Unverified holder/current-concentration facts remain explicit unknown/partial values.
+2. **X1.Ninja developer API validation — next.** — open a fresh provider-verification track for the currently available machine-readable developer API. Treat all responses as candidate evidence until identity, units, freshness, scope, reproducibility, same-fact semantics, and independence are explicitly proven. Prior SSE 403 evidence does not automatically apply to a different documented API contract.
 3. **Holder and wallet intelligence promotion** — promote useful concentration, direct-wallet-relationship, and related deterministic foundations only through explicit public/Scout-reliance contracts. Direct interactions must not be relabeled as beneficial ownership, common control, intent, fraud, or manipulation.
 4. **Discovery Ledger** — add an immutable first-observation record plus subsequent verified observations for supported X1 assets/entities, preserving exact source/fact-time/proof lineage so later performance and assessment-quality analysis can be reproduced.
 5. **Early Warning services** — advance concentration/liquidity/wallet/activity warning candidates only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
