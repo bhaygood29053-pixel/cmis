@@ -20,6 +20,19 @@ import unittest
 
 from liquidity_scout.cmis.runtime_gateway import RuntimeCMISGateway
 from liquidity_scout.providers.solana.live_fixture import SOLANA_TOKEN_2022_LIVE_FIXTURE
+from liquidity_scout.providers.solana.pyth_freshness_policy import (
+    FRESH,
+    FUTURE,
+    STALE,
+    accepted_pyth_freshness_policy,
+    classify_pyth_freshness,
+)
+from liquidity_scout.providers.solana.pyth_push import (
+    PYTH_CORE_RECEIVER_PROGRAM_ID,
+    PythSolanaPushProvider,
+    USDC_MINT,
+    USDC_USD_FEED_ID,
+)
 from liquidity_scout.providers.solana.rpc import SolanaRPCProvider
 
 
@@ -104,6 +117,50 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
         else:
             self.assertFalse(block_time["block_time_verified"])
             self.assertIsNone(block_time["block_time_unix"])
+
+    def test_pyth_usdc_sponsored_push_feed_read_only_contract(self):
+        pyth = PythSolanaPushProvider(self.provider)
+        result = pyth.get_price(USDC_MINT)
+
+        self.assertEqual(result["chain"], "solana")
+        self.assertEqual(result["source"], "pyth_core_solana_push")
+        self.assertEqual(result["mint"], USDC_MINT)
+        self.assertTrue(result["mapping_verified"])
+        self.assertEqual(result["feed_id"], USDC_USD_FEED_ID)
+        self.assertTrue(result["feed_id_verified"])
+        self.assertEqual(
+            result["account_owner"],
+            PYTH_CORE_RECEIVER_PROGRAM_ID,
+        )
+        self.assertTrue(result["account_owner_verified"])
+        self.assertTrue(result["write_authority_matches_feed_account"])
+        self.assertEqual(result["verification_level"], "full")
+        self.assertTrue(result["full_verification"])
+        self.assertTrue(result["price_integrity_verified"])
+        self.assertTrue(result["fact_time_verified"])
+        self.assertGreater(result["publish_time_unix"], 0)
+        self.assertGreaterEqual(result["posted_slot"], 0)
+        self.assertGreater(float(result["price_usd"]), 0)
+        self.assertFalse(result["symbol_discovery_used"])
+        self.assertFalse(result["hermes_used"])
+        self.assertFalse(result["current_price_promotable"])
+        self.assertFalse(result["source_independence_verified"])
+        self.assertFalse(result["execution_authorized"])
+
+        freshness = classify_pyth_freshness(
+            result,
+            policy=accepted_pyth_freshness_policy(),
+        )
+        self.assertIn(
+            freshness["classification"],
+            {FRESH, STALE, FUTURE},
+        )
+        self.assertTrue(freshness["classification_verified"])
+        self.assertTrue(freshness["pyth_freshness_verified"])
+        self.assertFalse(freshness["current_price_promotable"])
+        self.assertFalse(freshness["cross_source_time_identity_verified"])
+        self.assertFalse(freshness["source_independence_verified"])
+        self.assertFalse(freshness["execution_authorized"])
 
     @unittest.skipUnless(
         RUN_LARGEST,
