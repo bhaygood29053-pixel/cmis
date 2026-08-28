@@ -353,8 +353,11 @@ class CMISSolanaMarketReportTests(unittest.TestCase):
             secondary["jupiter_crosscheck"]["fact_time_delta_seconds"],
             "1",
         )
-        self.assertFalse(
+        self.assertIsNone(
             secondary["jupiter_crosscheck"]["time_identity_policy_complete"]
+        )
+        self.assertFalse(
+            secondary["jupiter_crosscheck"]["time_identity_policy_applied"]
         )
         self.assertFalse(
             secondary["jupiter_crosscheck"]["time_identity_verified"]
