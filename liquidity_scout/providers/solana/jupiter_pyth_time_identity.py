@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from liquidity_scout.cmis.evidence import AGREEMENT
+from liquidity_scout.cmis.evidence import AGREEMENT, CONFLICT, INSUFFICIENT_EVIDENCE
 
 VERSION = "solana_jupiter_pyth_time_identity/v1"
 
@@ -186,6 +186,19 @@ def classify_jupiter_pyth_time_identity(
             "classification": INVALID,
             "reason": "crosscheck_chain_invalid",
         }
+    crosscheck_status = crosscheck.get("status")
+    if crosscheck_status == INSUFFICIENT_EVIDENCE:
+        return {
+            **base,
+            "classification": UNAVAILABLE,
+            "reason": "crosscheck_evidence_unavailable",
+        }
+    if crosscheck_status not in {AGREEMENT, CONFLICT}:
+        return {
+            **base,
+            "classification": INVALID,
+            "reason": "crosscheck_status_invalid",
+        }
     if (
         crosscheck.get("identity_verified") is not True
         or crosscheck.get("semantics_verified") is not True
@@ -219,9 +232,15 @@ def classify_jupiter_pyth_time_identity(
             "classification_verified": True,
             "reason": "one_or_more_sources_stale",
         }
+    if jupiter_class == "POLICY_UNVERIFIED" or pyth_class == "POLICY_UNVERIFIED":
+        return {
+            **base,
+            "classification": POLICY_UNVERIFIED,
+            "reason": "one_or_more_source_freshness_policies_unverified",
+        }
     if (
-        jupiter_class in {"UNAVAILABLE", "POLICY_UNVERIFIED", None}
-        or pyth_class in {"UNAVAILABLE", "POLICY_UNVERIFIED", None}
+        jupiter_class in {"UNAVAILABLE", None}
+        or pyth_class in {"UNAVAILABLE", None}
     ):
         return {
             **base,
