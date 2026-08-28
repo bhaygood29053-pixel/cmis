@@ -80,6 +80,31 @@ class SolanaRPCLiveContractTests(unittest.TestCase):
                 )
             )
 
+    def test_read_only_block_time_freshness_primitives(self):
+        reference = self.provider.get_slot()
+
+        self.assertEqual(reference["chain"], "solana")
+        self.assertEqual(reference["source"], "solana_rpc")
+        self.assertEqual(reference["method"], "getSlot")
+        self.assertTrue(reference["slot_verified"])
+        self.assertEqual(reference["commitment"], self.provider.commitment)
+        self.assertGreaterEqual(reference["slot"], 0)
+
+        # Probe a bounded recent slot. A skipped/pruned/null block-time remains
+        # explicit unavailability and is not converted into a timestamp.
+        block_id = max(0, reference["slot"] - 32)
+        block_time = self.provider.get_block_time(block_id)
+
+        self.assertEqual(block_time["method"], "getBlockTime")
+        self.assertEqual(block_time["block_id"], block_id)
+        self.assertFalse(block_time["finality_verified"])
+        if block_time["block_time_available"] is True:
+            self.assertTrue(block_time["block_time_verified"])
+            self.assertGreaterEqual(block_time["block_time_unix"], 0)
+        else:
+            self.assertFalse(block_time["block_time_verified"])
+            self.assertIsNone(block_time["block_time_unix"])
+
     @unittest.skipUnless(
         RUN_LARGEST,
         "RUN_SOLANA_LARGEST_ACCOUNTS_LIVE_TESTS=1 is required",
