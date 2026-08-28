@@ -1,8 +1,12 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-08-27 (America/New_York)
+Last reconciled: 2026-08-28 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
+
+## Product naming invariant
+
+The public-facing product name is **ROBERTA — Verified On-Chain Intelligence**. The former working product name **X1 Intelligence Service** is retired. **CMIS** remains the deterministic backend/repository identity, while X1 Scout and Solana Scout remain chain-specialist component names. Product naming does not change the authority path, capability promotion state, verification semantics, or execution boundary.
 
 ## Canonical architecture
 

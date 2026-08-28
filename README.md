@@ -4,6 +4,12 @@
 
 CMIS is the deterministic blockchain-intelligence backend used by chain-specific Scouts. X1 Scout and Solana Scout call CMIS for freshness-sensitive market facts, tokenomics, verification evidence, proof quality, historical intelligence, deterministic risk, and bounded pre-trade analysis. Their reports flow back to Roberta, which owns coordination, policy, reasoning, learning-workflow integration, and the final user-facing response.
 
+## Product identity
+
+**ROBERTA — Verified On-Chain Intelligence** is the canonical public-facing product name. **CMIS** remains the deterministic backend/repository identity and is not being renamed. The former working product name **X1 Intelligence Service** is retired. X1 Scout and Solana Scout remain specialist component names beneath Roberta. This naming decision does not change CMIS authority, contracts, evidence semantics, or execution boundaries.
+
+Canonical product naming rules live in `bhaygood29053-pixel/roberta-langgraph/docs/PRODUCT_IDENTITY.md`.
+
 The repository was originally created as **Liquidity Scout**. The canonical project identity is now **CMIS** at `bhaygood29053-pixel/cmis`.
 
 > Compatibility note: the working Python package namespace is still `liquidity_scout`. That namespace remains an implementation compatibility detail and does not create a second authority layer.
@@ -40,7 +46,7 @@ Chain Provider -> CMIS -> Chain Scout -> Roberta
 
 CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, learning-workflow coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
 
-## Current roadmap position — reconciled 2026-08-27
+## Current roadmap position — reconciled 2026-08-28
 
 Accepted on `main`:
 
