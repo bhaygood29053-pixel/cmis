@@ -96,7 +96,8 @@ class FakeRPC:
 class PythSolanaPushProviderTests(unittest.TestCase):
     def test_exact_usdc_fixture_decodes_verified_pyth_price(self):
         rpc = FakeRPC()
-        provider = PythSolanaPushProvider(rpc)
+        ticks = iter([2_000_000_010.0, 2_000_000_011.25])
+        provider = PythSolanaPushProvider(rpc, clock=lambda: next(ticks))
 
         result = provider.get_price(USDC_MINT)
 
@@ -120,6 +121,9 @@ class PythSolanaPushProviderTests(unittest.TestCase):
         self.assertEqual(result["publish_time_unix"], 2_000_000_000)
         self.assertEqual(result["posted_slot"], 123456)
         self.assertTrue(result["fact_time_verified"])
+        self.assertEqual(result["collection_started_at_unix"], 2_000_000_010.0)
+        self.assertEqual(result["collection_completed_at_unix"], 2_000_000_011.25)
+        self.assertTrue(result["collection_time_verified"])
         self.assertFalse(result["symbol_discovery_used"])
         self.assertFalse(result["hermes_used"])
         self.assertFalse(result["current_price_promotable"])
