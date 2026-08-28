@@ -204,7 +204,8 @@ def verify_jupiter_vs_pyth_price(
         "jupiter_fact_time_unix": _canonical_decimal(jupiter_fact_time),
         "pyth_fact_time_unix": _canonical_decimal(pyth_fact_time),
         "fact_time_delta_seconds": _canonical_decimal(time_delta),
-        "time_identity_policy_complete": False,
+        "time_identity_policy_complete": None,
+        "time_identity_policy_applied": False,
         "time_identity_verified": False,
         "freshness_verified": False,
         "source_independence_verified": False,
@@ -213,7 +214,7 @@ def verify_jupiter_vs_pyth_price(
         "rejection_reasons": [],
         "warnings": [
             "numerical_agreement_does_not_establish_time_identity",
-            "no_cross_source_fact_time_delta_policy_is_accepted",
+            "time_identity_policy_not_applied_in_raw_crosscheck",
             "provider_count_does_not_establish_market_source_independence",
         ],
     }
