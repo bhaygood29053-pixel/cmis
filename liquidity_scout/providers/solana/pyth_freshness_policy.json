@@ -1,0 +1,7 @@
+{
+  "policy_id": "cmis.solana.pyth_core.current_price_freshness.v1",
+  "max_age_seconds": 60,
+  "max_age_provenance": "CMIS current-price evidence contract: a verified Pyth publish_time older than one minute at the post-read CMIS collection clock is not current. This is a CMIS operator governance bound selected independently of observed Pyth ages. The accepted sponsored USDC/USD Solana push feed is documented with a 1-minute heartbeat, which is source context rather than a freshness SLA.",
+  "max_future_skew_seconds": 5,
+  "future_skew_provenance": "CMIS clock-reference contract: allow at most five seconds of positive Pyth publish_time skew relative to the post-read CMIS UTC collection clock; larger future offsets fail closed. This is an operator governance bound, not a Pyth or Solana SLA."
+}

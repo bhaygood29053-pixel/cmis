@@ -3,6 +3,7 @@ import unittest
 from liquidity_scout.cmis.evidence import AGREEMENT, CONFLICT, INSUFFICIENT_EVIDENCE
 from liquidity_scout.providers.solana.market_verification import (
     verify_jupiter_vs_dexscreener_prices,
+    verify_jupiter_vs_pyth_price,
 )
 
 
@@ -34,6 +35,21 @@ def pair(address, price, *, role="base", subject=MINT):
     }
 
 
+def pyth(price="1.00", *, mint=MINT, publish_time=1000):
+    return {
+        "chain": "solana",
+        "source": "pyth_core_solana_push",
+        "mint": mint,
+        "mapping_verified": True,
+        "price_available": True,
+        "price_integrity_verified": True,
+        "fact_time_verified": True,
+        "price_usd": price,
+        "publish_time_unix": publish_time,
+        "quote_symbol": "USD",
+    }
+
+
 def dexscreener(*pairs):
     return {
         "chain": "solana",
@@ -47,6 +63,76 @@ def dexscreener(*pairs):
 
 
 class SolanaMarketVerificationTests(unittest.TestCase):
+    def test_jupiter_pyth_agreement_preserves_time_delta_without_time_promotion(self):
+        result = verify_jupiter_vs_pyth_price(
+            jupiter("1.00"),
+            pyth("1.005", publish_time=1002),
+            max_relative_difference="0.01",
+            jupiter_fact_time_unix=1000,
+        )
+
+        self.assertEqual(result["status"], AGREEMENT)
+        self.assertTrue(result["identity_verified"])
+        self.assertTrue(result["semantics_verified"])
+        self.assertTrue(result["within_tolerance"])
+        self.assertEqual(result["fact_time_delta_seconds"], "2")
+        self.assertFalse(result["time_identity_policy_complete"])
+        self.assertFalse(result["time_identity_verified"])
+        self.assertFalse(result["freshness_verified"])
+        self.assertFalse(result["source_independence_verified"])
+        self.assertFalse(result["current_price_promotable"])
+        self.assertFalse(result["execution_authorized"])
+
+    def test_jupiter_pyth_price_conflict_is_explicit_but_non_promotable(self):
+        result = verify_jupiter_vs_pyth_price(
+            jupiter("1.00"),
+            pyth("1.20", publish_time=1000),
+            max_relative_difference="0.01",
+            jupiter_fact_time_unix=1000,
+        )
+
+        self.assertEqual(result["status"], CONFLICT)
+        self.assertFalse(result["within_tolerance"])
+        self.assertFalse(result["time_identity_verified"])
+        self.assertFalse(result["current_price_promotable"])
+
+    def test_jupiter_pyth_requires_exact_mint_mapping_and_verified_integrity(self):
+        wrong_mint = verify_jupiter_vs_pyth_price(
+            jupiter(),
+            pyth(mint="OtherMint"),
+            max_relative_difference="0.01",
+            jupiter_fact_time_unix=1000,
+        )
+        self.assertEqual(wrong_mint["status"], INSUFFICIENT_EVIDENCE)
+        self.assertIn("mint_mismatch", wrong_mint["rejection_reasons"])
+
+        partial = pyth()
+        partial["price_integrity_verified"] = False
+        result = verify_jupiter_vs_pyth_price(
+            jupiter(),
+            partial,
+            max_relative_difference="0.01",
+            jupiter_fact_time_unix=1000,
+        )
+        self.assertEqual(result["status"], INSUFFICIENT_EVIDENCE)
+        self.assertIn(
+            "pyth_price_integrity_unverified",
+            result["rejection_reasons"],
+        )
+
+    def test_jupiter_pyth_missing_jupiter_fact_time_is_insufficient(self):
+        result = verify_jupiter_vs_pyth_price(
+            jupiter(),
+            pyth(),
+            max_relative_difference="0.01",
+            jupiter_fact_time_unix=None,
+        )
+        self.assertEqual(result["status"], INSUFFICIENT_EVIDENCE)
+        self.assertIn(
+            "jupiter_fact_time_unavailable",
+            result["rejection_reasons"],
+        )
+
     def test_tolerance_is_required_and_has_no_hidden_default(self):
         with self.assertRaisesRegex(ValueError, "must be supplied explicitly"):
             verify_jupiter_vs_dexscreener_prices(
