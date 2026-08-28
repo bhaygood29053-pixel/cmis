@@ -77,7 +77,8 @@ jobs:
 
       - name: Safety boundary
         run: |
-          echo "Required live methods: getTokenSupply and getAccountInfo(jsonParsed)."
-          echo "Production runtime asset_lookup and tokenomics are exercised against the known mint."
+          echo "Required live methods include getTokenSupply, getAccountInfo(jsonParsed), and read-only getAccountInfo(base64) for the exact Pyth USDC/USD sponsored feed account."
+          echo "Production runtime asset_lookup/tokenomics and the read-only Pyth account contract are exercised against accepted fixtures."
+          echo "Jupiter/Pyth same-time policy is deterministic and does not require CI to manufacture a live SAME_TIME sample or a Jupiter credential."
           echo "getTokenLargestAccounts concentration evidence is additionally exercised when a dedicated RPC secret is configured."
-          echo "No wallet key, transaction preparation, simulation, signing, broadcasting, swap route, or value movement is used."
+          echo "No wallet key, transaction preparation, simulation, signing, broadcasting, swap route, Pyth update submission, or value movement is used."
