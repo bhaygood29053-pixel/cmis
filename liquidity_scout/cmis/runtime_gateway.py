@@ -32,6 +32,10 @@ from liquidity_scout.cmis.concentration_intelligence_gateway import (
 from liquidity_scout.cmis.evidence_ledger import VerificationEvidenceLedger
 from liquidity_scout.cmis.evidence_quality_gateway import EvidenceQualityMixin
 from liquidity_scout.cmis.intelligence_evidence_ledger import IntelligenceEvidenceLedger
+from liquidity_scout.cmis.instant_x1_scan_gateway import (
+    InstantX1ScanMixin,
+    SERVICE as INSTANT_X1_SCAN_SERVICE,
+)
 from liquidity_scout.cmis.pre_trade_policy_gateway import PreTradePolicyMixin
 from liquidity_scout.cmis.solana_gateway import SolanaAssetLookupMixin
 from liquidity_scout.cmis.solana_historical_gateway import SolanaHistoricalCompareMixin
@@ -70,6 +74,11 @@ SUPPORTED_SERVICES = (
     *TRADE_SUPPORTED_SERVICES,
     *(
         ()
+        if INSTANT_X1_SCAN_SERVICE in TRADE_SUPPORTED_SERVICES
+        else (INSTANT_X1_SCAN_SERVICE,)
+    ),
+    *(
+        ()
         if VERIFICATION_EVIDENCE_SERVICE in TRADE_SUPPORTED_SERVICES
         else (VERIFICATION_EVIDENCE_SERVICE,)
     ),
@@ -95,6 +104,7 @@ def _prepare_sqlite_path(value: Any, *, label: str) -> str:
 
 class RuntimeCMISGateway(
     EvidenceQualityMixin,
+    InstantX1ScanMixin,
     ConcentrationIntelligenceGatewayMixin,
     PreTradePolicyMixin,
     SolanaHistoricalCompareMixin,
@@ -187,6 +197,7 @@ __all__ = [
     "CONCENTRATION_INTELLIGENCE_SERVICE",
     "DEFAULT_INTELLIGENCE_EVIDENCE_DB",
     "DEFAULT_VERIFICATION_EVIDENCE_DB",
+    "INSTANT_X1_SCAN_SERVICE",
     "RuntimeCMISGateway",
     "SUPPORTED_SERVICES",
     "VERIFICATION_EVIDENCE_SERVICE",
