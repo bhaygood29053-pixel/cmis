@@ -391,10 +391,12 @@ class InstantX1ScanTests(unittest.TestCase):
         self.assertIsNone(question)
         self.assertEqual(kwargs["mode"], "all_available")
         self.assertEqual(tuple(kwargs["metrics"]), HISTORY_METRICS)
+        self.assertFalse(kwargs["include_onchain_coverage"])
 
         question, _market, kwargs = gateway.history_calls[1]
         self.assertEqual(question, "Has price changed in the last 24 hours?")
         self.assertEqual(kwargs["mode"], "window")
+        self.assertFalse(kwargs["include_onchain_coverage"])
         self.assertNotIn("provider_history_backfill", kwargs)
 
         self.assertEqual(gateway.tokenomics_params, {})
