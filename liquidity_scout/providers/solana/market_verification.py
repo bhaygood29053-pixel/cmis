@@ -5,9 +5,11 @@ observations. It does not fetch data, pick a preferred pair, average prices, or
 invent a tolerance. Callers must provide the maximum relative difference
 explicitly.
 
-Because the current source contracts do not yet establish a shared observation
-time/scope, even numerical agreement remains non-promotable until a separate
-freshness/scope rule is proven.
+Raw numerical comparison deliberately does not apply the separately governed
+Jupiter/Pyth same-time policy. Higher CMIS evidence layers may classify exact
+provider fact times after both source-specific freshness gates pass. Numerical
+agreement and time identity remain separate from source independence and
+current-price promotion.
 """
 
 from __future__ import annotations
