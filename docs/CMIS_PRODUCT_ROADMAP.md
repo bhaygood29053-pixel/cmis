@@ -288,8 +288,9 @@ Near-term provider-gap priorities:
 - #306 observed eligible-pair liquidity/24h-volume aggregation is complete via PR #307 with pair-universe completeness explicitly unverified;
 - #308 Solana market observation freshness semantics is complete via PR #310: Jupiter blockId may be anchored to canonical Solana block time;
 - #311 Solana Jupiter current-price freshness policy is complete via PR #312 with explicit CMIS operator bounds of 60 seconds max age and 5 seconds future skew;
-- #313 timestamped Pyth Core secondary Solana price evidence is implemented in PR #314 for one exact USDC/USD fixture through canonical Solana RPC; source-specific Pyth freshness is deterministic and Jupiter/Pyth numerical/fact-time-delta evidence is available;
-- the next Solana gate is explicit Jupiter–Pyth cross-source time-identity policy governance; no source independence or current-price promotion follows from provider count or numerical agreement;
+- #313 timestamped Pyth Core secondary Solana price evidence is complete via PR #314 for one exact USDC/USD fixture through canonical Solana RPC; source-specific Pyth freshness is deterministic and Jupiter/Pyth numerical/fact-time-delta evidence is available;
+- #315 Jupiter–Pyth cross-source time-identity governance is implemented in PR #316 with an explicit five-second same-time operator window; exact same-time eligibility may now be verified while source independence, price-construction equivalence, and current-price promotion remain false;
+- the next Solana gate is provider/source-independence and price-construction compatibility analysis before any separate current-price promotion gate;
 - Oracle V2 #272 remains parked until policy-eligible live slots appear; then current-price correctness and source-independence gates may resume.
 
 ### Verified Intelligence
@@ -346,18 +347,19 @@ Current implementation sequence:
 16. aggregate Solana observed eligible-pair liquidity/24h volume under #306 while preserving incomplete pair-universe scope — complete via PR #307;
 17. verify Solana market observation freshness semantics under #308 without treating token/pair creation timestamps or collection time as market-fact freshness — complete via PR #310;
 18. define/apply the source-specific Jupiter current-price freshness policy under #311 — complete via PR #312 with 60-second max age / 5-second future skew CMIS governance;
-19. verify timestamped Pyth Core secondary Solana price evidence under #313 — implemented in PR #314 for one exact USDC/USD sponsored push-feed fixture;
-20. define an explicit Jupiter–Pyth cross-source maximum fact-time-delta policy with provenance before any same-time price gate;
-21. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
+19. verify timestamped Pyth Core secondary Solana price evidence under #313 — complete via PR #314 for one exact USDC/USD sponsored push-feed fixture;
+20. define an explicit Jupiter–Pyth cross-source maximum fact-time-delta policy under #315 — implemented in PR #316 with a five-second CMIS same-time window;
+21. evaluate Jupiter–Pyth provider/source independence and price-construction compatibility before any Solana current-price promotion gate;
+22. keep Oracle V2 #272 non-promoted until policy-eligible live slots exist, then resume same-fact price-correctness and source-independence gates.
 
 Future candidates — **not active milestones until separately accepted**:
 
-22. any public alert/Scout-reliance promotion;
-23. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-24. separate Solana current-price promotion only after time identity and independence/price-construction gates;
-25. further field-by-field Solana maturity;
-26. Ethereum under an explicit capability/acceptance plan;
-27. investigation/evidence export and premium access.
+23. any public alert/Scout-reliance promotion;
+24. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+25. separate Solana current-price promotion only after time identity and independence/price-construction gates;
+26. further field-by-field Solana maturity;
+27. Ethereum under an explicit capability/acceptance plan;
+28. investigation/evidence export and premium access.
 
 None authorizes execution.
 
