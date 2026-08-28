@@ -69,6 +69,11 @@ Not accepted/promoted:
 - no Ethereum provider milestone without a separate accepted gate;
 - no Controlled Execution or value movement.
 
+### Strategic product focus — 2026-08-28
+
+CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing; broad Solana feature expansion is deprioritized. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
+
+
 The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-08-27.md`](./docs/PROJECT_STATUS_2026-08-27.md).
 
 ## Active provider-gap work — not accepted capability
