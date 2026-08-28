@@ -71,6 +71,61 @@ def _mint_body(
 
 
 class SolanaRPCProviderTests(unittest.TestCase):
+    def test_block_time_preserves_exact_slot_identity_without_finality_claim(self):
+        post = _post_with(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": 1700000000,
+            }
+        )
+        provider = SolanaRPCProvider("https://rpc.example.invalid", post=post)
+
+        result = provider.get_block_time(12345)
+
+        self.assertEqual(result["method"], "getBlockTime")
+        self.assertEqual(result["block_id"], 12345)
+        self.assertEqual(result["block_time_unix"], 1700000000)
+        self.assertTrue(result["block_time_verified"])
+        self.assertFalse(result["finality_verified"])
+        self.assertEqual(post.calls[0]["json"]["params"], [12345])
+
+    def test_block_time_null_is_explicit_unavailability(self):
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            post=_post_with({"jsonrpc": "2.0", "id": 1, "result": None}),
+        )
+
+        result = provider.get_block_time(12345)
+
+        self.assertFalse(result["block_time_available"])
+        self.assertIsNone(result["block_time_unix"])
+        self.assertFalse(result["block_time_verified"])
+
+    def test_reference_slot_preserves_explicit_commitment(self):
+        post = _post_with(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": 12350,
+            }
+        )
+        provider = SolanaRPCProvider(
+            "https://rpc.example.invalid",
+            commitment="confirmed",
+            post=post,
+        )
+
+        result = provider.get_slot()
+
+        self.assertEqual(result["slot"], 12350)
+        self.assertEqual(result["commitment"], "confirmed")
+        self.assertTrue(result["slot_verified"])
+        self.assertEqual(
+            post.calls[0]["json"]["params"],
+            [{"commitment": "confirmed"}],
+        )
+
     def test_token_supply_preserves_raw_amount_decimals_and_slot(self):
         post = _post_with(
             {

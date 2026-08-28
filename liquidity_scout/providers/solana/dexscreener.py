@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 import math
+import time
 from typing import Any, Callable
 
 import requests
@@ -105,17 +106,22 @@ class DexScreenerSolanaProvider:
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = 20,
         get: Callable[..., Any] = requests.get,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self._base_url = _text(base_url, field="DEX Screener base URL").rstrip("/")
         if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
             raise ValueError("timeout must be a positive integer")
         self.timeout = timeout
         self._get = get
+        self._clock = clock
 
     def get_token_pairs(self, mint: str) -> dict[str, Any]:
         """Return all pair-scoped observations supplied for one Solana mint."""
 
         mint = _text(mint, field="mint")
+        collection_started_at = float(self._clock())
+        if not math.isfinite(collection_started_at) or collection_started_at < 0:
+            raise DexScreenerSourceError("collection start time must be a finite non-negative timestamp")
         transport_error_type: str | None = None
         try:
             response = self._get(
@@ -137,6 +143,15 @@ class DexScreenerSolanaProvider:
                 f"DEX Screener request failed ({transport_error_type})"
             ) from None
 
+        collection_completed_at = float(self._clock())
+        if (
+            not math.isfinite(collection_completed_at)
+            or collection_completed_at < collection_started_at
+        ):
+            raise DexScreenerSourceError(
+                "collection completion time must be finite and not precede start time"
+            )
+
         if not isinstance(body, list):
             raise DexScreenerSourceError("token-pairs response must be an array")
         if not body:
@@ -148,6 +163,9 @@ class DexScreenerSolanaProvider:
                 "pairs": [],
                 "pair_count_observed": 0,
                 "reason": "dexscreener_pairs_unavailable",
+                "collection_started_at_unix": collection_started_at,
+                "collection_completed_at_unix": collection_completed_at,
+                "collection_time_verified": True,
                 "freshness_verified": False,
                 "solana_wide_coverage_verified": False,
             }
@@ -212,6 +230,9 @@ class DexScreenerSolanaProvider:
             "pairs": pairs,
             "pair_count_observed": len(pairs),
             "scope": "pair_scoped_dexscreener_observations",
+            "collection_started_at_unix": collection_started_at,
+            "collection_completed_at_unix": collection_completed_at,
+            "collection_time_verified": True,
             "freshness_verified": False,
             "solana_wide_coverage_verified": False,
             "aggregate_price_selected": False,

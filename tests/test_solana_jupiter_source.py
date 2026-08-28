@@ -40,9 +40,12 @@ def _get_with(body):
     return get
 
 
-def _provider(body):
+def _provider(body, *, clock=None):
     get = _get_with(body)
-    return JupiterSourceProvider(api_key=TEST_KEY, get=get), get
+    kwargs = {"api_key": TEST_KEY, "get": get}
+    if clock is not None:
+        kwargs["clock"] = clock
+    return JupiterSourceProvider(**kwargs), get
 
 
 class JupiterSourceProviderTests(unittest.TestCase):
@@ -81,6 +84,28 @@ class JupiterSourceProviderTests(unittest.TestCase):
         self.assertFalse(result["freshness_verified"])
         self.assertEqual(get.calls[0]["params"], {"ids": MINT})
         self.assertEqual(get.calls[0]["headers"]["x-api-key"], TEST_KEY)
+
+    def test_price_collection_time_is_recorded_separately_from_fact_time(self):
+        ticks = iter([100.0, 101.25])
+        provider, _ = _provider(
+            {
+                MINT: {
+                    "createdAt": "2025-01-02T03:04:05Z",
+                    "usdPrice": 1,
+                    "blockId": 50,
+                    "decimals": 6,
+                }
+            },
+            clock=lambda: next(ticks),
+        )
+
+        result = provider.get_price(MINT)
+
+        self.assertEqual(result["collection_started_at_unix"], 100.0)
+        self.assertEqual(result["collection_completed_at_unix"], 101.25)
+        self.assertTrue(result["collection_time_verified"])
+        self.assertIsNone(result["observed_at"])
+        self.assertFalse(result["freshness_verified"])
 
     def test_missing_price_key_is_unavailable_not_zero(self):
         provider, _ = _provider({})

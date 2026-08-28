@@ -75,7 +75,7 @@ Recent cleanup is complete:
 - PR #227 — FortiBlox closed/archive candidate research;
 - PR #299 — repository/provider-state reconciliation for X1Scroll merged.
 
-The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is complete via PR #307. Issue #308 Solana market observation freshness semantics is the active field-level tracer bullet.
+The selected production RPC path is the Official X1 RPC. #301's self-hosted-node contract/probes remain available but live self-hosted verification is deferred/optional; CMIS makes no RPC-redundancy or market-source-independence claim from that path. Issue #304 holder semantics is complete via PR #305. Issue #306 bounded Solana observed-pair liquidity and 24h-volume aggregation is complete via PR #307. Issue #308 Solana market observation freshness semantics is implemented in PR #310: Jupiter blockId can anchor to canonical Solana block time, while DEX Screener market-fact time remains unavailable and no freshness policy/current-price promotion is accepted.
 
 ## Roberta dependency/status
 
@@ -87,12 +87,12 @@ The compact cross-project authority baseline is synchronized in `ROBERTA_CMIS_SO
 
 ## Roadmap now
 
-### 1. Verify Solana market observation freshness semantics
+### 1. Continue Solana freshness evidence after #308
 
-- preserve CMIS collection time separately from provider fact time and underlying market-fact freshness;
-- do not use Jupiter token `createdAt` or DEX Screener `pairCreatedAt` as price freshness evidence;
-- verify Jupiter `blockId` semantics from provider-owned evidence before any slot/block-time freshness mapping;
-- keep price freshness and current-price promotion false until exact fact-time evidence and an explicit freshness policy both pass.
+- Jupiter `blockId` -> canonical `getBlockTime` fact-time anchoring is implemented;
+- DEX Screener still exposes no accepted price/liquidity/volume update timestamp, so shared cross-source time identity remains false;
+- no numerical max-age/future-skew policy is accepted by implication;
+- any future current-price promotion requires a separate accepted freshness-policy gate plus compatible fact-time evidence for the compared sources.
 
 ### 2. Continue evidence-depth work
 
