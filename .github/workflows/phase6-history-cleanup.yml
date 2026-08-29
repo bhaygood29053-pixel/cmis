@@ -1,0 +1,150 @@
+name: Phase 6 Historical Git Cleanup
+
+on:
+  push:
+    branches:
+      - phase6/history-cleanup-run
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite-public-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PRE_REWRITE_MAIN: 95adc1f340096983f82a99648a958a37ea4c028e
+    steps:
+      - name: Check out repository with complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install history rewrite tool
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install git-filter-repo
+
+      - name: Fetch every branch and tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+          git ls-remote --heads --tags origin | sort > phase6-pre-rewrite-refs.txt
+          echo "PRE_REWRITE_REF_COUNT=$(wc -l < phase6-pre-rewrite-refs.txt)" >> "$GITHUB_ENV"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload pre-rewrite ref recovery map
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-cmis-pre-rewrite-refs
+          path: phase6-pre-rewrite-refs.txt
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Materialize all remote branches locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_branch="$(git branch --show-current)"
+          while read -r ref; do
+            branch="${ref#refs/remotes/origin/}"
+            [ "$branch" = "HEAD" ] && continue
+            [ "$branch" = "$current_branch" ] && continue
+            git branch -f "$branch" "$ref"
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin/)
+
+      - name: Rewrite protected CMIS paths from all history
+        shell: bash
+        run: |
+          set -euo pipefail
+          git filter-repo --force \
+            --path liquidity_scout/cmis/assets.py \
+            --path liquidity_scout/cmis/concentration.py \
+            --path liquidity_scout/cmis/concentration_alert.py \
+            --path liquidity_scout/cmis/concentration_change.py \
+            --path liquidity_scout/cmis/concentration_intelligence_gateway.py \
+            --path liquidity_scout/cmis/concentration_threshold.py \
+            --path liquidity_scout/cmis/evidence.py \
+            --path liquidity_scout/cmis/evidence_ledger.py \
+            --path liquidity_scout/cmis/evidence_quality_gateway.py \
+            --path liquidity_scout/cmis/evidence_receipt.py \
+            --path liquidity_scout/cmis/gateway.py \
+            --path liquidity_scout/cmis/instant_x1_scan_gateway.py \
+            --path liquidity_scout/cmis/intelligence_classification.py \
+            --path liquidity_scout/cmis/intelligence_evidence.py \
+            --path liquidity_scout/cmis/intelligence_evidence_ledger.py \
+            --path liquidity_scout/cmis/intelligence_history.py \
+            --path liquidity_scout/cmis/pre_trade_policy_gateway.py \
+            --path liquidity_scout/cmis/proof_score.py \
+            --path liquidity_scout/cmis/risk_evidence_gateway.py \
+            --path liquidity_scout/cmis/runtime_gateway.py \
+            --path liquidity_scout/cmis/solana_gateway.py \
+            --path liquidity_scout/cmis/solana_historical_gateway.py \
+            --path liquidity_scout/cmis/solana_market_gateway.py \
+            --path liquidity_scout/cmis/solana_observation_ledger.py \
+            --path liquidity_scout/cmis/solana_risk_gateway.py \
+            --path liquidity_scout/cmis/solana_runtime_config.py \
+            --path liquidity_scout/cmis/solana_tokenomics_gateway.py \
+            --path liquidity_scout/cmis/trade_gateway.py \
+            --path liquidity_scout/cmis/verification_gateway.py \
+            --path liquidity_scout/cmis/verified_intelligence_service.py \
+            --path liquidity_scout/cmis/verified_xdex_program_scope_gateway.py \
+            --path liquidity_scout/cmis/wallet_activity.py \
+            --path liquidity_scout/cmis/wallet_relationship.py \
+            --path liquidity_scout/cmis/x1_evidence_capabilities.py \
+            --path liquidity_scout/cmis/xdex_route_resolver.py \
+            --invert-paths
+
+      - name: Verify rewritten local refs are clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-list --all | grep -qx "$PRE_REWRITE_MAIN"; then
+            echo "Pre-rewrite main is still reachable after filtering."
+            exit 1
+          fi
+
+          failed=0
+          while read -r ref; do
+            remaining="$(git ls-tree -r --name-only "$ref" liquidity_scout/cmis | grep -E '^liquidity_scout/cmis/.*\.py$' | grep -Ev '^liquidity_scout/cmis/(__init__|capabilities|http)\.py$' || true)"
+            if [ -n "$remaining" ]; then
+              echo "Protected CMIS path remains in $ref"
+              printf '%s\n' "$remaining"
+              failed=1
+            fi
+          done < <(git for-each-ref --format='%(refname)' refs/heads/ refs/tags/)
+          test "$failed" -eq 0
+
+      - name: Force-push rewritten branches and tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force --all origin
+          git push --force --tags origin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Verify remote refs after rewrite
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --heads --tags origin | sort > phase6-post-rewrite-refs.txt
+          echo "Pre-rewrite refs: ${PRE_REWRITE_REF_COUNT}"
+          echo "Post-rewrite refs: $(wc -l < phase6-post-rewrite-refs.txt)"
+          test "$(wc -l < phase6-post-rewrite-refs.txt)" -eq "$PRE_REWRITE_REF_COUNT"
+          echo "PHASE6_CMIS_HISTORY_REWRITE=PASS"
+          echo "HISTORICAL_CLEANUP_COMPLETE=TRUE"
+
+      - name: Upload post-rewrite ref map
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-cmis-post-rewrite-refs
+          path: phase6-post-rewrite-refs.txt
+          retention-days: 90
+          if-no-files-found: error
