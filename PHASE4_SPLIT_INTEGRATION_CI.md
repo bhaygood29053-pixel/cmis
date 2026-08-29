@@ -18,11 +18,27 @@ public implementation is removed.
 7. The public fallback remains absent.
 8. CI must emit machine-readable split-validation evidence.
 
+## Checkpoint 1
+
+The initial Phase 4 cross-repository gate passed in ROBERTA Actions run
+`33228563613`.
+
+CMIS-specific proof included:
+- protected CMIS implementation absent from the staged public shell before private install;
+- `cmis-private-core==0.2.0` supplied the runtime;
+- public/private service and chain surfaces matched exactly;
+- CMIS capability handshake succeeded through authenticated HTTP;
+- unauthenticated capability access failed closed;
+- X1 Scout reached the private CMIS runtime;
+- Solana provider-gate isolation did not fall through to X1;
+- `PUBLIC_FALLBACK_USED=FALSE`;
+- `EXECUTION_AUTHORIZED=FALSE`.
+
 ## Source-removal gate
 
 Phase 4 does not remove protected CMIS implementation from public Git HEAD.
 Source removal is a later phase and remains blocked until the Phase 4 split
-integration gate is green and repeatable.
+integration gate is green and stable on merged `main`.
 
 No execution, signing, broadcasting, custody, value movement, new fact source,
 or new service promotion is authorized.
