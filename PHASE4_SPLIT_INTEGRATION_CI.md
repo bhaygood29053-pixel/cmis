@@ -58,5 +58,6 @@ service through authenticated HTTP and recorded
 CMIS main regression run `33228683303` and ROBERTA merged-main regression run
 `33249158273` both passed.
 
-The Phase 4 readiness gate for the next migration phase is satisfied. Protected
-implementation remains unchanged in public HEAD until that later phase begins.
+The Phase 4 readiness gate for the next migration phase was satisfied.
+Phase 5 subsequently removed the protected CMIS implementation from current
+public HEAD; historical Git cleanup remains separate.
