@@ -30,23 +30,27 @@ from dotenv import load_dotenv
 # because python-dotenv does not override them by default.
 load_dotenv()
 
-from .capabilities import build_capability_manifest
-from liquidity_scout.cmis_private_core import load_runtime_contract
+from .capabilities import (
+    PUBLIC_KNOWN_CHAINS,
+    PUBLIC_RUNTIME_SERVICES,
+    PUBLIC_SUPPORTED_CHAINS,
+    build_capability_manifest,
+)
+from liquidity_scout.cmis_private_core import (
+    EXPECTED_PRIVATE_CONTRACT,
+    PrivateCoreUnavailable,
+    load_runtime_contract,
+)
 
 
-# Phase 3 cutover: the public HTTP transport consumes one narrow runtime
-# contract. In production, CMIS_PRIVATE_CORE_REQUIRED=1 makes absence of the
-# private distribution fail closed. The public fallback is migration-only.
-_RUNTIME_CONTRACT = load_runtime_contract()
-CMISGateway = _RUNTIME_CONTRACT["gateway_class"]
-SUPPORTED_SERVICES = _RUNTIME_CONTRACT["supported_services"]
-SUPPORTED_CHAINS = _RUNTIME_CONTRACT["supported_chains"]
-KNOWN_CHAINS = _RUNTIME_CONTRACT["known_chains"]
-PRIVATE_CORE_SOURCE = _RUNTIME_CONTRACT["source"]
-PRIVATE_CORE_CONTRACT = _RUNTIME_CONTRACT["contract"]
+# The capability contract belongs to the public shell. Private implementation is
+# loaded only when a default runtime gateway is actually constructed.
+SUPPORTED_SERVICES = PUBLIC_RUNTIME_SERVICES
+SUPPORTED_CHAINS = PUBLIC_SUPPORTED_CHAINS
+KNOWN_CHAINS = PUBLIC_KNOWN_CHAINS
+PRIVATE_CORE_SOURCE = "private-required"
+PRIVATE_CORE_CONTRACT = EXPECTED_PRIVATE_CONTRACT
 
-# Build this at import/startup time so a new runtime service or known chain
-# cannot silently ship without an explicit capability classification.
 CAPABILITY_MANIFEST = build_capability_manifest(
     runtime_services=SUPPORTED_SERVICES,
     legacy_supported_chains=SUPPORTED_CHAINS,
@@ -87,7 +91,7 @@ def _validate_bind(host: str, api_key: str) -> None:
         )
 
 
-def make_handler(gateway: CMISGateway, *, api_key: str = ""):
+def make_handler(gateway: Any, *, api_key: str = ""):
     """Create one request-handler class bound to a gateway instance."""
     required_key = str(api_key or "").strip()
 
@@ -230,12 +234,30 @@ def create_server(
     *,
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
-    gateway: Optional[CMISGateway] = None,
+    gateway: Optional[Any] = None,
     api_key: Optional[str] = None,
 ) -> ThreadingHTTPServer:
     key = _api_key(api_key)
     _validate_bind(host, key)
-    handler = make_handler(gateway or CMISGateway(), api_key=key)
+
+    active_gateway = gateway
+    if active_gateway is None:
+        contract = load_runtime_contract()
+        if tuple(contract["supported_services"]) != tuple(SUPPORTED_SERVICES):
+            raise PrivateCoreUnavailable(
+                "CMIS private-core service surface does not match the public contract."
+            )
+        if tuple(contract["supported_chains"]) != tuple(SUPPORTED_CHAINS):
+            raise PrivateCoreUnavailable(
+                "CMIS private-core supported chains do not match the public contract."
+            )
+        if tuple(contract["known_chains"]) != tuple(KNOWN_CHAINS):
+            raise PrivateCoreUnavailable(
+                "CMIS private-core known chains do not match the public contract."
+            )
+        active_gateway = contract["gateway_class"]()
+
+    handler = make_handler(active_gateway, api_key=key)
     return ThreadingHTTPServer((host, int(port)), handler)
 
 
@@ -243,7 +265,7 @@ def serve(
     *,
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
-    gateway: Optional[CMISGateway] = None,
+    gateway: Optional[Any] = None,
     api_key: Optional[str] = None,
 ) -> None:
     server = create_server(
