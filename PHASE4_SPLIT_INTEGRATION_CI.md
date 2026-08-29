@@ -1,6 +1,6 @@
 # Phase 4 — CMIS Split Integration / CI
 
-Status: **IN PROGRESS**
+Status: **COMPLETE**
 
 Phase 4 hardens the mandatory CMIS private-engine boundary before protected
 public implementation is removed.
@@ -42,3 +42,21 @@ integration gate is green and stable on merged `main`.
 
 No execution, signing, broadcasting, custody, value movement, new fact source,
 or new service promotion is authorized.
+
+
+## Final Phase 4 evidence
+
+Phase 4 completion is proven by merged-main ROBERTA Actions run
+`33249158272` — **SUCCESS** — against CMIS baseline
+`45551d112e0779343c0d0e50d0d2631efc88f76c`.
+
+The source-stripped/private-core gate exercised every promoted CMIS runtime
+service through authenticated HTTP and recorded
+`PHASE4_PROMOTED_CMIS_SERVICE_SURFACE=PASS`,
+`PUBLIC_FALLBACK_USED=FALSE`, and `EXECUTION_AUTHORIZED=FALSE`.
+
+CMIS main regression run `33228683303` and ROBERTA merged-main regression run
+`33249158273` both passed.
+
+The Phase 4 readiness gate for the next migration phase is satisfied. Protected
+implementation remains unchanged in public HEAD until that later phase begins.
