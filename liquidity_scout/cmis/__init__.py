@@ -1,27 +1,37 @@
 """Public boundary for Cross-Chain Market Intelligence Service.
 
-The public repository owns capability contracts and transport. Protected CMIS
-implementation is supplied only by the required ``cmis-private-core`` package.
-This module intentionally avoids importing protected implementation eagerly so
-the public shell remains importable and can fail closed when the private core is
-not installed.
+The public repository owns the stable service/chain identifiers and integration
+adapter. Protected CMIS implementation is supplied only by the required
+``cmis-private-core`` package. Importing this public package never reconstructs
+or eagerly imports protected implementation.
 """
 
 from __future__ import annotations
 
-from .capabilities import (
-    PUBLIC_KNOWN_CHAINS,
-    PUBLIC_RUNTIME_SERVICES,
-    PUBLIC_SUPPORTED_CHAINS,
-)
 from liquidity_scout.cmis_private_core import (
     PrivateCoreUnavailable,
     load_runtime_contract,
 )
 
-KNOWN_CHAINS = PUBLIC_KNOWN_CHAINS
-SUPPORTED_CHAINS = PUBLIC_SUPPORTED_CHAINS
-SUPPORTED_SERVICES = PUBLIC_RUNTIME_SERVICES
+# Stable public identifiers accepted by Chain Scouts. Detailed capability and
+# evidence metadata is assembled in deployments where the private runtime is
+# installed; the public shell does not embed the protected evidence registry.
+SUPPORTED_SERVICES = (
+    "asset_lookup",
+    "market_report",
+    "rank",
+    "historical_compare",
+    "tokenomics",
+    "risk_check",
+    "pre_trade_check",
+    "trade_verification",
+    "verified_asset_activity",
+    "instant_x1_scan",
+    "verification_evidence",
+    "concentration_change_intelligence",
+)
+SUPPORTED_CHAINS = ("x1",)
+KNOWN_CHAINS = ("x1", "solana")
 
 
 def __getattr__(name: str):
@@ -33,7 +43,6 @@ def __getattr__(name: str):
         "DEFAULT_ASSET_DEFINITIONS",
         "DEFAULT_ASSET_REGISTRY",
     }:
-        # The private distribution supplies ``liquidity_scout.cmis.assets``.
         try:
             from . import assets as private_assets
         except (ImportError, ModuleNotFoundError) as exc:
