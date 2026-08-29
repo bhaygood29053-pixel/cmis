@@ -1,6 +1,6 @@
 # Phase 6 — Historical Git Cleanup and Migration Closure
 
-Status: **FINAL VALIDATION**
+Status: **COMPLETE**
 
 Phase 6 rewrote the active public CMIS branch/tag history to remove protected
 CMIS implementation paths from every reachable public ref while preserving the
@@ -52,6 +52,8 @@ The normal public test workflow now verifies:
 - execution authorization remains false.
 
 Closure-branch public-boundary test: Actions run `33252468519` — **SUCCESS**.
+Merged-main public-boundary test: Actions run `33252565770` — **SUCCESS**.
+Merged closure commit: `d3c9efcca39103fb58abb0cdeadfc55220c71769`.
 
 ## Safety boundary
 
@@ -69,5 +71,5 @@ branch/tag history. It cannot revoke copies already cloned, forked, cached, or
 downloaded, and Git hosting infrastructure may retain unreachable objects for
 some period after refs are rewritten.
 
-Phase 6 is complete once this closure state is merged to `main` and the same
-public-boundary test passes from merged `main`.
+Phase 6 is complete. The six-phase public-shell/private-core migration is
+closed.
