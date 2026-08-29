@@ -97,6 +97,8 @@ jobs:
             --path liquidity_scout/cmis/wallet_relationship.py \
             --path liquidity_scout/cmis/x1_evidence_capabilities.py \
             --path liquidity_scout/cmis/xdex_route_resolver.py \
+            --path liquidity_scout/cmis/xdex_direct_candidate_comparison.py \
+            --path liquidity_scout/cmis/xdex_direct_quote_comparator.py \
             --invert-paths
 
       - name: Verify rewritten local refs are clean
