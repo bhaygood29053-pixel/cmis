@@ -1,24 +1,57 @@
-"""External access boundary for Cross-Chain Market Intelligence Service.
+"""Public boundary for Cross-Chain Market Intelligence Service.
 
-This package exposes CMIS to external specialist consumers such as X1 Scout
-and Solana Scout. It is intentionally above provider modules: external clients
-send chain-aware service requests and never receive provider objects or
-provider credentials.
+The public repository owns the stable service/chain identifiers and integration
+adapter. Protected CMIS implementation is supplied only by the required
+``cmis-private-core`` package. Importing this public package never reconstructs
+or eagerly imports protected implementation.
 """
 
-from .assets import (
-    AssetRegistry,
-    DEFAULT_ASSET_DEFINITIONS,
-    DEFAULT_ASSET_REGISTRY,
+from __future__ import annotations
+
+from liquidity_scout.cmis_private_core import (
+    PrivateCoreUnavailable,
+    load_runtime_contract,
 )
-from .gateway import (
-    KNOWN_CHAINS,
-    SUPPORTED_CHAINS,
+
+# Stable public identifiers accepted by Chain Scouts. Detailed capability and
+# evidence metadata is assembled in deployments where the private runtime is
+# installed; the public shell does not embed the protected evidence registry.
+SUPPORTED_SERVICES = (
+    "asset_lookup",
+    "market_report",
+    "rank",
+    "historical_compare",
+    "tokenomics",
+    "risk_check",
+    "pre_trade_check",
+    "trade_verification",
+    "verified_asset_activity",
+    "instant_x1_scan",
+    "verification_evidence",
+    "concentration_change_intelligence",
 )
-from .verification_gateway import (
-    CMISGateway,
-    SUPPORTED_SERVICES,
-)
+SUPPORTED_CHAINS = ("x1",)
+KNOWN_CHAINS = ("x1", "solana")
+
+
+def __getattr__(name: str):
+    """Resolve legacy implementation symbols only through the private core."""
+    if name == "CMISGateway":
+        return load_runtime_contract()["gateway_class"]
+    if name in {
+        "AssetRegistry",
+        "DEFAULT_ASSET_DEFINITIONS",
+        "DEFAULT_ASSET_REGISTRY",
+    }:
+        try:
+            from . import assets as private_assets
+        except (ImportError, ModuleNotFoundError) as exc:
+            raise PrivateCoreUnavailable(
+                "cmis-private-core is required but is not installed."
+            ) from exc
+        return getattr(private_assets, name)
+    raise AttributeError(name)
+
 
 __all__ = [
     "AssetRegistry",
