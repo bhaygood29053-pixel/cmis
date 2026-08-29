@@ -47,7 +47,6 @@ jobs:
           assert not remaining, remaining
 
           from liquidity_scout import cmis
-          from liquidity_scout.cmis import http
           from liquidity_scout.cmis_private_core import (
               PrivateCoreUnavailable,
               load_runtime_contract,
@@ -55,8 +54,22 @@ jobs:
               private_core_status,
           )
 
-          assert tuple(cmis.SUPPORTED_SERVICES) == tuple(http.SUPPORTED_SERVICES)
-          assert tuple(cmis.SUPPORTED_CHAINS) == tuple(http.SUPPORTED_CHAINS)
+          assert tuple(cmis.SUPPORTED_SERVICES) == (
+              "asset_lookup",
+              "market_report",
+              "rank",
+              "historical_compare",
+              "tokenomics",
+              "risk_check",
+              "pre_trade_check",
+              "trade_verification",
+              "verified_asset_activity",
+              "instant_x1_scan",
+              "verification_evidence",
+              "concentration_change_intelligence",
+          )
+          assert tuple(cmis.SUPPORTED_CHAINS) == ("x1",)
+          assert tuple(cmis.KNOWN_CHAINS) == ("x1", "solana")
           assert private_core_required() is True
           status = private_core_status()
           assert status["required"] is True
@@ -71,11 +84,11 @@ jobs:
               raise AssertionError("CMIS public shell did not fail closed without private core")
 
           try:
-              http.create_server(host="127.0.0.1", port=0)
+              _ = cmis.CMISGateway
           except PrivateCoreUnavailable:
               pass
           else:
-              raise AssertionError("CMIS default server constructed without private core")
+              raise AssertionError("CMISGateway resolved without the private core")
 
           print("PHASE6_CMIS_PUBLIC_HISTORY_BOUNDARY=PASS")
           print("CMIS_PRIVATE_CORE_REQUIRED=PASS")
