@@ -1,38 +1,55 @@
 # Phase 3 — CMIS Private-Core Cutover
 
-Status: **IN PROGRESS**
+Status: **COMPLETE**
 
-The public repository now owns transport and public contract surfaces. Protected implementation is consumed through the private facade contract `cmis-private-core/v1`.
+The public repository owns CMIS transport and public contract surfaces. The
+runtime implementation is required from the private facade contract
+`cmis-private-core/v1`.
 
-## Public-owned surfaces
+## Final public/private boundary
 
+Public-owned surfaces:
 - `liquidity_scout/cmis/__init__.py`
 - `liquidity_scout/cmis/capabilities.py`
 - `liquidity_scout/cmis/http.py`
 - `liquidity_scout/cmis_private_core.py`
 
-The HTTP transport no longer imports `RuntimeCMISGateway` or gateway chain constants directly. It receives those values through `liquidity_scout.cmis_private_core.load_runtime_contract()`.
+The public capability contract now owns the accepted runtime service and chain
+identifiers. Default HTTP runtime construction loads `cmis-private-core`
+lazily and validates the private service/chain surface against that public
+contract.
 
-## Migration-only fallback
+There is **no public implementation fallback**. If `cmis-private-core` is
+missing or contract-incompatible, default CMIS runtime construction fails
+closed.
 
-Until split validation is complete, the adapter may fall back to the existing public implementation so the public repository remains independently testable.
+## Phase 3 validation evidence
 
-That fallback is not the target production architecture.
+Required-private-core split validation passed in ROBERTA workflow run
+`33227923034` with:
+- `CMIS_PRIVATE_CORE_REQUIRED=1`;
+- protected CMIS implementation removed from the assembled public shell;
+- `cmis-private-core==0.2.0` installed into the split runtime;
+- ROBERTA -> X1 Scout -> CMIS HTTP -> private `RuntimeCMISGateway` completed;
+- `PUBLIC_FALLBACK_USED=FALSE`.
 
-Production cutover requires:
+The fallback-free CMIS public regression suite also passed in Liquidity Scout
+Tests run `33227949785`.
 
-`CMIS_PRIVATE_CORE_REQUIRED=1`
+## Safety state
 
-With that flag enabled, an absent or incompatible private core fails closed.
+Phase 3 changes no authority boundaries:
+- ROBERTA owns orchestration/final synthesis.
+- Chain Scouts interpret and investigate.
+- CMIS owns deterministic verified facts/evidence/risk.
+- Providers remain beneath CMIS.
+- No execution, signing, broadcasting, custody, autonomous value movement, new
+  fact authority, or new service promotion is introduced.
 
-## Removal gate
+Protected implementation remains in public Git HEAD until the dedicated source
+removal phase. Historical Git-object cleanup remains a separate later phase.
 
-Do not delete protected CMIS implementation from public HEAD until all of the following pass:
+## Next phase
 
-1. private distribution build and doctor;
-2. public HTTP/capability tests using `cmis-private-core/v1`;
-3. evidence, verification, risk, history, provider, Instant X1 Scan, and runtime tests across the split;
-4. ROBERTA -> Scout -> CMIS integration validation;
-5. required-private-core mode with no public fallback.
-
-Historical Git cleanup is a separate post-cutover operation.
+Phase 4 broadens split-runtime integration/CI coverage and operationalizes the
+private-package validation path before public protected-source removal.
