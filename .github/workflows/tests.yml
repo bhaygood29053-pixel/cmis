@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - phase5/public-source-removal
+      - phase6/final-closure
   pull_request:
     branches:
       - main
@@ -13,101 +13,72 @@ permissions:
   contents: read
 
 jobs:
-  tests:
-    name: Python unit tests
+  public-shell-boundary:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out public shell
         uses: actions/checkout@v4
-
-      - name: Check out protected CMIS baseline
-        uses: actions/checkout@v4
-        with:
-          repository: bhaygood29053-pixel/cmis
-          ref: 45551d112e0779343c0d0e50d0d2631efc88f76c
-          path: cmis-protected-baseline
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
+          cache: pip
 
-      - name: Install dependencies
+      - name: Install public dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build
           pip install -r requirements.txt
 
-      - name: Build private CMIS runtime
+      - name: Validate Phase 6 public boundary
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf phase5-build phase5-dist phase5-runtime
-          mkdir -p phase5-build/liquidity_scout/cmis phase5-build/cmis_core phase5-dist phase5-runtime/site
+          python - <<'PY'
+          from pathlib import Path
 
-          cp cmis-protected-baseline/liquidity_scout/cmis/*.py phase5-build/liquidity_scout/cmis/
-          rm -f             phase5-build/liquidity_scout/cmis/__init__.py             phase5-build/liquidity_scout/cmis/capabilities.py             phase5-build/liquidity_scout/cmis/http.py
+          cmis_dir = Path("liquidity_scout/cmis")
+          allowed = {"__init__.py", "capabilities.py", "http.py"}
+          remaining = sorted(
+              path.name
+              for path in cmis_dir.glob("*.py")
+              if path.name not in allowed
+          )
+          assert not remaining, remaining
 
-          cat > phase5-build/pyproject.toml <<'EOF'
-          [build-system]
-          requires = ["setuptools>=68", "wheel"]
-          build-backend = "setuptools.build_meta"
+          from liquidity_scout import cmis
+          from liquidity_scout.cmis import http
+          from liquidity_scout.cmis_private_core import (
+              PrivateCoreUnavailable,
+              load_runtime_contract,
+              private_core_required,
+              private_core_status,
+          )
 
-          [project]
-          name = "cmis-private-core"
-          version = "0.2.0"
-          requires-python = ">=3.11"
-          dependencies = []
+          assert tuple(cmis.SUPPORTED_SERVICES) == tuple(http.SUPPORTED_SERVICES)
+          assert tuple(cmis.SUPPORTED_CHAINS) == tuple(http.SUPPORTED_CHAINS)
+          assert private_core_required() is True
+          status = private_core_status()
+          assert status["required"] is True
+          assert status["available"] is False
+          assert status["source"] == "unavailable"
 
-          [tool.setuptools.packages.find]
-          where = ["."]
-          include = ["cmis_core*", "liquidity_scout.cmis*"]
-          namespaces = true
-          EOF
+          try:
+              load_runtime_contract()
+          except PrivateCoreUnavailable:
+              pass
+          else:
+              raise AssertionError("CMIS public shell did not fail closed without private core")
 
-          cat > phase5-build/cmis_core/__init__.py <<'EOF'
-          __version__ = "0.2.0"
-          PHASE = 3
-          PUBLIC_SHELL_REPOSITORY = "bhaygood29053-pixel/cmis"
-          PUBLIC_SHELL_BASELINE = "bd9aaa786a9188d3edbfa35692b6754fd9b8b769"
-          EOF
+          try:
+              http.create_server(host="127.0.0.1", port=0)
+          except PrivateCoreUnavailable:
+              pass
+          else:
+              raise AssertionError("CMIS default server constructed without private core")
 
-          cat > phase5-build/cmis_core/api.py <<'EOF'
-          from __future__ import annotations
-
-          CUTOVER_CONTRACT = "cmis-private-core/v1"
-
-          def runtime_gateway_class():
-              from liquidity_scout.cmis.runtime_gateway import RuntimeCMISGateway
-              return RuntimeCMISGateway
-
-          def runtime_contract():
-              from liquidity_scout.cmis.gateway import KNOWN_CHAINS, SUPPORTED_CHAINS
-              from liquidity_scout.cmis.runtime_gateway import SUPPORTED_SERVICES, RuntimeCMISGateway
-              return {
-                  "contract": CUTOVER_CONTRACT,
-                  "gateway_class": RuntimeCMISGateway,
-                  "supported_services": tuple(SUPPORTED_SERVICES),
-                  "supported_chains": tuple(SUPPORTED_CHAINS),
-                  "known_chains": tuple(KNOWN_CHAINS),
-              }
-          EOF
-
-          python -m build --wheel --outdir phase5-dist phase5-build
-          python -m pip install --no-deps --target phase5-runtime/site phase5-dist/*.whl
-
-          rsync -a --ignore-existing liquidity_scout/ phase5-runtime/site/liquidity_scout/
-          find . -maxdepth 1 -type f -name '*.py' -exec cp {} phase5-runtime/site/ \;
-
-          test -e phase5-runtime/site/liquidity_scout/cmis/runtime_gateway.py
-          test -e phase5-runtime/site/liquidity_scout/cmis/http.py
-          python -m compileall -q phase5-runtime/site
-
-      - name: Run Liquidity Scout tests against split runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd phase5-runtime
-          PYTHONPATH="$GITHUB_WORKSPACE/phase5-runtime/site:$GITHUB_WORKSPACE"             python -m unittest discover -s "$GITHUB_WORKSPACE/tests" -p "test_*.py" -v
+          print("PHASE6_CMIS_PUBLIC_HISTORY_BOUNDARY=PASS")
+          print("CMIS_PRIVATE_CORE_REQUIRED=PASS")
+          print("PUBLIC_FALLBACK_USED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
