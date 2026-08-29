@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import unittest
 from unittest.mock import patch
 
@@ -8,24 +7,13 @@ from liquidity_scout import cmis_private_core
 
 
 class CMISPrivateCoreAdapterTests(unittest.TestCase):
-    def test_public_transition_fallback_remains_available_during_phase3(self):
-        with patch.object(cmis_private_core, "_load_private_api", return_value=None):
-            with patch.dict(os.environ, {}, clear=False):
-                os.environ.pop("CMIS_PRIVATE_CORE_REQUIRED", None)
-                contract = cmis_private_core.load_runtime_contract()
+    def test_private_core_is_mandatory_after_phase3_cutover(self):
+        self.assertTrue(cmis_private_core.private_core_required())
 
-        self.assertEqual(contract["source"], "public-transition")
-        self.assertEqual(
-            contract["contract"],
-            cmis_private_core.PUBLIC_TRANSITION_CONTRACT,
-        )
-        self.assertTrue(callable(contract["gateway_class"]))
-
-    def test_required_mode_fails_closed_without_private_distribution(self):
+    def test_missing_private_distribution_always_fails_closed(self):
         with patch.object(cmis_private_core, "_load_private_api", return_value=None):
-            with patch.dict(os.environ, {"CMIS_PRIVATE_CORE_REQUIRED": "1"}):
-                with self.assertRaises(cmis_private_core.PrivateCoreUnavailable):
-                    cmis_private_core.load_runtime_contract()
+            with self.assertRaises(cmis_private_core.PrivateCoreUnavailable):
+                cmis_private_core.load_runtime_contract()
 
     def test_private_contract_must_match_expected_version(self):
         class FakePrivateAPI:
@@ -39,9 +27,27 @@ class CMISPrivateCoreAdapterTests(unittest.TestCase):
                     "known_chains": (),
                 }
 
-        with patch.object(cmis_private_core, "_load_private_api", return_value=FakePrivateAPI):
+        with patch.object(
+            cmis_private_core,
+            "_load_private_api",
+            return_value=FakePrivateAPI,
+        ):
             with self.assertRaises(cmis_private_core.PrivateCoreUnavailable):
                 cmis_private_core.load_runtime_contract()
+
+    def test_status_reports_no_public_fallback(self):
+        with patch.object(cmis_private_core, "_load_private_api", return_value=None):
+            status = cmis_private_core.private_core_status()
+
+        self.assertEqual(
+            status,
+            {
+                "available": False,
+                "required": True,
+                "source": "unavailable",
+                "expected_contract": "cmis-private-core/v1",
+            },
+        )
 
 
 if __name__ == "__main__":
