@@ -33,6 +33,26 @@ INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
 INTELLIGENCE_EVIDENCE_SCHEMA_VERSION = 1
 CAPABILITY_STATES = frozenset({"supported", "bounded", "partial", "unavailable"})
 
+# Public-shell runtime contract. These identifiers are part of the accepted
+# Chain Scout API surface and therefore remain public even though the
+# implementation is private. The private facade must match these values exactly.
+PUBLIC_RUNTIME_SERVICES = (
+    "asset_lookup",
+    "market_report",
+    "rank",
+    "historical_compare",
+    "tokenomics",
+    "risk_check",
+    "pre_trade_check",
+    "trade_verification",
+    "verified_asset_activity",
+    "instant_x1_scan",
+    "verification_evidence",
+    "concentration_change_intelligence",
+)
+PUBLIC_SUPPORTED_CHAINS = ("x1",)
+PUBLIC_KNOWN_CHAINS = ("x1", "solana")
+
 
 def _capability(
     state: str,
@@ -526,6 +546,9 @@ __all__ = [
     "INTELLIGENCE_EVIDENCE_SCHEMA_VERSION",
     "INTELLIGENCE_FOUNDATION_SCHEMA_VERSION",
     "PROOF_SCORE_SCHEMA_VERSION",
+    "PUBLIC_KNOWN_CHAINS",
+    "PUBLIC_RUNTIME_SERVICES",
+    "PUBLIC_SUPPORTED_CHAINS",
     "build_capability_manifest",
     "service_capability",
     "validate_capability_contract",
