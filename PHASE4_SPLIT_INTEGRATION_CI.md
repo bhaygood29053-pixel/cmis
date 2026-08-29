@@ -37,8 +37,8 @@ CMIS-specific proof included:
 ## Source-removal gate
 
 Phase 4 does not remove protected CMIS implementation from public Git HEAD.
-Source removal is a later phase and remains blocked until the Phase 4 split
-integration gate is green and stable on merged `main`.
+The split integration gate is now green and stable on merged `main`; controlled
+public-source removal belongs to the next migration phase.
 
 No execution, signing, broadcasting, custody, value movement, new fact source,
 or new service promotion is authorized.
