@@ -1,19 +1,16 @@
-"""Phase 3 adapter from the public CMIS shell to the private core.
+"""Public-shell adapter to the required private CMIS implementation.
 
-The public transport imports only this boundary. During migration, a public
-fallback keeps the existing repository testable before deployment installs the
-private distribution. Production cutover can fail closed by setting
-CMIS_PRIVATE_CORE_REQUIRED=1.
+Phase 3 cutover is fail-closed: the public shell exposes contracts and transport,
+while cmis-private-core owns the runtime implementation. There is no public
+implementation fallback.
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from typing import Any
 
 EXPECTED_PRIVATE_CONTRACT = "cmis-private-core/v1"
-PUBLIC_TRANSITION_CONTRACT = "cmis-public-transition/v1"
 
 
 class PrivateCoreUnavailable(RuntimeError):
@@ -21,12 +18,8 @@ class PrivateCoreUnavailable(RuntimeError):
 
 
 def private_core_required() -> bool:
-    return os.getenv("CMIS_PRIVATE_CORE_REQUIRED", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    """Return True: CMIS private core is mandatory after Phase 3 cutover."""
+    return True
 
 
 def _load_private_api():
@@ -41,7 +34,9 @@ def _load_private_api():
 
 def _validate_private_contract(value: object) -> dict[str, Any]:
     if not isinstance(value, Mapping):
-        raise PrivateCoreUnavailable("CMIS private-core facade returned a non-mapping contract.")
+        raise PrivateCoreUnavailable(
+            "CMIS private-core facade returned a non-mapping contract."
+        )
     contract = dict(value)
     if contract.get("contract") != EXPECTED_PRIVATE_CONTRACT:
         raise PrivateCoreUnavailable("CMIS private-core contract version is incompatible.")
@@ -61,44 +56,28 @@ def _validate_private_contract(value: object) -> dict[str, Any]:
 
 
 def load_runtime_contract() -> dict[str, Any]:
-    """Load the private runtime contract or the temporary public fallback."""
+    """Load the required private CMIS runtime contract or fail closed."""
     private_api = _load_private_api()
-    if private_api is not None:
-        return _validate_private_contract(private_api.runtime_contract())
-
-    if private_core_required():
+    if private_api is None:
         raise PrivateCoreUnavailable(
-            "CMIS_PRIVATE_CORE_REQUIRED is enabled but cmis-private-core is not installed."
+            "cmis-private-core is required but is not installed."
         )
-
-    # Transitional fallback only. This path is removed after Phase 3 split
-    # validation and before proprietary implementation is removed from public HEAD.
-    from liquidity_scout.cmis.gateway import KNOWN_CHAINS, SUPPORTED_CHAINS
-    from liquidity_scout.cmis.runtime_gateway import SUPPORTED_SERVICES, RuntimeCMISGateway
-
-    return {
-        "contract": PUBLIC_TRANSITION_CONTRACT,
-        "source": "public-transition",
-        "gateway_class": RuntimeCMISGateway,
-        "supported_services": tuple(SUPPORTED_SERVICES),
-        "supported_chains": tuple(SUPPORTED_CHAINS),
-        "known_chains": tuple(KNOWN_CHAINS),
-    }
+    return _validate_private_contract(private_api.runtime_contract())
 
 
 def private_core_status() -> dict[str, Any]:
-    """Return a non-secret deployment status for diagnostics/tests."""
+    """Return non-secret deployment status for diagnostics/tests."""
     api = _load_private_api()
     return {
         "available": api is not None,
-        "required": private_core_required(),
+        "required": True,
+        "source": "private" if api is not None else "unavailable",
         "expected_contract": EXPECTED_PRIVATE_CONTRACT,
     }
 
 
 __all__ = [
     "EXPECTED_PRIVATE_CONTRACT",
-    "PUBLIC_TRANSITION_CONTRACT",
     "PrivateCoreUnavailable",
     "load_runtime_contract",
     "private_core_required",
