@@ -1,0 +1,52 @@
+name: X1.Ninja Price-Only Reserve-Ratio Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  price-only-ratio:
+    name: Price-only updates vs gross reserve ratio
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue358-price-only-reserve-ratio-mode'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_PRICE_ONLY_RATIO_LIVE: "1"
+      X1_NINJA_PRICE_ONLY_MAX_SNAPSHOTS: "50"
+      X1_NINJA_PRICE_ONLY_POLL_SECONDS: "8"
+      X1_NINJA_PRICE_ONLY_CATALOG_LIMIT: "100"
+      X1_NINJA_PRICE_ONLY_MAX_POOLS: "30"
+      X1_NINJA_PRICE_ONLY_TARGET_EVENTS: "5"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify X1.Ninja key
+        run: |
+          test -n "${X1_NINJA_API_KEY:-}"
+      - name: Run deterministic price-only ratio tests
+        run: |
+          python -m unittest tests.test_x1_ninja_price_only_reserve_ratio_mode -v
+      - name: Run bounded live price-only ratio evidence
+        run: |
+          python -m unittest tests.test_x1_ninja_price_only_reserve_ratio_mode_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1.Ninja/X1 RPC reconciliation evidence only."
+          echo "No provider source/fact-time/freshness inference from correlation."
+          echo "No priceUsd, liquidity, TVL, source-independence, transaction construction, signing, broadcasting, custody, trading, or execution promotion."
