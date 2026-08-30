@@ -10,6 +10,7 @@ from liquidity_scout.providers.x1.routed_multi_amm_ambiguity import (
 from liquidity_scout.providers.x1.transaction_semantics import (
     TokenDelta,
     VerificationReport,
+    XDEX_MAINNET_OBSERVED_PROGRAM_ID,
 )
 
 
@@ -222,6 +223,92 @@ class RoutedMultiAmmAmbiguityTests(unittest.TestCase):
         )
         self.assertFalse(result["classification_change_authorized"])
         self.assertTrue(result["existing_fail_closed_block_should_remain"])
+
+    def test_default_collector_detects_duplicated_rpc_inner_group(self):
+        instruction = {
+            "programId": XDEX_MAINNET_OBSERVED_PROGRAM_ID,
+            "accounts": [POOL, ASSET_VAULT, COUNTER_VAULT],
+        }
+
+        def duplicated_group_tx(signature, *, rpc_url):
+            return {
+                "transaction": {
+                    "signatures": [signature],
+                    "message": {
+                        "accountKeys": [
+                            POOL,
+                            ASSET_VAULT,
+                            COUNTER_VAULT,
+                            XDEX_MAINNET_OBSERVED_PROGRAM_ID,
+                        ],
+                        "instructions": [],
+                    },
+                },
+                "meta": {
+                    "innerInstructions": [
+                        {
+                            "index": 4,
+                            "instructions": [dict(instruction)],
+                        },
+                        {
+                            "index": 4,
+                            "instructions": [dict(instruction)],
+                        },
+                    ],
+                },
+            }
+
+        def duplicate_membership(**kwargs):
+            return {
+                "transaction_pool_membership_verified": True,
+                "recognized_amm_instruction_count": 2,
+                "selected_pool_instruction_count": 2,
+                "selected_pool_instruction_evidence": [],
+            }
+
+        result = characterize_routed_multi_amm_ambiguity(
+            signature=SIGNATURE,
+            pool_address=POOL,
+            rpc_url="rpc",
+            identity_resolver=identity_resolver,
+            transaction_fetcher=duplicated_group_tx,
+            transaction_verifier=verifier,
+            membership_prover=duplicate_membership,
+        )
+
+        self.assertEqual(
+            result["ambiguity_cause"],
+            CAUSE_DUPLICATE_REPRESENTATION,
+        )
+        self.assertEqual(
+            result["recognized_amm_instruction_count_raw"],
+            2,
+        )
+        self.assertEqual(
+            result["recognized_amm_instruction_count_normalized"],
+            1,
+        )
+        self.assertTrue(
+            result["duplicate_occurrence_representation_verified"]
+        )
+        self.assertEqual(
+            sorted(
+                row["source_group_position"]
+                for row in result[
+                    "recognized_amm_instruction_occurrences"
+                ]
+            ),
+            [0, 1],
+        )
+        self.assertEqual(
+            {
+                row["parent_outer_instruction_index"]
+                for row in result[
+                    "recognized_amm_instruction_occurrences"
+                ]
+            },
+            {4},
+        )
 
     def test_membership_occurrence_count_mismatch_fails_closed(self):
         occurrences = [selected(), unrelated()]
