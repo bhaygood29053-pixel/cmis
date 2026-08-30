@@ -1,6 +1,6 @@
 # Roberta ↔ CMIS Source Sync Baseline
 
-Last reconciled: 2026-08-28 (America/New_York)
+Last reconciled: 2026-08-30 (America/New_York)
 
 This file is the compact cross-project synchronization baseline. It is intentionally mirrored in both repositories. Repository-local architecture, capability, roadmap, and status documents remain authoritative for implementation details.
 
@@ -34,12 +34,13 @@ User / transport
 ## Current CMIS contract baseline
 
 ```text
-CMIS capability contract = 1.12.0
+CMIS capability contract = 1.13.0
 global existing-service minimum = 1.8.0
 concentration_change_intelligence minimum = 1.9.0
 all_available history minimum = 1.10.0
 x1_asset_identity/v1 minimum = 1.11.0
 verified provider-price backfill semantics = 1.12.0
+instant_x1_scan/v1 minimum = 1.13.0
 ```
 
 Accepted milestones carried by that contract line:
@@ -48,6 +49,7 @@ Accepted milestones carried by that contract line:
 - CMIS `1.10.0` added `historical_compare` modes `all_available` and `all_available_pair`.
 - CMIS `1.11.0` added normalized exact-mint X1 identity under `x1_asset_identity/v1`; the exact mint remains the fungible identity root.
 - CMIS `1.12.0` permits a narrow verified provider-price backfill for historical price only. It does not prove provider source independence, archive completeness, continuous coverage, historical USD-stable peg behavior, or complete asset lifetime.
+- CMIS `1.13.0` adds the promoted X1-only `instant_x1_scan/v1` composition service. It adds no new provider truth path and keeps holder/current-concentration fields fail-closed when their evidence is not verified.
 
 The core Phase 11 `intelligence_foundation` remains read-only/non-promoted as a group. The separately accepted Phase 12 wrapper remains exactly:
 
@@ -64,6 +66,20 @@ execution_authorized = false
 ```
 
 Solana remains unavailable/non-promoted for this service.
+
+The CMIS `1.13.0` Instant X1 Scan promotion is exactly:
+
+```text
+service = instant_x1_scan
+service_contract_version = instant_x1_scan/v1
+chain = x1
+read_only = true
+public_service_promoted = true
+scout_reliance_promoted = true
+execution_authorized = false
+```
+
+It is composition-only over accepted CMIS evidence and local CMIS history. Roberta/X1 Scout must still adopt this service explicitly before it becomes a Roberta-dispatchable capability; upstream CMIS promotion alone does not create a Roberta routing path.
 
 ## Oracle V2 provider-gap status
 
@@ -94,6 +110,12 @@ execution_authorized = false
 ```
 
 No current slot is price-eligible in the latest live evidence because all observed relay slots were stale. Five relay slots remain same-system redundancy, not five independent market sources. The next Oracle gate resumes only when new policy-eligible live slots appear.
+
+## Public/private runtime boundary
+
+Both public repositories completed the protected-runtime split and Phase 6 historical cleanup on 2026-08-29. The public `roberta-langgraph` and `cmis` repositories now carry the public shell, contracts, documentation, and fail-closed integration tests; protected runtime implementation is supplied by the corresponding private-core packages at deployment/test assembly time.
+
+The steady-state rule is fail-closed: missing or incompatible private runtime must not trigger a public fallback. The authority path remains `User -> Roberta -> Chain Scout -> CMIS -> Chain Provider`, and the split changes code placement rather than trust or execution authority.
 
 ## Roberta Learning Plane baseline
 
