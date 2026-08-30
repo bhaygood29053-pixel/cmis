@@ -1,6 +1,6 @@
 # Roberta ↔ Chain Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-28
+Last reconciled: 2026-08-30
 
 ## Canonical hierarchy
 
