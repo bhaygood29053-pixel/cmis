@@ -36,6 +36,7 @@ class NinjaCatalogPriceExecutionLinkLiveTests(unittest.TestCase):
         self.assertTrue(addresses, "No bounded exact-XNT catalog pools found")
 
         snapshots = []
+        observed_price_events = []
         verified_events = []
         seen_signatures = set()
         diagnostics = []
@@ -65,6 +66,9 @@ class NinjaCatalogPriceExecutionLinkLiveTests(unittest.TestCase):
                         })
                         continue
 
+                    if event.get("price_changed") is True:
+                        observed_price_events.append(event)
+
                     if event["status"] == "verified":
                         signature = event["matched_transaction"]["signature"]
                         if signature not in seen_signatures:
@@ -93,7 +97,7 @@ class NinjaCatalogPriceExecutionLinkLiveTests(unittest.TestCase):
                 time.sleep(POLL_SECONDS)
 
         aggregate = aggregate_catalog_price_links(
-            verified_events,
+            observed_price_events,
             minimum_verified_events=5,
         )
 
@@ -104,6 +108,8 @@ class NinjaCatalogPriceExecutionLinkLiveTests(unittest.TestCase):
                 "monitored_pool_count": len(addresses),
                 "poll_seconds": POLL_SECONDS,
                 "aggregate": aggregate,
+                "verified_event_count_seen": len(verified_events),
+                "observed_price_event_count": len(observed_price_events),
                 "diagnostics": diagnostics,
             }, sort_keys=True, default=str)
         )
