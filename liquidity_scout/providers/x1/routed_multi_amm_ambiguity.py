@@ -153,13 +153,14 @@ def _collect_source_aware_occurrences(
         if not isinstance(group, Mapping):
             continue
         parent_index = group.get("index")
-        parent_index = (
-            parent_index
-            if isinstance(parent_index, int)
-            and not isinstance(parent_index, bool)
-            and parent_index >= 0
-            else None
-        )
+        if (
+            isinstance(parent_index, bool)
+            or not isinstance(parent_index, int)
+            or parent_index < 0
+        ):
+            raise ValueError(
+                "inner instruction group source index unavailable"
+            )
         instructions = group.get("instructions")
         instructions = (
             instructions
