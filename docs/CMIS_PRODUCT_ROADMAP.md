@@ -295,11 +295,12 @@ CMIS is now prioritized around the verified data and intelligence services requi
 1. **Instant X1 Scan support — implemented under #322 / CMIS 1.13.0.** The compact `instant_x1_scan/v1` service composes exact identity, market, tokenomics, CMIS-stored verified history, deterministic risk, and runtime evidence quality. Unverified holder/current-concentration facts remain explicit unknown/partial values.
 2. **X1.Ninja developer API validation — next.** — open a fresh provider-verification track for the currently available machine-readable developer API. Treat all responses as candidate evidence until identity, units, freshness, scope, reproducibility, same-fact semantics, and independence are explicitly proven. Prior SSE 403 evidence does not automatically apply to a different documented API contract.
 3. **Holder and wallet intelligence promotion** — promote useful concentration, direct-wallet-relationship, and related deterministic foundations only through explicit public/Scout-reliance contracts. Direct interactions must not be relabeled as beneficial ownership, common control, intent, fraud, or manipulation.
-4. **Discovery Ledger** — add an immutable first-observation record plus subsequent verified observations for supported X1 assets/entities, preserving exact source/fact-time/proof lineage so later performance and assessment-quality analysis can be reproduced.
-5. **Early Warning services** — advance concentration/liquidity/wallet/activity warning candidates only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
-6. **Deterministic Compare services** — support first-class current-vs-history and entity-vs-entity comparisons without recomputing facts outside the canonical evidence store.
-7. **X1 ecosystem/network brief inputs** — expose bounded verified market, network, validator, protocol, and ecosystem observations needed for a Roberta daily intelligence brief, one field at a time under exact provenance and scope.
-8. **Machine ROBERTA support contracts** — after service contracts stabilize, CMIS should expose only the deterministic backend services/evidence needed by a separately owned Machine ROBERTA interface. The external agent/DApp API, schemas, authentication, quotas, and SDK belong to Roberta; CMIS must not become the general agent product. Premium/access policy must never change truth, verification, Proof Score, risk, or evidence semantics.
+4. **Deterministic Token Burn Intelligence — Issue #368.** Promote the existing generic X1 burn-scanner foundation into an exact-mint, read-only burn-intelligence contract that reports cumulative verified observed burns plus trailing **24h, 7d, and 30d** burn totals/event counts. Complete lifetime burn may be claimed only when archive/signature/history completeness is independently proven; otherwise the cumulative value remains explicitly bounded to verified observed coverage.
+5. **Discovery Ledger** — add an immutable first-observation record plus subsequent verified observations for supported X1 assets/entities, preserving exact source/fact-time/proof lineage so later performance and assessment-quality analysis can be reproduced.
+6. **Early Warning services** — advance concentration/liquidity/wallet/activity warning candidates only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
+7. **Deterministic Compare services** — support first-class current-vs-history and entity-vs-entity comparisons without recomputing facts outside the canonical evidence store.
+8. **X1 ecosystem/network brief inputs** — expose bounded verified market, network, validator, protocol, and ecosystem observations needed for a Roberta daily intelligence brief, one field at a time under exact provenance and scope.
+9. **Machine ROBERTA support contracts** — after service contracts stabilize, CMIS should expose only the deterministic backend services/evidence needed by a separately owned Machine ROBERTA interface. The external agent/DApp API, schemas, authentication, quotas, and SDK belong to Roberta; CMIS must not become the general agent product. Premium/access policy must never change truth, verification, Proof Score, risk, or evidence semantics.
 
 ### Scope discipline
 
@@ -416,6 +417,132 @@ Any promoted output must preserve:
 - `execution_authorized=false`.
 
 Until that promotion gate passes, expected execution slippage remains unavailable.
+
+### X1 Token Burn Intelligence — Issue #368
+
+CMIS should promote the existing generic X1 burn-scanner/provider foundation into a versioned, exact-mint burn-intelligence service. Candidate public contract name:
+
+```text
+token_burn_intelligence/v1
+```
+
+This name is roadmap intent only until an explicit service contract is reviewed and accepted.
+
+The service should answer, for an exact X1 mint:
+
+- how many tokens CMIS has **verified as burned across all proven available coverage**;
+- how many tokens were burned in the trailing **24 hours**;
+- how many tokens were burned in the trailing **7 days**;
+- how many tokens were burned in the trailing **30 days**;
+- burn-event counts for cumulative, 24h, 7d, and 30d scopes;
+- exact coverage start/end;
+- exact evaluation/as-of time;
+- scan/archive completeness state;
+- evidence provenance, limitations, Evidence Receipt, and Proof Score where supported.
+
+#### Burn semantics
+
+Count only deterministic accepted on-chain token-destruction semantics for the exact mint, such as verified SPL Token `Burn` / `BurnChecked`-equivalent instructions under the accepted X1 parser contract.
+
+Do **not** count a transfer to a so-called dead/burn address as a token burn merely because a provider, explorer, project, or user labels the address that way. Any non-standard destruction mechanism requires its own separately accepted semantic proof.
+
+Burn identity is rooted in the exact mint. Symbol/name lookup may assist resolution, but ticker/name equality never defines which asset was burned.
+
+Each burn event should be uniquely keyed so the same transaction/instruction cannot be double-counted across rescans or providers. The canonical event identity should include enough exact transaction/instruction position information to make persistence idempotent.
+
+#### Cumulative total vs. complete lifetime total
+
+The contract must distinguish:
+
+```text
+verified_burned_observed
+```
+
+from:
+
+```text
+complete_lifetime_burn
+```
+
+A cumulative scan may report every burn CMIS has verified within its proven available history. It may set a field equivalent to:
+
+```text
+lifetime_total_burn_verified = true
+```
+
+only when complete token-lifetime/archive/signature traversal is independently proven.
+
+Otherwise:
+
+```text
+lifetime_total_burn_verified = false
+```
+
+and the cumulative amount remains explicitly coverage-bounded. The UI must not relabel it as the token's definitive lifetime burn.
+
+#### Rolling-window semantics
+
+Trailing windows should be computed relative to one explicit canonical UTC `as_of` time:
+
+```text
+24h = (as_of - 24 hours, as_of]
+7d  = (as_of - 7 days, as_of]
+30d = (as_of - 30 days, as_of]
+```
+
+Only burn events with accepted canonical transaction/block time may enter those buckets. Events with missing, malformed, ambiguous, or unverified time remain outside time-window totals and must surface as unresolved rather than being guessed into a window.
+
+Window output should preserve both:
+
+- burned token amount;
+- burn-event count.
+
+#### Supply relationship
+
+Current verified supply may be exposed alongside burn intelligence when available, and CMIS may derive an explicitly labeled ratio such as:
+
+```text
+verified_observed_burn / current_verified_supply
+```
+
+but it must not call that value “percent of original supply burned” unless original/genesis supply is independently proven.
+
+Likewise, supply decline is not automatically equivalent to cumulative burns, and cumulative burns are not the same as net supply change when minting can also occur. Burn instructions and mint instructions must remain separate facts.
+
+#### Historical persistence and incremental scans
+
+The accepted provider-owned activity/event parser and existing `x1_burn_scan.py` foundation should be reused rather than creating a second burn parser.
+
+The production design should support:
+
+- durable content-addressed/idempotent burn observations;
+- incremental rescans from the last verified position;
+- bounded backfill toward earliest available history;
+- explicit gap detection;
+- exact signatures/transactions scanned;
+- no double counting when windows overlap;
+- deterministic regeneration of 24h/7d/30d aggregates from accepted event records.
+
+#### Roberta consumption
+
+After explicit CMIS public-service and X1 Scout-reliance promotion, Roberta should be able to answer questions such as:
+
+- “How much AGI has been burned?”
+- “How much AGI was burned in the last 24 hours?”
+- “Show AGI burns for 24h, 7d, and 30d.”
+- “Is the burn rate accelerating?”
+- “Compare XNT and AGI burn activity.”
+
+The last two require compatible multi-period/compare evidence and must not be inferred from incomplete or incomparable coverage.
+
+This capability is read-only:
+
+```text
+analysis_only = true
+execution_authorized = false
+```
+
+It grants no authority to construct or submit burn transactions.
 
 ### 2. Discovery Ledger
 
@@ -637,19 +764,20 @@ Current implementation sequence:
 
 Future candidates — **not active milestones until separately accepted**:
 
-23. read-only quote-to-executed-swap matching and a content-addressed realized-slippage ledger;
-24. comparable-trade execution-quality statistics under exact route/pool/config/direction semantics;
-25. expected execution-slippage promotion only after a separate evidence-adequacy and validation gate;
-26. immutable X1 Discovery Ledger / first-verified-observation service;
-27. deterministic Early Warning service families, each with explicit persistence/freshness/severity/replay contracts and separate public/Scout promotion;
-28. first-class deterministic Compare support that preserves compatible scope/time/provenance;
-29. bounded X1 ecosystem/network brief inputs for Roberta synthesis;
-30. any additional public alert/Scout-reliance promotion;
-31. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-32. separate Solana current-price promotion only after time identity and independence/price-construction gates;
-33. further field-by-field Solana maturity;
-34. Ethereum under an explicit capability/acceptance plan;
-35. investigation/evidence export and premium access.
+23. deterministic X1 Token Burn Intelligence under Issue #368, including exact-mint cumulative verified-observed burn plus trailing 24h/7d/30d totals and completeness semantics;
+24. read-only quote-to-executed-swap matching and a content-addressed realized-slippage ledger;
+25. comparable-trade execution-quality statistics under exact route/pool/config/direction semantics;
+26. expected execution-slippage promotion only after a separate evidence-adequacy and validation gate;
+27. immutable X1 Discovery Ledger / first-verified-observation service;
+28. deterministic Early Warning service families, each with explicit persistence/freshness/severity/replay contracts and separate public/Scout promotion;
+29. first-class deterministic Compare support that preserves compatible scope/time/provenance;
+30. bounded X1 ecosystem/network brief inputs for Roberta synthesis;
+31. any additional public alert/Scout-reliance promotion;
+32. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+33. separate Solana current-price promotion only after time identity and independence/price-construction gates;
+34. further field-by-field Solana maturity;
+35. Ethereum under an explicit capability/acceptance plan;
+36. investigation/evidence export and premium access.
 
 None authorizes execution.
 
