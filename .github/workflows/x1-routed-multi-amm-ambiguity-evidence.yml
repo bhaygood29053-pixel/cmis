@@ -1,0 +1,44 @@
+name: X1 Routed Multi-AMM Ambiguity Evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/issue360-delayed-vault-swap-departure-link
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  routed-multi-amm-ambiguity:
+    name: Characterize exact blocking AMM instructions
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue367-routed-multi-amm-ambiguity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_ROUTED_MULTI_AMM_LIVE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run deterministic ambiguity tests
+        run: |
+          python -m unittest tests.test_x1_routed_multi_amm_ambiguity -v
+      - name: Run exact-signature live ambiguity evidence
+        run: |
+          python -m unittest tests.test_x1_routed_multi_amm_ambiguity_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1 RPC instruction-level evidence only."
+          echo "No #360 lookback/tolerance/signature-cap widening."
+          echo "No ambiguous transaction is promoted to an exact swap."
+          echo "No provider fact-time, update-source, freshness, priceUsd, liquidity, TVL, CMIS promotion, or execution claim."
