@@ -1,0 +1,60 @@
+name: X1.Ninja priceNative Semantic Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  price-native-semantics:
+    name: X1.Ninja priceNative vs verified reserve ratio
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue343-ninja-price-native-semantics'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_PRICE_NATIVE_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Run deterministic priceNative semantic tests
+        run: |
+          python -m unittest tests.test_x1_ninja_price_native_semantics -v
+
+      - name: Run live read-only priceNative semantic evidence
+        run: |
+          python -m unittest tests.test_x1_ninja_price_native_semantics_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1.Ninja/RPC pair-price evidence only."
+          echo "No priceUsd, freshness, USD liquidity, XDEX TVL, volume, market-cap or source-independence promotion."
+          echo "No Scout/public-service/risk/execution authority."
+          echo "No transaction construction, signing, broadcasting, custody, trading, or value movement."
