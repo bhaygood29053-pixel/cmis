@@ -364,12 +364,34 @@ def verify_delayed_catalog_price_transition(
         if cutoff_time <= block_decimal <= after_end_time:
             eligible_rows.append(row)
 
+    # getSignaturesForAddress is newest-to-oldest. Under the declared
+    # delayed-link rule we need the latest exact two-sided pool swap, not every
+    # older swap in the horizon. Once one exact swap slot is found, inspect
+    # only remaining rows at that same slot for ambiguity and stop before
+    # decoding older slots.
+    eligible_rows = sorted(
+        eligible_rows,
+        key=lambda row: row.get("slot", -1),
+        reverse=True,
+    )
+
     candidates = []
     rejections = []
+    latest_verified_swap_slot = None
+
     for row in eligible_rows:
+        row_slot = row.get("slot")
+        if (
+            latest_verified_swap_slot is not None
+            and isinstance(row_slot, int)
+            and row_slot < latest_verified_swap_slot
+        ):
+            break
+
         signature = _text(row.get("signature"))
         if not signature:
             continue
+
         try:
             candidate = _exact_swap_candidate(
                 pool_address=pool_address,
@@ -408,7 +430,11 @@ def verify_delayed_catalog_price_transition(
                 relative=relative,
                 absolute=absolute,
             )
-            candidates.append(candidate)
+
+            if latest_verified_swap_slot is None:
+                latest_verified_swap_slot = candidate["slot"]
+            if candidate["slot"] == latest_verified_swap_slot:
+                candidates.append(candidate)
         except Exception as exc:
             rejections.append({
                 "signature": signature,
@@ -424,25 +450,13 @@ def verify_delayed_catalog_price_transition(
         and row["after_price_comparison"]["within_tolerance"] is True
     ]
 
-    latest_slot = max(
-        (
-            row.get("slot")
-            for row in candidates
-            if isinstance(row.get("slot"), int)
-        ),
-        default=None,
-    )
-    latest_candidates = [
-        row
-        for row in candidates
-        if latest_slot is not None and row.get("slot") == latest_slot
-    ]
+    latest_candidates = list(candidates)
 
     unique_latest_delayed_match = bool(
-        len(qualifying) == 1
-        and len(latest_candidates) == 1
+        len(candidates) == 1
+        and len(qualifying) == 1
         and qualifying[0].get("signature")
-        == latest_candidates[0].get("signature")
+        == candidates[0].get("signature")
     )
 
     matched = qualifying[0] if unique_latest_delayed_match else None
@@ -517,6 +531,7 @@ def verify_delayed_catalog_price_transition(
         "eligible_history_row_count": len(eligible_rows),
         "verified_swap_candidate_count": len(candidates),
         "qualifying_delayed_match_count": len(qualifying),
+        "latest_verified_swap_slot": latest_verified_swap_slot,
         "latest_verified_swap_count": len(latest_candidates),
         "matched_transaction": matched,
         "candidates": candidates,
