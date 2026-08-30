@@ -245,6 +245,63 @@ class DelayedCatalogPriceLinkTests(unittest.TestCase):
             result["delayed_catalog_price_execution_link_verified"]
         )
 
+    def test_does_not_cherry_pick_older_matching_swap(self):
+        def history(address, *, limit, rpc_url):
+            return [
+                {
+                    "signature": "latest_mismatch",
+                    "slot": 96,
+                    "err": None,
+                    "block_time": 1001,
+                },
+                {
+                    "signature": "match",
+                    "slot": 95,
+                    "err": None,
+                    "block_time": 1000,
+                },
+            ]
+
+        def verify(tx, *, signature, rpc_url):
+            if signature == "latest_mismatch":
+                return report(signature, 96, 1001, "0.021")
+            return report(signature, 95, 1000, "0.02")
+
+        before = snapshot(
+            "0.0019",
+            start_slot=100,
+            end_slot=101,
+            observed_start=1050,
+            observed_end=1051,
+        )
+        after = snapshot(
+            "0.002",
+            start_slot=110,
+            end_slot=111,
+            observed_start=1060,
+            observed_end=1061,
+        )
+
+        result = verify_delayed_catalog_price_transition(
+            before=before,
+            after=after,
+            pool_address=POOL,
+            structural_verifier=structural,
+            signature_fetcher=history,
+            transaction_fetcher=tx_fetch,
+            transaction_verifier=verify,
+            membership_prover=membership,
+            recognized_program_ids=(XDEX_MAINNET_OBSERVED_PROGRAM_ID,),
+            rpc_url="rpc",
+        )
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["latest_verified_swap_slot"], 96)
+        self.assertEqual(result["verified_swap_candidate_count"], 1)
+        self.assertFalse(
+            result["delayed_catalog_price_execution_link_verified"]
+        )
+
     def test_multi_amm_candidate_fails_closed(self):
         def routed_membership(**kwargs):
             return {
