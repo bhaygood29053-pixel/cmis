@@ -270,6 +270,42 @@ class VaultActivityCorrelationTests(unittest.TestCase):
             result["catalog_price_reserve_ratio_link_verified"]
         )
 
+    def test_unresolved_vault_transaction_blocks_reserve_attribution(self):
+        before = snapshot("0.5", "100", "50", lower=10)
+        after = snapshot("0.5", "110", "50", upper=13)
+
+        def history(address, *, limit, rpc_url):
+            if address == VAULT_ASSET:
+                return [{
+                    "signature": "bad",
+                    "slot": 12,
+                    "err": None,
+                    "block_time": 1012,
+                    "confirmation_status": "confirmed",
+                }]
+            return []
+
+        def tx_fetch(signature, *, rpc_url):
+            raise RuntimeError("unavailable")
+
+        result = verify_vault_activity_transition(
+            before=before,
+            after=after,
+            pool_address=POOL,
+            structural_verifier=structural,
+            signature_fetcher=history,
+            transaction_fetcher=tx_fetch,
+            recognized_program_ids=(XDEX_MAINNET_OBSERVED_PROGRAM_ID,),
+            rpc_url="rpc",
+        )
+
+        self.assertFalse(result["transaction_coverage_complete"])
+        self.assertEqual(len(result["rejections"]), 1)
+        self.assertFalse(
+            result["provider_reserve_delta_matches_vault_delta"]
+        )
+        self.assertFalse(result["vault_activity_correlated"])
+
     def test_after_price_can_match_gross_reserve_ratio_independently(self):
         before = snapshot("0.49", "100", "50", lower=10)
         after = snapshot("0.5", "100", "50", upper=13)
