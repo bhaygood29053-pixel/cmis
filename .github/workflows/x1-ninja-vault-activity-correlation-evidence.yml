@@ -1,0 +1,52 @@
+name: X1.Ninja Vault Activity Correlation Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vault-activity:
+    name: Unexplained catalog updates vs exact vault activity
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue356-vault-activity-correlation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_VAULT_ACTIVITY_LIVE: "1"
+      X1_NINJA_VAULT_MAX_SNAPSHOTS: "30"
+      X1_NINJA_VAULT_POLL_SECONDS: "10"
+      X1_NINJA_VAULT_CATALOG_LIMIT: "100"
+      X1_NINJA_VAULT_MAX_POOLS: "15"
+      X1_NINJA_VAULT_TARGET_EVENTS: "5"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify X1.Ninja key
+        run: |
+          test -n "${X1_NINJA_API_KEY:-}"
+      - name: Run deterministic vault-activity tests
+        run: |
+          python -m unittest tests.test_x1_ninja_vault_activity_correlation -v
+      - name: Run bounded live vault-activity evidence
+        run: |
+          python -m unittest tests.test_x1_ninja_vault_activity_correlation_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1.Ninja/X1 RPC vault-activity evidence only."
+          echo "No causal/provider-source inference from transaction timing."
+          echo "No provider fact-time, freshness, priceUsd, liquidity, TVL, source-independence, transaction construction, signing, broadcasting, custody, trading, or execution promotion."
