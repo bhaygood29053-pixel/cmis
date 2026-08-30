@@ -9,6 +9,7 @@ from liquidity_scout.providers.x1.ninja_catalog_price_execution_link import (
     select_bounded_xnt_catalog_pools,
 )
 from liquidity_scout.providers.x1.ninja_delayed_vault_departure_link import (
+    UNAVAILABLE_OR_INCOMPLETE,
     aggregate_delayed_vault_departure_links,
     verify_delayed_vault_departure_link,
 )
@@ -101,7 +102,7 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
         )
 
         snapshots = []
-        departure_events = []
+        evidence_events = []
         diagnostics = []
         seen_event_keys = set()
         price_only_candidate_count = 0
@@ -134,6 +135,20 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
                             pool_address=address,
                         )
                     except Exception as exc:
+                        event_key = (
+                            f"{address}:snapshot:{index}:verification_exception"
+                        )
+                        evidence_events.append({
+                            "event_key": event_key,
+                            "pool_address": address,
+                            "status": "unavailable",
+                            "outcome": UNAVAILABLE_OR_INCOMPLETE,
+                            "price_only_reserve_ratio_departure_verified": False,
+                            "delayed_vault_swap_execution_link_verified": False,
+                            "departure_lag_observed": False,
+                            "warning": "verification_exception",
+                            "error": f"{type(exc).__name__}: {exc}",
+                        })
                         diagnostics.append({
                             "snapshot_index": index,
                             "pool_address": address,
@@ -148,7 +163,7 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
                         key = result.get("event_key")
                         if key and key not in seen_event_keys:
                             seen_event_keys.add(key)
-                            departure_events.append(result)
+                            evidence_events.append(result)
                     else:
                         diagnostics.append({
                             "snapshot_index": index,
@@ -159,15 +174,29 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
                             "warnings": result.get("warnings"),
                         })
 
-                if len(departure_events) >= TARGET_DEPARTURES:
+                verified_departure_count = sum(
+                    1
+                    for row in evidence_events
+                    if row.get(
+                        "price_only_reserve_ratio_departure_verified"
+                    ) is True
+                )
+                if verified_departure_count >= TARGET_DEPARTURES:
                     break
 
             if index < MAX_SNAPSHOTS - 1:
                 time.sleep(POLL_SECONDS)
 
         aggregate = aggregate_delayed_vault_departure_links(
-            departure_events,
+            evidence_events,
             minimum_verified_departures=5,
+        )
+        verified_departure_count = sum(
+            1
+            for row in evidence_events
+            if row.get(
+                "price_only_reserve_ratio_departure_verified"
+            ) is True
         )
 
         public = {
@@ -176,7 +205,7 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
             "catalog_price_only_candidate_count": (
                 price_only_candidate_count
             ),
-            "verified_departure_count": len(departure_events),
+            "verified_departure_count": verified_departure_count,
             "aggregate": aggregate,
             "diagnostics": diagnostics,
         }
@@ -185,16 +214,14 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
             + json.dumps(public, sort_keys=True, default=str)
         )
 
-        self.assertIn(
-            aggregate["status"],
-            {"verified", "partial", "unavailable"},
+        self.assertEqual(aggregate["status"], "verified")
+        self.assertTrue(
+            aggregate["price_only_reserve_ratio_departure_verified"]
         )
-        if len(departure_events) >= 5:
-            self.assertTrue(
-                aggregate[
-                    "price_only_reserve_ratio_departure_verified"
-                ]
-            )
+        self.assertTrue(
+            aggregate["delayed_vault_swap_execution_link_verified"]
+        )
+        self.assertTrue(aggregate["departure_pattern_verified"])
 
         self.assertFalse(aggregate["provider_fact_time_verified"])
         self.assertFalse(aggregate["update_source_semantics_verified"])
