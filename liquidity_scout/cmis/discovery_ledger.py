@@ -123,6 +123,59 @@ class DiscoveryObservationV1:
     execution_authorized: bool = False
 
     def __post_init__(self) -> None:
+        # Canonicalize internal scalar/list fields even if a caller uses the
+        # dataclass constructor directly instead of the preferred create().
+        object.__setattr__(self, "chain", _text("chain", self.chain).lower())
+        object.__setattr__(
+            self,
+            "subject_kind",
+            _text("subject_kind", self.subject_kind),
+        )
+        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id))
+        object.__setattr__(self, "mint", _text("mint", self.mint))
+        object.__setattr__(
+            self,
+            "identity_contract",
+            _text("identity_contract", self.identity_contract),
+        )
+        object.__setattr__(
+            self,
+            "observation_kind",
+            _text("observation_kind", self.observation_kind),
+        )
+        object.__setattr__(self, "source_id", _text("source_id", self.source_id))
+        object.__setattr__(
+            self,
+            "source_role",
+            _text("source_role", self.source_role),
+        )
+        object.__setattr__(
+            self,
+            "source_scope",
+            _text("source_scope", self.source_scope),
+        )
+        object.__setattr__(
+            self,
+            "verification_state",
+            _text("verification_state", self.verification_state).lower(),
+        )
+        object.__setattr__(
+            self,
+            "evidence_receipt_id",
+            _optional_text("evidence_receipt_id", self.evidence_receipt_id),
+        )
+        object.__setattr__(
+            self,
+            "proof_score_id",
+            _optional_text("proof_score_id", self.proof_score_id),
+        )
+        object.__setattr__(
+            self,
+            "limitations",
+            _text_tuple("limitations", self.limitations),
+        )
+        object.__setattr__(self, "warnings", _text_tuple("warnings", self.warnings))
+
         if self.chain != "x1":
             raise DiscoveryLedgerContractError("Discovery Ledger v1 is X1-only")
         if self.subject_kind != DISCOVERY_SUBJECT_KIND:
