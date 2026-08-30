@@ -435,6 +435,8 @@ The service should answer, for an exact X1 mint:
 - how many tokens were burned in the trailing **7 days**;
 - how many tokens were burned in the trailing **30 days**;
 - burn-event counts for cumulative, 24h, 7d, and 30d scopes;
+- **period-over-period burn percentage change** for 24h, 7d, and 30d;
+- the exact immediately preceding equal-length period amount used as each percentage-change denominator;
 - exact coverage start/end;
 - exact evaluation/as-of time;
 - scan/archive completeness state;
@@ -496,6 +498,42 @@ Window output should preserve both:
 
 - burned token amount;
 - burn-event count.
+
+#### Period-over-period percentage change
+
+For each burn window, CMIS should compare the current window with the **immediately preceding equal-length window**:
+
+```text
+current 24h vs previous 24h
+current 7d  vs previous 7d
+current 30d vs previous 30d
+```
+
+For current burn amount `C` and prior burn amount `P`:
+
+```text
+percent_change = ((C - P) / P) * 100
+```
+
+The returned record must preserve:
+
+- current-period burn amount;
+- prior-period burn amount;
+- absolute change;
+- percentage change;
+- direction (`INCREASED`, `DECREASED`, `UNCHANGED`, or explicit non-numeric state);
+- exact current/prior window bounds;
+- coverage status for both windows.
+
+A numeric percentage is valid only when both comparison windows have compatible sufficient verified coverage.
+
+Zero-denominator behavior must fail closed:
+
+- prior = 0 and current > 0 -> `percent_change = null`, with an explicit state such as `NEW_BURN_ACTIVITY`; never report infinity;
+- prior = 0 and current = 0 -> zero-to-zero behavior must be explicitly defined by the accepted contract before returning numeric `0%`;
+- missing/incomplete prior-window evidence -> `percent_change = null` with an explicit insufficient-coverage state.
+
+This percentage describes **change in burn activity**, not percent of supply burned. Supply-based ratios remain separate fields.
 
 #### Supply relationship
 
