@@ -68,7 +68,7 @@ def token_delta(account, mint, delta, post):
 
 
 def verification(tx, **kwargs):
-    side = kwargs["expected_side"]
+    side = "BUY"
     if side == "BUY":
         asset = token_delta(VAULT_ASSET, ASSET, "-45.585834357", "337267.374174613")
         quote = token_delta(VAULT_XNT, WXNT_MINT, "0.019692091", "145.316639876")
@@ -171,7 +171,7 @@ class NinjaExecutionPriceTests(unittest.TestCase):
             )
             return report
 
-        with self.assertRaisesRegex(ValueError, "delta signs"):
+        with self.assertRaisesRegex(ValueError, "two-sided swap"):
             verify_ninja_trade_execution_price(
                 pool_address=POOL,
                 trade_row={
@@ -193,7 +193,7 @@ class NinjaExecutionPriceTests(unittest.TestCase):
         samples = [
             {
                 "pool_address": f"Pool{i}",
-                "provider_side": "BUY" if i % 2 == 0 else "SELL",
+                "onchain_side": "BUY" if i % 2 == 0 else "SELL",
                 "trade_price_native_execution_semantics_verified": True,
                 "current_pool_price_native_latest_trade_link_verified": False,
             }
@@ -212,7 +212,7 @@ class NinjaExecutionPriceTests(unittest.TestCase):
         samples = [
             {
                 "pool_address": "Pool",
-                "provider_side": "BUY",
+                "onchain_side": "BUY",
                 "trade_price_native_execution_semantics_verified": True,
                 "current_pool_price_native_latest_trade_link_verified": False,
             }
