@@ -114,9 +114,7 @@ def verify_ninja_trade_execution_price(
     if _text(trade_row.get("poolAddress")) != pool_address:
         raise ValueError("trade row poolAddress mismatch")
 
-    side = _text(trade_row.get("type"))
-    if side not in {"BUY", "SELL"}:
-        raise ValueError("trade type must be BUY or SELL")
+    provider_type_raw = trade_row.get("type")
     signature = _text(trade_row.get("txHash"))
     if not signature:
         raise ValueError("trade txHash is required")
@@ -158,10 +156,6 @@ def verify_ninja_trade_execution_price(
         tx,
         signature=signature,
         rpc_url=rpc_url,
-        expected_side=side,
-        expected_mint=identity["asset_mint"],
-        expected_token_amount=provider_asset,
-        expected_native_amount=provider_quote,
     )
     membership = membership_prover(
         verification_report=report,
@@ -174,24 +168,38 @@ def verify_ninja_trade_execution_price(
     asset_delta = _vault_delta(report, identity["asset_vault"], identity["asset_mint"])
     quote_delta = _vault_delta(report, identity["counter_vault"], identity["counter_mint"])
 
-    signs_ok = (
-        asset_delta.delta_ui < 0 and quote_delta.delta_ui > 0
-        if side == "BUY"
-        else asset_delta.delta_ui > 0 and quote_delta.delta_ui < 0
-    )
-    if not signs_ok:
-        raise ValueError("vault delta signs do not match side")
-
-    leg = report.pool_leg_match
-    amounts_ok = bool(
-        leg is not None
-        and leg.amount_match is True
-        and leg.asset_account == identity["asset_vault"]
-        and leg.quote_account == identity["counter_vault"]
-    )
+    if asset_delta.delta_ui < 0 and quote_delta.delta_ui > 0:
+        onchain_side = "BUY"
+    elif asset_delta.delta_ui > 0 and quote_delta.delta_ui < 0:
+        onchain_side = "SELL"
+    else:
+        raise ValueError("pool vault deltas do not form one two-sided swap")
 
     asset_amount = abs(asset_delta.delta_ui)
     quote_amount = abs(quote_delta.delta_ui)
+
+    def amount_matches(provider_value: Decimal, chain_value: Decimal, decimals: int) -> bool:
+        quantum = Decimal(1).scaleb(-decimals)
+        return provider_value.quantize(quantum) == chain_value.quantize(quantum)
+
+    asset_amount_match = amount_matches(
+        provider_asset,
+        asset_amount,
+        asset_delta.decimals,
+    )
+    quote_amount_match = amount_matches(
+        provider_quote,
+        quote_amount,
+        quote_delta.decimals,
+    )
+    amounts_ok = asset_amount_match and quote_amount_match
+
+    provider_slot = trade_row.get("slot")
+    slot_match = bool(
+        not isinstance(provider_slot, bool)
+        and isinstance(provider_slot, int)
+        and report.slot == provider_slot
+    )
     execution_price = quote_amount / asset_amount
     if asset_delta.post_ui <= 0 or quote_delta.post_ui <= 0:
         raise ValueError("post-trade reserves must be positive")
@@ -217,7 +225,7 @@ def verify_ninja_trade_execution_price(
         and report.succeeded
         and report.xdex_amm_invoked
         and amounts_ok
-        and signs_ok
+        and slot_match
         and vs_execution["within_tolerance"]
     )
 
@@ -231,10 +239,15 @@ def verify_ninja_trade_execution_price(
         "transaction_signature": signature,
         "transaction_slot": report.slot,
         "transaction_block_time": report.block_time,
-        "provider_side": side,
+        "provider_type_raw": provider_type_raw,
+        "provider_type_semantics_verified": False,
+        "onchain_side": onchain_side,
         "transaction_pool_membership_verified": True,
         "provider_amounts_match_exact_pool_leg": amounts_ok,
-        "pool_vault_delta_signs_verified": signs_ok,
+        "provider_asset_amount_matches_vault_delta": asset_amount_match,
+        "provider_quote_amount_matches_vault_delta": quote_amount_match,
+        "provider_slot_matches_rpc_slot": slot_match,
+        "pool_vault_delta_signs_verified": True,
         "onchain": {
             "asset_amount": format(asset_amount, "f"),
             "quote_amount": format(quote_amount, "f"),
@@ -281,7 +294,7 @@ def aggregate_ninja_execution_price_samples(
     rows = [dict(row) for row in samples if isinstance(row, Mapping)]
     verified = [row for row in rows if row.get("trade_price_native_execution_semantics_verified") is True]
     linked = [row for row in verified if row.get("current_pool_price_native_latest_trade_link_verified") is True]
-    sides = {row.get("provider_side") for row in verified}
+    sides = {row.get("onchain_side") for row in verified}
 
     trade_ok = bool(len(verified) >= minimum_verified_swaps and len(verified) == len(rows))
     catalog_ok = bool(trade_ok and len(linked) == len(rows))
@@ -298,6 +311,7 @@ def aggregate_ninja_execution_price_samples(
         "observed_sides": sorted(side for side in sides if side),
         "both_swap_directions_observed": {"BUY", "SELL"}.issubset(sides),
         "trade_price_native_execution_semantics_verified": trade_ok,
+        "provider_trade_type_semantics_verified": False,
         "current_pool_price_native_latest_trade_link_verified": catalog_ok,
         "universal_pool_catalog_price_native_semantics_verified": False,
         "provider_fact_time_verified": False,
