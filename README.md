@@ -46,7 +46,7 @@ Chain Provider -> CMIS -> Chain Scout -> Roberta
 
 CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, learning-workflow coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
 
-## Current roadmap position — reconciled 2026-08-28
+## Current roadmap position — reconciled 2026-08-30
 
 Accepted on `main`:
 
@@ -64,7 +64,8 @@ Accepted on `main`:
 - **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
-- **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main` via PR #228; its post-merge source/roadmap state is synchronized through Roberta PR #231.
+- **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main`; operator-local MB4E source mastery is complete at 14/14 required stages plus the final capstone, with authoritative read-only autonomous-training telemetry accepted.
+- **Six-phase public-shell/private-core migration:** complete. Protected CMIS implementation is removed from active public branch/tag history and public package boundaries fail closed without the required private core.
 
 Not accepted/promoted:
 
@@ -80,7 +81,7 @@ Not accepted/promoted:
 CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing, but Solana product expansion and release work are deferred to a future phase. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
 
 
-The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-08-27.md`](./docs/PROJECT_STATUS_2026-08-27.md).
+The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-08-30.md`](./docs/PROJECT_STATUS_2026-08-30.md).
 
 ## Active provider-gap work — not accepted capability
 
