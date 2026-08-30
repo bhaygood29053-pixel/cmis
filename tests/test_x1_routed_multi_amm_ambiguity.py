@@ -367,6 +367,56 @@ class RoutedMultiAmmAmbiguityTests(unittest.TestCase):
                         membership_prover=one_membership,
                     )
 
+    def test_default_collector_rejects_unresolved_account_reference(self):
+        def unresolved_account_tx(signature, *, rpc_url):
+            return {
+                "transaction": {
+                    "signatures": [signature],
+                    "message": {
+                        "accountKeys": [
+                            POOL,
+                            ASSET_VAULT,
+                            COUNTER_VAULT,
+                            XDEX_MAINNET_OBSERVED_PROGRAM_ID,
+                        ],
+                        "instructions": [
+                            {
+                                "programId": XDEX_MAINNET_OBSERVED_PROGRAM_ID,
+                                "accounts": [
+                                    POOL,
+                                    ASSET_VAULT,
+                                    COUNTER_VAULT,
+                                    999,
+                                ],
+                            },
+                        ],
+                    },
+                },
+                "meta": {"innerInstructions": []},
+            }
+
+        def exact_membership(**kwargs):
+            return {
+                "transaction_pool_membership_verified": True,
+                "recognized_amm_instruction_count": 1,
+                "selected_pool_instruction_count": 1,
+                "selected_pool_instruction_evidence": [],
+            }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "recognized AMM instruction account reference unresolved",
+        ):
+            characterize_routed_multi_amm_ambiguity(
+                signature=SIGNATURE,
+                pool_address=POOL,
+                rpc_url="rpc",
+                identity_resolver=identity_resolver,
+                transaction_fetcher=unresolved_account_tx,
+                transaction_verifier=verifier,
+                membership_prover=exact_membership,
+            )
+
     def test_unverified_transaction_pool_membership_fails_closed(self):
         occurrences = [selected()]
 
