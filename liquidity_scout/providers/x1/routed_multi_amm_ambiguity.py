@@ -6,7 +6,9 @@ multi-AMM by #360, but it does not relax the accepted fail-closed swap gate.
 
 A representation artifact is considered deterministically proven only when the
 same recognized instruction occurrence is duplicated with the exact same
-program id, scope, group index, instruction index, and resolved account list.
+program id, scope, source parent outer-instruction index, instruction index,
+and resolved account list. The RPC inner-group `index` is preserved separately
+from list position so duplicated group representations can be detected.
 Different outer/inner locations remain distinct instructions even when their
 program/account fingerprints match.
 """
@@ -31,11 +33,13 @@ from liquidity_scout.providers.x1.transaction_pool_membership import (
 )
 from liquidity_scout.providers.x1.transaction_semantics import (
     VerificationReport,
+    account_key_info,
     fetch_transaction,
     verify_transaction,
 )
 from liquidity_scout.providers.x1.vault_pair_correlation import (
-    collect_recognized_amm_instruction_occurrences,
+    _resolve_account_ref,
+    _resolve_program_id,
 )
 from liquidity_scout.providers.x1.rpc import DEFAULT_X1_RPC_URL
 
@@ -70,6 +74,111 @@ def _default_identity_resolver(
     return identity
 
 
+def _collect_source_aware_occurrences(
+    transaction: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    account_keys, _ = account_key_info(dict(transaction))
+    wanted = set(RECOGNIZED_AMM_PROGRAM_IDS)
+    rows: list[dict[str, Any]] = []
+
+    def inspect(
+        instruction: Any,
+        *,
+        scope: str,
+        parent_outer_instruction_index: int | None,
+        source_group_position: int | None,
+        instruction_index: int,
+    ) -> None:
+        if not isinstance(instruction, Mapping):
+            return
+        program_id = _resolve_program_id(instruction, account_keys)
+        if program_id not in wanted:
+            return
+        raw_accounts = instruction.get("accounts")
+        raw_accounts = (
+            raw_accounts
+            if isinstance(raw_accounts, Sequence)
+            and not isinstance(raw_accounts, (str, bytes))
+            else []
+        )
+        accounts = [
+            address
+            for address in (
+                _resolve_account_ref(value, account_keys)
+                for value in raw_accounts
+            )
+            if address
+        ]
+        rows.append({
+            "program_id": program_id,
+            "scope": scope,
+            "parent_outer_instruction_index": (
+                parent_outer_instruction_index
+            ),
+            "source_group_position": source_group_position,
+            "instruction_index": instruction_index,
+            "accounts": accounts,
+        })
+
+    raw_tx = transaction.get("transaction")
+    raw_tx = raw_tx if isinstance(raw_tx, Mapping) else {}
+    message = raw_tx.get("message")
+    message = message if isinstance(message, Mapping) else {}
+    outer = message.get("instructions")
+    outer = (
+        outer
+        if isinstance(outer, Sequence)
+        and not isinstance(outer, (str, bytes))
+        else []
+    )
+    for instruction_index, instruction in enumerate(outer):
+        inspect(
+            instruction,
+            scope="outer",
+            parent_outer_instruction_index=None,
+            source_group_position=None,
+            instruction_index=instruction_index,
+        )
+
+    meta = transaction.get("meta")
+    meta = meta if isinstance(meta, Mapping) else {}
+    inner_groups = meta.get("innerInstructions")
+    inner_groups = (
+        inner_groups
+        if isinstance(inner_groups, Sequence)
+        and not isinstance(inner_groups, (str, bytes))
+        else []
+    )
+    for source_group_position, group in enumerate(inner_groups):
+        if not isinstance(group, Mapping):
+            continue
+        parent_index = group.get("index")
+        parent_index = (
+            parent_index
+            if isinstance(parent_index, int)
+            and not isinstance(parent_index, bool)
+            and parent_index >= 0
+            else None
+        )
+        instructions = group.get("instructions")
+        instructions = (
+            instructions
+            if isinstance(instructions, Sequence)
+            and not isinstance(instructions, (str, bytes))
+            else []
+        )
+        for instruction_index, instruction in enumerate(instructions):
+            inspect(
+                instruction,
+                scope="inner",
+                parent_outer_instruction_index=parent_index,
+                source_group_position=source_group_position,
+                instruction_index=instruction_index,
+            )
+
+    return rows
+
+
 def _occurrence_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
     accounts = row.get("accounts")
     accounts = (
@@ -81,7 +190,7 @@ def _occurrence_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
     return (
         row.get("program_id"),
         row.get("scope"),
-        row.get("group_index"),
+        row.get("parent_outer_instruction_index"),
         row.get("instruction_index"),
         accounts,
     )
@@ -95,10 +204,14 @@ def _normalized_occurrence(row: Mapping[str, Any]) -> dict[str, Any]:
         and not isinstance(accounts, (str, bytes))
         else []
     )
+    parent_index = row.get("parent_outer_instruction_index")
+    if parent_index is None:
+        parent_index = row.get("group_index")
     return {
         "program_id": _text(row.get("program_id")),
         "scope": _text(row.get("scope")),
-        "group_index": row.get("group_index"),
+        "parent_outer_instruction_index": parent_index,
+        "source_group_position": row.get("source_group_position"),
         "instruction_index": row.get("instruction_index"),
         "accounts": accounts,
     }
@@ -163,7 +276,7 @@ def characterize_routed_multi_amm_ambiguity(
     ),
     occurrence_collector: Callable[
         [Mapping[str, Any]], Sequence[Mapping[str, Any]]
-    ] = collect_recognized_amm_instruction_occurrences,
+    ] = _collect_source_aware_occurrences,
 ) -> dict[str, Any]:
     """Return instruction-level evidence for one #360 ambiguity signature."""
 
