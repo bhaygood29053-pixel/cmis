@@ -1,0 +1,47 @@
+name: X1.Ninja priceNative Fact-Time Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  price-fact-time:
+    name: Repeated Ninja price/reserve timestamp evidence
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue345-ninja-price-native-fact-time'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_PRICE_FACT_TIME_LIVE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify X1.Ninja key
+        run: |
+          test -n "${X1_NINJA_API_KEY:-}"
+      - name: Run deterministic fact-time tests
+        run: |
+          python -m unittest tests.test_x1_ninja_price_fact_time -v
+      - name: Run repeated live fact-time evidence
+        run: |
+          python -m unittest tests.test_x1_ninja_price_fact_time_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only timestamp/update evidence only."
+          echo "No priceNative, priceUsd, liquidity, TVL, volume, market-cap, freshness or source-independence promotion."
+          echo "No Scout/public-service/risk/execution authority."
