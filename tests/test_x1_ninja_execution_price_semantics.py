@@ -156,7 +156,12 @@ class NinjaExecutionPriceTests(unittest.TestCase):
         self.assertFalse(
             result["comparisons"]["trade_priceNative_vs_post_trade_reserve_ratio"]["within_tolerance"]
         )
-        self.assertTrue(result["current_pool_price_native_latest_trade_link_verified"])
+        self.assertTrue(
+            result["current_pool_price_native_selected_trade_match_observed"]
+        )
+        self.assertFalse(
+            result["current_pool_price_native_latest_trade_link_verified"]
+        )
         self.assertFalse(result["provider_fact_time_verified"])
         self.assertFalse(result["cmis_promotable"])
 
