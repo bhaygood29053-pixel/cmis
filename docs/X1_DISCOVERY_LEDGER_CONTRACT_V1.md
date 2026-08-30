@@ -115,7 +115,14 @@ For a canonical tuple:
 ```
 
 `first_verified_observed_at` is the minimum `fact_time_unix` among accepted
-records where `fact_time_verified=true`.
+records where **all** of the following are true:
+
+```text
+verification_state = verified
+identity_verified = true
+fact_time_verified = true
+fact_time_unix is present
+```
 
 It means only:
 
@@ -148,20 +155,51 @@ source observed the fact earlier than another.
 
 ## Content identity
 
-Content identity is SHA-256 over canonical JSON of the full immutable observation
-payload excluding the content id itself.
+Content identity is SHA-256 over canonical JSON of the exact immutable object
+below, excluding the content id itself:
+
+```json
+{
+  "contract_version": "x1_discovery_ledger/v1",
+  "chain": "x1",
+  "subject_kind": "x1_asset",
+  "subject_id": "<canonical mint>",
+  "mint": "<canonical mint>",
+  "identity_contract": "x1_asset_identity/v1",
+  "identity_verified": true,
+  "observation_kind": "<non-empty text>",
+  "fact_time_unix": "<integer Unix seconds or null>",
+  "fact_time_verified": "<boolean>",
+  "recorded_at_unix": "<integer Unix seconds>",
+  "source_id": "<non-empty text>",
+  "source_role": "<non-empty text>",
+  "source_scope": "<non-empty text>",
+  "verification_state": "<verified|partial|unavailable|conflict>",
+  "evidence_receipt_id": "<non-empty text or null>",
+  "proof_score_id": "<non-empty text or null>",
+  "limitations": ["<normalized text>", "..."],
+  "warnings": ["<normalized text>", "..."],
+  "execution_authorized": false
+}
+```
 
 ```text
 discovery_observation_id = do_<64 lowercase hex>
 ```
 
-Canonical JSON uses:
+Canonicalization is exact:
 
-- UTF-8;
-- sorted keys;
-- compact separators;
-- exact normalized scalar values;
-- deterministic ordered limitations/warnings.
+- encode as UTF-8;
+- serialize every object member shown above, including optional evidence/proof
+  fields as JSON `null` when absent;
+- sort JSON object keys lexicographically;
+- use compact separators `,` and `:` with no insignificant whitespace;
+- preserve integer/boolean/null scalar types exactly;
+- normalize each `limitations` / `warnings` entry by trimming surrounding
+  whitespace and rejecting empty/non-text entries;
+- sort each limitations/warnings array lexicographically and remove exact
+  duplicates before serialization;
+- do not include `content_id` in the hashed object.
 
 An exact duplicate is idempotent. The same supplied content id with a different
 canonical payload is a tamper/conflict and fails closed.
