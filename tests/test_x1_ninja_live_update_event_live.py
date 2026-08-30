@@ -5,6 +5,7 @@ import unittest
 
 from liquidity_scout.providers.x1.market import fetch_all_pools
 from liquidity_scout.providers.x1.ninja_live_update_event import (
+    collect_recent_exact_pool_activity,
     select_first_meaningful_transition,
 )
 from liquidity_scout.providers.x1.ninja_price_fact_time import (
@@ -42,6 +43,19 @@ class NinjaLiveUpdateEventEvidenceTests(unittest.TestCase):
             if row.get("pool_address")
         ]
         self.assertEqual(len(addresses), 5)
+
+        mismatch_pools = [
+            "42L71tiJR69Y8jDx9jGCivoxMkyS22LVAANeRS7smH5R",
+            "VmZfZnHzFTKSf19ZvAxa4duzChve3JYHVCPq1FvezhN",
+        ]
+        activity = [
+            collect_recent_exact_pool_activity(address, limit=5)
+            for address in mismatch_pools
+        ]
+        print(
+            "[X1 mismatch-pool recent signatures] "
+            + json.dumps(activity, sort_keys=True, default=str)
+        )
 
         snapshots = []
         result = None
