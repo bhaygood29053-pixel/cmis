@@ -269,9 +269,10 @@ def verify_ninja_trade_execution_price(
             "current_pool_priceNative_vs_trade_priceNative": catalog_link,
         },
         "trade_price_native_execution_semantics_verified": verified,
-        "current_pool_price_native_latest_trade_link_verified": bool(
+        "current_pool_price_native_selected_trade_match_observed": bool(
             verified and catalog_link and catalog_link.get("within_tolerance") is True
         ),
+        "current_pool_price_native_latest_trade_link_verified": False,
         "provider_fact_time_verified": False,
         "freshness_verified": False,
         "price_usd_semantics_verified": False,
@@ -293,11 +294,15 @@ def aggregate_ninja_execution_price_samples(
 
     rows = [dict(row) for row in samples if isinstance(row, Mapping)]
     verified = [row for row in rows if row.get("trade_price_native_execution_semantics_verified") is True]
-    linked = [row for row in verified if row.get("current_pool_price_native_latest_trade_link_verified") is True]
+    selected_matches = [
+        row
+        for row in verified
+        if row.get("current_pool_price_native_selected_trade_match_observed") is True
+    ]
     sides = {row.get("onchain_side") for row in verified}
 
     trade_ok = bool(len(verified) >= minimum_verified_swaps and len(verified) == len(rows))
-    catalog_ok = bool(trade_ok and len(linked) == len(rows))
+    catalog_ok = False
 
     return {
         "service": "x1_ninja_execution_price_semantics",
@@ -312,6 +317,7 @@ def aggregate_ninja_execution_price_samples(
         "both_swap_directions_observed": {"BUY", "SELL"}.issubset(sides),
         "trade_price_native_execution_semantics_verified": trade_ok,
         "provider_trade_type_semantics_verified": False,
+        "current_pool_price_native_selected_trade_match_count": len(selected_matches),
         "current_pool_price_native_latest_trade_link_verified": catalog_ok,
         "universal_pool_catalog_price_native_semantics_verified": False,
         "provider_fact_time_verified": False,
