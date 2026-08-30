@@ -301,6 +301,25 @@ class DelayedVaultDepartureLinkTests(unittest.TestCase):
             result["warnings"],
         )
 
+    def test_full_history_page_ending_at_inclusive_cutoff_fails_closed(self):
+        rows = [
+            history(
+                f"sig-{i}",
+                slot=190 - i,
+                block_time=1199 - i,
+            )
+            for i in range(100)
+        ]
+        self.assertEqual(rows[-1]["block_time"], 1100)
+
+        result = self.run_case(rows=rows)
+
+        self.assertEqual(result["status"], "unavailable")
+        self.assertIn(
+            "vault_history_does_not_cover_fixed_pre_before_lookback",
+            result["warnings"],
+        )
+
     def test_multi_amm_candidate_fails_closed(self):
         def routed(**kwargs):
             return {
