@@ -241,7 +241,13 @@ class RoutedMultiAmmAmbiguityTests(unittest.TestCase):
                             COUNTER_VAULT,
                             XDEX_MAINNET_OBSERVED_PROGRAM_ID,
                         ],
-                        "instructions": [],
+                        "instructions": [
+                            {"programId": "System111", "accounts": []},
+                            {"programId": "System111", "accounts": []},
+                            {"programId": "System111", "accounts": []},
+                            {"programId": "System111", "accounts": []},
+                            {"programId": "System111", "accounts": []},
+                        ],
                     },
                 },
                 "meta": {
@@ -316,7 +322,7 @@ class RoutedMultiAmmAmbiguityTests(unittest.TestCase):
             "accounts": [POOL, ASSET_VAULT, COUNTER_VAULT],
         }
 
-        for bad_index in (None, -1, "4", True):
+        for bad_index in (None, -1, "4", True, 0):
             with self.subTest(index=bad_index):
                 group = {"instructions": [dict(instruction)]}
                 if bad_index is not None:
@@ -360,6 +366,26 @@ class RoutedMultiAmmAmbiguityTests(unittest.TestCase):
                         transaction_verifier=verifier,
                         membership_prover=one_membership,
                     )
+
+    def test_unverified_transaction_pool_membership_fails_closed(self):
+        occurrences = [selected()]
+
+        def unverified_membership(**kwargs):
+            return {
+                "transaction_pool_membership_verified": False,
+                "recognized_amm_instruction_count": 1,
+                "selected_pool_instruction_count": 1,
+                "selected_pool_instruction_evidence": [],
+            }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "exact transaction-to-pool membership unverified",
+        ):
+            self.run_case(
+                occurrences,
+                membership_prover=unverified_membership,
+            )
 
     def test_membership_occurrence_count_mismatch_fails_closed(self):
         occurrences = [selected(), unrelated()]
