@@ -101,14 +101,14 @@ def _collect_source_aware_occurrences(
             and not isinstance(raw_accounts, (str, bytes))
             else []
         )
-        accounts = [
-            address
-            for address in (
-                _resolve_account_ref(value, account_keys)
-                for value in raw_accounts
-            )
-            if address
-        ]
+        accounts = []
+        for value in raw_accounts:
+            address = _resolve_account_ref(value, account_keys)
+            if not address:
+                raise ValueError(
+                    "recognized AMM instruction account reference unresolved"
+                )
+            accounts.append(address)
         rows.append({
             "program_id": program_id,
             "scope": scope,
