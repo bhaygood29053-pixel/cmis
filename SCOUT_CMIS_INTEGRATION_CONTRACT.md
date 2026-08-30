@@ -1,6 +1,6 @@
 # Scout ↔ CMIS Integration Contract
 
-Last reconciled: 2026-08-26
+Last reconciled: 2026-08-30
 
 ## Boundary
 
@@ -27,7 +27,7 @@ The `liquidity_scout` namespace is a migration compatibility identifier, not a s
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.10.0`. The promoted concentration service continues to require CMIS `>=1.9.0`.
+Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.13.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v1` requires `>=1.13.0`.
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
@@ -47,6 +47,7 @@ risk_check
 pre_trade_check
 verification_evidence
 concentration_change_intelligence
+instant_x1_scan
 ```
 
 `concentration_change_intelligence` is a separately accepted **Phase 12**, X1-only, bounded/read-only wrapper:
@@ -64,6 +65,12 @@ Solana is unavailable/non-callable/non-promoted for this service.
 
 A Scout must validate these exact fields before dispatch and preserve the returned facts/evidence/proof/limitations without recomputation. The service does not establish unique-holder or beneficial-owner semantics and does not authorize whale/insider/bot/intent/ownership labels.
 
+## Instant X1 Scan
+
+CMIS `1.13.0` adds X1-only `instant_x1_scan/v1` as a bounded read-only composition service. Scouts must treat it as composition over already accepted identity, market, tokenomics, local verified history, deterministic risk, and runtime evidence-quality data. It does not create new underlying fact authority and must preserve explicit unknown/partial holder or current-concentration fields.
+
+Solana advertises this service as unavailable. A Scout must validate exact service contract, chain, callability/read-only state, and `execution_authorized=false` before dispatch.
+
 ## Request/response rules
 
 Every request names the chain explicitly. Unsupported chains do not fall back to another chain.
@@ -74,13 +81,13 @@ Fresh accepted CMIS/provider evidence overrides remembered live values.
 
 ## Historical comparison usage
 
-Under CMIS `1.10.0`, X1 Scouts may use the existing `historical_compare` service in three modes:
+Under CMIS `1.10.0+`, X1 Scouts may use the existing `historical_compare` service in three modes:
 
 - `window` — existing explicit 24h / 7d / 30d metric comparison;
 - `all_available` — one asset across all verified observations currently stored by CMIS;
 - `all_available_pair` — two assets compared only across their overlapping verified CMIS observation window.
 
-Natural requests such as “entire history,” “full history,” “since inception,” or “lifetime history” may select `all_available`; pair mode still requires an explicit second asset. Scouts must preserve CMIS coverage bounds and must not relabel `all_available` as proven complete asset lifetime. `full_asset_lifetime_verified=false` and `continuous_coverage_verified=false` remain authoritative until CMIS proves otherwise.
+Natural requests such as “entire history,” “full history,” “since inception,” or “lifetime history” may select `all_available`; pair mode still requires an explicit second asset. Scouts must preserve CMIS coverage bounds and must not relabel `all_available` as proven complete asset lifetime. `full_asset_lifetime_verified=false` and `continuous_coverage_verified=false` remain authoritative until CMIS proves otherwise. For CMIS `>=1.12.0`, verified provider-price backfill may extend price only and must preserve non-independence, archive/continuity uncertainty, historical stable-quote uncertainty, and non-lifetime-completeness.
 
 ## X1
 
@@ -106,6 +113,10 @@ execution_authorized = false
 ```
 
 A `PASS` is not permission to trade.
+
+## Public/private runtime boundary
+
+The CMIS six-phase public-shell/private-core migration is complete. The public package fails closed when protected private-core implementation is unavailable; Scouts must not rely on a public reconstruction fallback. This deployment boundary does not change service authority or capability semantics.
 
 ## Safety
 

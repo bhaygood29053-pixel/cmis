@@ -1,6 +1,6 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-08-28 (America/New_York)
+Last reconciled: 2026-08-30 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
 
@@ -44,6 +44,7 @@ Accepted milestones on `main`:
 - **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
 - **CMIS capability contract: `1.13.0`.**
 - **Instant X1 Scan: IMPLEMENTED under #322 as `instant_x1_scan/v1`.** The service is X1-only, read-only, composition-only, local-history-only, and fail-closed for unverified holder/current-concentration facts; Proof Score remains separate from deterministic risk.
+- **Six-phase public-shell/private-core migration: COMPLETE.** Protected CMIS implementation is removed from active public branch/tag history, public package boundaries fail closed without the required private core, and no public reconstruction fallback is accepted.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
 - **Roberta autonomous Learning Plane upstream dependency: ACCEPTED on Roberta `main` via PR #228; post-merge Roberta source/roadmap reconciliation is accepted via PR #231.**
@@ -228,6 +229,10 @@ Those observations do **not** establish:
 - source independence.
 
 Warp Bridge machine-readable operational state remains unavailable until an exact provenance-approved read contract is accepted.
+
+## Public-shell/private-core migration closure
+
+The six-phase CMIS public-shell/private-core migration is complete. Active public branch/tag history was rewritten to remove protected implementation paths, steady-state public package boundaries fail closed without the required private core, and migration-era public reconstruction is no longer a normal runtime/test path. This migration changes source protection and deployment packaging only; it does not promote a service, add provider authority, alter proof/risk semantics, or authorize execution.
 
 ## Evidence quality and proof rules
 
@@ -421,7 +426,7 @@ Chain Scouts investigate and interpret within their chain.
 Roberta coordinates, learns within bounded static-source rules, and explains.
 ```
 
-The paired Roberta #226 / CMIS #269 source-sync reconciliation is merged. Roberta PR #228's autonomous Learning Plane and PR #231's post-merge source/roadmap synchronization are also merged on Roberta `main`. Roberta's accepted MB4E prebuilt bank construction reaches Stage 8 / Market Structure; Stages 9-14 plus the final capstone remain outstanding source-mastery work rather than prerequisites for the existence of the autonomous controller.
+The paired Roberta #226 / CMIS #269 source-sync reconciliation is merged. Roberta PR #228's autonomous Learning Plane and subsequent source/roadmap reconciliation are accepted on Roberta `main`. Roberta's accepted MB4E prebuilt bank construction remains through Stage 8 / Market Structure, while operator-local source mastery is complete at 14/14 required stages plus the required final capstone. Runtime-generated Stages 9-14 remain mastery evidence rather than separately accepted prebuilt repository banks.
 
 Roberta may synthesize accepted CMIS results but must not recalculate CMIS truth/proof, silently upgrade inference to fact, collapse risk and evidence quality into one score, or treat internal non-promoted foundations as callable services.
 

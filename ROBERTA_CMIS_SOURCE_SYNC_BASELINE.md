@@ -1,6 +1,6 @@
 # Roberta ↔ CMIS Source Sync Baseline
 
-Last reconciled: 2026-08-28 (America/New_York)
+Last reconciled: 2026-08-30 (America/New_York)
 
 This file is the compact cross-project synchronization baseline. It is intentionally mirrored in both repositories. Repository-local architecture, capability, roadmap, and status documents remain authoritative for implementation details.
 
@@ -34,12 +34,13 @@ User / transport
 ## Current CMIS contract baseline
 
 ```text
-CMIS capability contract = 1.12.0
+CMIS capability contract = 1.13.0
 global existing-service minimum = 1.8.0
 concentration_change_intelligence minimum = 1.9.0
 all_available history minimum = 1.10.0
 x1_asset_identity/v1 minimum = 1.11.0
 verified provider-price backfill semantics = 1.12.0
+instant_x1_scan/v1 minimum = 1.13.0
 ```
 
 Accepted milestones carried by that contract line:
@@ -48,6 +49,7 @@ Accepted milestones carried by that contract line:
 - CMIS `1.10.0` added `historical_compare` modes `all_available` and `all_available_pair`.
 - CMIS `1.11.0` added normalized exact-mint X1 identity under `x1_asset_identity/v1`; the exact mint remains the fungible identity root.
 - CMIS `1.12.0` permits a narrow verified provider-price backfill for historical price only. It does not prove provider source independence, archive completeness, continuous coverage, historical USD-stable peg behavior, or complete asset lifetime.
+- CMIS `1.13.0` adds bounded X1 `instant_x1_scan/v1`, a read-only composition service that reuses accepted identity, market, tokenomics, local verified history, deterministic risk, and runtime evidence-quality state without inventing missing holder or current-concentration facts.
 
 The core Phase 11 `intelligence_foundation` remains read-only/non-promoted as a group. The separately accepted Phase 12 wrapper remains exactly:
 
@@ -114,7 +116,9 @@ The controller may, after explicit static-source selection:
 
 Learning remains a separate authority plane. It cannot self-authorize CMIS contracts, provider trust, Scout promotion, fresh chain truth, governance changes, wallet permissions, transaction construction/signing/broadcasting, trading, custody, bridge transfer, or Controlled Execution.
 
-For *Mastering Blockchain, Fourth Edition*, accepted prebuilt repository banks remain through Stage 8 / Market Structure. Runtime-generated later-stage banks are valid only through the autonomous controller's exact provenance/verification gates; bank existence is not mastery.
+For *Mastering Blockchain, Fourth Edition*, accepted prebuilt repository banks remain through Stage 8 / Market Structure. Runtime-generated later-stage banks remain distinct from prebuilt repository acceptance. The authoritative operator-local source-mastery ledger is complete at 14/14 required stages plus the required final capstone. Mastery evidence remains source-plan-bound learning evidence, not live-state authority.
+
+Authoritative autonomous-training telemetry is accepted as `roberta-autonomous-training-telemetry/v1`, read-only and non-authorizing, with ledger-backed mastery/completion reconciliation and `execution_authorized=false`.
 
 ## Internal non-promoted CMIS foundations
 
@@ -129,6 +133,10 @@ No broader public intelligence/alert promotion is accepted by implication.
 ## Provider-gap state
 
 The X1 provider-gap track remains read-only/fail-closed. Warp Bridge and FortiBlox research branches are closed as not currently verifiable/candidate research. X1Scroll PR #229 is closed and X1Scroll is removed from CMIS integration scope because no repository API key was available for the required credential-backed probe; no provider request was made and no X1Scroll capability is accepted on `main`. A future secondary provider requires a new explicit verification gate.
+
+## CMIS runtime migration status
+
+The CMIS six-phase public-shell/private-core migration and historical Git cleanup are complete. Public CMIS package boundaries fail closed when protected private-core implementation is unavailable. This deployment split does not change service authority or create a public fallback.
 
 ## Execution boundary
 
