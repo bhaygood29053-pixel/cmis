@@ -175,7 +175,7 @@ def _pre_before_history(
         not missing_time_before_slot
         and (
             len(normalized) < limit
-            or (known_times and min(known_times) <= cutoff_time)
+            or (known_times and min(known_times) < cutoff_time)
         )
     )
 
