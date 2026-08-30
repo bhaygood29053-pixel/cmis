@@ -1,0 +1,60 @@
+name: X1 Exact Pool Triangulation Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-pool-triangulation:
+    name: X1.Ninja vs XDEX vs X1 RPC identity
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue335-exact-pool-triangulation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_EXACT_POOL_TRIANGULATION_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Run deterministic triangulation tests
+        run: |
+          python -m unittest tests.test_x1_exact_pool_triangulation -v
+
+      - name: Run live read-only exact-pool evidence
+        run: |
+          python -m unittest tests.test_x1_exact_pool_triangulation_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Identity-only read-only provider/RPC evidence."
+          echo "No price/liquidity/volume/market-cap/freshness promotion."
+          echo "No Scout/public-service/risk/execution authority."
+          echo "No transaction construction, signing, broadcasting, custody, trading, or value movement."
