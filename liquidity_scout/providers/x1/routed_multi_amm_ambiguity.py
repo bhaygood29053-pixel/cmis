@@ -157,6 +157,7 @@ def _collect_source_aware_occurrences(
             isinstance(parent_index, bool)
             or not isinstance(parent_index, int)
             or parent_index < 0
+            or parent_index >= len(outer)
         ):
             raise ValueError(
                 "inner instruction group source index unavailable"
@@ -331,6 +332,8 @@ def characterize_routed_multi_amm_ambiguity(
     if not isinstance(membership_raw, Mapping):
         raise ValueError("transaction-pool membership evidence unavailable")
     membership = dict(membership_raw)
+    if membership.get("transaction_pool_membership_verified") is not True:
+        raise ValueError("exact transaction-to-pool membership unverified")
 
     raw_occurrences = occurrence_collector(transaction)
     if (
