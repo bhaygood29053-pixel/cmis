@@ -1,0 +1,51 @@
+name: X1.Ninja Delayed Catalog Price-Link Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  delayed-catalog-link:
+    name: Delayed catalog priceNative vs exact XDEX swaps
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue354-delayed-catalog-price-link'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_DELAYED_CATALOG_LINK_LIVE: "1"
+      X1_NINJA_DELAYED_LINK_MAX_SNAPSHOTS: "36"
+      X1_NINJA_DELAYED_LINK_POLL_SECONDS: "10"
+      X1_NINJA_DELAYED_LINK_LIMIT: "100"
+      X1_NINJA_DELAYED_LINK_MAX_POOLS: "30"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify X1.Ninja key
+        run: |
+          test -n "${X1_NINJA_API_KEY:-}"
+      - name: Run deterministic delayed-link tests
+        run: |
+          python -m unittest tests.test_x1_ninja_delayed_catalog_price_link -v
+      - name: Run bounded live delayed-link evidence
+        run: |
+          python -m unittest tests.test_x1_ninja_delayed_catalog_price_link_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only delayed catalog-price evidence only."
+          echo "Fixed 900-second lookback; no retroactive widening."
+          echo "No provider fact-time, freshness, priceUsd, liquidity, TVL, source-independence, transaction construction, signing, broadcasting, custody, trading, or execution promotion."
