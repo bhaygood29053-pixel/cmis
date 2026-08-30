@@ -70,6 +70,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertEqual(x1["state"], "bounded")
         self.assertTrue(x1["callable"])
         self.assertTrue(x1["read_only"])
+        self.assertTrue(x1["composition_only"])
         self.assertTrue(x1["public_service_promoted"])
         self.assertTrue(x1["scout_reliance_promoted"])
         self.assertEqual(
@@ -84,6 +85,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
 
         self.assertEqual(solana["state"], "unavailable")
         self.assertFalse(solana["callable"])
+        self.assertTrue(solana["composition_only"])
         self.assertFalse(solana["public_service_promoted"])
         self.assertFalse(solana["scout_reliance_promoted"])
         self.assertIn(
