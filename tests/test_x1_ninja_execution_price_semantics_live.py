@@ -71,6 +71,16 @@ class NinjaExecutionPriceLiveTests(unittest.TestCase):
                     continue
                 seen_signatures.add(signature)
 
+                raw_type = trade.get("type")
+                if raw_type not in {"BUY", "SELL"}:
+                    errors.append({
+                        "pool_address": pool,
+                        "transaction_signature": signature,
+                        "stage": "unsupported_trade_type",
+                        "raw_type": raw_type,
+                    })
+                    continue
+
                 try:
                     result = verify_ninja_trade_execution_price(
                         pool_address=pool,
