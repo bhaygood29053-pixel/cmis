@@ -44,6 +44,7 @@ class NinjaVaultActivityLiveTests(unittest.TestCase):
 
         snapshots = []
         vault_events = []
+        complete_vault_event_count = 0
         strict_verified = 0
         delayed_verified = 0
         diagnostics = []
@@ -122,12 +123,13 @@ class NinjaVaultActivityLiveTests(unittest.TestCase):
                         })
                         continue
 
+                    vault_events.append(vault_event)
                     if vault_event.get(
                         "vault_history_complete_for_window"
                     ) is True:
-                        vault_events.append(vault_event)
+                        complete_vault_event_count += 1
 
-                if len(vault_events) >= TARGET_EVENTS:
+                if complete_vault_event_count >= TARGET_EVENTS:
                     break
 
             if index < MAX_SNAPSHOTS - 1:
@@ -153,6 +155,7 @@ class NinjaVaultActivityLiveTests(unittest.TestCase):
             "strict_verified_event_count": strict_verified,
             "delayed_verified_event_count": delayed_verified,
             "vault_event_count": len(vault_events),
+            "complete_vault_event_count": complete_vault_event_count,
             "transaction_classification_counts": classification_counts,
             "aggregate": aggregate,
             "diagnostics": diagnostics,
@@ -166,7 +169,7 @@ class NinjaVaultActivityLiveTests(unittest.TestCase):
             aggregate["status"],
             {"verified", "partial", "unavailable"},
         )
-        if len(vault_events) >= 5:
+        if complete_vault_event_count >= 5 and len(vault_events) == complete_vault_event_count:
             self.assertTrue(aggregate["all_vault_histories_complete"])
 
         self.assertFalse(
