@@ -616,6 +616,17 @@ def verify_vault_activity_transition(
             })
             if record["slot"] != row["slot"]:
                 raise ValueError("same signature has inconsistent vault-history slot")
+            if (
+                record.get("block_time") is not None
+                and row.get("block_time") is not None
+                and Decimal(str(record["block_time"]))
+                != Decimal(str(row["block_time"]))
+            ):
+                raise ValueError(
+                    "same signature has inconsistent vault-history block time"
+                )
+            if record.get("block_time") is None and row.get("block_time") is not None:
+                record["block_time"] = row.get("block_time")
             record["seen_on"].append(source_name)
 
     transactions = []
@@ -640,6 +651,15 @@ def verify_vault_activity_transition(
                 raise ValueError("transaction not found/successful")
             if report.slot != history_row["slot"]:
                 raise ValueError("vault-history slot mismatches transaction slot")
+            if (
+                history_row.get("block_time") is not None
+                and report.block_time is not None
+                and Decimal(str(history_row["block_time"]))
+                != Decimal(str(report.block_time))
+            ):
+                raise ValueError(
+                    "vault-history block time mismatches transaction block time"
+                )
 
             vault0 = _vault_delta(
                 report,
@@ -714,9 +734,16 @@ def verify_vault_activity_transition(
         relative=reserve_relative,
         absolute=reserve_absolute,
     )
-    reserve_delta_match = bool(
+    raw_reserve_delta_match = bool(
         base_delta_comparison["within_tolerance"]
         and quote_delta_comparison["within_tolerance"]
+    )
+    transaction_coverage_complete = bool(
+        not rejections
+        and len(transactions) == len(signatures)
+    )
+    reserve_delta_match = bool(
+        raw_reserve_delta_match and transaction_coverage_complete
     )
 
     vault_mutation_observed = bool(
@@ -729,7 +756,7 @@ def verify_vault_activity_transition(
         price_changed
         and not provider_reserve_changed
         and not vault_mutation_observed
-        and not rejections
+        and transaction_coverage_complete
     )
 
     if identity["xnt_slot"] == 0:
@@ -753,6 +780,7 @@ def verify_vault_activity_transition(
             reserve_ratio_comparison["within_tolerance"]
         )
 
+    swaps = []
     swap_matches = []
     for row in transactions:
         execution_raw = row.get("execution_price_native")
@@ -769,10 +797,28 @@ def verify_vault_activity_transition(
             absolute=price_absolute,
         )
         row["after_price_vs_execution_price"] = comparison
+        swaps.append(row)
         if comparison["within_tolerance"]:
             swap_matches.append(row)
 
-    execution_link = bool(len(swap_matches) == 1)
+    latest_swap_slot = max(
+        (
+            row.get("slot")
+            for row in swaps
+            if isinstance(row.get("slot"), int)
+        ),
+        default=None,
+    )
+    latest_swaps = [
+        row for row in swaps if row.get("slot") == latest_swap_slot
+    ]
+    execution_link = bool(
+        transaction_coverage_complete
+        and len(swap_matches) == 1
+        and len(latest_swaps) == 1
+        and swap_matches[0].get("signature")
+        == latest_swaps[0].get("signature")
+    )
 
     classifications: dict[str, int] = {}
     for row in transactions:
@@ -816,6 +862,7 @@ def verify_vault_activity_transition(
         },
         "unique_vault_history_signature_count": len(signatures),
         "verified_vault_transaction_count": len(transactions),
+        "transaction_coverage_complete": transaction_coverage_complete,
         "transaction_classification_counts": classifications,
         "transactions": transactions,
         "rejections": rejections,
@@ -828,10 +875,13 @@ def verify_vault_activity_transition(
             "pooledQuote_vs_vault_0_delta": quote_delta_comparison,
         },
         "vault_activity_correlated": vault_activity_correlated,
+        "raw_provider_reserve_delta_matches_verified_sum": raw_reserve_delta_match,
         "provider_reserve_delta_matches_vault_delta": reserve_delta_match,
         "price_only_update_observed": price_only_update,
         "catalog_price_execution_link_verified": execution_link,
         "catalog_price_execution_match_count": len(swap_matches),
+        "latest_exact_swap_slot": latest_swap_slot,
+        "latest_exact_swap_count": len(latest_swaps),
         "catalog_price_reserve_ratio_link_verified": reserve_ratio_link,
         "catalog_price_reserve_ratio_comparison": reserve_ratio_comparison,
         "catalog_price_active_reserve_link_verified": False,
@@ -924,10 +974,10 @@ def aggregate_vault_activity_evidence(
         "price_only_update_event_count": len(price_only),
         "catalog_execution_link_event_count": len(execution_links),
         "catalog_reserve_ratio_link_event_count": len(reserve_ratio_links),
-        "vault_activity_correlated": bool(enough and correlated),
-        "provider_reserve_delta_matches_vault_delta": bool(
-            enough and reserve_matches
-        ),
+        "vault_activity_correlated_observed": bool(correlated),
+        "provider_reserve_delta_match_observed": bool(reserve_matches),
+        "vault_activity_correlated": False,
+        "provider_reserve_delta_matches_vault_delta": False,
         "price_only_update_observed": bool(price_only),
         "catalog_price_execution_link_verified": False,
         "catalog_price_reserve_ratio_link_verified": False,
