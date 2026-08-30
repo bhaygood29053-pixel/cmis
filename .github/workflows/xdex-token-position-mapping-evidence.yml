@@ -1,0 +1,52 @@
+name: XDEX Token Position Mapping Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  token-position-mapping:
+    name: XDEX token1/token2 vs RPC mint slots
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue337-xdex-token-position-mapping'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_XDEX_TOKEN_POSITION_MAPPING_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run deterministic positional-mapping tests
+        run: |
+          python -m unittest tests.test_xdex_token_position_mapping -v
+
+      - name: Run live read-only positional evidence
+        run: |
+          python -m unittest tests.test_xdex_token_position_mapping_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only positional identity evidence only."
+          echo "No base/quote semantic claim."
+          echo "No reserve/price/liquidity/volume/market-cap/freshness promotion."
+          echo "No transaction construction, signing, broadcasting, custody, trading, or execution."
