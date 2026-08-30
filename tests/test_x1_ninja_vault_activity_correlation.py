@@ -338,7 +338,12 @@ class VaultActivityCorrelationTests(unittest.TestCase):
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["vault_activity_correlated_event_count"], 2)
         self.assertEqual(result["price_only_update_event_count"], 1)
-        self.assertTrue(result["vault_activity_correlated"])
+        self.assertTrue(result["vault_activity_correlated_observed"])
+        self.assertTrue(result["provider_reserve_delta_match_observed"])
+        self.assertFalse(result["vault_activity_correlated"])
+        self.assertFalse(
+            result["provider_reserve_delta_matches_vault_delta"]
+        )
         self.assertTrue(result["price_only_update_observed"])
         self.assertFalse(result["catalog_price_execution_link_verified"])
         self.assertFalse(
