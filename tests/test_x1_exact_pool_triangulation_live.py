@@ -36,10 +36,38 @@ def _public_result(result):
 class X1ExactPoolTriangulationLiveTests(unittest.TestCase):
     def test_one_exact_pool_is_bound_across_ninja_xdex_and_rpc(self):
         ninja_pools, _xnt_price = fetch_all_pools(sleep_seconds=0)
-        xdex_pools = fetch_pool_list()
+        xdex_observations = {}
+        xdex_pools = []
+        selected_xdex_network = None
+        for network in ("mainnet", "X1 Mainnet"):
+            try:
+                rows = fetch_pool_list(network=network)
+                xdex_observations[network] = {
+                    "status": "ok",
+                    "pool_count": len(rows),
+                }
+            except Exception as exc:
+                rows = []
+                xdex_observations[network] = {
+                    "status": "error",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+
+            if rows and not xdex_pools:
+                xdex_pools = rows
+                selected_xdex_network = network
+
+        print(
+            "[XDEX pool-list network evidence] "
+            + json.dumps(xdex_observations, sort_keys=True, default=str)
+        )
 
         self.assertTrue(ninja_pools, "X1.Ninja returned no current pools")
-        self.assertTrue(xdex_pools, "XDEX public API returned no current pools")
+        self.assertTrue(
+            xdex_pools,
+            "XDEX public API returned no current pools for either observed "
+            "network dialect.",
+        )
 
         result = triangulate_exact_pool_identity(
             ninja_pools=ninja_pools,
@@ -47,9 +75,11 @@ class X1ExactPoolTriangulationLiveTests(unittest.TestCase):
             signature_limit=1,
         )
 
+        public = _public_result(result)
+        public["selected_xdex_pool_network"] = selected_xdex_network
         print(
             "[X1 exact pool triangulation evidence] "
-            + json.dumps(_public_result(result), sort_keys=True, default=str)
+            + json.dumps(public, sort_keys=True, default=str)
         )
 
         self.assertEqual(
