@@ -67,7 +67,7 @@ def token_delta(account, mint, delta, post):
     )
 
 
-def verification(**kwargs):
+def verification(tx, **kwargs):
     side = kwargs["expected_side"]
     if side == "BUY":
         asset = token_delta(VAULT_ASSET, ASSET, "-45.585834357", "337267.374174613")
@@ -161,8 +161,8 @@ class NinjaExecutionPriceTests(unittest.TestCase):
         self.assertFalse(result["cmis_promotable"])
 
     def test_wrong_vault_sign_fails_closed(self):
-        def wrong(**kwargs):
-            report = verification(**kwargs)
+        def wrong(tx, **kwargs):
+            report = verification(tx, **kwargs)
             report.token_deltas[0] = token_delta(
                 VAULT_ASSET,
                 ASSET,
