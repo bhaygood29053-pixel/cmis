@@ -299,7 +299,7 @@ CMIS is now prioritized around the verified data and intelligence services requi
 5. **Early Warning services** — advance concentration/liquidity/wallet/activity warning candidates only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
 6. **Deterministic Compare services** — support first-class current-vs-history and entity-vs-entity comparisons without recomputing facts outside the canonical evidence store.
 7. **X1 ecosystem/network brief inputs** — expose bounded verified market, network, validator, protocol, and ecosystem observations needed for a Roberta daily intelligence brief, one field at a time under exact provenance and scope.
-8. **Developer intelligence API** — after service contracts stabilize, prepare a bounded developer-facing CMIS/Roberta intelligence surface for other X1 applications. Premium/access policy must never change truth, verification, Proof Score, or risk semantics.
+8. **Machine ROBERTA support contracts** — after service contracts stabilize, CMIS should expose only the deterministic backend services/evidence needed by a separately owned Machine ROBERTA interface. The external agent/DApp API, schemas, authentication, quotas, and SDK belong to Roberta; CMIS must not become the general agent product. Premium/access policy must never change truth, verification, Proof Score, risk, or evidence semantics.
 
 ### Scope discipline
 
@@ -311,6 +311,251 @@ CMIS is now prioritized around the verified data and intelligence services requi
 - No roadmap item authorizes transaction construction, signing, broadcasting, custody, swaps, bridge value transfer, or autonomous value movement.
 
 This roadmap update changes **priority and product direction only**. It does not promote any currently internal service, declare X1.Ninja verified, or change the accepted CMIS capability contract by itself.
+
+## Human/Machine ROBERTA evidence-support roadmap — planned
+
+CMIS owns the deterministic evidence capabilities required by both Human ROBERTA and Machine ROBERTA. It does **not** own their presentation, conversational policy, external machine-client envelope, authentication, SDK, or user personalization.
+
+Canonical split:
+
+```text
+Human ROBERTA / Machine ROBERTA
+              |
+            Roberta
+              |
+          Chain Scout
+              |
+             CMIS
+              |
+     verified provider/source
+```
+
+CMIS should expose one accepted fact/evidence contract that both Roberta faces can consume. Human and Machine Roberta must not receive different truth semantics merely because their presentation differs.
+
+### 1. Execution-quality and realized-slippage evidence
+
+Current accepted distinction remains:
+
+- quote slippage tolerance semantics: verified/corroborated for tested XDEX quote scope;
+- exact route-scoped price impact: usable only where the accepted proof contract passes;
+- bounded fee evidence: usable only within exact proven scope;
+- **expected execution slippage: unavailable** until separately proven.
+
+The roadmap for closing that gap is:
+
+#### Stage A — quote-to-executed-swap matcher
+
+Create a read-only deterministic matcher that can bind, only when evidence is sufficient:
+
+- exact chain;
+- exact token-in/token-out mints;
+- exact pool;
+- exact AMM configuration;
+- trade direction;
+- requested input;
+- quote observation time/slot;
+- quoted expected output;
+- quote minimum output / tolerance;
+- executed transaction signature;
+- execution time/slot;
+- actual output;
+- explicit fees;
+- accepted source/proof lineage.
+
+Ambiguous or unmatched quote/execution pairs must fail closed. No transaction preparation or simulation may be used as an execution shortcut.
+
+#### Stage B — realized-slippage ledger
+
+Persist content-addressed realized execution observations with exact provenance.
+
+At minimum preserve:
+
+- quote expected output;
+- actual output;
+- realized slippage;
+- trade size;
+- route/pool depth context;
+- direction;
+- fee evidence;
+- observation and execution times;
+- evidence scope;
+- Evidence Receipt / Proof Score identities where supported;
+- limitations and unresolved fields.
+
+Sparse observations remain sparse. Missing quote/fill history is not interpolated.
+
+#### Stage C — comparable-trade statistics
+
+Once enough verified observations exist, expose deterministic descriptive statistics for compatible cohorts, potentially including:
+
+- sample count;
+- median realized slippage;
+- percentile ranges;
+- trade-size-to-pool-depth buckets;
+- direction-specific behavior;
+- pool/config-specific behavior;
+- observation-window bounds.
+
+Cohorts must not mix incompatible route, pool, AMM config, unit, direction, or semantic scopes merely to increase sample size.
+
+#### Stage D — expected execution-slippage contract
+
+Only after a separately accepted adequacy/validation contract proves that the historical sample supports prediction may CMIS promote an expected-execution-slippage capability.
+
+Any promoted output must preserve:
+
+- exact model/statistical method identity and version;
+- input scope;
+- sample size;
+- calibration/validation evidence;
+- expected range rather than false precision where appropriate;
+- freshness/market-regime limitations;
+- unresolved evidence;
+- explicit distinction from user-selected slippage tolerance;
+- `analysis_only=true`;
+- `execution_authorized=false`.
+
+Until that promotion gate passes, expected execution slippage remains unavailable.
+
+### 2. Discovery Ledger
+
+CMIS should own the immutable evidence ledger supporting Roberta's **Discovery / first-observation** workflow.
+
+For each supported X1 subject, preserve separately:
+
+- first verified identity observation;
+- first verified market observation;
+- first verified liquidity observation;
+- first verified activity observation;
+- subsequent verified observations;
+- exact fact/source time;
+- source and verification method;
+- evidence/proof lineage;
+- known observation gaps.
+
+The service must distinguish:
+
+```text
+first_verified_observation
+```
+
+from:
+
+```text
+asset_inception
+token_launch
+market_creation
+```
+
+unless those stronger claims are separately proven.
+
+Human Roberta may say “ROBERTA first verified this asset on …”. Machine Roberta may receive the exact timestamp and `asset_inception_verified=false`. CMIS remains the source of the underlying fact.
+
+### 3. Early Warning evidence and service contracts
+
+CMIS should develop deterministic warning primitives only from accepted multi-observation evidence.
+
+Candidate warning families include:
+
+- liquidity decline or deterioration;
+- concentration change;
+- unusual activity under an explicit deterministic statistical/threshold contract;
+- identity/metadata/authority changes;
+- evidence-quality degradation;
+- provider disagreement;
+- stale/freshness deterioration;
+- future execution-quality/slippage deterioration after its evidence contract exists.
+
+Each warning contract must define:
+
+- subject and exact metric;
+- unit;
+- comparison window;
+- persistence requirements;
+- comparator/baseline;
+- severity policy identity/version;
+- freshness;
+- replay/deduplication semantics;
+- evidence provenance;
+- unknown/partial behavior.
+
+Warning severity is policy, not an inferred behavioral accusation or market-risk score unless an accepted risk contract explicitly says otherwise.
+
+No warning may silently become:
+
+- manipulation;
+- insider activity;
+- fraud/scam;
+- beneficial ownership;
+- intent;
+- causality;
+- imminent price prediction.
+
+Public-service / Scout-reliance promotion remains a separate gate for each warning family.
+
+### 4. Deterministic Compare support
+
+CMIS should expose comparison-ready deterministic evidence rather than forcing Roberta to build a second fact layer.
+
+Comparison support should preserve:
+
+- exact subjects;
+- compatible metric/unit definitions;
+- aligned or explicitly non-aligned fact times;
+- overlapping verified historical windows where required;
+- per-subject source/provenance;
+- missing-data asymmetry;
+- evidence-quality differences;
+- exact limitations.
+
+Roberta may synthesize “which is stronger on dimension X,” but CMIS should not invent a universal winner/score unless a separately accepted deterministic policy defines one.
+
+### 5. X1 ecosystem/network brief inputs
+
+CMIS should expose bounded reusable inputs for Roberta's X1 Brief one field/service at a time.
+
+Candidate evidence domains include:
+
+- verified market/liquidity/activity aggregates with explicit universe coverage;
+- new/first-observed assets from the Discovery Ledger;
+- material liquidity/concentration/activity changes;
+- provider/evidence-health state;
+- accepted network/validator/protocol observations where exact providers and semantics are proven.
+
+CMIS should not become the prose briefing product. Roberta owns prioritization, narrative synthesis, and user presentation.
+
+### 6. Machine ROBERTA backend requirements
+
+To support a stable Machine ROBERTA surface, CMIS services should continue strengthening:
+
+- versioned contracts;
+- explicit capability classification per chain/service;
+- deterministic unavailable/partial/conflict states;
+- stable reason/state codes where CMIS owns the underlying condition;
+- exact timestamps/freshness;
+- exact chain/asset/pool/route scope;
+- request/result traceability where appropriate;
+- Evidence Receipt / Proof Score attachment;
+- deterministic error semantics;
+- read-only idempotence where applicable.
+
+CMIS does not own the external `roberta_intelligence/v1` envelope, API keys, agent identity, quotas, SDK, human-vs-machine rendering, or personalization policy.
+
+### 7. No universal score at the CMIS layer
+
+CMIS must not collapse market depth, activity, history, concentration, risk, evidence strength, and execution evidence into one opaque universal score.
+
+Return the deterministic dimensions separately. Roberta may provide a recommendation using explicit policy while preserving the dimensions and their provenance.
+
+### 8. Cross-project acceptance rule
+
+For a new Human/Machine ROBERTA feature that depends on CMIS:
+
+1. CMIS proves and, where required, promotes the exact backend fact/evidence service;
+2. X1 Scout adopts the service under an explicit minimum-contract/capability gate;
+3. Roberta maps the accepted result into the Canonical ROBERTA Decision Object;
+4. Human and Machine renderers must preserve the same underlying facts/unknowns;
+5. no step implies execution authority.
 
 ## Product direction
 
@@ -392,12 +637,19 @@ Current implementation sequence:
 
 Future candidates — **not active milestones until separately accepted**:
 
-23. any public alert/Scout-reliance promotion;
-24. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
-25. separate Solana current-price promotion only after time identity and independence/price-construction gates;
-26. further field-by-field Solana maturity;
-27. Ethereum under an explicit capability/acceptance plan;
-28. investigation/evidence export and premium access.
+23. read-only quote-to-executed-swap matching and a content-addressed realized-slippage ledger;
+24. comparable-trade execution-quality statistics under exact route/pool/config/direction semantics;
+25. expected execution-slippage promotion only after a separate evidence-adequacy and validation gate;
+26. immutable X1 Discovery Ledger / first-verified-observation service;
+27. deterministic Early Warning service families, each with explicit persistence/freshness/severity/replay contracts and separate public/Scout promotion;
+28. first-class deterministic Compare support that preserves compatible scope/time/provenance;
+29. bounded X1 ecosystem/network brief inputs for Roberta synthesis;
+30. any additional public alert/Scout-reliance promotion;
+31. deeper XDEX route/execution evidence without transaction preparation as a proof shortcut;
+32. separate Solana current-price promotion only after time identity and independence/price-construction gates;
+33. further field-by-field Solana maturity;
+34. Ethereum under an explicit capability/acceptance plan;
+35. investigation/evidence export and premium access.
 
 None authorizes execution.
 
@@ -429,6 +681,8 @@ Roberta coordinates, learns within bounded static-source rules, and explains.
 The paired Roberta #226 / CMIS #269 source-sync reconciliation is merged. Roberta PR #228's autonomous Learning Plane and subsequent source/roadmap reconciliation are accepted on Roberta `main`. Roberta's accepted MB4E prebuilt bank construction remains through Stage 8 / Market Structure, while operator-local source mastery is complete at 14/14 required stages plus the required final capstone. Runtime-generated Stages 9-14 remain mastery evidence rather than separately accepted prebuilt repository banks.
 
 Roberta may synthesize accepted CMIS results but must not recalculate CMIS truth/proof, silently upgrade inference to fact, collapse risk and evidence quality into one score, or treat internal non-promoted foundations as callable services.
+
+Human ROBERTA and Machine ROBERTA are two Roberta-owned presentation/client surfaces over the same accepted intelligence. CMIS must provide identical underlying fact/evidence semantics to both; it does not own the Human renderer, Machine external schema, API authentication, quotas, SDK, saved user policies, or agent action authority.
 
 Roberta's Learning System, autonomous Learning Plane, retained lessons, Pyramid training state, memory, policy, and human approval do not override CMIS for freshness-sensitive market/blockchain facts and do not authorize CMIS execution.
 
