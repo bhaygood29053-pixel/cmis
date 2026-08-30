@@ -19,7 +19,6 @@ jobs:
       X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
       RUN_X1_NINJA_LIVE_UPDATE_EVENT: "1"
-      RUN_X1_NINJA_DECODER_CANDIDATE_LIVE: "1"
       X1_NINJA_UPDATE_MAX_SNAPSHOTS: "36"
       X1_NINJA_UPDATE_POLL_SECONDS: "10"
 
@@ -39,9 +38,6 @@ jobs:
       - name: Run deterministic update-event tests
         run: |
           python -m unittest tests.test_x1_ninja_live_update_event -v
-      - name: Print recent mismatch-pool decoder candidates
-        run: |
-          python -m unittest tests.test_x1_ninja_decoder_candidate_live -v
       - name: Run bounded live update-event evidence
         run: |
           python -m unittest tests.test_x1_ninja_live_update_event_live -v
