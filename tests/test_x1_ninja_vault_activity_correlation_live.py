@@ -123,6 +123,27 @@ class NinjaVaultActivityLiveTests(unittest.TestCase):
                         })
                         continue
 
+                    vault_event["upstream_filter_evidence"] = {
+                        "strict_status": strict.get("status"),
+                        "strict_link_verified": strict.get(
+                            "catalog_price_execution_link_verified"
+                        ),
+                        "strict_eligible_signature_count": strict.get(
+                            "eligible_signature_count"
+                        ),
+                        "delayed_status": (
+                            delayed.get("status")
+                            if isinstance(delayed, dict)
+                            else None
+                        ),
+                        "delayed_link_verified": (
+                            delayed.get(
+                                "delayed_catalog_price_execution_link_verified"
+                            )
+                            if isinstance(delayed, dict)
+                            else False
+                        ),
+                    }
                     vault_events.append(vault_event)
                     if vault_event.get(
                         "vault_history_complete_for_window"
