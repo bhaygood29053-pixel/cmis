@@ -127,6 +127,10 @@ def _exact_swap_candidate(
     )
     if membership.get("transaction_pool_membership_verified") is not True:
         raise ValueError("exact transaction-to-pool membership unverified")
+    if membership.get("recognized_amm_instruction_count") != 1:
+        raise ValueError("routed_or_multi_amm_instruction_ambiguity")
+    if membership.get("selected_pool_instruction_count") != 1:
+        raise ValueError("multiple_selected_pool_instruction_ambiguity")
 
     asset = _vault_delta(
         report,
@@ -380,6 +384,18 @@ def verify_delayed_catalog_price_transition(
                 candidate["execution_price_native"],
                 name="execution_price_native",
             )
+            if candidate["slot"] != row.get("slot"):
+                raise ValueError("signature-history slot mismatches transaction slot")
+            history_block_time = row.get("block_time")
+            if (
+                history_block_time is not None
+                and Decimal(str(candidate["block_time"]))
+                != Decimal(str(history_block_time))
+            ):
+                raise ValueError(
+                    "signature-history block time mismatches transaction block time"
+                )
+
             candidate["before_price_comparison"] = _compare(
                 before_price,
                 execution_price,
