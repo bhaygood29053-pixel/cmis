@@ -1,0 +1,59 @@
+name: X1.Ninja Developer API Catalog Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-evidence:
+    name: Read-only X1.Ninja pool catalog contract
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue333-x1-ninja-developer-api-catalog'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      RUN_X1_NINJA_CATALOG_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Run deterministic catalog contract tests
+        run: |
+          python -m unittest tests.test_x1_ninja_pool_catalog_contract -v
+
+      - name: Run live read-only catalog evidence
+        run: |
+          python -m unittest tests.test_x1_ninja_pool_catalog_live -v
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only provider evidence only."
+          echo "No financial/freshness semantic promotion."
+          echo "No Scout/public-service/risk/execution authority."
+          echo "No transaction construction, signing, broadcasting, custody, trading, or value movement."
