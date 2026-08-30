@@ -145,7 +145,11 @@ def verifier(tx, *, signature, rpc_url):
 
 
 def membership(**kwargs):
-    return {"transaction_pool_membership_verified": True}
+    return {
+        "transaction_pool_membership_verified": True,
+        "recognized_amm_instruction_count": 1,
+        "selected_pool_instruction_count": 1,
+    }
 
 
 class DelayedCatalogPriceLinkTests(unittest.TestCase):
@@ -239,6 +243,54 @@ class DelayedCatalogPriceLinkTests(unittest.TestCase):
         self.assertEqual(result["status"], "unavailable")
         self.assertFalse(
             result["delayed_catalog_price_execution_link_verified"]
+        )
+
+    def test_multi_amm_candidate_fails_closed(self):
+        def routed_membership(**kwargs):
+            return {
+                "transaction_pool_membership_verified": True,
+                "recognized_amm_instruction_count": 2,
+                "selected_pool_instruction_count": 1,
+            }
+
+        before = snapshot(
+            "0.0019",
+            start_slot=100,
+            end_slot=101,
+            observed_start=1050,
+            observed_end=1051,
+        )
+        after = snapshot(
+            "0.002",
+            start_slot=110,
+            end_slot=111,
+            observed_start=1060,
+            observed_end=1061,
+        )
+
+        result = verify_delayed_catalog_price_transition(
+            before=before,
+            after=after,
+            pool_address=POOL,
+            structural_verifier=structural,
+            signature_fetcher=signatures,
+            transaction_fetcher=tx_fetch,
+            transaction_verifier=verifier,
+            membership_prover=routed_membership,
+            recognized_program_ids=(XDEX_MAINNET_OBSERVED_PROGRAM_ID,),
+            rpc_url="rpc",
+        )
+
+        self.assertEqual(result["status"], "unavailable")
+        self.assertFalse(
+            result["delayed_catalog_price_execution_link_verified"]
+        )
+        self.assertTrue(
+            any(
+                "routed_or_multi_amm_instruction_ambiguity"
+                in row.get("error", "")
+                for row in result["rejections"]
+            )
         )
 
     def test_fixed_lookback_cannot_be_widened(self):
