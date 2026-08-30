@@ -138,17 +138,19 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
                         event_key = (
                             f"{address}:snapshot:{index}:verification_exception"
                         )
-                        evidence_events.append({
-                            "event_key": event_key,
-                            "pool_address": address,
-                            "status": "unavailable",
-                            "outcome": UNAVAILABLE_OR_INCOMPLETE,
-                            "price_only_reserve_ratio_departure_verified": False,
-                            "delayed_vault_swap_execution_link_verified": False,
-                            "departure_lag_observed": False,
-                            "warning": "verification_exception",
-                            "error": f"{type(exc).__name__}: {exc}",
-                        })
+                        if event_key not in seen_event_keys:
+                            seen_event_keys.add(event_key)
+                            evidence_events.append({
+                                "event_key": event_key,
+                                "pool_address": address,
+                                "status": "unavailable",
+                                "outcome": UNAVAILABLE_OR_INCOMPLETE,
+                                "price_only_reserve_ratio_departure_verified": False,
+                                "delayed_vault_swap_execution_link_verified": False,
+                                "departure_lag_observed": False,
+                                "warning": "verification_exception",
+                                "error": f"{type(exc).__name__}: {exc}",
+                            })
                         diagnostics.append({
                             "snapshot_index": index,
                             "pool_address": address,
@@ -164,6 +166,25 @@ class NinjaDelayedVaultDepartureLiveTests(unittest.TestCase):
                         if key and key not in seen_event_keys:
                             seen_event_keys.add(key)
                             evidence_events.append(result)
+                    elif result.get("status") == "unavailable":
+                        key = (
+                            result.get("event_key")
+                            or f"{address}:snapshot:{index}:unavailable"
+                        )
+                        if key not in seen_event_keys:
+                            seen_event_keys.add(key)
+                            incomplete = dict(result)
+                            incomplete["event_key"] = key
+                            incomplete["outcome"] = UNAVAILABLE_OR_INCOMPLETE
+                            evidence_events.append(incomplete)
+                        diagnostics.append({
+                            "snapshot_index": index,
+                            "pool_address": address,
+                            "stage": "not_verified_departure",
+                            "status": result.get("status"),
+                            "outcome": result.get("outcome"),
+                            "warnings": result.get("warnings"),
+                        })
                     else:
                         diagnostics.append({
                             "snapshot_index": index,
