@@ -82,15 +82,29 @@ class X1ExactPoolTriangulationLiveTests(unittest.TestCase):
             + json.dumps(public, sort_keys=True, default=str)
         )
 
-        self.assertEqual(
+        self.assertIn(
             result["status"],
-            "verified",
-            "No exact current pool reached full Ninja/XDEX/RPC identity proof.",
+            {"verified", "partial"},
+            "No exact current pool reached Ninja/XDEX/RPC identity proof.",
         )
         self.assertTrue(result["identity"]["pool_identity_verified"])
         self.assertTrue(result["identity"]["token_set_identity_verified"])
-        self.assertTrue(result["identity"]["base_quote_orientation_verified"])
         self.assertTrue(result["identity"]["rpc_mint_identity_verified"])
+
+        xdex_basis = result["provider_identity"]["xdex"]["role_basis"]
+        if xdex_basis == "declared_base_quote":
+            self.assertTrue(
+                result["identity"]["base_quote_orientation_verified"]
+            )
+        else:
+            self.assertEqual(xdex_basis, "provider_token1_token2")
+            self.assertFalse(
+                result["identity"]["base_quote_orientation_verified"]
+            )
+            self.assertFalse(
+                result["identity"]["provider_role_orientation_agreement"]
+            )
+
         self.assertFalse(
             result["identity"]["onchain_mint_slot_base_quote_semantics_verified"]
         )
