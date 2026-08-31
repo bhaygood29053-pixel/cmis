@@ -155,6 +155,7 @@ def _normalize_activity_report(
             and activity_observed_at is not None
             and coverage_start_time <= coverage_end_time
             and activity_observed_at == coverage_end_time
+            and time_coverage_reason is None
             and observation_time_semantics
             == "newest_selected_transaction_block_time"
         )
@@ -166,6 +167,7 @@ def _normalize_activity_report(
                 _strict_nonnegative_int(coverage.get("observed_at")),
                 _text(coverage.get("observation_time_semantics")),
                 coverage.get("time_coverage_verified") is True,
+                _text(coverage.get("time_coverage_reason")),
             )
             time_contract_valid = coverage_time_values == (
                 coverage_start_time,
@@ -173,6 +175,7 @@ def _normalize_activity_report(
                 activity_observed_at,
                 observation_time_semantics,
                 True,
+                None,
             )
 
         if not time_contract_valid:
