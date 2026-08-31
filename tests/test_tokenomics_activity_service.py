@@ -143,9 +143,12 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         )
         burn_metrics = report["burn_metrics"]
         self.assertTrue(burn_metrics["available"])
-        self.assertEqual(burn_metrics["status"], "ok")
+        self.assertEqual(burn_metrics["status"], "partial")
+        self.assertTrue(burn_metrics["window_metrics_complete"])
         self.assertEqual(burn_metrics["observed_at"], NOW)
         self.assertFalse(burn_metrics["lifetime_total_burn_verified"])
+        self.assertEqual(burn_metrics["verified_burned_observed"], "1.25")
+        self.assertEqual(burn_metrics["verified_burned_raw_observed"], "1250000")
         self.assertEqual(
             burn_metrics["windows"]["24h"]["burned_tokens"],
             "1.25",
@@ -270,6 +273,19 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         self.assertEqual(
             report["burn_metrics"]["reason"],
             "token_activity_events_not_supplied",
+        )
+    def test_event_summary_mismatch_withholds_burn_metrics(self):
+        activity = activity_report(
+            burned_raw_observed="999999",
+        )
+
+        report = report_with_activity(activity)
+
+        self.assertTrue(report["token_activity"]["activity_verified"])
+        self.assertFalse(report["burn_metrics"]["available"])
+        self.assertEqual(
+            report["burn_metrics"]["reason"],
+            "token_activity_event_summary_mismatch",
         )
     def test_activity_for_different_mint_is_rejected_fail_closed(self):
         report = report_with_activity(
