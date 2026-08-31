@@ -15,12 +15,21 @@ DAY = 24 * 60 * 60
 NOW = 10_000_000
 
 
-def supply_record(*, decimals=6, total_supply="42.5", raw_supply="42500000"):
+def supply_record(
+    *,
+    decimals=6,
+    total_supply="42.5",
+    raw_supply="42500000",
+    observation_slot=123456,
+    observation_slot_verified=True,
+):
     return {
         "raw_supply": raw_supply,
         "decimals": decimals,
         "total_supply": total_supply,
         "supply_verified": True,
+        "observation_slot": observation_slot,
+        "observation_slot_verified": observation_slot_verified,
         "source": "X1 RPC getTokenSupply",
     }
 
@@ -218,6 +227,8 @@ class CMISTokenomicsContractTests(unittest.TestCase):
         self.assertEqual(response["status"], OK)
         data = response["data"]
         self.assertTrue(data["current_total_supply_verified"])
+        self.assertTrue(data["current_total_observation_slot_verified"])
+        self.assertEqual(data["current_total_observation_slot"], 123456)
         self.assertEqual(data["current_total_supply"], "42.5")
         self.assertTrue(data["circulating_supply_verified"])
         self.assertEqual(data["circulating_supply_raw"], "40000000")
@@ -256,6 +267,28 @@ class CMISTokenomicsContractTests(unittest.TestCase):
             },
             response["sources"],
         )
+
+    def test_rpc_supply_slot_mismatch_withholds_circulation(self):
+        response = build_tokenomics_response(
+            MINT,
+            get_token_supply=lambda mint, **kwargs: supply_record(
+                observation_slot=123457,
+            ),
+            get_mint_info=lambda mint, **kwargs: mint_record(),
+            activity_report=activity_report(),
+            circulating_supply_report=circulation_report(),
+        )
+
+        data = response["data"]
+        self.assertTrue(data["current_total_supply_verified"])
+        self.assertEqual(data["current_total_observation_slot"], 123457)
+        self.assertFalse(data["circulating_supply_verified"])
+        self.assertEqual(
+            data["circulating_supply_details"]["reason"],
+            "circulating_supply_rpc_total_supply_slot_mismatch",
+        )
+        codes = {warning["code"] for warning in response["warnings"]}
+        self.assertIn("circulating_supply_unverified", codes)
 
     def test_incomplete_circulation_contract_stays_unverified_with_reason(self):
         circulation = circulation_report()
