@@ -505,9 +505,9 @@ class TokenActivityScannerTests(unittest.TestCase):
                 MINT,
                 "legacy:top:0",
                 "legacy",
-                "burn",
-                "burn",
-                "500000",
+                "mint",
+                "mintto",
+                "999999",
                 "AuthorityA",
                 "TokenAccountA",
                 1700000000,
@@ -546,6 +546,10 @@ class TokenActivityScannerTests(unittest.TestCase):
             report["coverage"]["revalidated_cached_transactions"],
             1,
         )
+        self.assertEqual(
+            report["coverage"]["unrevalidated_cached_transactions"],
+            0,
+        )
         stored = self.db.execute(
             """
             SELECT block_time, block_time_verified,
@@ -563,15 +567,18 @@ class TokenActivityScannerTests(unittest.TestCase):
                 "strict_raw_rpc_nonnegative_int_v1",
             ),
         )
-        event_time = self.db.execute(
+        rebuilt_event = self.db.execute(
             """
-            SELECT block_time
+            SELECT kind, instruction_type, raw_amount, block_time
             FROM token_activity_events
             WHERE mint = ? AND event_key = ?
             """,
             (MINT, "legacy:top:0"),
-        ).fetchone()[0]
-        self.assertEqual(event_time, 1700000100)
+        ).fetchone()
+        self.assertEqual(
+            rebuilt_event,
+            ("burn", "burn", "500000", 1700000100),
+        )
 
     def test_failed_legacy_revalidation_cannot_produce_time_coverage(self):
         self.db.execute(
@@ -634,6 +641,10 @@ class TokenActivityScannerTests(unittest.TestCase):
             report["coverage"]["revalidated_cached_transactions"],
             0,
         )
+        self.assertEqual(
+            report["coverage"]["unrevalidated_cached_transactions"],
+            1,
+        )
         stored = self.db.execute(
             """
             SELECT block_time, block_time_verified,
@@ -679,6 +690,10 @@ class TokenActivityScannerTests(unittest.TestCase):
         )
         self.assertEqual(
             second["coverage"]["revalidated_cached_transactions"],
+            0,
+        )
+        self.assertEqual(
+            second["coverage"]["unrevalidated_cached_transactions"],
             0,
         )
         self.assertEqual(second["coverage"]["transactions_retrieved"], 1)
