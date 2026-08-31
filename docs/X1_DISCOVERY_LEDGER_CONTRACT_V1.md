@@ -194,12 +194,32 @@ Canonicalization is exact:
   fields as JSON `null` when absent;
 - sort JSON object keys lexicographically;
 - use compact separators `,` and `:` with no insignificant whitespace;
+- escape quotation mark as `\"` and reverse solidus as `\\`; escape backspace,
+  form feed, line feed, carriage return, and tab as `\b`, `\f`, `\n`, `\r`,
+  and `\t`, respectively;
+- escape all other U+0000 through U+001F characters as `\u00xx` with lowercase
+  hexadecimal digits; do not escape solidus (`/`), DEL (U+007F), or any other
+  Unicode scalar value, including non-ASCII text, U+2028/U+2029, and emoji;
+- encode those unescaped scalar values directly as UTF-8, with no BOM, no
+  trailing newline, and no Unicode normalization; reject surrogate code points
+  (U+D800 through U+DFFF) before creating an observation;
 - preserve integer/boolean/null scalar types exactly;
+- require actual strings for every text scalar and text-array member before
+  trimming; numbers, booleans, mappings, and lists must never be coerced to text;
+- optional Evidence Receipt and Proof Score ids accept `null` or non-empty
+  strings only; limitations/warnings are arrays (empty when omitted), not `null`;
 - normalize each `limitations` / `warnings` entry by trimming surrounding
   whitespace and rejecting empty/non-text entries;
 - sort each limitations/warnings array lexicographically and remove exact
   duplicates before serialization;
 - do not include `content_id` in the hashed object.
+
+For the accepted scalar domain, these serialization rules are equivalent to
+Python `json.dumps(payload, sort_keys=True, separators=(",", ":"),
+ensure_ascii=False).encode("utf-8")`. The same string-escaping rules apply to
+ledger-state hashing. Input JSON escape spelling does not change identity:
+literal `café` and decoded `caf\u00e9` represent the same string; canonically
+distinct Unicode sequences are not silently normalized into one another.
 
 An exact duplicate is idempotent. The same supplied content id with a different
 canonical payload is a tamper/conflict and fails closed.
@@ -308,7 +328,12 @@ The implementation must cover at least:
 9. partial/conflict record retained but not first;
 10. Proof Score preservation without risk synthesis;
 11. serialization/replay equivalence;
-12. `execution_authorized=false` enforcement.
+12. `execution_authorized=false` enforcement;
+13. non-string scalar/array-member rejection through factory, constructor, and
+    serialized replay, including optional evidence/proof ids;
+14. pinned Unicode/control-character canonical bytes and content/state hashes;
+15. invalid surrogate rejection before hashing and preservation of distinct
+    Unicode sequences without normalization.
 
 ## Non-goals
 
