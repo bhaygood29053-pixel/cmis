@@ -311,8 +311,75 @@ def _build_burn_metrics_section(activity_report, token_activity, *, decimals):
     except (TypeError, ValueError):
         return _empty_burn_metrics("burn_metrics_validation_error")
 
+    if metrics.get("time_buckets_verified") is not True:
+        return _empty_burn_metrics("burn_metric_event_time_unverified")
+
+    expected_summary = {
+        "mint_events_observed": _strict_nonnegative_int(
+            activity_report.get("mint_events_observed")
+        ),
+        "minted_raw_observed": _strict_nonnegative_int(
+            activity_report.get("minted_raw_observed")
+        ),
+        "burn_events_observed": _strict_nonnegative_int(
+            activity_report.get("burn_events_observed")
+        ),
+        "burned_raw_observed": _strict_nonnegative_int(
+            activity_report.get("burned_raw_observed")
+        ),
+    }
+    actual_summary = {
+        "mint_events_observed": metrics.get("mint_events_observed"),
+        "minted_raw_observed": _strict_nonnegative_int(
+            metrics.get("minted_raw_observed")
+        ),
+        "burn_events_observed": metrics.get("burn_events_observed"),
+        "burned_raw_observed": _strict_nonnegative_int(
+            metrics.get("burned_raw_observed")
+        ),
+    }
+    if (
+        any(value is None for value in expected_summary.values())
+        or actual_summary != expected_summary
+    ):
+        return _empty_burn_metrics("token_activity_event_summary_mismatch")
+
+    unavailable_windows = []
+    unavailable_comparisons = []
+    for label, window in (metrics.get("windows") or {}).items():
+        if not isinstance(window, dict) or window.get("status") != "ok":
+            unavailable_windows.append(label)
+            continue
+        comparison = window.get("period_over_period")
+        if comparison is not None and (
+            not isinstance(comparison, dict)
+            or comparison.get("status") != "ok"
+        ):
+            unavailable_comparisons.append(label)
+
     metrics["available"] = True
-    metrics["status"] = "ok"
+    metrics["window_metrics_complete"] = (
+        not unavailable_windows and not unavailable_comparisons
+    )
+    metrics["window_metrics_status"] = (
+        "ok" if metrics["window_metrics_complete"] else "partial"
+    )
+    metrics["unavailable_windows"] = unavailable_windows
+    metrics["unavailable_comparisons"] = unavailable_comparisons
+    # Full #368 burn intelligence remains partial until the independently
+    # verified circulating-supply and historical burn-time valuation layers
+    # are supplied.
+    metrics["status"] = "partial"
+    metrics["partial_reasons"] = [
+        "historical_burn_time_valuation_not_supplied",
+        "circulating_supply_contract_not_supplied",
+    ]
+    if unavailable_windows:
+        metrics["partial_reasons"].append("burn_window_coverage_incomplete")
+    if unavailable_comparisons:
+        metrics["partial_reasons"].append(
+            "burn_period_comparison_coverage_incomplete"
+        )
     metrics["source"] = token_activity.get("source")
     metrics["scan_id"] = token_activity.get("scan_id")
     return metrics
