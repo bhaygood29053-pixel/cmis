@@ -148,7 +148,8 @@ def _normalize_activity_report(
 
     if time_coverage_verified:
         time_contract_valid = (
-            coverage_start_time is not None
+            coverage_verified
+            and coverage_start_time is not None
             and coverage_end_time is not None
             and activity_observed_at is not None
             and coverage_start_time <= coverage_end_time
