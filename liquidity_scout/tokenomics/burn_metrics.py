@@ -177,8 +177,11 @@ def build_burn_metrics(
     malformed_events = 0
     untimed_events = 0
     future_timed_events = 0
+    pre_coverage_events = 0
     burned_observed = 0
     burn_events_observed = 0
+    minted_observed = 0
+    mint_events_observed = 0
 
     for event in events or []:
         if not isinstance(event, dict):
@@ -196,6 +199,11 @@ def build_burn_metrics(
             untimed_events += 1
         elif block_time > observed_at:
             future_timed_events += 1
+        elif (
+            coverage_start_time is not None
+            and block_time < coverage_start_time
+        ):
+            pre_coverage_events += 1
 
         normalized.append({
             "kind": kind,
@@ -206,13 +214,21 @@ def build_burn_metrics(
         if kind == "burn":
             burned_observed += raw_amount
             burn_events_observed += 1
+        else:
+            minted_observed += raw_amount
+            mint_events_observed += 1
 
     input_events_verified = malformed_events == 0
-    time_buckets_verified = (
+    event_time_contract_verified = (
         input_events_verified
         and untimed_events == 0
         and future_timed_events == 0
+        and pre_coverage_events == 0
     )
+    observed_event_totals_verified = (
+        event_time_contract_verified and coverage_verified is True
+    )
+    time_buckets_verified = event_time_contract_verified
     timed_events = [
         event for event in normalized
         if event["block_time"] is not None and event["block_time"] <= observed_at
@@ -302,18 +318,31 @@ def build_burn_metrics(
         windows[label] = window
 
     return {
+        "mint_events_observed": mint_events_observed,
+        "minted_raw_observed": str(minted_observed),
+        "minted_tokens_observed": scale_raw_amount(minted_observed, decimals),
         "burn_events_observed": burn_events_observed,
         "burned_raw_observed": str(burned_observed),
         "burned_tokens_observed": scale_raw_amount(burned_observed, decimals),
-        "verified_burned_observed": input_events_verified,
+        "observed_event_totals_verified": observed_event_totals_verified,
+        "verified_burned_raw_observed": (
+            str(burned_observed) if observed_event_totals_verified else None
+        ),
+        "verified_burned_observed": (
+            scale_raw_amount(burned_observed, decimals)
+            if observed_event_totals_verified
+            else None
+        ),
         "lifetime_total_burn_verified": False,
         "malformed_events": malformed_events,
         "untimed_events": untimed_events,
         "future_timed_events": future_timed_events,
+        "pre_coverage_events": pre_coverage_events,
         "time_buckets_verified": time_buckets_verified,
         "coverage_verified": coverage_verified is True,
         "coverage_start_time": coverage_start_time,
         "coverage_end_time": coverage_end_time,
+        "coverage_time_semantics": "start_exclusive_end_inclusive",
         "observed_at": observed_at,
         "windows": windows,
         "valuation": {

@@ -42,6 +42,32 @@ def _max_signatures(value):
     return parsed
 
 
+BLOCK_TIME_VALIDATION_SEMANTICS = "strict_raw_rpc_nonnegative_int_v1"
+
+
+def _ensure_processed_activity_columns(db):
+    """Mark legacy cached transaction times unverified by default.
+
+    Rows created before strict raw-RPC block-time validation receive
+    block_time_verified=0 and therefore cannot be reused for time coverage
+    until the transaction is fetched again and revalidated.
+    """
+    columns = {
+        row[1]
+        for row in db.execute(
+            "PRAGMA table_info(processed_token_activity)"
+        ).fetchall()
+    }
+    additions = {
+        "block_time_verified": "INTEGER NOT NULL DEFAULT 0",
+        "block_time_validation_semantics": "TEXT",
+    }
+    for column, declaration in additions.items():
+        if column not in columns:
+            db.execute(
+                f"ALTER TABLE processed_token_activity ADD COLUMN {column} {declaration}"
+            )
+
 def _ensure_scan_metadata_columns(db):
     """Add coverage-scope columns to older standalone activity databases."""
     columns = {
@@ -52,6 +78,13 @@ def _ensure_scan_metadata_columns(db):
         "coverage_scope": "TEXT NOT NULL DEFAULT 'unknown'",
         "lifetime_coverage_verified": "INTEGER NOT NULL DEFAULT 0",
         "lifetime_coverage_reason": "TEXT",
+        "time_coverage_verified": "INTEGER NOT NULL DEFAULT 0",
+        "time_coverage_reason": "TEXT",
+        "coverage_start_time": "INTEGER",
+        "coverage_end_time": "INTEGER",
+        "coverage_time_semantics": "TEXT",
+        "observed_at": "INTEGER",
+        "observation_time_semantics": "TEXT",
     }
     for column, declaration in additions.items():
         if column not in columns:
@@ -68,6 +101,8 @@ def initialize_activity_db(db):
             mint TEXT NOT NULL,
             signature TEXT NOT NULL,
             block_time INTEGER,
+            block_time_verified INTEGER NOT NULL DEFAULT 0,
+            block_time_validation_semantics TEXT,
             PRIMARY KEY (mint, signature)
         )
         """
@@ -106,10 +141,18 @@ def initialize_activity_db(db):
             oldest_signature TEXT,
             coverage_scope TEXT NOT NULL DEFAULT 'unknown',
             lifetime_coverage_verified INTEGER NOT NULL DEFAULT 0,
-            lifetime_coverage_reason TEXT
+            lifetime_coverage_reason TEXT,
+            time_coverage_verified INTEGER NOT NULL DEFAULT 0,
+            time_coverage_reason TEXT,
+            coverage_start_time INTEGER,
+            coverage_end_time INTEGER,
+            coverage_time_semantics TEXT,
+            observed_at INTEGER,
+            observation_time_semantics TEXT
         )
         """
     )
+    _ensure_processed_activity_columns(db)
     _ensure_scan_metadata_columns(db)
     db.commit()
     return db
@@ -247,26 +290,62 @@ def collect_signature_window(rpc, mint, *, max_signatures=None):
 
 
 def _processed_signatures(db, mint, signatures):
+    """Return strictly validated cache hits and legacy/unverified cache rows."""
     if not signatures:
-        return set()
-    found = set()
+        return set(), set()
+
+    verified = set()
+    unverified = set()
     for start in range(0, len(signatures), 500):
         chunk = signatures[start:start + 500]
         placeholders = ",".join("?" for _ in chunk)
         rows = db.execute(
             f"""
-            SELECT signature
+            SELECT signature, block_time_verified,
+                   block_time_validation_semantics
             FROM processed_token_activity
             WHERE mint = ? AND signature IN ({placeholders})
             """,
             [mint, *chunk],
         ).fetchall()
-        found.update(row[0] for row in rows)
-    return found
+        for signature, block_time_verified, semantics in rows:
+            if (
+                block_time_verified == 1
+                and semantics == BLOCK_TIME_VALIDATION_SEMANTICS
+            ):
+                verified.add(signature)
+            else:
+                unverified.add(signature)
+    return verified, unverified
+
+
+def _canonical_block_time(value):
+    """Return a strict non-negative integer block time or None.
+
+    Raw RPC types are validated before SQLite can apply INTEGER affinity.
+    Booleans and numeric strings are intentionally rejected rather than
+    coerced.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
 
 
 def _persist_transaction(db, mint, signature, tx, events):
-    block_time = tx.get("blockTime") if isinstance(tx, dict) else None
+    raw_block_time = tx.get("blockTime") if isinstance(tx, dict) else None
+    block_time = _canonical_block_time(raw_block_time)
+    block_time_verified = block_time is not None
+
+    # Refetched legacy rows must be rebuilt from the current parsed
+    # transaction. Do not preserve stale event payloads from an older parser.
+    db.execute(
+        """
+        DELETE FROM token_activity_events
+        WHERE mint = ? AND signature = ?
+        """,
+        (mint, signature),
+    )
+
     for event in events:
         location = _text(event.get("location"))
         if not location:
@@ -288,18 +367,30 @@ def _persist_transaction(db, mint, signature, tx, events):
                 _text(event.get("raw_amount")),
                 _text(event.get("authority")),
                 _text(event.get("account")),
-                event.get("block_time"),
+                block_time,
             ),
         )
 
     db.execute(
         """
         INSERT OR REPLACE INTO processed_token_activity (
-            mint, signature, block_time
-        ) VALUES (?, ?, ?)
+            mint, signature, block_time, block_time_verified,
+            block_time_validation_semantics
+        ) VALUES (?, ?, ?, ?, ?)
         """,
-        (mint, signature, block_time),
+        (
+            mint,
+            signature,
+            block_time,
+            int(block_time_verified),
+            (
+                BLOCK_TIME_VALIDATION_SEMANTICS
+                if block_time_verified
+                else None
+            ),
+        ),
     )
+    return block_time_verified
 
 
 def _load_window_events(db, mint, signatures):
@@ -337,6 +428,91 @@ def _load_window_events(db, mint, signatures):
     ]
 
 
+def _load_window_block_times(db, mint, signatures):
+    """Load selected transaction block times in exact signature-selection order."""
+    if not signatures:
+        return []
+
+    found = {}
+    for start in range(0, len(signatures), 500):
+        chunk = signatures[start:start + 500]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"""
+            SELECT signature, block_time
+            FROM processed_token_activity
+            WHERE mint = ? AND signature IN ({placeholders})
+            """,
+            [mint, *chunk],
+        ).fetchall()
+        for signature, block_time in rows:
+            found[signature] = block_time
+
+    return [found.get(signature) for signature in signatures]
+
+
+def _time_coverage_state(block_times, *, coverage_verified):
+    """Verify deterministic fact-time bounds for the selected history.
+
+    Selected signatures are newest-to-oldest. A verified interval uses an
+    exclusive lower bound and inclusive upper bound. The lower boundary is
+    intentionally exclusive so a signature-count cutoff that lands inside a
+    shared block-time second cannot imply coverage of omitted same-time
+    history.
+
+    observed_at is the newest selected successful transaction canonical block
+    time. It is a fact-time watermark, not local wall-clock scan time.
+    """
+    unavailable = {
+        "time_coverage_verified": False,
+        "time_coverage_reason": None,
+        "coverage_start_time": None,
+        "coverage_end_time": None,
+        "coverage_time_semantics": None,
+        "observed_at": None,
+        "observation_time_semantics": None,
+    }
+
+    if coverage_verified is not True:
+        unavailable["time_coverage_reason"] = "selected_window_coverage_unverified"
+        return unavailable
+
+    if not block_times:
+        unavailable["time_coverage_reason"] = (
+            "selected_history_has_no_fact_time_boundary"
+        )
+        return unavailable
+
+    normalized = []
+    for value in block_times:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            unavailable["time_coverage_reason"] = (
+                "selected_transaction_block_time_unavailable"
+            )
+            return unavailable
+        normalized.append(value)
+
+    if any(
+        newer_time < older_time
+        for newer_time, older_time in zip(normalized, normalized[1:])
+    ):
+        unavailable["time_coverage_reason"] = (
+            "selected_transaction_block_times_not_monotonic"
+        )
+        return unavailable
+
+    return {
+        "time_coverage_verified": True,
+        "time_coverage_reason": None,
+        "coverage_start_time": normalized[-1],
+        "coverage_end_time": normalized[0],
+        "coverage_time_semantics": "start_exclusive_end_inclusive",
+        "observed_at": normalized[0],
+        "observation_time_semantics": (
+            "newest_selected_transaction_block_time"
+        ),
+    }
+
 def _lifetime_coverage_reason(report, coverage):
     if not report.get("coverage_verified"):
         return "selected_window_coverage_unverified"
@@ -359,8 +535,10 @@ def _record_scan(db, mint, coverage, report):
             selection_complete, history_exhausted, coverage_verified,
             activity_verified, newest_signature, oldest_signature,
             coverage_scope, lifetime_coverage_verified,
-            lifetime_coverage_reason
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            lifetime_coverage_reason, time_coverage_verified,
+            time_coverage_reason, coverage_start_time, coverage_end_time,
+            coverage_time_semantics, observed_at, observation_time_semantics
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             mint,
@@ -378,6 +556,13 @@ def _record_scan(db, mint, coverage, report):
             coverage.get("coverage_scope"),
             int(report["lifetime_coverage_verified"]),
             report.get("lifetime_coverage_reason"),
+            int(coverage.get("time_coverage_verified") is True),
+            coverage.get("time_coverage_reason"),
+            coverage.get("coverage_start_time"),
+            coverage.get("coverage_end_time"),
+            coverage.get("coverage_time_semantics"),
+            coverage.get("observed_at"),
+            coverage.get("observation_time_semantics"),
         ),
     )
     db.commit()
@@ -399,11 +584,12 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         max_signatures=max_signatures,
     )
     signatures = selection["signatures"]
-    cached = _processed_signatures(db, mint, signatures)
+    cached, unverified_cached = _processed_signatures(db, mint, signatures)
 
     retrieved = len(cached)
     transaction_errors = 0
     newly_retrieved = 0
+    revalidated_cached = 0
 
     for signature in signatures:
         if signature in cached:
@@ -434,9 +620,17 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
             continue
 
         events = extract_token_events(tx, mint)
-        _persist_transaction(db, mint, signature, tx, events)
+        block_time_revalidated = _persist_transaction(
+            db,
+            mint,
+            signature,
+            tx,
+            events,
+        )
         retrieved += 1
         newly_retrieved += 1
+        if signature in unverified_cached and block_time_revalidated:
+            revalidated_cached += 1
 
     db.commit()
 
@@ -453,6 +647,11 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         "selection_rpc_errors": selection["selection_rpc_errors"],
         "transaction_errors": transaction_errors,
         "cached_transactions": len(cached),
+        "unverified_cached_transactions": len(unverified_cached),
+        "revalidated_cached_transactions": revalidated_cached,
+        "unrevalidated_cached_transactions": (
+            len(unverified_cached) - revalidated_cached
+        ),
         "new_transactions_retrieved": newly_retrieved,
         "newest_signature": selection["newest_signature"],
         "oldest_signature": selection["oldest_signature"],
@@ -466,6 +665,16 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         decimals=decimals,
         coverage=coverage,
     )
+
+    time_coverage = _time_coverage_state(
+        _load_window_block_times(db, mint, signatures),
+        coverage_verified=report.get("coverage_verified") is True,
+    )
+    coverage.update(time_coverage)
+    report["coverage"].update(time_coverage)
+    for key, value in time_coverage.items():
+        report[key] = value
+
     report["coverage_scope"] = coverage["coverage_scope"]
     report["lifetime_coverage_verified"] = False
     report["lifetime_coverage_reason"] = _lifetime_coverage_reason(report, coverage)
