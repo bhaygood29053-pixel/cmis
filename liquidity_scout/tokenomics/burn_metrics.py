@@ -22,11 +22,12 @@ COMPARISON_WINDOWS = {"24h", "7d", "30d"}
 def _nonnegative_int(value):
     if value is None or isinstance(value, bool):
         return None
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    text = str(value).strip()
+    if not text or not text.isdigit():
         return None
-    return parsed if parsed >= 0 else None
+    return int(text)
 
 
 def _raw_integer(value):
