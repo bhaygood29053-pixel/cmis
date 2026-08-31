@@ -342,6 +342,7 @@ def build_burn_metrics(
         "coverage_verified": coverage_verified is True,
         "coverage_start_time": coverage_start_time,
         "coverage_end_time": coverage_end_time,
+        "coverage_time_semantics": "start_exclusive_end_inclusive",
         "observed_at": observed_at,
         "windows": windows,
         "valuation": {
