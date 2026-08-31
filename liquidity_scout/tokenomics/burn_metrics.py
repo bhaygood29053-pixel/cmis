@@ -31,7 +31,11 @@ def _nonnegative_int(value):
 
 
 def _raw_integer(value):
-    text = str(value or "").strip()
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    text = str(value).strip()
     if not text or not text.isdigit():
         return None
     return int(text)
