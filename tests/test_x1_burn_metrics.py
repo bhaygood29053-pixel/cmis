@@ -34,6 +34,14 @@ class BurnMetricsTests(unittest.TestCase):
             event("burn", 1000, NOW - DAY - 100),
         ])
 
+        self.assertEqual(report["mint_events_observed"], 1)
+        self.assertEqual(report["minted_raw_observed"], "1000")
+        self.assertEqual(report["burn_events_observed"], 2)
+        self.assertEqual(report["burned_raw_observed"], "2500")
+        self.assertTrue(report["observed_event_totals_verified"])
+        self.assertEqual(report["verified_burned_raw_observed"], "2500")
+        self.assertEqual(report["verified_burned_observed"], "25")
+
         current = report["windows"]["24h"]
         self.assertEqual(current["burned_raw"], "1500")
         self.assertEqual(current["burned_tokens"], "15")
@@ -109,6 +117,16 @@ class BurnMetricsTests(unittest.TestCase):
         self.assertIsNone(day["burned_raw"])
         self.assertEqual(day["issuance_state"], "INSUFFICIENT_COVERAGE")
 
+    def test_malformed_event_withholds_verified_observed_burn_amount(self):
+        report = self.build([
+            event("burn", 500, NOW - 10),
+            {"kind": "burn", "raw_amount": "not-a-number", "block_time": NOW - 20},
+        ])
+
+        self.assertEqual(report["burned_raw_observed"], "500")
+        self.assertFalse(report["observed_event_totals_verified"])
+        self.assertIsNone(report["verified_burned_raw_observed"])
+        self.assertIsNone(report["verified_burned_observed"])
     def test_missing_block_time_fails_closed_for_all_time_buckets(self):
         report = self.build([
             event("burn", 500, None),
