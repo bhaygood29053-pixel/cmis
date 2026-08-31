@@ -262,6 +262,17 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         )
         self.assertFalse(report["burn_metrics"]["available"])
 
+    def test_missing_nested_coverage_withholds_time_contract(self):
+        activity = activity_report(coverage=None)
+
+        report = report_with_activity(activity)
+
+        self.assertFalse(report["token_activity"]["time_coverage_verified"])
+        self.assertEqual(
+            report["token_activity"]["time_coverage_reason"],
+            "token_activity_time_coverage_malformed",
+        )
+        self.assertFalse(report["burn_metrics"]["available"])
     def test_missing_event_payload_withholds_burn_metrics(self):
         activity = activity_report()
         activity.pop("events")
