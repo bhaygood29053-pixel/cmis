@@ -150,6 +150,9 @@ def build_circulating_supply_metrics(
     evidence_total_verified = evidence.get("total_supply_verified") is True
     evidence_total_raw = _strict_nonnegative_int(evidence.get("total_supply_raw"))
     total_supply_source = _text(evidence.get("total_supply_source"))
+    total_supply_observation_slot = _strict_nonnegative_int(
+        evidence.get("total_supply_observation_slot")
+    )
     observation_slot = _strict_nonnegative_int(evidence.get("observation_slot"))
     observed_at = _strict_nonnegative_int(evidence.get("observed_at"))
     observation_time_verified = evidence.get("observation_time_verified") is True
@@ -204,9 +207,27 @@ def build_circulating_supply_metrics(
             current_total_raw=current_total_raw,
             current_total_source=current_total_source,
         )
+    if total_supply_observation_slot is None:
+        return _unavailable(
+            "circulating_supply_total_supply_slot_unverified",
+            mint=mint,
+            decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
+        )
     if evidence_total_raw != current_total_raw:
         return _unavailable(
             "circulating_supply_total_supply_mismatch",
+            mint=mint,
+            decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
+        )
+    if total_supply_observation_slot != observation_slot:
+        return _unavailable(
+            "circulating_supply_total_supply_slot_mismatch",
             mint=mint,
             decimals=decimals,
             current_total_supply_verified=True,
@@ -408,7 +429,7 @@ def build_circulating_supply_metrics(
         "circulating_to_total_supply_ratio": ratio,
         "ratio_state": ratio_state,
         "observation_slot": observation_slot,
-        "total_supply_observation_slot": observation_slot,
+        "total_supply_observation_slot": total_supply_observation_slot,
         "observed_at": observed_at,
         "observation_time_verified": observation_time_verified,
         "exclusions": normalized,
