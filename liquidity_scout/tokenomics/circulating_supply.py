@@ -99,6 +99,7 @@ def build_circulating_supply_metrics(
     decimals,
     current_total_raw,
     current_total_supply_verified,
+    current_total_observation_slot=None,
     current_total_source=None,
 ):
     """Verify one exact-mint circulation/exclusion report.
@@ -116,6 +117,9 @@ def build_circulating_supply_metrics(
     mint = _text(mint)
     decimals = _strict_nonnegative_int(decimals)
     current_total_raw = _strict_nonnegative_int(current_total_raw)
+    current_total_observation_slot = _strict_nonnegative_int(
+        current_total_observation_slot
+    )
 
     if not mint:
         return _unavailable("token_mint_required")
@@ -130,6 +134,16 @@ def build_circulating_supply_metrics(
             current_total_raw=current_total_raw,
             current_total_source=current_total_source,
         )
+    if current_total_observation_slot is None:
+        return _unavailable(
+            "current_total_supply_slot_unverified",
+            mint=mint,
+            decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
+        )
+
     if not isinstance(evidence, dict):
         return _unavailable(
             "circulating_supply_contract_not_supplied",
@@ -219,6 +233,15 @@ def build_circulating_supply_metrics(
     if evidence_total_raw != current_total_raw:
         return _unavailable(
             "circulating_supply_total_supply_mismatch",
+            mint=mint,
+            decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
+        )
+    if current_total_observation_slot != observation_slot:
+        return _unavailable(
+            "circulating_supply_rpc_total_supply_slot_mismatch",
             mint=mint,
             decimals=decimals,
             current_total_supply_verified=True,
@@ -418,6 +441,7 @@ def build_circulating_supply_metrics(
         "current_total_supply_verified": True,
         "current_total_supply_reconciled": True,
         "current_total_source": _text(current_total_source),
+        "current_total_observation_slot": current_total_observation_slot,
         "total_supply_raw": str(current_total_raw),
         "total_supply": scale_raw_amount(current_total_raw, decimals),
         "total_supply_source": total_supply_source,
