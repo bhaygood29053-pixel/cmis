@@ -316,6 +316,76 @@ class TokenActivityScannerTests(unittest.TestCase):
         self.assertIsNone(report["coverage_end_time"])
         self.assertIsNone(report["observed_at"])
 
+    def test_boolean_block_time_is_not_coerced_by_sqlite(self):
+        rpc = FakeRPC(
+            [[signature("sig1")]],
+            transactions={
+                "sig1": transaction(
+                    parsed_ix("burn", "500000"),
+                    block_time=True,
+                ),
+            },
+        )
+
+        report = scan_token_activity(
+            rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=1,
+        )
+
+        self.assertTrue(report["activity_verified"])
+        self.assertFalse(report["time_coverage_verified"])
+        self.assertEqual(
+            report["time_coverage_reason"],
+            "selected_transaction_block_time_unavailable",
+        )
+        stored = self.db.execute(
+            """
+            SELECT block_time
+            FROM processed_token_activity
+            WHERE mint = ? AND signature = ?
+            """,
+            (MINT, "sig1"),
+        ).fetchone()[0]
+        self.assertIsNone(stored)
+
+    def test_numeric_string_block_time_is_not_coerced_by_sqlite(self):
+        rpc = FakeRPC(
+            [[signature("sig1")]],
+            transactions={
+                "sig1": transaction(
+                    parsed_ix("burn", "500000"),
+                    block_time="1700000000",
+                ),
+            },
+        )
+
+        report = scan_token_activity(
+            rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=1,
+        )
+
+        self.assertTrue(report["activity_verified"])
+        self.assertFalse(report["time_coverage_verified"])
+        self.assertEqual(
+            report["time_coverage_reason"],
+            "selected_transaction_block_time_unavailable",
+        )
+        stored = self.db.execute(
+            """
+            SELECT block_time
+            FROM processed_token_activity
+            WHERE mint = ? AND signature = ?
+            """,
+            (MINT, "sig1"),
+        ).fetchone()[0]
+        self.assertIsNone(stored)
+
     def test_non_monotonic_selected_block_times_fail_closed(self):
         rpc = FakeRPC(
             [[signature("newer"), signature("older")]],
