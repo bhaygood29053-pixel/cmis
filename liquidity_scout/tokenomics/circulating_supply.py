@@ -134,9 +134,9 @@ def build_circulating_supply_metrics(
             current_total_raw=current_total_raw,
             current_total_source=current_total_source,
         )
-    if current_total_observation_slot is None:
+    if not isinstance(evidence, dict):
         return _unavailable(
-            "current_total_supply_slot_unverified",
+            "circulating_supply_contract_not_supplied",
             mint=mint,
             decimals=decimals,
             current_total_supply_verified=True,
@@ -144,9 +144,9 @@ def build_circulating_supply_metrics(
             current_total_source=current_total_source,
         )
 
-    if not isinstance(evidence, dict):
+    if current_total_observation_slot is None:
         return _unavailable(
-            "circulating_supply_contract_not_supplied",
+            "current_total_supply_slot_unverified",
             mint=mint,
             decimals=decimals,
             current_total_supply_verified=True,
