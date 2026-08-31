@@ -40,7 +40,29 @@ def _ratio_text(numerator, denominator):
     return text or "0"
 
 
-def _unavailable(reason, *, mint=None, decimals=None):
+def _unavailable(
+    reason,
+    *,
+    mint=None,
+    decimals=None,
+    current_total_supply_verified=False,
+    current_total_raw=None,
+    current_total_source=None,
+):
+    total_raw = (
+        str(current_total_raw)
+        if current_total_supply_verified and current_total_raw is not None
+        else None
+    )
+    total_supply = (
+        scale_raw_amount(current_total_raw, decimals)
+        if (
+            current_total_supply_verified
+            and current_total_raw is not None
+            and decimals is not None
+        )
+        else None
+    )
     return {
         "available": False,
         "status": "unavailable",
@@ -50,9 +72,11 @@ def _unavailable(reason, *, mint=None, decimals=None):
         "contract": CIRCULATION_CONTRACT,
         "contract_verified": False,
         "exclusion_universe_complete": False,
-        "current_total_supply_verified": False,
-        "total_supply_raw": None,
-        "total_supply": None,
+        "current_total_supply_verified": current_total_supply_verified is True,
+        "current_total_supply_reconciled": False,
+        "current_total_source": _text(current_total_source),
+        "total_supply_raw": total_raw,
+        "total_supply": total_supply,
         "excluded_supply_raw": None,
         "excluded_supply": None,
         "circulating_supply_raw": None,
@@ -102,12 +126,18 @@ def build_circulating_supply_metrics(
             "current_total_supply_unverified",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=False,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if not isinstance(evidence, dict):
         return _unavailable(
             "circulating_supply_contract_not_supplied",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
 
     evidence_mint = _text(evidence.get("mint"))
@@ -130,24 +160,36 @@ def build_circulating_supply_metrics(
             "circulating_supply_mint_mismatch",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if evidence_decimals != decimals:
         return _unavailable(
             "circulating_supply_decimals_mismatch",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if contract != CIRCULATION_CONTRACT or not contract_verified or not contract_source:
         return _unavailable(
             "circulating_supply_contract_unverified",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if not universe_complete or not universe_source:
         return _unavailable(
             "circulating_supply_exclusion_universe_incomplete",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if (
         not evidence_total_verified
@@ -158,24 +200,36 @@ def build_circulating_supply_metrics(
             "circulating_supply_total_supply_evidence_unverified",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if evidence_total_raw != current_total_raw:
         return _unavailable(
             "circulating_supply_total_supply_mismatch",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if observation_slot is None:
         return _unavailable(
             "circulating_supply_observation_slot_unverified",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if observation_time_verified and observed_at is None:
         return _unavailable(
             "circulating_supply_observation_time_malformed",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
     if not observation_time_verified:
         observed_at = None
@@ -184,6 +238,9 @@ def build_circulating_supply_metrics(
             "circulating_supply_source_unverified",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
 
     exclusions = evidence.get("exclusions")
@@ -192,6 +249,9 @@ def build_circulating_supply_metrics(
             "circulating_supply_exclusions_malformed",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
 
     normalized = []
@@ -273,6 +333,9 @@ def build_circulating_supply_metrics(
             "circulating_supply_exclusions_exceed_total_supply",
             mint=mint,
             decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
         )
 
     circulating_raw = current_total_raw - excluded_raw
@@ -311,6 +374,8 @@ def build_circulating_supply_metrics(
         "exclusion_universe_complete": True,
         "exclusion_universe_source": universe_source,
         "current_total_supply_verified": True,
+        "current_total_supply_reconciled": True,
+        "current_total_source": _text(current_total_source),
         "total_supply_raw": str(current_total_raw),
         "total_supply": scale_raw_amount(current_total_raw, decimals),
         "total_supply_source": total_supply_source,
@@ -322,6 +387,7 @@ def build_circulating_supply_metrics(
         "circulating_to_total_supply_ratio": ratio,
         "ratio_state": ratio_state,
         "observation_slot": observation_slot,
+        "total_supply_observation_slot": observation_slot,
         "observed_at": observed_at,
         "observation_time_verified": observation_time_verified,
         "exclusions": normalized,
