@@ -250,6 +250,8 @@ class TokenomicsServiceTests(unittest.TestCase):
                 "decimals": 6,
                 "total_supply": "1",
                 "supply_verified": True,
+                "observation_slot": 123456,
+                "observation_slot_verified": True,
                 "source": "X1 RPC getTokenSupply",
             },
             get_mint_info=lambda mint, **kwargs: {
@@ -280,6 +282,35 @@ class TokenomicsServiceTests(unittest.TestCase):
         self.assertIn(
             "X1 RPC token account evidence",
             details["sources"],
+        )
+
+    def test_circulation_requires_rpc_total_supply_slot(self):
+        report = build_tokenomics_report(
+            "MintA",
+            get_token_supply=lambda mint, **kwargs: {
+                "raw_supply": "1000000",
+                "decimals": 6,
+                "total_supply": "1",
+                "supply_verified": True,
+                "source": "X1 RPC getTokenSupply",
+            },
+            get_mint_info=lambda mint, **kwargs: {
+                "mint_authority": None,
+                "mint_authority_verified": True,
+                "freeze_authority": None,
+                "freeze_authority_verified": True,
+                "decimals": 6,
+                "source": "X1 RPC getAccountInfo(jsonParsed)",
+            },
+            circulating_supply_report=circulation_report(),
+        )
+
+        self.assertTrue(report["current_total_supply_verified"])
+        self.assertFalse(report["current_total_observation_slot_verified"])
+        self.assertFalse(report["circulating_supply_verified"])
+        self.assertEqual(
+            report["circulating_supply_details"]["reason"],
+            "current_total_supply_slot_unverified",
         )
 
     def test_current_supply_never_becomes_circulating_or_maximum_supply(self):
