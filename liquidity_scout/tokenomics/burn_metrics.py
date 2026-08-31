@@ -179,6 +179,8 @@ def build_burn_metrics(
     future_timed_events = 0
     burned_observed = 0
     burn_events_observed = 0
+    minted_observed = 0
+    mint_events_observed = 0
 
     for event in events or []:
         if not isinstance(event, dict):
@@ -206,6 +208,9 @@ def build_burn_metrics(
         if kind == "burn":
             burned_observed += raw_amount
             burn_events_observed += 1
+        else:
+            minted_observed += raw_amount
+            mint_events_observed += 1
 
     input_events_verified = malformed_events == 0
     time_buckets_verified = (
@@ -302,10 +307,21 @@ def build_burn_metrics(
         windows[label] = window
 
     return {
+        "mint_events_observed": mint_events_observed,
+        "minted_raw_observed": str(minted_observed),
+        "minted_tokens_observed": scale_raw_amount(minted_observed, decimals),
         "burn_events_observed": burn_events_observed,
         "burned_raw_observed": str(burned_observed),
         "burned_tokens_observed": scale_raw_amount(burned_observed, decimals),
-        "verified_burned_observed": input_events_verified,
+        "observed_event_totals_verified": input_events_verified,
+        "verified_burned_raw_observed": (
+            str(burned_observed) if input_events_verified else None
+        ),
+        "verified_burned_observed": (
+            scale_raw_amount(burned_observed, decimals)
+            if input_events_verified
+            else None
+        ),
         "lifetime_total_burn_verified": False,
         "malformed_events": malformed_events,
         "untimed_events": untimed_events,
