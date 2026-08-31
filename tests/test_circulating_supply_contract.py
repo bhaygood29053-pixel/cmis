@@ -55,7 +55,10 @@ def evidence(**overrides):
     return value
 
 
-def build(value=None, **kwargs):
+_DEFAULT = object()
+
+
+def build(value=_DEFAULT, **kwargs):
     params = {
         "mint": MINT,
         "decimals": 6,
@@ -65,7 +68,7 @@ def build(value=None, **kwargs):
     }
     params.update(kwargs)
     return build_circulating_supply_metrics(
-        evidence() if value is None else value,
+        evidence() if value is _DEFAULT else value,
         **params,
     )
 
