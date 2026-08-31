@@ -1,9 +1,10 @@
 """CMIS contract wrapper for deterministic tokenomics facts.
 
 The wrapper preserves the existing tokenomics service and exposes its verified
-current RPC facts plus separately supplied bounded mint/burn activity through
-the shared chain-aware CMIS envelope. It does not infer circulating supply,
-maximum supply, or lifetime scanner coverage.
+current RPC facts plus separately supplied bounded mint/burn activity and
+independently verified circulating-supply exclusion evidence through the shared
+chain-aware CMIS envelope. It does not infer circulating supply from burns or
+wallet balances, and it does not infer maximum supply or lifetime coverage.
 """
 
 from collections.abc import Mapping
@@ -134,9 +135,15 @@ def _warnings(report: Mapping[str, Any]) -> list:
             })
 
     if report.get("circulating_supply_verified") is not True:
+        circulating = report.get("circulating_supply_details")
+        circulating = circulating if isinstance(circulating, Mapping) else {}
         warnings.append({
             "code": "circulating_supply_unverified",
-            "message": "Circulating supply is not independently verified by this service.",
+            "message": (
+                "Circulating supply is unavailable unless a complete, "
+                "independently verified exclusion contract is supplied."
+            ),
+            "reason": _text(circulating.get("reason")),
         })
     if report.get("maximum_supply_verified") is not True:
         warnings.append({
@@ -168,14 +175,16 @@ def build_tokenomics_response(
     get_token_supply=None,
     get_mint_info=None,
     activity_report: Optional[Mapping[str, Any]] = None,
+    circulating_supply_report: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Return ``tokenomics`` through the shared CMIS response contract.
 
     Current supply and authority facts come from the existing deterministic
     tokenomics service. Bounded mint/burn activity remains a separately supplied
-    scanner result. A complete bounded result is ``ok`` even though lifetime
-    coverage, circulating supply, and maximum supply remain explicitly
-    unverified. Missing verification becomes ``partial`` or ``unavailable``;
+    scanner result. Circulating supply is accepted only through a separately
+    supplied verified exclusion contract. A complete bounded result is ``ok``
+    even when optional circulating/maximum supply enrichment is unavailable.
+    Missing core verification becomes ``partial`` or ``unavailable``;
     validation failures become ``error``.
     """
     mint_text = _text(mint)
@@ -195,6 +204,7 @@ def build_tokenomics_response(
         "symbol": symbol,
         "name": name,
         "activity_report": activity_report,
+        "circulating_supply_report": circulating_supply_report,
     }
     if rpc_url is not None:
         kwargs["rpc_url"] = rpc_url
