@@ -30,9 +30,6 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-from liquidity_scout.providers.x1.ninja_delayed_vault_departure_link import (
-    _exact_vault_delta_attribution,
-)
 from liquidity_scout.providers.x1.routed_multi_amm_ambiguity import (
     _collect_source_aware_occurrences,
     _default_identity_resolver,
@@ -46,9 +43,14 @@ from liquidity_scout.providers.x1.transaction_pool_membership import (
 )
 from liquidity_scout.providers.x1.transaction_semantics import (
     VerificationReport,
+    account_key_info,
     XDEX_MAINNET_OBSERVED_PROGRAM_ID,
     fetch_transaction,
     verify_transaction,
+)
+from liquidity_scout.providers.x1.vault_pair_correlation import (
+    _resolve_account_ref,
+    _resolve_program_id,
 )
 
 
@@ -76,6 +78,184 @@ def _text(value: Any) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+def _exact_vault_delta_attribution(
+    *,
+    transaction: Mapping[str, Any],
+    identity: Mapping[str, Any],
+    membership: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Prove target-vault deltas are not contaminated by another instruction."""
+
+    selected = membership.get("selected_pool_instruction_evidence")
+    if (
+        not isinstance(selected, Sequence)
+        or isinstance(selected, (str, bytes))
+        or len(selected) != 1
+        or not isinstance(selected[0], Mapping)
+    ):
+        return {
+            "transaction_wide_vault_delta_attribution_verified": False,
+            "warning": "unique_selected_pool_instruction_evidence_required",
+            "additional_exact_vault_instruction_touches": [],
+        }
+
+    selected_row = selected[0]
+    selected_scope = _text(selected_row.get("scope"))
+    selected_index = selected_row.get("instruction_index")
+    if (
+        selected_scope != "outer"
+        or isinstance(selected_index, bool)
+        or not isinstance(selected_index, int)
+        or selected_index < 0
+    ):
+        return {
+            "transaction_wide_vault_delta_attribution_verified": False,
+            "warning": "selected_inner_amm_vault_delta_attribution_unavailable",
+            "selected_scope": selected_scope,
+            "selected_instruction_index": selected_index,
+            "additional_exact_vault_instruction_touches": [],
+        }
+
+    account_keys, _ = account_key_info(dict(transaction))
+    exact_vaults = {
+        _text(identity.get("asset_vault")),
+        _text(identity.get("counter_vault")),
+    }
+    exact_vaults.discard(None)
+    if len(exact_vaults) != 2:
+        raise ValueError("exact vault identity unavailable for attribution")
+
+    touches: list[dict[str, Any]] = []
+
+    def inspect(
+        instruction: Any,
+        *,
+        scope: str,
+        parent_outer_index: int | None,
+        instruction_index: int,
+    ) -> None:
+        if not isinstance(instruction, Mapping):
+            return
+
+        raw_accounts = instruction.get("accounts")
+        if not isinstance(raw_accounts, Sequence) or isinstance(
+            raw_accounts, (str, bytes)
+        ):
+            raw_accounts = []
+        accounts = [
+            address
+            for address in (
+                _resolve_account_ref(raw, account_keys)
+                for raw in raw_accounts
+            )
+            if address
+        ]
+
+        parsed = instruction.get("parsed")
+        parsed_type = (
+            _text(parsed.get("type"))
+            if isinstance(parsed, Mapping)
+            else None
+        )
+        parsed_info = (
+            parsed.get("info")
+            if isinstance(parsed, Mapping)
+            and isinstance(parsed.get("info"), Mapping)
+            else {}
+        )
+        parsed_endpoints = [
+            address
+            for address in (
+                _text(parsed_info.get(field))
+                for field in ("source", "destination", "account")
+            )
+            if address
+        ]
+
+        referenced = set(accounts)
+        referenced.update(parsed_endpoints)
+        touched = sorted(exact_vaults.intersection(referenced))
+        if not touched:
+            return
+
+        touches.append({
+            "scope": scope,
+            "parent_outer_instruction_index": parent_outer_index,
+            "instruction_index": instruction_index,
+            "program_id": _resolve_program_id(instruction, account_keys),
+            "parsed_type": parsed_type,
+            "exact_vaults_touched": touched,
+        })
+
+    raw_tx = transaction.get("transaction")
+    raw_tx = raw_tx if isinstance(raw_tx, Mapping) else {}
+    message = raw_tx.get("message")
+    message = message if isinstance(message, Mapping) else {}
+    outer = message.get("instructions")
+    outer = (
+        outer
+        if isinstance(outer, Sequence)
+        and not isinstance(outer, (str, bytes))
+        else []
+    )
+    for index, instruction in enumerate(outer):
+        if index == selected_index:
+            continue
+        inspect(
+            instruction,
+            scope="outer",
+            parent_outer_index=index,
+            instruction_index=index,
+        )
+
+    meta = transaction.get("meta")
+    meta = meta if isinstance(meta, Mapping) else {}
+    inner_groups = meta.get("innerInstructions")
+    inner_groups = (
+        inner_groups
+        if isinstance(inner_groups, Sequence)
+        and not isinstance(inner_groups, (str, bytes))
+        else []
+    )
+    for group in inner_groups:
+        if not isinstance(group, Mapping):
+            continue
+        parent_index = group.get("index")
+        instructions = group.get("instructions")
+        instructions = (
+            instructions
+            if isinstance(instructions, Sequence)
+            and not isinstance(instructions, (str, bytes))
+            else []
+        )
+        if parent_index == selected_index:
+            continue
+        for instruction_index, instruction in enumerate(instructions):
+            inspect(
+                instruction,
+                scope="inner",
+                parent_outer_index=(
+                    parent_index
+                    if isinstance(parent_index, int)
+                    and not isinstance(parent_index, bool)
+                    else None
+                ),
+                instruction_index=instruction_index,
+            )
+
+    return {
+        "transaction_wide_vault_delta_attribution_verified": not touches,
+        "warning": (
+            None
+            if not touches
+            else "additional_exact_vault_instruction_touch_ambiguity"
+        ),
+        "selected_scope": selected_scope,
+        "selected_outer_instruction_index": selected_index,
+        "additional_exact_vault_instruction_touches": touches,
+    }
 
 
 def _b58encode(raw: bytes) -> str:
