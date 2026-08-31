@@ -14,6 +14,7 @@ from liquidity_scout.tokenomics import (
     get_mint_info as core_get_mint_info,
     get_token_supply as core_get_token_supply,
 )
+from liquidity_scout.tokenomics.burn_metrics import build_burn_metrics
 
 
 def _text(value):
@@ -31,6 +32,17 @@ def _nonnegative_int(value):
     if parsed < 0:
         return None
     return parsed
+
+
+def _strict_nonnegative_int(value):
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    text = str(value).strip()
+    if not text or not text.isdigit():
+        return None
+    return int(text)
 
 
 def _authority_state(value, verified, *, absent_state):
@@ -55,6 +67,12 @@ def _empty_activity_section(reason="token_activity_not_supplied"):
         "coverage": None,
         "coverage_scope": None,
         "coverage_verified": False,
+        "time_coverage_verified": False,
+        "time_coverage_reason": reason,
+        "coverage_start_time": None,
+        "coverage_end_time": None,
+        "observed_at": None,
+        "observation_time_semantics": None,
         "lifetime_coverage_verified": False,
         "lifetime_coverage_reason": reason,
         "scanner_activity_verified": False,
@@ -113,6 +131,56 @@ def _normalize_activity_report(
     if coverage_scope is None and coverage is not None:
         coverage_scope = _text(coverage.get("coverage_scope"))
 
+    time_coverage_verified = activity_report.get("time_coverage_verified") is True
+    time_coverage_reason = _text(activity_report.get("time_coverage_reason"))
+    coverage_start_time = _strict_nonnegative_int(
+        activity_report.get("coverage_start_time")
+    )
+    coverage_end_time = _strict_nonnegative_int(
+        activity_report.get("coverage_end_time")
+    )
+    activity_observed_at = _strict_nonnegative_int(
+        activity_report.get("observed_at")
+    )
+    observation_time_semantics = _text(
+        activity_report.get("observation_time_semantics")
+    )
+
+    if time_coverage_verified:
+        time_contract_valid = (
+            coverage_start_time is not None
+            and coverage_end_time is not None
+            and activity_observed_at is not None
+            and coverage_start_time <= coverage_end_time
+            and activity_observed_at == coverage_end_time
+            and observation_time_semantics
+            == "newest_selected_transaction_block_time"
+        )
+
+        if time_contract_valid and coverage is not None:
+            coverage_time_values = (
+                _strict_nonnegative_int(coverage.get("coverage_start_time")),
+                _strict_nonnegative_int(coverage.get("coverage_end_time")),
+                _strict_nonnegative_int(coverage.get("observed_at")),
+                _text(coverage.get("observation_time_semantics")),
+                coverage.get("time_coverage_verified") is True,
+            )
+            time_contract_valid = coverage_time_values == (
+                coverage_start_time,
+                coverage_end_time,
+                activity_observed_at,
+                observation_time_semantics,
+                True,
+            )
+
+        if not time_contract_valid:
+            time_coverage_verified = False
+            time_coverage_reason = "token_activity_time_coverage_malformed"
+            coverage_start_time = None
+            coverage_end_time = None
+            activity_observed_at = None
+            observation_time_semantics = None
+
     scanner_lifetime_claim = (
         activity_report.get("lifetime_coverage_verified") is True
     )
@@ -131,6 +199,10 @@ def _normalize_activity_report(
         verification_reasons.append("token_activity_coverage_unverified")
     if not scanner_activity_verified:
         verification_reasons.append("token_activity_scanner_unverified")
+    if not time_coverage_verified:
+        verification_reasons.append(
+            time_coverage_reason or "token_activity_time_coverage_unverified"
+        )
     if verified_decimals is None:
         verification_reasons.append("token_activity_rpc_decimals_unverified")
     elif activity_decimals != verified_decimals:
@@ -174,6 +246,12 @@ def _normalize_activity_report(
         "coverage": dict(coverage) if coverage is not None else None,
         "coverage_scope": coverage_scope,
         "coverage_verified": coverage_verified,
+        "time_coverage_verified": time_coverage_verified,
+        "time_coverage_reason": time_coverage_reason,
+        "coverage_start_time": coverage_start_time,
+        "coverage_end_time": coverage_end_time,
+        "observed_at": activity_observed_at,
+        "observation_time_semantics": observation_time_semantics,
         "lifetime_coverage_verified": False,
         "lifetime_coverage_reason": lifetime_coverage_reason,
         "scanner_activity_verified": scanner_activity_verified,
@@ -187,6 +265,56 @@ def _normalize_activity_report(
         "verification_reasons": verification_reasons,
     }
 
+
+def _empty_burn_metrics(reason):
+    return {
+        "available": False,
+        "status": "unavailable",
+        "reason": reason,
+        "lifetime_total_burn_verified": False,
+        "valuation": {
+            "status": "unavailable",
+            "reason": "historical_burn_time_valuation_not_supplied",
+        },
+        "circulating_supply": {
+            "status": "unavailable",
+            "reason": "circulating_supply_contract_not_supplied",
+        },
+    }
+
+
+def _build_burn_metrics_section(activity_report, token_activity, *, decimals):
+    if not isinstance(activity_report, dict):
+        return _empty_burn_metrics("token_activity_not_supplied")
+    if token_activity.get("activity_verified") is not True:
+        return _empty_burn_metrics("token_activity_not_verified_for_burn_metrics")
+    if token_activity.get("time_coverage_verified") is not True:
+        return _empty_burn_metrics(
+            token_activity.get("time_coverage_reason")
+            or "token_activity_time_coverage_unverified"
+        )
+
+    events = activity_report.get("events")
+    if not isinstance(events, list):
+        return _empty_burn_metrics("token_activity_events_not_supplied")
+
+    try:
+        metrics = build_burn_metrics(
+            events,
+            decimals=decimals,
+            observed_at=token_activity.get("observed_at"),
+            coverage_verified=True,
+            coverage_start_time=token_activity.get("coverage_start_time"),
+            coverage_end_time=token_activity.get("coverage_end_time"),
+        )
+    except (TypeError, ValueError):
+        return _empty_burn_metrics("burn_metrics_validation_error")
+
+    metrics["available"] = True
+    metrics["status"] = "ok"
+    metrics["source"] = token_activity.get("source")
+    metrics["scan_id"] = token_activity.get("scan_id")
+    return metrics
 
 def build_tokenomics_report(
     mint,
@@ -306,6 +434,11 @@ def build_tokenomics_report(
         mint=mint,
         verified_decimals=decimals,
     )
+    burn_metrics = _build_burn_metrics_section(
+        activity_report,
+        token_activity,
+        decimals=decimals,
+    )
 
     return {
         "mint": mint,
@@ -328,6 +461,7 @@ def build_tokenomics_report(
         "freeze_authority_state": freeze_authority_state,
         "future_minting_possible": future_minting_possible,
         "token_activity": token_activity,
+        "burn_metrics": burn_metrics,
         # Current SPL mint supply is not circulating supply or maximum supply.
         "circulating_supply": None,
         "circulating_supply_verified": False,
