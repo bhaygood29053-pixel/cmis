@@ -93,6 +93,35 @@ def _warnings(report: Mapping[str, Any]) -> list:
             ),
         })
 
+    burn_metrics = report.get("burn_metrics")
+    burn_metrics = burn_metrics if isinstance(burn_metrics, Mapping) else {}
+    if burn_metrics.get("available") is not True:
+        warnings.append({
+            "code": "burn_metrics_unavailable",
+            "message": (
+                "Deterministic burn-window metrics are unavailable because "
+                "verified scanner fact-time coverage or event payloads are missing."
+            ),
+            "reason": _text(burn_metrics.get("reason")),
+        })
+    else:
+        windows = burn_metrics.get("windows")
+        windows = windows if isinstance(windows, Mapping) else {}
+        unavailable_windows = [
+            label
+            for label, record in windows.items()
+            if not isinstance(record, Mapping) or record.get("status") != "ok"
+        ]
+        if unavailable_windows:
+            warnings.append({
+                "code": "burn_metrics_window_coverage_partial",
+                "message": (
+                    "Burn metrics were computed, but one or more requested "
+                    "time windows lack sufficient verified coverage."
+                ),
+                "windows": unavailable_windows,
+            })
+
     if report.get("circulating_supply_verified") is not True:
         warnings.append({
             "code": "circulating_supply_unverified",
