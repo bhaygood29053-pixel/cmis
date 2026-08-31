@@ -144,14 +144,15 @@ def _exact_vault_delta_attribution(
             raw_accounts, (str, bytes)
         ):
             raw_accounts = []
-        accounts = [
-            address
-            for address in (
-                _resolve_account_ref(raw, account_keys)
-                for raw in raw_accounts
-            )
-            if address
-        ]
+        accounts = []
+        for raw in raw_accounts:
+            address = _resolve_account_ref(raw, account_keys)
+            if not address:
+                raise ValueError(
+                    "instruction account reference unresolved during "
+                    "exact-vault attribution"
+                )
+            accounts.append(address)
 
         parsed = instruction.get("parsed")
         parsed_type = (
@@ -365,9 +366,8 @@ def _collect_swap_base_input_program_data(
         invoked = parse_invoke(line)
         if invoked is not None:
             program_id, depth = invoked
-            if depth > len(stack) + 1:
+            if depth != len(stack) + 1:
                 raise ValueError("program invocation stack depth unavailable")
-            stack[:] = stack[: depth - 1]
             stack.append(program_id)
 
             if program_id == XDEX_MAINNET_OBSERVED_PROGRAM_ID:

@@ -382,6 +382,20 @@ class XdexRouteTopologyTests(unittest.TestCase):
         )
         self.assertFalse(result["classification_change_authorized"])
 
+    def test_unresolved_account_reference_blocks_target_attribution(self):
+        signature = next(iter(FIXTURES))
+        tx = transaction_for(signature)
+        tx["transaction"]["message"]["instructions"].append({
+            "programId": "UnrelatedProgram111",
+            "accounts": [999_999],
+        })
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "account reference unresolved during exact-vault attribution",
+        ):
+            run_fixture(signature, transaction=tx)
+
 
     def test_duplicate_program_data_in_one_invocation_fails_closed(self):
         signature = next(iter(FIXTURES))
@@ -421,6 +435,21 @@ class XdexRouteTopologyTests(unittest.TestCase):
         result = run_fixture(signature, transaction=tx)
         self.assertTrue(result["route_topology_verified"])
         self.assertTrue(result["target_pool_leg_verified"])
+
+    def test_overlapping_invocation_depth_fails_closed(self):
+        signature = next(iter(FIXTURES))
+        tx = transaction_for(signature)
+        logs = tx["meta"]["logMessages"]
+        logs.insert(
+            1,
+            "Program UnrelatedProgram111 invoke [1]",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "program invocation stack depth unavailable",
+        ):
+            run_fixture(signature, transaction=tx)
 
 
     def test_missing_program_data_fails_closed(self):
