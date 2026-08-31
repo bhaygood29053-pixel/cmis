@@ -49,6 +49,17 @@ class BurnMetricsTests(unittest.TestCase):
         self.assertEqual(change["percent_change"], "50")
         self.assertEqual(change["change_state"], "AVAILABLE")
 
+    def test_numeric_zero_raw_amount_is_valid(self):
+        report = self.build([
+            event("burn", 0, NOW - 10),
+        ])
+
+        current = report["windows"]["1h"]
+        self.assertEqual(current["status"], "ok")
+        self.assertEqual(current["burned_raw"], "0")
+        self.assertEqual(current["burn_events"], 1)
+        self.assertEqual(report["malformed_events"], 0)
+
     def test_burn_without_emission_does_not_manufacture_infinity(self):
         report = self.build([
             event("burn", 250, NOW - 10),
