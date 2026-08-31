@@ -3,6 +3,10 @@ from .activity import (
     scale_raw_amount,
     summarize_token_events,
 )
+from .circulating_supply import (
+    CIRCULATION_CONTRACT,
+    build_circulating_supply_metrics,
+)
 from .rpc import (
     DEFAULT_X1_RPC_URL,
     X1RPCError,
@@ -20,8 +24,10 @@ from .scanner import (
 )
 
 __all__ = [
+    "CIRCULATION_CONTRACT",
     "DEFAULT_X1_RPC_URL",
     "X1RPCError",
+    "build_circulating_supply_metrics",
     "collect_signature_window",
     "extract_token_events",
     "get_mint_info",

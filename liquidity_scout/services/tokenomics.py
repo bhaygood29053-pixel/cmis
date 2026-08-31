@@ -3,7 +3,8 @@
 This service composes reusable X1 RPC primitives into a machine-readable
 report. It reports only facts that can be verified from current RPC responses.
 A precomputed standalone token-activity scan may be attached, but this service
-never triggers burn/mint scanning itself. Circulating supply, maximum supply,
+never triggers burn/mint scanning itself. Circulating supply may be attached
+only through the independently verified exclusion contract. Maximum supply,
 market cap, and safety scores remain outside this layer until independently
 verified.
 """
@@ -15,6 +16,9 @@ from liquidity_scout.tokenomics import (
     get_token_supply as core_get_token_supply,
 )
 from liquidity_scout.tokenomics.burn_metrics import build_burn_metrics
+from liquidity_scout.tokenomics.circulating_supply import (
+    build_circulating_supply_metrics,
+)
 
 
 def _text(value):
@@ -409,6 +413,7 @@ def build_tokenomics_report(
     get_token_supply=core_get_token_supply,
     get_mint_info=core_get_mint_info,
     activity_report=None,
+    circulating_supply_report=None,
 ):
     """Return verified current supply, authority, and bounded activity facts.
 
@@ -419,7 +424,9 @@ def build_tokenomics_report(
     raw supply remains observable, but scaled supply and token-activity values
     are not certified until the conflict is resolved. ``activity_report`` must
     come from a separate scanner boundary; this service never initiates token-
-    history scanning.
+    history scanning. ``circulating_supply_report`` must come from a separate
+    deterministic exclusion-evidence boundary; this service does not discover
+    or classify non-circulating accounts itself.
     """
     mint = _text(mint)
     if not mint:
@@ -472,6 +479,15 @@ def build_tokenomics_report(
     raw_supply = (
         supply_record.get("raw_supply") if source_supply_verified else None
     )
+    supply_observation_slot = (
+        _strict_nonnegative_int(supply_record.get("observation_slot"))
+        if (
+            source_supply_verified
+            and supply_record.get("observation_slot_verified") is True
+        )
+        else None
+    )
+    supply_observation_slot_verified = supply_observation_slot is not None
     decimals = supply_decimals if supply_verified else None
 
     mint_authority_verified = bool(
@@ -518,17 +534,45 @@ def build_tokenomics_report(
         mint=mint,
         verified_decimals=decimals,
     )
+
+    circulating_supply_details = build_circulating_supply_metrics(
+        circulating_supply_report,
+        mint=mint,
+        decimals=decimals,
+        current_total_raw=raw_supply,
+        current_total_supply_verified=supply_verified,
+        current_total_observation_slot=supply_observation_slot,
+        current_total_source=supply_record.get("source"),
+    )
+
     burn_metrics = _build_burn_metrics_section(
         activity_report,
         token_activity,
         decimals=decimals,
     )
+    burn_metrics["circulating_supply"] = circulating_supply_details
+    if burn_metrics.get("available") is True:
+        partial_reasons = [
+            reason
+            for reason in list(burn_metrics.get("partial_reasons") or [])
+            if reason != "circulating_supply_contract_not_supplied"
+        ]
+        if circulating_supply_details.get("circulating_supply_verified") is not True:
+            partial_reasons.append(
+                circulating_supply_details.get("reason")
+                or "circulating_supply_unverified"
+            )
+        burn_metrics["partial_reasons"] = partial_reasons
+        burn_metrics["status"] = "partial" if partial_reasons else "ok"
 
     return {
         "mint": mint,
         "symbol": _text(symbol),
         "name": _text(name),
         "current_total_supply": current_total_supply,
+        "current_total_supply_verified": supply_verified,
+        "current_total_observation_slot": supply_observation_slot,
+        "current_total_observation_slot_verified": supply_observation_slot_verified,
         "raw_supply": raw_supply,
         "decimals": decimals,
         "supply_verified": supply_verified,
@@ -546,15 +590,33 @@ def build_tokenomics_report(
         "future_minting_possible": future_minting_possible,
         "token_activity": token_activity,
         "burn_metrics": burn_metrics,
-        # Current SPL mint supply is not circulating supply or maximum supply.
-        "circulating_supply": None,
-        "circulating_supply_verified": False,
+        "circulating_supply": (
+            circulating_supply_details.get("circulating_supply")
+            if circulating_supply_details.get("circulating_supply_verified") is True
+            else None
+        ),
+        "circulating_supply_raw": (
+            circulating_supply_details.get("circulating_supply_raw")
+            if circulating_supply_details.get("circulating_supply_verified") is True
+            else None
+        ),
+        "circulating_supply_verified": (
+            circulating_supply_details.get("circulating_supply_verified") is True
+        ),
+        "circulating_to_total_supply_ratio": (
+            circulating_supply_details.get("circulating_to_total_supply_ratio")
+            if circulating_supply_details.get("circulating_supply_verified") is True
+            else None
+        ),
+        "circulating_supply_details": circulating_supply_details,
+        # Current SPL mint supply is not maximum supply.
         "maximum_supply": None,
         "maximum_supply_verified": False,
         "sources": {
             "current_supply": supply_record.get("source"),
             "mint_account": mint_record.get("source"),
             "token_activity": token_activity.get("source"),
+            "circulating_supply": circulating_supply_details.get("source"),
         },
         "unavailable_reasons": unavailable_reasons,
     }

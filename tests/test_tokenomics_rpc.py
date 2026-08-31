@@ -90,6 +90,34 @@ class TokenomicsRPCTests(unittest.TestCase):
         )
         self.assertTrue(parsed["supply_verified"])
 
+    def test_token_supply_preserves_verified_context_slot(self):
+        parsed = parse_token_supply_result({
+            "context": {"slot": 123456},
+            "value": {
+                "amount": "42000000",
+                "decimals": 6,
+                "uiAmountString": "42",
+            },
+        })
+
+        self.assertEqual(parsed["observation_slot"], 123456)
+        self.assertTrue(parsed["observation_slot_verified"])
+
+    def test_token_supply_malformed_context_slot_is_not_verified(self):
+        for bad_slot in (True, "123456", -1):
+            parsed = parse_token_supply_result({
+                "context": {"slot": bad_slot},
+                "value": {
+                    "amount": "42000000",
+                    "decimals": 6,
+                    "uiAmountString": "42",
+                },
+            })
+
+            self.assertTrue(parsed["supply_verified"])
+            self.assertIsNone(parsed["observation_slot"])
+            self.assertFalse(parsed["observation_slot_verified"])
+
     def test_token_supply_missing_decimals_is_unverified_not_zero_decimals(self):
         parsed = parse_token_supply_result({
             "value": {
@@ -172,6 +200,7 @@ class TokenomicsRPCTests(unittest.TestCase):
             calls.append(json)
             return FakeResponse({
                 "result": {
+                    "context": {"slot": 123456},
                     "value": {
                         "amount": "42000000",
                         "decimals": 6,
@@ -189,6 +218,8 @@ class TokenomicsRPCTests(unittest.TestCase):
         self.assertEqual(calls[0]["method"], "getTokenSupply")
         self.assertEqual(calls[0]["params"], ["MintA"])
         self.assertEqual(parsed["total_supply"], "42")
+        self.assertEqual(parsed["observation_slot"], 123456)
+        self.assertTrue(parsed["observation_slot_verified"])
 
     def test_get_mint_info_requests_json_parsed_account(self):
         calls = []

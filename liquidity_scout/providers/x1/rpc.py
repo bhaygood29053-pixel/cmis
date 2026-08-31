@@ -249,10 +249,18 @@ def parse_block_result(result, *, slot):
 
 
 def parse_token_supply_result(result):
-    """Parse getTokenSupply while preserving missing-data uncertainty."""
-    value = (result or {}).get("value")
+    """Parse getTokenSupply while preserving supply and observation-slot evidence."""
+    if not isinstance(result, dict):
+        return None
+
+    value = result.get("value")
     if not isinstance(value, dict):
         return None
+
+    context = result.get("context")
+    observation_slot = None
+    if isinstance(context, dict):
+        observation_slot = _nonnegative_int(context.get("slot"))
 
     raw_supply = _text(value.get("amount"))
     decimals = _decimals(value.get("decimals"))
@@ -265,6 +273,8 @@ def parse_token_supply_result(result):
         "total_supply": total_supply,
         "ui_amount_string": ui_amount_string,
         "supply_verified": total_supply is not None,
+        "observation_slot": observation_slot,
+        "observation_slot_verified": observation_slot is not None,
         "source": "X1 RPC getTokenSupply",
     }
 
