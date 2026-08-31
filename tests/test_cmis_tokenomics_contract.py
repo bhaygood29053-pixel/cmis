@@ -7,7 +7,7 @@ from liquidity_scout.services import (
     UNAVAILABLE,
     build_tokenomics_response,
 )
-from liquidity_scout.tokenomics import X1RPCError
+from liquidity_scout.tokenomics import CIRCULATION_CONTRACT, X1RPCError
 
 
 MINT = "MintA"
@@ -40,6 +40,42 @@ def mint_record(
         "freeze_authority_verified": freeze_verified,
         "decimals": decimals,
         "source": "X1 RPC getAccountInfo(jsonParsed)",
+    }
+
+
+def circulation_report(
+    *,
+    total_raw="42500000",
+    excluded_raw="2500000",
+):
+    return {
+        "mint": MINT,
+        "decimals": 6,
+        "contract": CIRCULATION_CONTRACT,
+        "contract_verified": True,
+        "contract_source": "verified exclusion policy registry",
+        "exclusion_universe_complete": True,
+        "exclusion_universe_source": "complete exclusion inventory",
+        "total_supply_verified": True,
+        "total_supply_raw": total_raw,
+        "total_supply_source": "X1 RPC getTokenSupply",
+        "observation_slot": 123456,
+        "observed_at": 1700000000,
+        "observation_time_verified": True,
+        "source": "CMIS circulation evidence",
+        "exclusions": [
+            {
+                "account": "ExcludedA",
+                "mint": MINT,
+                "raw_balance": excluded_raw,
+                "account_identity_verified": True,
+                "balance_verified": True,
+                "circulation_exclusion_verified": True,
+                "exclusion_reason": "verified_non_circulating_treasury",
+                "observation_slot": 123456,
+                "source": "X1 RPC token account evidence",
+            },
+        ],
     }
 
 
@@ -168,6 +204,57 @@ class CMISTokenomicsContractTests(unittest.TestCase):
         self.assertIn("burn_metrics_partial", codes)
         self.assertIn("circulating_supply_unverified", codes)
         self.assertIn("maximum_supply_unverified", codes)
+
+    def test_verified_circulation_contract_is_exposed_without_burn_double_subtraction(self):
+        response = build_tokenomics_response(
+            MINT,
+            get_token_supply=lambda mint, **kwargs: supply_record(),
+            get_mint_info=lambda mint, **kwargs: mint_record(),
+            activity_report=activity_report(),
+            circulating_supply_report=circulation_report(),
+        )
+
+        self.assertEqual(response["status"], OK)
+        data = response["data"]
+        self.assertTrue(data["current_total_supply_verified"])
+        self.assertEqual(data["current_total_supply"], "42.5")
+        self.assertTrue(data["circulating_supply_verified"])
+        self.assertEqual(data["circulating_supply_raw"], "40000000")
+        self.assertEqual(data["circulating_supply"], "40")
+        self.assertEqual(
+            data["circulating_to_total_supply_ratio"],
+            "0.9411764705882352941176470588235294117647",
+        )
+
+        details = data["circulating_supply_details"]
+        self.assertEqual(details["excluded_supply_raw"], "2500000")
+        self.assertEqual(details["exclusion_count"], 1)
+        self.assertEqual(details["observation_slot"], 123456)
+
+        burn_metrics = data["burn_metrics"]
+        self.assertEqual(
+            burn_metrics["circulating_supply"]["circulating_supply"],
+            "40",
+        )
+        self.assertNotIn(
+            "circulating_supply_contract_not_supplied",
+            burn_metrics["partial_reasons"],
+        )
+        self.assertEqual(
+            burn_metrics["partial_reasons"],
+            ["historical_burn_time_valuation_not_supplied"],
+        )
+
+        codes = {warning["code"] for warning in response["warnings"]}
+        self.assertNotIn("circulating_supply_unverified", codes)
+        self.assertIn("burn_metrics_partial", codes)
+        self.assertIn(
+            {
+                "source": "CMIS circulation evidence",
+                "role": "tokenomics.circulating_supply",
+            },
+            response["sources"],
+        )
 
     def test_verified_active_authorities_are_still_successful_tokenomics_facts(self):
         response = build_tokenomics_response(
