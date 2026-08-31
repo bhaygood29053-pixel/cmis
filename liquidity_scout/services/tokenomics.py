@@ -479,6 +479,15 @@ def build_tokenomics_report(
     raw_supply = (
         supply_record.get("raw_supply") if source_supply_verified else None
     )
+    supply_observation_slot = (
+        _strict_nonnegative_int(supply_record.get("observation_slot"))
+        if (
+            source_supply_verified
+            and supply_record.get("observation_slot_verified") is True
+        )
+        else None
+    )
+    supply_observation_slot_verified = supply_observation_slot is not None
     decimals = supply_decimals if supply_verified else None
 
     mint_authority_verified = bool(
@@ -532,6 +541,7 @@ def build_tokenomics_report(
         decimals=decimals,
         current_total_raw=raw_supply,
         current_total_supply_verified=supply_verified,
+        current_total_observation_slot=supply_observation_slot,
         current_total_source=supply_record.get("source"),
     )
 
@@ -561,6 +571,8 @@ def build_tokenomics_report(
         "name": _text(name),
         "current_total_supply": current_total_supply,
         "current_total_supply_verified": supply_verified,
+        "current_total_observation_slot": supply_observation_slot,
+        "current_total_observation_slot_verified": supply_observation_slot_verified,
         "raw_supply": raw_supply,
         "decimals": decimals,
         "supply_verified": supply_verified,
