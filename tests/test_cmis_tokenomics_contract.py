@@ -142,6 +142,9 @@ class CMISTokenomicsContractTests(unittest.TestCase):
         )
         burn_metrics = response["data"]["burn_metrics"]
         self.assertTrue(burn_metrics["available"])
+        self.assertEqual(burn_metrics["status"], "partial")
+        self.assertTrue(burn_metrics["window_metrics_complete"])
+        self.assertEqual(burn_metrics["verified_burned_observed"], "1")
         self.assertEqual(burn_metrics["observed_at"], NOW)
         self.assertEqual(
             burn_metrics["windows"]["24h"]["burned_tokens"],
@@ -160,6 +163,7 @@ class CMISTokenomicsContractTests(unittest.TestCase):
         self.assertTrue(response["confidence"]["complete"])
         codes = {warning["code"] for warning in response["warnings"]}
         self.assertIn("lifetime_coverage_unverified", codes)
+        self.assertIn("burn_metrics_partial", codes)
         self.assertIn("circulating_supply_unverified", codes)
         self.assertIn("maximum_supply_unverified", codes)
 
