@@ -150,6 +150,17 @@ class BurnMetricsTests(unittest.TestCase):
             self.assertEqual(window["status"], "unavailable")
             self.assertIsNone(window["burned_raw"])
 
+    def test_event_before_coverage_start_fails_closed(self):
+        report = self.build(
+            [event("burn", 500, NOW - DAY)],
+            coverage_start_time=NOW - 60,
+        )
+
+        self.assertEqual(report["pre_coverage_events"], 1)
+        self.assertFalse(report["time_buckets_verified"])
+        self.assertFalse(report["observed_event_totals_verified"])
+        self.assertIsNone(report["verified_burned_observed"])
+        self.assertEqual(report["windows"]["1h"]["status"], "unavailable")
     def test_future_block_time_fails_closed_for_time_buckets(self):
         report = self.build([
             event("burn", 500, NOW + 1),
