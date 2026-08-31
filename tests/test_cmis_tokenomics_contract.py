@@ -64,6 +64,7 @@ def activity_report(**overrides):
             "time_coverage_reason": None,
             "coverage_start_time": NOW - (60 * DAY),
             "coverage_end_time": NOW,
+            "coverage_time_semantics": "start_exclusive_end_inclusive",
             "observed_at": NOW,
             "observation_time_semantics": (
                 "newest_selected_transaction_block_time"
@@ -75,6 +76,7 @@ def activity_report(**overrides):
         "time_coverage_reason": None,
         "coverage_start_time": NOW - (60 * DAY),
         "coverage_end_time": NOW,
+        "coverage_time_semantics": "start_exclusive_end_inclusive",
         "observed_at": NOW,
         "observation_time_semantics": "newest_selected_transaction_block_time",
         "activity_verified": True,
@@ -226,6 +228,7 @@ class CMISTokenomicsContractTests(unittest.TestCase):
             time_coverage_reason="selected_transaction_block_time_unavailable",
             coverage_start_time=None,
             coverage_end_time=None,
+            coverage_time_semantics=None,
             observed_at=None,
             observation_time_semantics=None,
         )
@@ -235,6 +238,7 @@ class CMISTokenomicsContractTests(unittest.TestCase):
             "time_coverage_reason": "selected_transaction_block_time_unavailable",
             "coverage_start_time": None,
             "coverage_end_time": None,
+            "coverage_time_semantics": None,
             "observed_at": None,
             "observation_time_semantics": None,
         })
