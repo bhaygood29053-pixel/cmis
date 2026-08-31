@@ -148,6 +148,14 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         self.assertEqual(burn_metrics["status"], "partial")
         self.assertTrue(burn_metrics["window_metrics_complete"])
         self.assertEqual(burn_metrics["observed_at"], NOW)
+        self.assertEqual(
+            burn_metrics["coverage_time_semantics"],
+            "start_exclusive_end_inclusive",
+        )
+        self.assertEqual(
+            burn_metrics["observation_time_semantics"],
+            "newest_selected_transaction_block_time",
+        )
         self.assertFalse(burn_metrics["lifetime_total_burn_verified"])
         self.assertEqual(burn_metrics["verified_burned_observed"], "1.25")
         self.assertEqual(burn_metrics["verified_burned_raw_observed"], "1250000")
@@ -258,6 +266,23 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         )
         activity["coverage"] = dict(activity["coverage"])
         activity["coverage"]["time_coverage_reason"] = "contradictory_reason"
+
+        report = report_with_activity(activity)
+
+        self.assertFalse(report["token_activity"]["time_coverage_verified"])
+        self.assertEqual(
+            report["token_activity"]["time_coverage_reason"],
+            "token_activity_time_coverage_malformed",
+        )
+        self.assertFalse(report["burn_metrics"]["available"])
+    def test_wrong_coverage_boundary_semantics_fail_closed(self):
+        activity = activity_report(
+            coverage_time_semantics="start_inclusive_end_inclusive",
+        )
+        activity["coverage"] = dict(activity["coverage"])
+        activity["coverage"]["coverage_time_semantics"] = (
+            "start_inclusive_end_inclusive"
+        )
 
         report = report_with_activity(activity)
 
