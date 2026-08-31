@@ -393,6 +393,9 @@ def _build_burn_metrics_section(activity_report, token_activity, *, decimals):
         metrics["partial_reasons"].append(
             "burn_period_comparison_coverage_incomplete"
         )
+    metrics["observation_time_semantics"] = token_activity.get(
+        "observation_time_semantics"
+    )
     metrics["source"] = token_activity.get("source")
     metrics["scan_id"] = token_activity.get("scan_id")
     return metrics
