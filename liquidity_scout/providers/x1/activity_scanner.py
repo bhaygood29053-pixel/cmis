@@ -335,6 +335,17 @@ def _persist_transaction(db, mint, signature, tx, events):
     raw_block_time = tx.get("blockTime") if isinstance(tx, dict) else None
     block_time = _canonical_block_time(raw_block_time)
     block_time_verified = block_time is not None
+
+    # Refetched legacy rows must be rebuilt from the current parsed
+    # transaction. Do not preserve stale event payloads from an older parser.
+    db.execute(
+        """
+        DELETE FROM token_activity_events
+        WHERE mint = ? AND signature = ?
+        """,
+        (mint, signature),
+    )
+
     for event in events:
         location = _text(event.get("location"))
         if not location:
@@ -360,18 +371,6 @@ def _persist_transaction(db, mint, signature, tx, events):
             ),
         )
 
-    # A legacy event row may already contain a SQLite-coerced block_time.
-    # Revalidation must overwrite that timestamp (including with NULL) before
-    # the event can participate in burn-window arithmetic.
-    db.execute(
-        """
-        UPDATE token_activity_events
-        SET block_time = ?
-        WHERE mint = ? AND signature = ?
-        """,
-        (block_time, mint, signature),
-    )
-
     db.execute(
         """
         INSERT OR REPLACE INTO processed_token_activity (
@@ -391,6 +390,7 @@ def _persist_transaction(db, mint, signature, tx, events):
             ),
         ),
     )
+    return block_time_verified
 
 
 def _load_window_events(db, mint, signatures):
@@ -620,10 +620,16 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
             continue
 
         events = extract_token_events(tx, mint)
-        _persist_transaction(db, mint, signature, tx, events)
+        block_time_revalidated = _persist_transaction(
+            db,
+            mint,
+            signature,
+            tx,
+            events,
+        )
         retrieved += 1
         newly_retrieved += 1
-        if signature in unverified_cached:
+        if signature in unverified_cached and block_time_revalidated:
             revalidated_cached += 1
 
     db.commit()
@@ -643,6 +649,9 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         "cached_transactions": len(cached),
         "unverified_cached_transactions": len(unverified_cached),
         "revalidated_cached_transactions": revalidated_cached,
+        "unrevalidated_cached_transactions": (
+            len(unverified_cached) - revalidated_cached
+        ),
         "new_transactions_retrieved": newly_retrieved,
         "newest_signature": selection["newest_signature"],
         "oldest_signature": selection["oldest_signature"],
