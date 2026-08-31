@@ -248,6 +248,21 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
             "selected_transaction_block_time_unavailable",
         )
 
+    def test_verified_time_contract_rejects_nonempty_reason(self):
+        activity = activity_report(
+            time_coverage_reason="contradictory_reason",
+        )
+        activity["coverage"] = dict(activity["coverage"])
+        activity["coverage"]["time_coverage_reason"] = "contradictory_reason"
+
+        report = report_with_activity(activity)
+
+        self.assertFalse(report["token_activity"]["time_coverage_verified"])
+        self.assertEqual(
+            report["token_activity"]["time_coverage_reason"],
+            "token_activity_time_coverage_malformed",
+        )
+        self.assertFalse(report["burn_metrics"]["available"])
     def test_conflicting_time_metadata_withholds_burn_metrics(self):
         activity = activity_report()
         activity["coverage"] = dict(activity["coverage"])
