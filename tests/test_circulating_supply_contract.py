@@ -22,6 +22,7 @@ def evidence(**overrides):
         "total_supply_verified": True,
         "total_supply_raw": "100000000",
         "total_supply_source": "X1 RPC getTokenSupply",
+        "total_supply_observation_slot": 123456,
         "observation_slot": SLOT,
         "observed_at": 1700000000,
         "observation_time_verified": True,
@@ -139,6 +140,17 @@ class CirculatingSupplyContractTests(unittest.TestCase):
         self.assertEqual(
             report["reason"],
             "circulating_supply_exclusion_universe_incomplete",
+        )
+
+    def test_total_supply_observation_slot_must_match(self):
+        report = build(
+            evidence(total_supply_observation_slot=SLOT + 1)
+        )
+
+        self.assertFalse(report["circulating_supply_verified"])
+        self.assertEqual(
+            report["reason"],
+            "circulating_supply_total_supply_slot_mismatch",
         )
 
     def test_total_supply_mismatch_fails_closed(self):
