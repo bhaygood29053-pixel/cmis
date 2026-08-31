@@ -239,6 +239,15 @@ def build_circulating_supply_metrics(
             current_total_raw=current_total_raw,
             current_total_source=current_total_source,
         )
+    if observation_slot is None:
+        return _unavailable(
+            "circulating_supply_observation_slot_unverified",
+            mint=mint,
+            decimals=decimals,
+            current_total_supply_verified=True,
+            current_total_raw=current_total_raw,
+            current_total_source=current_total_source,
+        )
     if current_total_observation_slot != observation_slot:
         return _unavailable(
             "circulating_supply_rpc_total_supply_slot_mismatch",
@@ -251,15 +260,6 @@ def build_circulating_supply_metrics(
     if total_supply_observation_slot != observation_slot:
         return _unavailable(
             "circulating_supply_total_supply_slot_mismatch",
-            mint=mint,
-            decimals=decimals,
-            current_total_supply_verified=True,
-            current_total_raw=current_total_raw,
-            current_total_source=current_total_source,
-        )
-    if observation_slot is None:
-        return _unavailable(
-            "circulating_supply_observation_slot_unverified",
             mint=mint,
             decimals=decimals,
             current_total_supply_verified=True,
