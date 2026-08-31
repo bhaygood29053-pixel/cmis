@@ -71,6 +71,7 @@ def _empty_activity_section(reason="token_activity_not_supplied"):
         "time_coverage_reason": reason,
         "coverage_start_time": None,
         "coverage_end_time": None,
+        "coverage_time_semantics": None,
         "observed_at": None,
         "observation_time_semantics": None,
         "lifetime_coverage_verified": False,
@@ -139,6 +140,9 @@ def _normalize_activity_report(
     coverage_end_time = _strict_nonnegative_int(
         activity_report.get("coverage_end_time")
     )
+    coverage_time_semantics = _text(
+        activity_report.get("coverage_time_semantics")
+    )
     activity_observed_at = _strict_nonnegative_int(
         activity_report.get("observed_at")
     )
@@ -155,6 +159,7 @@ def _normalize_activity_report(
             and activity_observed_at is not None
             and coverage_start_time <= coverage_end_time
             and activity_observed_at == coverage_end_time
+            and coverage_time_semantics == "start_exclusive_end_inclusive"
             and time_coverage_reason is None
             and observation_time_semantics
             == "newest_selected_transaction_block_time"
@@ -164,6 +169,7 @@ def _normalize_activity_report(
             coverage_time_values = (
                 _strict_nonnegative_int(coverage.get("coverage_start_time")),
                 _strict_nonnegative_int(coverage.get("coverage_end_time")),
+                _text(coverage.get("coverage_time_semantics")),
                 _strict_nonnegative_int(coverage.get("observed_at")),
                 _text(coverage.get("observation_time_semantics")),
                 coverage.get("time_coverage_verified") is True,
@@ -172,6 +178,7 @@ def _normalize_activity_report(
             time_contract_valid = coverage_time_values == (
                 coverage_start_time,
                 coverage_end_time,
+                coverage_time_semantics,
                 activity_observed_at,
                 observation_time_semantics,
                 True,
@@ -183,6 +190,7 @@ def _normalize_activity_report(
             time_coverage_reason = "token_activity_time_coverage_malformed"
             coverage_start_time = None
             coverage_end_time = None
+            coverage_time_semantics = None
             activity_observed_at = None
             observation_time_semantics = None
 
@@ -255,6 +263,7 @@ def _normalize_activity_report(
         "time_coverage_reason": time_coverage_reason,
         "coverage_start_time": coverage_start_time,
         "coverage_end_time": coverage_end_time,
+        "coverage_time_semantics": coverage_time_semantics,
         "observed_at": activity_observed_at,
         "observation_time_semantics": observation_time_semantics,
         "lifetime_coverage_verified": False,
