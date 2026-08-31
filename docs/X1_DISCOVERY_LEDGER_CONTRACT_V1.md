@@ -103,8 +103,12 @@ not establish first-observation order.
 operational provenance only and MUST NOT establish or displace first verified
 observation.
 
-Both time values use integer Unix seconds in v1. Booleans, floats, strings,
-negative values, NaN, and infinities are rejected.
+Both time values use integer Unix seconds in v1 and MUST be in the inclusive
+range `0..9007199254740991` (`2**53 - 1`). This bound keeps canonical JSON
+timestamp values exactly representable across Python and JavaScript/JSON
+implementations used to reproduce content and state hashes. Booleans, floats,
+strings, negative values, values above this bound, NaN, and infinities are
+rejected.
 
 ## First verified observation
 
@@ -204,6 +208,9 @@ Canonicalization is exact:
   trailing newline, and no Unicode normalization; reject surrogate code points
   (U+D800 through U+DFFF) before creating an observation;
 - preserve integer/boolean/null scalar types exactly;
+- require `fact_time_unix` and `recorded_at_unix` integers to remain within
+  `0..9007199254740991` so canonical hashes are portable across compliant
+  Python and JavaScript implementations;
 - require actual strings for every text scalar and text-array member before
   trimming; numbers, booleans, mappings, and lists must never be coerced to text;
 - optional Evidence Receipt and Proof Score ids accept `null` or non-empty
@@ -253,7 +260,8 @@ Fail closed on:
 - empty observation kind;
 - empty source id/role/scope;
 - unsupported verification state;
-- invalid fact or recorded time;
+- invalid fact or recorded time, including any value above
+  `9007199254740991`;
 - verified fact-time flag without a fact time;
 - supplied content id that does not exactly match canonical content;
 - duplicate content id with a different payload;
@@ -333,7 +341,9 @@ The implementation must cover at least:
     serialized replay, including optional evidence/proof ids;
 14. pinned Unicode/control-character canonical bytes and content/state hashes;
 15. invalid surrogate rejection before hashing and preservation of distinct
-    Unicode sequences without normalization.
+    Unicode sequences without normalization;
+16. timestamp boundary acceptance at `2**53 - 1` and rejection above it across
+    factory, direct-constructor, and serialized-replay entry points.
 
 ## Non-goals
 
