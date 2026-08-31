@@ -42,6 +42,32 @@ def _max_signatures(value):
     return parsed
 
 
+BLOCK_TIME_VALIDATION_SEMANTICS = "strict_raw_rpc_nonnegative_int_v1"
+
+
+def _ensure_processed_activity_columns(db):
+    """Mark legacy cached transaction times unverified by default.
+
+    Rows created before strict raw-RPC block-time validation receive
+    block_time_verified=0 and therefore cannot be reused for time coverage
+    until the transaction is fetched again and revalidated.
+    """
+    columns = {
+        row[1]
+        for row in db.execute(
+            "PRAGMA table_info(processed_token_activity)"
+        ).fetchall()
+    }
+    additions = {
+        "block_time_verified": "INTEGER NOT NULL DEFAULT 0",
+        "block_time_validation_semantics": "TEXT",
+    }
+    for column, declaration in additions.items():
+        if column not in columns:
+            db.execute(
+                f"ALTER TABLE processed_token_activity ADD COLUMN {column} {declaration}"
+            )
+
 def _ensure_scan_metadata_columns(db):
     """Add coverage-scope columns to older standalone activity databases."""
     columns = {
@@ -75,6 +101,8 @@ def initialize_activity_db(db):
             mint TEXT NOT NULL,
             signature TEXT NOT NULL,
             block_time INTEGER,
+            block_time_verified INTEGER NOT NULL DEFAULT 0,
+            block_time_validation_semantics TEXT,
             PRIMARY KEY (mint, signature)
         )
         """
@@ -124,6 +152,7 @@ def initialize_activity_db(db):
         )
         """
     )
+    _ensure_processed_activity_columns(db)
     _ensure_scan_metadata_columns(db)
     db.commit()
     return db
@@ -261,22 +290,33 @@ def collect_signature_window(rpc, mint, *, max_signatures=None):
 
 
 def _processed_signatures(db, mint, signatures):
+    """Return strictly validated cache hits and legacy/unverified cache rows."""
     if not signatures:
-        return set()
-    found = set()
+        return set(), set()
+
+    verified = set()
+    unverified = set()
     for start in range(0, len(signatures), 500):
         chunk = signatures[start:start + 500]
         placeholders = ",".join("?" for _ in chunk)
         rows = db.execute(
             f"""
-            SELECT signature
+            SELECT signature, block_time_verified,
+                   block_time_validation_semantics
             FROM processed_token_activity
             WHERE mint = ? AND signature IN ({placeholders})
             """,
             [mint, *chunk],
         ).fetchall()
-        found.update(row[0] for row in rows)
-    return found
+        for signature, block_time_verified, semantics in rows:
+            if (
+                block_time_verified == 1
+                and semantics == BLOCK_TIME_VALIDATION_SEMANTICS
+            ):
+                verified.add(signature)
+            else:
+                unverified.add(signature)
+    return verified, unverified
 
 
 def _canonical_block_time(value):
@@ -294,6 +334,7 @@ def _canonical_block_time(value):
 def _persist_transaction(db, mint, signature, tx, events):
     raw_block_time = tx.get("blockTime") if isinstance(tx, dict) else None
     block_time = _canonical_block_time(raw_block_time)
+    block_time_verified = block_time is not None
     for event in events:
         location = _text(event.get("location"))
         if not location:
@@ -319,13 +360,36 @@ def _persist_transaction(db, mint, signature, tx, events):
             ),
         )
 
+    # A legacy event row may already contain a SQLite-coerced block_time.
+    # Revalidation must overwrite that timestamp (including with NULL) before
+    # the event can participate in burn-window arithmetic.
+    db.execute(
+        """
+        UPDATE token_activity_events
+        SET block_time = ?
+        WHERE mint = ? AND signature = ?
+        """,
+        (block_time, mint, signature),
+    )
+
     db.execute(
         """
         INSERT OR REPLACE INTO processed_token_activity (
-            mint, signature, block_time
-        ) VALUES (?, ?, ?)
+            mint, signature, block_time, block_time_verified,
+            block_time_validation_semantics
+        ) VALUES (?, ?, ?, ?, ?)
         """,
-        (mint, signature, block_time),
+        (
+            mint,
+            signature,
+            block_time,
+            int(block_time_verified),
+            (
+                BLOCK_TIME_VALIDATION_SEMANTICS
+                if block_time_verified
+                else None
+            ),
+        ),
     )
 
 
@@ -520,11 +584,12 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         max_signatures=max_signatures,
     )
     signatures = selection["signatures"]
-    cached = _processed_signatures(db, mint, signatures)
+    cached, unverified_cached = _processed_signatures(db, mint, signatures)
 
     retrieved = len(cached)
     transaction_errors = 0
     newly_retrieved = 0
+    revalidated_cached = 0
 
     for signature in signatures:
         if signature in cached:
@@ -558,6 +623,8 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         _persist_transaction(db, mint, signature, tx, events)
         retrieved += 1
         newly_retrieved += 1
+        if signature in unverified_cached:
+            revalidated_cached += 1
 
     db.commit()
 
@@ -574,6 +641,8 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         "selection_rpc_errors": selection["selection_rpc_errors"],
         "transaction_errors": transaction_errors,
         "cached_transactions": len(cached),
+        "unverified_cached_transactions": len(unverified_cached),
+        "revalidated_cached_transactions": revalidated_cached,
         "new_transactions_retrieved": newly_retrieved,
         "newest_signature": selection["newest_signature"],
         "oldest_signature": selection["oldest_signature"],
