@@ -11,6 +11,8 @@ from liquidity_scout.tokenomics import X1RPCError
 
 
 MINT = "MintA"
+DAY = 24 * 60 * 60
+NOW = 10_000_000
 
 
 def supply_record(*, decimals=6, total_supply="42.5", raw_supply="42500000"):
@@ -58,9 +60,23 @@ def activity_report(**overrides):
             "selection_complete": True,
             "history_exhausted": False,
             "max_signatures": 3,
+            "time_coverage_verified": True,
+            "time_coverage_reason": None,
+            "coverage_start_time": NOW - (60 * DAY),
+            "coverage_end_time": NOW,
+            "observed_at": NOW,
+            "observation_time_semantics": (
+                "newest_selected_transaction_block_time"
+            ),
         },
         "coverage_scope": "bounded",
         "coverage_verified": True,
+        "time_coverage_verified": True,
+        "time_coverage_reason": None,
+        "coverage_start_time": NOW - (60 * DAY),
+        "coverage_end_time": NOW,
+        "observed_at": NOW,
+        "observation_time_semantics": "newest_selected_transaction_block_time",
         "activity_verified": True,
         "lifetime_coverage_verified": False,
         "lifetime_coverage_reason": "bounded_window_only",
@@ -69,6 +85,23 @@ def activity_report(**overrides):
         "scan_id": "scan-1",
         "source": "X1 RPC parsed token instructions",
         "storage": "sqlite",
+        "events": [
+            {
+                "kind": "mint",
+                "raw_amount": "1000000",
+                "block_time": NOW - 100,
+            },
+            {
+                "kind": "mint",
+                "raw_amount": "2000000",
+                "block_time": NOW - 200,
+            },
+            {
+                "kind": "burn",
+                "raw_amount": "1000000",
+                "block_time": NOW - 300,
+            },
+        ],
     }
     report.update(overrides)
     return report
@@ -101,9 +134,26 @@ class CMISTokenomicsContractTests(unittest.TestCase):
         self.assertEqual(response["data"]["mint_authority_state"], "revoked")
         self.assertEqual(response["data"]["freeze_authority_state"], "none")
         self.assertTrue(response["data"]["token_activity"]["activity_verified"])
+        self.assertTrue(response["data"]["token_activity"]["time_coverage_verified"])
+        self.assertEqual(response["data"]["token_activity"]["observed_at"], NOW)
         self.assertEqual(response["data"]["token_activity"]["coverage_scope"], "bounded")
         self.assertFalse(
             response["data"]["token_activity"]["lifetime_coverage_verified"]
+        )
+        burn_metrics = response["data"]["burn_metrics"]
+        self.assertTrue(burn_metrics["available"])
+        self.assertEqual(burn_metrics["observed_at"], NOW)
+        self.assertEqual(
+            burn_metrics["windows"]["24h"]["burned_tokens"],
+            "1",
+        )
+        self.assertEqual(
+            burn_metrics["windows"]["24h"]["burn_to_emission_ratio"],
+            "0.3333333333333333333333333333333333333333",
+        )
+        self.assertEqual(
+            burn_metrics["windows"]["24h"]["issuance_state"],
+            "INFLATIONARY",
         )
         self.assertEqual(response["confidence"]["verified_checks"], 4)
         self.assertEqual(response["confidence"]["total_checks"], 4)
@@ -166,6 +216,36 @@ class CMISTokenomicsContractTests(unittest.TestCase):
         self.assertIn("rpc_decimals_mismatch", codes)
         self.assertIn("token_activity_rpc_decimals_unverified", codes)
 
+    def test_missing_scanner_time_contract_keeps_burn_metrics_unavailable(self):
+        activity = activity_report(
+            time_coverage_verified=False,
+            time_coverage_reason="selected_transaction_block_time_unavailable",
+            coverage_start_time=None,
+            coverage_end_time=None,
+            observed_at=None,
+            observation_time_semantics=None,
+        )
+        activity["coverage"] = dict(activity["coverage"])
+        activity["coverage"].update({
+            "time_coverage_verified": False,
+            "time_coverage_reason": "selected_transaction_block_time_unavailable",
+            "coverage_start_time": None,
+            "coverage_end_time": None,
+            "observed_at": None,
+            "observation_time_semantics": None,
+        })
+
+        response = build_tokenomics_response(
+            MINT,
+            get_token_supply=lambda mint, **kwargs: supply_record(),
+            get_mint_info=lambda mint, **kwargs: mint_record(),
+            activity_report=activity,
+        )
+
+        self.assertEqual(response["status"], OK)
+        self.assertFalse(response["data"]["burn_metrics"]["available"])
+        codes = {warning["code"] for warning in response["warnings"]}
+        self.assertIn("burn_metrics_unavailable", codes)
     def test_rpc_failure_with_no_verified_activity_is_unavailable(self):
         def fail_supply(mint, **kwargs):
             raise X1RPCError("supply unavailable")
