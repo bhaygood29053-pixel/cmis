@@ -16,6 +16,7 @@ def circulation_report(*, total_raw="1000000", excluded_raw="250000"):
         "total_supply_verified": True,
         "total_supply_raw": total_raw,
         "total_supply_source": "X1 RPC getTokenSupply",
+        "total_supply_observation_slot": 123456,
         "observation_slot": 123456,
         "observed_at": 1700000000,
         "observation_time_verified": True,
