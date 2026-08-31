@@ -120,6 +120,10 @@ class CirculatingSupplyContractTests(unittest.TestCase):
         report = build(None)
 
         self.assertFalse(report["circulating_supply_verified"])
+        self.assertTrue(report["current_total_supply_verified"])
+        self.assertEqual(report["total_supply_raw"], "100000000")
+        self.assertEqual(report["total_supply"], "100")
+        self.assertEqual(report["current_total_source"], "X1 RPC getTokenSupply")
         self.assertEqual(
             report["reason"],
             "circulating_supply_contract_not_supplied",
