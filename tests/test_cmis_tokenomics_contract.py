@@ -256,6 +256,40 @@ class CMISTokenomicsContractTests(unittest.TestCase):
             response["sources"],
         )
 
+    def test_incomplete_circulation_contract_stays_unverified_with_reason(self):
+        circulation = circulation_report()
+        circulation["exclusion_universe_complete"] = False
+
+        response = build_tokenomics_response(
+            MINT,
+            get_token_supply=lambda mint, **kwargs: supply_record(),
+            get_mint_info=lambda mint, **kwargs: mint_record(),
+            activity_report=activity_report(),
+            circulating_supply_report=circulation,
+        )
+
+        data = response["data"]
+        self.assertFalse(data["circulating_supply_verified"])
+        self.assertIsNone(data["circulating_supply"])
+        self.assertEqual(
+            data["circulating_supply_details"]["reason"],
+            "circulating_supply_exclusion_universe_incomplete",
+        )
+        self.assertTrue(
+            data["circulating_supply_details"]["current_total_supply_verified"]
+        )
+        codes = {warning["code"] for warning in response["warnings"]}
+        self.assertIn("circulating_supply_unverified", codes)
+        warning = next(
+            item
+            for item in response["warnings"]
+            if item["code"] == "circulating_supply_unverified"
+        )
+        self.assertEqual(
+            warning["reason"],
+            "circulating_supply_exclusion_universe_incomplete",
+        )
+
     def test_verified_active_authorities_are_still_successful_tokenomics_facts(self):
         response = build_tokenomics_response(
             MINT,
