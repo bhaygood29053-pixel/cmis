@@ -120,6 +120,23 @@ class BurnMetricsTests(unittest.TestCase):
         self.assertFalse(report["time_buckets_verified"])
         self.assertEqual(report["windows"]["1h"]["status"], "unavailable")
 
+    def test_fractional_block_time_is_not_silently_truncated(self):
+        report = self.build([
+            event("burn", 500, NOW - 0.5),
+        ])
+
+        self.assertEqual(report["untimed_events"], 1)
+        self.assertFalse(report["time_buckets_verified"])
+        self.assertEqual(report["windows"]["1h"]["status"], "unavailable")
+
+    def test_fractional_observed_at_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.build([], observed_at=NOW + 0.5)
+
+    def test_fractional_decimals_are_rejected(self):
+        with self.assertRaises(ValueError):
+            self.build([], decimals=2.5)
+
     def test_window_boundary_is_start_exclusive_end_inclusive(self):
         report = self.build([
             event("burn", 100, NOW - DAY),
