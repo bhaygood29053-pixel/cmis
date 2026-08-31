@@ -279,8 +279,21 @@ def _processed_signatures(db, mint, signatures):
     return found
 
 
+def _canonical_block_time(value):
+    """Return a strict non-negative integer block time or None.
+
+    Raw RPC types are validated before SQLite can apply INTEGER affinity.
+    Booleans and numeric strings are intentionally rejected rather than
+    coerced.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 def _persist_transaction(db, mint, signature, tx, events):
-    block_time = tx.get("blockTime") if isinstance(tx, dict) else None
+    raw_block_time = tx.get("blockTime") if isinstance(tx, dict) else None
+    block_time = _canonical_block_time(raw_block_time)
     for event in events:
         location = _text(event.get("location"))
         if not location:
@@ -302,7 +315,7 @@ def _persist_transaction(db, mint, signature, tx, events):
                 _text(event.get("raw_amount")),
                 _text(event.get("authority")),
                 _text(event.get("account")),
-                event.get("block_time"),
+                block_time,
             ),
         )
 
