@@ -382,6 +382,47 @@ class XdexRouteTopologyTests(unittest.TestCase):
         )
         self.assertFalse(result["classification_change_authorized"])
 
+
+    def test_duplicate_program_data_in_one_invocation_fails_closed(self):
+        signature = next(iter(FIXTURES))
+        tx = transaction_for(signature)
+        logs = tx["meta"]["logMessages"]
+        data_index = next(
+            index
+            for index, line in enumerate(logs)
+            if line.startswith("Program data: ")
+        )
+        logs.insert(data_index + 1, logs[data_index])
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "multiple SwapBaseInput Program-data events",
+        ):
+            run_fixture(signature, transaction=tx)
+
+    def test_nested_program_data_is_not_attributed_to_xdex(self):
+        signature = next(iter(FIXTURES))
+        tx = transaction_for(signature)
+        logs = tx["meta"]["logMessages"]
+        success_index = next(
+            index
+            for index, line in enumerate(logs)
+            if line == (
+                f"Program {XDEX_MAINNET_OBSERVED_PROGRAM_ID} success"
+            )
+        )
+        nested_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        logs[success_index:success_index] = [
+            f"Program {nested_program} invoke [2]",
+            "Program data: AAAAAAAAAAA=",
+            f"Program {nested_program} success",
+        ]
+
+        result = run_fixture(signature, transaction=tx)
+        self.assertTrue(result["route_topology_verified"])
+        self.assertTrue(result["target_pool_leg_verified"])
+
+
     def test_missing_program_data_fails_closed(self):
         signature = next(iter(FIXTURES))
         tx = transaction_for(signature)
