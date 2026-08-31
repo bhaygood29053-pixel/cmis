@@ -172,6 +172,12 @@ class TokenActivityDatabaseMigrationTests(unittest.TestCase):
             self.assertIn("coverage_scope", columns)
             self.assertIn("lifetime_coverage_verified", columns)
             self.assertIn("lifetime_coverage_reason", columns)
+            self.assertIn("time_coverage_verified", columns)
+            self.assertIn("time_coverage_reason", columns)
+            self.assertIn("coverage_start_time", columns)
+            self.assertIn("coverage_end_time", columns)
+            self.assertIn("observed_at", columns)
+            self.assertIn("observation_time_semantics", columns)
         finally:
             db.close()
 
@@ -188,8 +194,14 @@ class TokenActivityScannerTests(unittest.TestCase):
         rpc = FakeRPC(
             [[signature("sig1"), signature("sig2")]],
             transactions={
-                "sig1": transaction(parsed_ix("mintTo", "3000000")),
-                "sig2": transaction(parsed_ix("burn", "1250000")),
+                "sig1": transaction(
+                    parsed_ix("mintTo", "3000000"),
+                    block_time=1700000100,
+                ),
+                "sig2": transaction(
+                    parsed_ix("burn", "1250000"),
+                    block_time=1700000000,
+                ),
             },
         )
 
@@ -211,6 +223,15 @@ class TokenActivityScannerTests(unittest.TestCase):
         self.assertEqual(report["minted_tokens_observed"], "3")
         self.assertEqual(report["burned_tokens_observed"], "1.25")
         self.assertEqual(report["net_issuance_tokens"], "1.75")
+        self.assertTrue(report["time_coverage_verified"])
+        self.assertIsNone(report["time_coverage_reason"])
+        self.assertEqual(report["coverage_start_time"], 1700000000)
+        self.assertEqual(report["coverage_end_time"], 1700000100)
+        self.assertEqual(report["observed_at"], 1700000100)
+        self.assertEqual(
+            report["observation_time_semantics"],
+            "newest_selected_transaction_block_time",
+        )
         self.assertEqual(len(report["events"]), 2)
         self.assertEqual(
             report["coverage"]["coverage_scope"],
@@ -228,7 +249,10 @@ class TokenActivityScannerTests(unittest.TestCase):
             SELECT signatures_scanned, transactions_retrieved,
                    rpc_errors, coverage_verified, activity_verified,
                    newest_signature, oldest_signature, coverage_scope,
-                   lifetime_coverage_verified, lifetime_coverage_reason
+                   lifetime_coverage_verified, lifetime_coverage_reason,
+                   time_coverage_verified, time_coverage_reason,
+                   coverage_start_time, coverage_end_time, observed_at,
+                   observation_time_semantics
             FROM token_activity_scans
             WHERE scan_id = ?
             """,
@@ -247,9 +271,74 @@ class TokenActivityScannerTests(unittest.TestCase):
                 "bounded",
                 0,
                 "bounded_signature_window",
+                1,
+                None,
+                1700000000,
+                1700000100,
+                1700000100,
+                "newest_selected_transaction_block_time",
             ),
         )
 
+    def test_missing_transaction_block_time_withholds_time_coverage(self):
+        rpc = FakeRPC(
+            [[signature("sig1")]],
+            transactions={
+                "sig1": transaction(
+                    parsed_ix("burn", "500000"),
+                    block_time=None,
+                ),
+            },
+        )
+
+        report = scan_token_activity(
+            rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=1,
+        )
+
+        self.assertTrue(report["activity_verified"])
+        self.assertFalse(report["time_coverage_verified"])
+        self.assertEqual(
+            report["time_coverage_reason"],
+            "selected_transaction_block_time_unavailable",
+        )
+        self.assertIsNone(report["coverage_start_time"])
+        self.assertIsNone(report["coverage_end_time"])
+        self.assertIsNone(report["observed_at"])
+
+    def test_non_monotonic_selected_block_times_fail_closed(self):
+        rpc = FakeRPC(
+            [[signature("newer"), signature("older")]],
+            transactions={
+                "newer": transaction(
+                    parsed_ix("burn", "500000"),
+                    block_time=1700000000,
+                ),
+                "older": transaction(
+                    parsed_ix("mintTo", "1000000"),
+                    block_time=1700000100,
+                ),
+            },
+        )
+
+        report = scan_token_activity(
+            rpc,
+            mint=MINT,
+            decimals=6,
+            db=self.db,
+            max_signatures=2,
+        )
+
+        self.assertTrue(report["activity_verified"])
+        self.assertFalse(report["time_coverage_verified"])
+        self.assertEqual(
+            report["time_coverage_reason"],
+            "selected_transaction_block_times_not_monotonic",
+        )
+        self.assertIsNone(report["observed_at"])
     def test_rpc_history_exhaustion_still_does_not_claim_lifetime(self):
         rpc = FakeRPC(
             [[signature("sig1")]],
