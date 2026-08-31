@@ -102,6 +102,16 @@ class BurnMetricsTests(unittest.TestCase):
             "NO_CHANGE_ZERO_BASE",
         )
 
+    def test_unverified_scan_coverage_withholds_verified_observed_total(self):
+        report = self.build(
+            [event("burn", 500, NOW - 10)],
+            coverage_verified=False,
+        )
+
+        self.assertEqual(report["burned_raw_observed"], "500")
+        self.assertFalse(report["observed_event_totals_verified"])
+        self.assertIsNone(report["verified_burned_raw_observed"])
+        self.assertIsNone(report["verified_burned_observed"])
     def test_insufficient_time_depth_hides_window_values(self):
         report = self.build(
             [event("burn", 500, NOW - 10)],
