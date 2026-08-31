@@ -4,6 +4,8 @@ from liquidity_scout.services import build_tokenomics_report
 
 
 MINT = "MintA"
+DAY = 24 * 60 * 60
+NOW = 10_000_000
 
 
 def supply_record(*, verified=True, decimals=6):
@@ -52,11 +54,25 @@ def activity_report(**overrides):
             "history_exhausted": False,
             "max_signatures": 2,
             "coverage_scope": "bounded",
+            "time_coverage_verified": True,
+            "time_coverage_reason": None,
+            "coverage_start_time": NOW - (60 * DAY),
+            "coverage_end_time": NOW,
+            "observed_at": NOW,
+            "observation_time_semantics": (
+                "newest_selected_transaction_block_time"
+            ),
             "lifetime_coverage_verified": False,
             "lifetime_coverage_reason": "bounded_signature_window",
         },
         "coverage_scope": "bounded",
         "coverage_verified": True,
+        "time_coverage_verified": True,
+        "time_coverage_reason": None,
+        "coverage_start_time": NOW - (60 * DAY),
+        "coverage_end_time": NOW,
+        "observed_at": NOW,
+        "observation_time_semantics": "newest_selected_transaction_block_time",
         "lifetime_coverage_verified": False,
         "lifetime_coverage_reason": "bounded_signature_window",
         "amounts_verified": True,
@@ -66,6 +82,23 @@ def activity_report(**overrides):
         "scan_id": 42,
         "source": "X1 RPC parsed token instructions",
         "storage": "standalone SQLite token activity DB",
+        "events": [
+            {
+                "kind": "mint",
+                "raw_amount": "1000000",
+                "block_time": NOW - 100,
+            },
+            {
+                "kind": "mint",
+                "raw_amount": "2000000",
+                "block_time": NOW - 200,
+            },
+            {
+                "kind": "burn",
+                "raw_amount": "1250000",
+                "block_time": NOW - 300,
+            },
+        ],
     }
     value.update(overrides)
     return value
@@ -107,6 +140,31 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         self.assertEqual(
             report["sources"]["token_activity"],
             "X1 RPC parsed token instructions",
+        )
+        burn_metrics = report["burn_metrics"]
+        self.assertTrue(burn_metrics["available"])
+        self.assertEqual(burn_metrics["status"], "ok")
+        self.assertEqual(burn_metrics["observed_at"], NOW)
+        self.assertFalse(burn_metrics["lifetime_total_burn_verified"])
+        self.assertEqual(
+            burn_metrics["windows"]["24h"]["burned_tokens"],
+            "1.25",
+        )
+        self.assertEqual(
+            burn_metrics["windows"]["24h"]["minted_tokens"],
+            "3",
+        )
+        self.assertEqual(
+            burn_metrics["windows"]["24h"]["issuance_state"],
+            "INFLATIONARY",
+        )
+        self.assertEqual(
+            burn_metrics["valuation"]["status"],
+            "unavailable",
+        )
+        self.assertEqual(
+            burn_metrics["circulating_supply"]["status"],
+            "unavailable",
         )
 
     def test_service_does_not_upgrade_scanner_lifetime_claim(self):
@@ -158,6 +216,61 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
             report["verification_reasons"],
         )
 
+    def test_missing_time_coverage_withholds_burn_metrics(self):
+        activity = activity_report(
+            time_coverage_verified=False,
+            time_coverage_reason="selected_transaction_block_time_unavailable",
+            coverage_start_time=None,
+            coverage_end_time=None,
+            observed_at=None,
+            observation_time_semantics=None,
+        )
+        activity["coverage"] = dict(activity["coverage"])
+        activity["coverage"].update({
+            "time_coverage_verified": False,
+            "time_coverage_reason": "selected_transaction_block_time_unavailable",
+            "coverage_start_time": None,
+            "coverage_end_time": None,
+            "observed_at": None,
+            "observation_time_semantics": None,
+        })
+
+        report = report_with_activity(activity)
+
+        self.assertTrue(report["token_activity"]["activity_verified"])
+        self.assertFalse(report["token_activity"]["time_coverage_verified"])
+        self.assertFalse(report["burn_metrics"]["available"])
+        self.assertEqual(
+            report["burn_metrics"]["reason"],
+            "selected_transaction_block_time_unavailable",
+        )
+
+    def test_conflicting_time_metadata_withholds_burn_metrics(self):
+        activity = activity_report()
+        activity["coverage"] = dict(activity["coverage"])
+        activity["coverage"]["observed_at"] = NOW - 1
+
+        report = report_with_activity(activity)
+
+        self.assertFalse(report["token_activity"]["time_coverage_verified"])
+        self.assertEqual(
+            report["token_activity"]["time_coverage_reason"],
+            "token_activity_time_coverage_malformed",
+        )
+        self.assertFalse(report["burn_metrics"]["available"])
+
+    def test_missing_event_payload_withholds_burn_metrics(self):
+        activity = activity_report()
+        activity.pop("events")
+
+        report = report_with_activity(activity)
+
+        self.assertTrue(report["token_activity"]["time_coverage_verified"])
+        self.assertFalse(report["burn_metrics"]["available"])
+        self.assertEqual(
+            report["burn_metrics"]["reason"],
+            "token_activity_events_not_supplied",
+        )
     def test_activity_for_different_mint_is_rejected_fail_closed(self):
         report = report_with_activity(
             activity_report(mint="OtherMint")
