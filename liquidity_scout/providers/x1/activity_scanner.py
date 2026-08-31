@@ -52,6 +52,12 @@ def _ensure_scan_metadata_columns(db):
         "coverage_scope": "TEXT NOT NULL DEFAULT 'unknown'",
         "lifetime_coverage_verified": "INTEGER NOT NULL DEFAULT 0",
         "lifetime_coverage_reason": "TEXT",
+        "time_coverage_verified": "INTEGER NOT NULL DEFAULT 0",
+        "time_coverage_reason": "TEXT",
+        "coverage_start_time": "INTEGER",
+        "coverage_end_time": "INTEGER",
+        "observed_at": "INTEGER",
+        "observation_time_semantics": "TEXT",
     }
     for column, declaration in additions.items():
         if column not in columns:
@@ -106,7 +112,13 @@ def initialize_activity_db(db):
             oldest_signature TEXT,
             coverage_scope TEXT NOT NULL DEFAULT 'unknown',
             lifetime_coverage_verified INTEGER NOT NULL DEFAULT 0,
-            lifetime_coverage_reason TEXT
+            lifetime_coverage_reason TEXT,
+            time_coverage_verified INTEGER NOT NULL DEFAULT 0,
+            time_coverage_reason TEXT,
+            coverage_start_time INTEGER,
+            coverage_end_time INTEGER,
+            observed_at INTEGER,
+            observation_time_semantics TEXT
         )
         """
     )
@@ -337,6 +349,89 @@ def _load_window_events(db, mint, signatures):
     ]
 
 
+def _load_window_block_times(db, mint, signatures):
+    """Load selected transaction block times in exact signature-selection order."""
+    if not signatures:
+        return []
+
+    found = {}
+    for start in range(0, len(signatures), 500):
+        chunk = signatures[start:start + 500]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"""
+            SELECT signature, block_time
+            FROM processed_token_activity
+            WHERE mint = ? AND signature IN ({placeholders})
+            """,
+            [mint, *chunk],
+        ).fetchall()
+        for signature, block_time in rows:
+            found[signature] = block_time
+
+    return [found.get(signature) for signature in signatures]
+
+
+def _time_coverage_state(block_times, *, coverage_verified):
+    """Verify deterministic fact-time bounds for the selected history.
+
+    Selected signatures are newest-to-oldest. A verified interval uses an
+    exclusive lower bound and inclusive upper bound. The lower boundary is
+    intentionally exclusive so a signature-count cutoff that lands inside a
+    shared block-time second cannot imply coverage of omitted same-time
+    history.
+
+    observed_at is the newest selected successful transaction canonical block
+    time. It is a fact-time watermark, not local wall-clock scan time.
+    """
+    unavailable = {
+        "time_coverage_verified": False,
+        "time_coverage_reason": None,
+        "coverage_start_time": None,
+        "coverage_end_time": None,
+        "observed_at": None,
+        "observation_time_semantics": None,
+    }
+
+    if coverage_verified is not True:
+        unavailable["time_coverage_reason"] = "selected_window_coverage_unverified"
+        return unavailable
+
+    if not block_times:
+        unavailable["time_coverage_reason"] = (
+            "selected_history_has_no_fact_time_boundary"
+        )
+        return unavailable
+
+    normalized = []
+    for value in block_times:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            unavailable["time_coverage_reason"] = (
+                "selected_transaction_block_time_unavailable"
+            )
+            return unavailable
+        normalized.append(value)
+
+    if any(
+        newer_time < older_time
+        for newer_time, older_time in zip(normalized, normalized[1:])
+    ):
+        unavailable["time_coverage_reason"] = (
+            "selected_transaction_block_times_not_monotonic"
+        )
+        return unavailable
+
+    return {
+        "time_coverage_verified": True,
+        "time_coverage_reason": None,
+        "coverage_start_time": normalized[-1],
+        "coverage_end_time": normalized[0],
+        "observed_at": normalized[0],
+        "observation_time_semantics": (
+            "newest_selected_transaction_block_time"
+        ),
+    }
+
 def _lifetime_coverage_reason(report, coverage):
     if not report.get("coverage_verified"):
         return "selected_window_coverage_unverified"
@@ -359,8 +454,10 @@ def _record_scan(db, mint, coverage, report):
             selection_complete, history_exhausted, coverage_verified,
             activity_verified, newest_signature, oldest_signature,
             coverage_scope, lifetime_coverage_verified,
-            lifetime_coverage_reason
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            lifetime_coverage_reason, time_coverage_verified,
+            time_coverage_reason, coverage_start_time, coverage_end_time,
+            observed_at, observation_time_semantics
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             mint,
@@ -378,6 +475,12 @@ def _record_scan(db, mint, coverage, report):
             coverage.get("coverage_scope"),
             int(report["lifetime_coverage_verified"]),
             report.get("lifetime_coverage_reason"),
+            int(coverage.get("time_coverage_verified") is True),
+            coverage.get("time_coverage_reason"),
+            coverage.get("coverage_start_time"),
+            coverage.get("coverage_end_time"),
+            coverage.get("observed_at"),
+            coverage.get("observation_time_semantics"),
         ),
     )
     db.commit()
@@ -466,6 +569,16 @@ def scan_token_activity(rpc, *, mint, decimals, db, max_signatures=None):
         decimals=decimals,
         coverage=coverage,
     )
+
+    time_coverage = _time_coverage_state(
+        _load_window_block_times(db, mint, signatures),
+        coverage_verified=report.get("coverage_verified") is True,
+    )
+    coverage.update(time_coverage)
+    report["coverage"].update(time_coverage)
+    for key, value in time_coverage.items():
+        report[key] = value
+
     report["coverage_scope"] = coverage["coverage_scope"]
     report["lifetime_coverage_verified"] = False
     report["lifetime_coverage_reason"] = _lifetime_coverage_reason(report, coverage)
