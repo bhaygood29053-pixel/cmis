@@ -56,6 +56,7 @@ def _ensure_scan_metadata_columns(db):
         "time_coverage_reason": "TEXT",
         "coverage_start_time": "INTEGER",
         "coverage_end_time": "INTEGER",
+        "coverage_time_semantics": "TEXT",
         "observed_at": "INTEGER",
         "observation_time_semantics": "TEXT",
     }
@@ -117,6 +118,7 @@ def initialize_activity_db(db):
             time_coverage_reason TEXT,
             coverage_start_time INTEGER,
             coverage_end_time INTEGER,
+            coverage_time_semantics TEXT,
             observed_at INTEGER,
             observation_time_semantics TEXT
         )
@@ -389,6 +391,7 @@ def _time_coverage_state(block_times, *, coverage_verified):
         "time_coverage_reason": None,
         "coverage_start_time": None,
         "coverage_end_time": None,
+        "coverage_time_semantics": None,
         "observed_at": None,
         "observation_time_semantics": None,
     }
@@ -426,6 +429,7 @@ def _time_coverage_state(block_times, *, coverage_verified):
         "time_coverage_reason": None,
         "coverage_start_time": normalized[-1],
         "coverage_end_time": normalized[0],
+        "coverage_time_semantics": "start_exclusive_end_inclusive",
         "observed_at": normalized[0],
         "observation_time_semantics": (
             "newest_selected_transaction_block_time"
@@ -456,8 +460,8 @@ def _record_scan(db, mint, coverage, report):
             coverage_scope, lifetime_coverage_verified,
             lifetime_coverage_reason, time_coverage_verified,
             time_coverage_reason, coverage_start_time, coverage_end_time,
-            observed_at, observation_time_semantics
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            coverage_time_semantics, observed_at, observation_time_semantics
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             mint,
@@ -479,6 +483,7 @@ def _record_scan(db, mint, coverage, report):
             coverage.get("time_coverage_reason"),
             coverage.get("coverage_start_time"),
             coverage.get("coverage_end_time"),
+            coverage.get("coverage_time_semantics"),
             coverage.get("observed_at"),
             coverage.get("observation_time_semantics"),
         ),
