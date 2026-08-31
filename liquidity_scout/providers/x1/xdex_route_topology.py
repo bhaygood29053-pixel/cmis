@@ -313,7 +313,14 @@ def decode_swap_base_input_program_data(value: str) -> dict[str, Any]:
 def _collect_swap_base_input_program_data(
     transaction: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    """Collect outer XDEX SwapBaseInput Program-data events in log order."""
+    """Collect exactly one outer XDEX SwapBaseInput event per invocation.
+
+    The log parser tracks the active invocation stack so Program-data emitted
+    by nested CPI programs is not attributed to XDEX. A SwapBaseInput outer
+    invocation must emit exactly one matching Program-data event before its
+    success line. A second XDEX Program-data event in the same invocation is
+    ambiguous and fails closed.
+    """
 
     meta = transaction.get("meta")
     meta = meta if isinstance(meta, Mapping) else {}
@@ -321,62 +328,122 @@ def _collect_swap_base_input_program_data(
     if not isinstance(logs, Sequence) or isinstance(logs, (str, bytes)):
         raise ValueError("transaction log messages unavailable")
 
-    invoke_prefix = f"Program {XDEX_MAINNET_OBSERVED_PROGRAM_ID} invoke ["
-    success_line = f"Program {XDEX_MAINNET_OBSERVED_PROGRAM_ID} success"
-    failed_prefix = f"Program {XDEX_MAINNET_OBSERVED_PROGRAM_ID} failed"
-
-    waiting_for_instruction = False
-    waiting_for_data = False
-    current_depth: int | None = None
     rows: list[dict[str, Any]] = []
+    stack: list[str] = []
+    active_swap: dict[str, Any] | None = None
+
+    def parse_invoke(line: str) -> tuple[str, int] | None:
+        if not line.startswith("Program ") or " invoke [" not in line:
+            return None
+        prefix, depth_text = line.rsplit(" invoke [", 1)
+        if not depth_text.endswith("]"):
+            return None
+        program_id = prefix[len("Program "):].strip()
+        try:
+            depth = int(depth_text[:-1])
+        except ValueError as exc:
+            raise ValueError("program invocation depth unavailable") from exc
+        if not program_id or depth < 1:
+            raise ValueError("program invocation identity unavailable")
+        return program_id, depth
+
+    def parse_completion(line: str) -> tuple[str, bool] | None:
+        if not line.startswith("Program "):
+            return None
+        if line.endswith(" success"):
+            return line[len("Program "):-len(" success")].strip(), True
+        marker = " failed"
+        if marker in line:
+            return line[len("Program "):line.index(marker)].strip(), False
+        return None
 
     for raw_line in logs:
         line = _text(raw_line)
         if not line:
             continue
 
-        if line.startswith(invoke_prefix) and line.endswith("]"):
-            depth_text = line[len(invoke_prefix):-1]
-            try:
-                current_depth = int(depth_text)
-            except ValueError as exc:
-                raise ValueError("XDEX invocation depth unavailable") from exc
-            waiting_for_instruction = True
-            waiting_for_data = False
+        invoked = parse_invoke(line)
+        if invoked is not None:
+            program_id, depth = invoked
+            if depth > len(stack) + 1:
+                raise ValueError("program invocation stack depth unavailable")
+            stack[:] = stack[: depth - 1]
+            stack.append(program_id)
+
+            if program_id == XDEX_MAINNET_OBSERVED_PROGRAM_ID:
+                if depth != 1:
+                    raise ValueError(
+                        "inner XDEX SwapBaseInput route invocation is not accepted"
+                    )
+                if active_swap is not None:
+                    raise ValueError("overlapping XDEX invocation is ambiguous")
+                active_swap = {
+                    "instruction_seen": False,
+                    "swap_base_input": False,
+                    "program_data_count": 0,
+                }
             continue
 
-        if waiting_for_instruction:
-            if line == "Program log: Instruction: SwapBaseInput":
-                waiting_for_instruction = False
-                waiting_for_data = True
-                continue
-            if line.startswith("Program log: Instruction:"):
-                waiting_for_instruction = False
-                waiting_for_data = False
-                current_depth = None
-                continue
+        current_program = stack[-1] if stack else None
+        if (
+            current_program == XDEX_MAINNET_OBSERVED_PROGRAM_ID
+            and active_swap is not None
+            and line.startswith("Program log: Instruction:")
+        ):
+            if active_swap["instruction_seen"]:
+                raise ValueError("multiple XDEX instruction logs in one invocation")
+            active_swap["instruction_seen"] = True
+            active_swap["swap_base_input"] = (
+                line == "Program log: Instruction: SwapBaseInput"
+            )
+            continue
 
-        if waiting_for_data:
-            prefix = "Program data: "
-            if line.startswith(prefix):
-                if current_depth != 1:
-                    raise ValueError(
-                        "inner XDEX SwapBaseInput route event is not accepted"
-                    )
-                decoded = decode_swap_base_input_program_data(line[len(prefix):])
-                rows.append(decoded)
-                waiting_for_data = False
-                waiting_for_instruction = False
-                current_depth = None
+        if (
+            current_program == XDEX_MAINNET_OBSERVED_PROGRAM_ID
+            and active_swap is not None
+            and line.startswith("Program data: ")
+        ):
+            if not active_swap["swap_base_input"]:
                 continue
-            if line == success_line or line.startswith(failed_prefix):
-                raise ValueError("SwapBaseInput Program-data event unavailable")
+            active_swap["program_data_count"] += 1
+            if active_swap["program_data_count"] > 1:
+                raise ValueError(
+                    "multiple SwapBaseInput Program-data events in one invocation"
+                )
+            rows.append(
+                decode_swap_base_input_program_data(
+                    line[len("Program data: "):]
+                )
+            )
+            continue
 
-    if waiting_for_data:
-        raise ValueError("SwapBaseInput Program-data event unavailable")
+        completed = parse_completion(line)
+        if completed is not None:
+            program_id, succeeded = completed
+            if not stack or stack[-1] != program_id:
+                raise ValueError("program invocation completion stack mismatch")
+
+            if program_id == XDEX_MAINNET_OBSERVED_PROGRAM_ID:
+                if active_swap is None:
+                    raise ValueError("XDEX invocation state unavailable")
+                if not succeeded:
+                    raise ValueError("XDEX SwapBaseInput invocation failed")
+                if active_swap["swap_base_input"]:
+                    if active_swap["program_data_count"] != 1:
+                        raise ValueError(
+                            "SwapBaseInput Program-data event unavailable"
+                        )
+                active_swap = None
+
+            stack.pop()
+            continue
+
+    if active_swap is not None:
+        raise ValueError("unterminated XDEX invocation")
+    if stack:
+        raise ValueError("unterminated program invocation stack")
 
     return rows
-
 
 def _validate_identity(
     identity_raw: Mapping[str, Any],
