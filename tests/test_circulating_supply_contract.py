@@ -65,6 +65,7 @@ def build(value=_DEFAULT, **kwargs):
         "decimals": 6,
         "current_total_raw": "100000000",
         "current_total_supply_verified": True,
+        "current_total_observation_slot": SLOT,
         "current_total_source": "X1 RPC getTokenSupply",
     }
     params.update(kwargs)
@@ -140,6 +141,28 @@ class CirculatingSupplyContractTests(unittest.TestCase):
         self.assertEqual(
             report["reason"],
             "circulating_supply_exclusion_universe_incomplete",
+        )
+
+    def test_missing_rpc_total_supply_slot_fails_closed(self):
+        report = build(
+            current_total_observation_slot=None,
+        )
+
+        self.assertFalse(report["circulating_supply_verified"])
+        self.assertEqual(
+            report["reason"],
+            "current_total_supply_slot_unverified",
+        )
+
+    def test_rpc_total_supply_slot_must_match_exclusion_snapshot(self):
+        report = build(
+            current_total_observation_slot=SLOT + 1,
+        )
+
+        self.assertFalse(report["circulating_supply_verified"])
+        self.assertEqual(
+            report["reason"],
+            "circulating_supply_rpc_total_supply_slot_mismatch",
         )
 
     def test_total_supply_observation_slot_must_match(self):
