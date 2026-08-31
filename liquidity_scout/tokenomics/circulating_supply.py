@@ -264,6 +264,9 @@ def build_circulating_supply_metrics(
                 "circulating_supply_exclusion_malformed",
                 mint=mint,
                 decimals=decimals,
+                current_total_supply_verified=True,
+                current_total_raw=current_total_raw,
+                current_total_source=current_total_source,
             )
 
         account = _text(item.get("account"))
@@ -278,24 +281,36 @@ def build_circulating_supply_metrics(
                 "circulating_supply_exclusion_account_invalid",
                 mint=mint,
                 decimals=decimals,
+                current_total_supply_verified=True,
+                current_total_raw=current_total_raw,
+                current_total_source=current_total_source,
             )
         if item_mint != mint or item.get("account_identity_verified") is not True:
             return _unavailable(
                 "circulating_supply_exclusion_identity_unverified",
                 mint=mint,
                 decimals=decimals,
+                current_total_supply_verified=True,
+                current_total_raw=current_total_raw,
+                current_total_source=current_total_source,
             )
         if raw_balance is None or item.get("balance_verified") is not True:
             return _unavailable(
                 "circulating_supply_exclusion_balance_unverified",
                 mint=mint,
                 decimals=decimals,
+                current_total_supply_verified=True,
+                current_total_raw=current_total_raw,
+                current_total_source=current_total_source,
             )
         if item_slot != observation_slot:
             return _unavailable(
                 "circulating_supply_exclusion_slot_mismatch",
                 mint=mint,
                 decimals=decimals,
+                current_total_supply_verified=True,
+                current_total_raw=current_total_raw,
+                current_total_source=current_total_source,
             )
         if (
             not exclusion_reason
@@ -305,12 +320,18 @@ def build_circulating_supply_metrics(
                 "circulating_supply_exclusion_semantics_unverified",
                 mint=mint,
                 decimals=decimals,
+                current_total_supply_verified=True,
+                current_total_raw=current_total_raw,
+                current_total_source=current_total_source,
             )
         if not item_source:
             return _unavailable(
                 "circulating_supply_exclusion_source_unverified",
                 mint=mint,
                 decimals=decimals,
+                current_total_supply_verified=True,
+                current_total_raw=current_total_raw,
+                current_total_source=current_total_source,
             )
 
         seen_accounts.add(account)
