@@ -105,21 +105,32 @@ def _warnings(report: Mapping[str, Any]) -> list:
             "reason": _text(burn_metrics.get("reason")),
         })
     else:
-        windows = burn_metrics.get("windows")
-        windows = windows if isinstance(windows, Mapping) else {}
-        unavailable_windows = [
-            label
-            for label, record in windows.items()
-            if not isinstance(record, Mapping) or record.get("status") != "ok"
-        ]
-        if unavailable_windows:
+        if burn_metrics.get("status") == "partial":
+            warnings.append({
+                "code": "burn_metrics_partial",
+                "message": (
+                    "Burn intelligence is only partially complete; independent "
+                    "supply and/or historical valuation layers remain unavailable."
+                ),
+                "reasons": list(burn_metrics.get("partial_reasons") or []),
+            })
+
+        unavailable_windows = list(
+            burn_metrics.get("unavailable_windows") or []
+        )
+        unavailable_comparisons = list(
+            burn_metrics.get("unavailable_comparisons") or []
+        )
+        if unavailable_windows or unavailable_comparisons:
             warnings.append({
                 "code": "burn_metrics_window_coverage_partial",
                 "message": (
                     "Burn metrics were computed, but one or more requested "
-                    "time windows lack sufficient verified coverage."
+                    "time windows or prior-period comparisons lack sufficient "
+                    "verified coverage."
                 ),
                 "windows": unavailable_windows,
+                "comparisons": unavailable_comparisons,
             })
 
     if report.get("circulating_supply_verified") is not True:
