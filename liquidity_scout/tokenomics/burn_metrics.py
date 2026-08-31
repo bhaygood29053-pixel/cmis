@@ -213,6 +213,9 @@ def build_burn_metrics(
             mint_events_observed += 1
 
     input_events_verified = malformed_events == 0
+    observed_event_totals_verified = (
+        input_events_verified and coverage_verified is True
+    )
     time_buckets_verified = (
         input_events_verified
         and untimed_events == 0
@@ -313,13 +316,13 @@ def build_burn_metrics(
         "burn_events_observed": burn_events_observed,
         "burned_raw_observed": str(burned_observed),
         "burned_tokens_observed": scale_raw_amount(burned_observed, decimals),
-        "observed_event_totals_verified": input_events_verified,
+        "observed_event_totals_verified": observed_event_totals_verified,
         "verified_burned_raw_observed": (
-            str(burned_observed) if input_events_verified else None
+            str(burned_observed) if observed_event_totals_verified else None
         ),
         "verified_burned_observed": (
             scale_raw_amount(burned_observed, decimals)
-            if input_events_verified
+            if observed_event_totals_verified
             else None
         ),
         "lifetime_total_burn_verified": False,
