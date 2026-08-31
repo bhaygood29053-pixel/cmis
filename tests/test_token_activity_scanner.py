@@ -176,6 +176,7 @@ class TokenActivityDatabaseMigrationTests(unittest.TestCase):
             self.assertIn("time_coverage_reason", columns)
             self.assertIn("coverage_start_time", columns)
             self.assertIn("coverage_end_time", columns)
+            self.assertIn("coverage_time_semantics", columns)
             self.assertIn("observed_at", columns)
             self.assertIn("observation_time_semantics", columns)
         finally:
@@ -227,6 +228,10 @@ class TokenActivityScannerTests(unittest.TestCase):
         self.assertIsNone(report["time_coverage_reason"])
         self.assertEqual(report["coverage_start_time"], 1700000000)
         self.assertEqual(report["coverage_end_time"], 1700000100)
+        self.assertEqual(
+            report["coverage_time_semantics"],
+            "start_exclusive_end_inclusive",
+        )
         self.assertEqual(report["observed_at"], 1700000100)
         self.assertEqual(
             report["observation_time_semantics"],
@@ -251,7 +256,8 @@ class TokenActivityScannerTests(unittest.TestCase):
                    newest_signature, oldest_signature, coverage_scope,
                    lifetime_coverage_verified, lifetime_coverage_reason,
                    time_coverage_verified, time_coverage_reason,
-                   coverage_start_time, coverage_end_time, observed_at,
+                   coverage_start_time, coverage_end_time,
+                   coverage_time_semantics, observed_at,
                    observation_time_semantics
             FROM token_activity_scans
             WHERE scan_id = ?
@@ -275,6 +281,7 @@ class TokenActivityScannerTests(unittest.TestCase):
                 None,
                 1700000000,
                 1700000100,
+                "start_exclusive_end_inclusive",
                 1700000100,
                 "newest_selected_transaction_block_time",
             ),
