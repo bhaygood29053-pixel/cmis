@@ -459,6 +459,7 @@ def build_instant_x1_scan_response(
             "current_top_account_concentration_not_promoted_in_v2",
             "history_may_include_bounded_verified_provider_price_backfill",
             "provider_price_backfill_is_price_only",
+            "provider_source_independence_not_verified",
             "provider_archive_completeness_not_verified",
             "history_does_not_imply_complete_asset_lifetime",
             "continuous_coverage_requires_separate_archive_completeness_proof",
