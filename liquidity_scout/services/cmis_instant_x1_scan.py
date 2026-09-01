@@ -21,7 +21,7 @@ from liquidity_scout.services.cmis_contract import (
 )
 
 SERVICE = "instant_x1_scan"
-CONTRACT_VERSION = "instant_x1_scan/v1"
+CONTRACT_VERSION = "instant_x1_scan/v2"
 HISTORY_METRICS = ("price", "liquidity", "volume", "transactions")
 
 
@@ -199,7 +199,7 @@ def _holder_concentration_section(
             "value": None,
             "verified": False,
             "state": "unavailable",
-            "reason": "current_concentration_not_promoted_for_instant_x1_scan_v1",
+            "reason": "current_concentration_not_promoted_for_instant_x1_scan_v2",
         },
     }
 
@@ -216,10 +216,18 @@ def _compact_history_metric(metric: Any) -> dict[str, Any]:
         "first_observed_at": value.get("first_observed_at"),
         "last_value": value.get("last_value"),
         "last_observed_at": value.get("last_observed_at"),
+        "coverage_seconds": value.get("coverage_seconds"),
         "total_change_pct": value.get("total_change_pct"),
         "minimum_value": value.get("minimum_value"),
         "maximum_value": value.get("maximum_value"),
         "sampled_max_drawdown_pct": value.get("sampled_max_drawdown_pct"),
+        "observed_gap_count": value.get("observed_gap_count"),
+        "largest_observed_gap_seconds": value.get("largest_observed_gap_seconds"),
+        "gap_threshold_seconds": value.get("gap_threshold_seconds"),
+        "provider_backfill_observation_count": value.get(
+            "provider_backfill_observation_count"
+        ),
+        "provider_history_imported": value.get("provider_history_imported") is True,
         "continuous_coverage_verified": (
             value.get("continuous_coverage_verified") is True
         ),
@@ -229,12 +237,23 @@ def _compact_history_metric(metric: Any) -> dict[str, Any]:
 def _history_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
     data = _mapping(envelope.get("data"))
     metrics = _mapping(data.get("metrics"))
+    coverage = _mapping(data.get("coverage"))
+    provider_price_history = _mapping(data.get("provider_price_history"))
+    provider_backfill = _mapping(data.get("provider_history_backfill"))
+    provider_history_imported = data.get("provider_history_imported") is True
+    coverage_scope = data.get("coverage_scope")
+    if provider_history_imported:
+        coverage_scope = (
+            "cmis_verified_observations_with_bounded_provider_price_backfill"
+        )
     return {
         "status": _status(envelope),
         "mode": data.get("mode"),
-        "coverage_scope": data.get("coverage_scope"),
+        "coverage_scope": coverage_scope,
+        "base_coverage_scope": data.get("coverage_scope"),
         "first_verified_observed_at": data.get("first_verified_observed_at"),
         "last_verified_observed_at": data.get("last_verified_observed_at"),
+        "coverage_seconds": data.get("coverage_seconds"),
         "available_metric_count": data.get("available_metric_count"),
         "multi_point_metric_count": data.get("multi_point_metric_count"),
         "asset_lifetime_start_verified": (
@@ -246,6 +265,10 @@ def _history_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "continuous_coverage_verified": (
             data.get("continuous_coverage_verified") is True
         ),
+        "provider_history_imported": provider_history_imported,
+        "provider_price_history": dict(provider_price_history),
+        "provider_history_backfill": dict(provider_backfill),
+        "coverage": dict(coverage),
         "metrics": {
             name: _compact_history_metric(metrics.get(name))
             for name in HISTORY_METRICS
@@ -392,7 +415,7 @@ def build_instant_x1_scan_response(
         "section": "holder_concentration",
         "message": (
             "Current top-account concentration is not promoted into Instant X1 "
-            "Scan v1; internal intelligence foundations are not used as a "
+            "Scan v2; internal intelligence foundations are not used as a "
             "public-service shortcut."
         ),
     })
@@ -433,9 +456,12 @@ def build_instant_x1_scan_response(
         "limitations": [
             "missing_or_unverified_fields_remain_unknown",
             "holder_count_requires_existing_verified_holder_semantics",
-            "current_top_account_concentration_not_promoted_in_v1",
-            "history_is_cmis_stored_verified_observations_only",
+            "current_top_account_concentration_not_promoted_in_v2",
+            "history_may_include_bounded_verified_provider_price_backfill",
+            "provider_price_backfill_is_price_only",
+            "provider_archive_completeness_not_verified",
             "history_does_not_imply_complete_asset_lifetime",
+            "continuous_coverage_requires_separate_archive_completeness_proof",
             "proof_score_does_not_modify_market_facts_or_risk",
             "risk_score_remains_unavailable_until_separately_calibrated",
             "execution_authorized_false",
