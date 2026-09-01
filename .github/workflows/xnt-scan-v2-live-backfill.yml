@@ -1,0 +1,128 @@
+name: XNT Scan v2 Live Backfill
+
+on:
+  push:
+    branches:
+      - feature/instant-x1-scan-history-depth-v2
+    paths:
+      - ".github/workflows/xnt-scan-v2-live-backfill.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xnt-live-backfill:
+    name: Read-only XNT verified provider history backfill
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Require X1.Ninja credential
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 2
+          fi
+
+      - name: Run bounded verified XNT provider backfill
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import tempfile
+          import time
+          from pathlib import Path
+
+          import historical_metrics
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.ninja_history import fetch_pool_ohlcv_raw
+          from liquidity_scout.providers.x1.xdex_price_history_import import (
+              WRAPPED_XNT_MINT,
+              backfill_verified_xdex_usd_price_history,
+          )
+
+          key = os.environ["X1_NINJA_API_KEY"].strip()
+          now = int(time.time())
+          time_from = now - 300 * 86400
+
+          pools, xnt_price_usd = fetch_all_pools(api_key=key)
+
+          with tempfile.TemporaryDirectory(prefix="cmis-xnt-v2-live-") as tempdir:
+              original_db = historical_metrics.DB_FILE
+              historical_metrics.DB_FILE = str(Path(tempdir) / "history.db")
+              try:
+                  result = backfill_verified_xdex_usd_price_history(
+                      WRAPPED_XNT_MINT,
+                      "XNT",
+                      catalog_pools=pools,
+                      history_backend=historical_metrics,
+                      time_from=time_from,
+                      time_to=now,
+                      ninja_fetcher=lambda pool_address, **kwargs: fetch_pool_ohlcv_raw(
+                          pool_address,
+                          api_key=key,
+                          **kwargs,
+                      ),
+                      imported_at=now,
+                  )
+                  summary = historical_metrics.verified_price_import_summary(
+                      WRAPPED_XNT_MINT
+                  )
+                  series = historical_metrics.historical_series(
+                      WRAPPED_XNT_MINT,
+                      "price",
+                  )
+              finally:
+                  historical_metrics.DB_FILE = original_db
+
+          print("XNT LIVE PROVIDER BACKFILL")
+          print("catalog pools:", len(pools))
+          print("catalog XNT price:", xnt_price_usd)
+          print("status:", result.get("status"))
+          print("reason:", result.get("reason"))
+          print("method:", result.get("method"))
+          print("provider pair:", result.get("provider_pair"))
+          print("provider history imported:", result.get("provider_history_imported"))
+          print("candidate observations:", result.get("candidate_verified_observation_count"))
+          print("imported observations:", result.get("imported_observation_count"))
+          print("stored verified provider observations:", result.get("stored_verified_provider_observation_count"))
+          print("first imported:", result.get("first_imported_observed_at"))
+          print("last imported:", result.get("last_imported_observed_at"))
+          print("usable observations:", len(series))
+          print("summary:", summary)
+          print("full lifetime verified:", result.get("full_asset_lifetime_verified"))
+          print("continuous coverage verified:", result.get("continuous_coverage_verified"))
+          print("provider range complete verified:", result.get("provider_range_complete_verified"))
+          print("source independence verified:", result.get("source_independence_verified"))
+
+          assert result.get("provider_history_imported") is True
+          assert int(result.get("stored_verified_provider_observation_count") or 0) > 0
+          assert len(series) > 0
+          assert result.get("full_asset_lifetime_verified") is False
+          assert result.get("continuous_coverage_verified") is False
+          assert result.get("provider_range_complete_verified") is False
+          assert result.get("source_independence_verified") is False
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only XDEX/X1.Ninja provider evidence only."
+          echo "Temporary SQLite storage only."
+          echo "No transaction construction, signing, broadcasting, custody, execution, or value movement."
