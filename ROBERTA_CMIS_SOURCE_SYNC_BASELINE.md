@@ -19,27 +19,31 @@ This file is the compact cross-project synchronization baseline and is intention
 
 ## Current synchronized accepted state
 
-### ROBERTA public `main`
+### ROBERTA public + protected core
 
-Current accepted public head at reconciliation: `ef62246b49ef9ecca3d3e7546691e86e89bb0818`.
+Current accepted public head at reconciliation: `ecad683bdc2f8e8474e33a476b3f2f758b84f183`.
+Current accepted protected `roberta-core` head at reconciliation: `c57aac701ea112fff3fc25bba28c55a4a8219adb`.
 
 Accepted product milestones include:
 
 - CMIS capability boundary `1.13.0` through X1 Scout;
 - first-class X1 `instant_x1_scan/v1` adoption through the existing Roberta -> X1 Scout -> CMIS path;
-- deterministic `instant_x1_scan_product_view/v1` Human-facing projection with unknown/unverified values preserved;
-- deterministic `x1_compare/v1` product contract;
-- first-class X1 Compare workflow using two validated Instant X1 Scan views and, only for explicit full-history intent, one capability-gated CMIS `all_available_pair` request;
-- Human ROBERTA + Machine ROBERTA two-face roadmap under one canonical intelligence/decision layer;
-- planned BURN workflow consumption of accepted CMIS burn intelligence without Roberta recomputation;
-- Learning System Phases 1-10, autonomous source-grounded Learning Plane, mastered-run replay protection, and authoritative read-only training telemetry;
+- deterministic `instant_x1_scan_product_view/v1` projection with unknown/unverified values preserved;
+- deterministic `x1_compare/v1` product contract and first-class X1 Compare workflow;
+- accepted public Canonical ROBERTA Decision Object v1 contract plus protected `roberta_decision/v1` implementation;
+- deterministic Human ROBERTA and Machine ROBERTA projections from the same canonical Decision Object for the first Instant X1 Scan tracer bullet;
+- Machine projection contract `roberta_intelligence/v1` with explicit null/unavailable preservation and bounded evidence depth;
+- no new ROBERTA trade-decision policy in the Decision Object tracer: source risk recommendation is preserved, `reason_codes=[]`, and `policy_applied=false`;
+- planned BURN / WHAT CHANGED? consumption of accepted CMIS burn intelligence without Roberta recomputation;
+- Learning System Phases 1-10, autonomous source-grounded Learning Plane, mastered-run replay protection, authoritative read-only training telemetry, and bounded scheduler/queue foundation;
+- repaired protected-core CI that validates Python 3.11, Python 3.12, and the pinned public-shell overlay rather than testing the protected overlay as a standalone host;
 - public-shell/private-core migration closure.
 
-Roberta does not gain a direct provider or direct product-level CMIS shortcut from these milestones.
+Roberta does not gain a direct provider or direct product-level CMIS shortcut from these milestones. Human/Machine presentation remains a projection layer, not a competing fact/risk authority.
 
 ### CMIS public `main`
 
-Current accepted public head at reconciliation: `aba62285c3074f2d0628111eb33a8db0e9725782`.
+Current accepted public head at reconciliation: `c4e55265d11186da50ec809d896cac7a44e575c2`.
 
 Current capability contract remains `1.13.0`. Accepted milestones include:
 
@@ -60,25 +64,27 @@ Accepted burn metrics do not imply complete lifetime burn coverage. Current on-c
 
 ### 1. Roberta burn-intelligence consumption
 
-CMIS PR #377 is accepted on `main`. Historical burn-time valuation now belongs to CMIS and remains evidence-bound and fail-closed.
+CMIS burn arithmetic, coverage semantics, period-over-period changes, circulating-supply context, and exact burn-time valuation are accepted upstream.
 
-The next burn-product gate is a separately reviewed X1 Scout/Roberta consumption path for BURN and WHAT CHANGED? views. Roberta must preserve CMIS amounts, period-over-period changes, valuation completeness, Evidence Receipt / Proof Score lineage, and unknown/partial states without recalculating burn or price values.
+The next flagship product gate is a separately reviewed X1 Scout/Roberta consumption path for **BURN** and **WHAT CHANGED?**. Roberta must preserve CMIS amounts, comparison denominators/states, valuation completeness, Evidence Receipt / Proof Score lineage, and unknown/partial states without recalculating burns or historical prices.
+
+The accepted Decision Object should be extended only through a separately tested workflow contract; burn output must not be squeezed into Instant X1 Scan semantics by implication.
 
 ### 2. CMIS delayed catalog-departure evidence — PR #363
 
 PR #363 remains open. Reconciled exact head: `208756f4880a9d6e47d377b19abab37701a83f2a`.
 
-- deterministic/full Liquidity Scout tests are green on that head;
-- X1.Ninja Delayed Vault Departure Evidence remains an evidence-accumulation gate, not a software-success shortcut;
-- the five-independent-departure floor, fixed 900-second pre-BEFORE lookback, max 100 signatures per exact vault, unique-latest-swap rule, and fail-closed ambiguity handling remain unchanged;
+- the five-independent-departure floor remains fixed;
+- the pre-BEFORE lookback remains 900 seconds with max 100 signatures per exact vault;
+- unique-latest-swap and fail-closed ambiguity requirements remain unchanged;
 - current collection settings may monitor up to 150 pools, collect up to 400 snapshots, and target 40 price-only candidates; 40 candidates is a collection target, not a promotion threshold;
 - routed/multi-AMM evidence does not authorize classifier widening without a separately accepted deterministic contract.
 
-Do not merge #363 until its exact-head live evidence gate and review requirements are satisfied. Do not lower evidence thresholds merely to obtain a passing workflow.
+Do not merge #363 merely to obtain a green workflow. Its live evidence gate must satisfy the accepted contract.
 
 ### 3. XDEX automated-order/routed-family investigation — Issue #374
 
-Issue #374 remains open and diagnostic-only. Bounded routed-target evidence does not authorize TWAP, limit, take-profit, stop-loss, or other user-level execution-family labels without family-specific deterministic evidence. `classification_change_authorized=false` remains authoritative.
+Issue #374 remains diagnostic-only. Bounded routed-target evidence does not authorize TWAP, limit, take-profit, stop-loss, or other user-level execution-family labels without family-specific deterministic evidence. `classification_change_authorized=false` remains authoritative.
 
 ### 4. X1 Discovery Ledger
 
@@ -100,8 +106,8 @@ Native Telegram adapter PR #264 remains pending. Telegram is a transport boundar
 
 ## Near-term synchronized roadmap
 
-1. **X1 flagship productization:** keep Instant X1 Scan and Compare as accepted Roberta foundations; build the canonical Roberta Decision Object and Human/Machine renderers without creating a second fact authority.
-2. **Burn intelligence productization:** add a separately gated X1 Scout/Roberta consumption path for accepted CMIS burn metrics and burn-time valuation, then expose BURN and WHAT CHANGED? views without Roberta-side recomputation.
+1. **Burn intelligence productization:** define and implement the X1 Scout/Roberta BURN + WHAT CHANGED? consumption contract over accepted CMIS burn intelligence, then project it through the canonical Decision Object without Roberta-side fact recomputation.
+2. **Decision Object expansion:** after the burn tracer is accepted, add additional workflow adapters one at a time (Compare, Discovery, Watch) while keeping one canonical intelligence basis and separate Human/Machine renderers.
 3. **Delayed price evidence:** resolve #363 using the existing strict evidence thresholds; consume routed target-leg evidence only through a separately reviewed classifier change if the evidence supports it.
 4. **Discovery:** finish public #365 + protected `cmis-core` #6, then build Scout-facing discovery/history workflows only after the foundation is accepted.
 5. **Early Warning / What Changed?:** build deterministic CMIS evidence contracts on accepted Discovery/history primitives; keep presentation/policy in Roberta.
@@ -122,4 +128,4 @@ Both projects have completed the public-shell/private-core migration and histori
 
 ## Core sync rule
 
-**Roberta may learn and orchestrate; CMIS may verify changing chain facts. Neither learning, diagnostics, roadmap state, nor an open PR self-promotes into a new authority boundary. Fresh accepted CMIS/provider evidence wins for freshness-sensitive state, and every public-service, Scout-reliance, operational-trust, wallet, or execution promotion remains separately gated.**
+**Roberta may learn, orchestrate, and project accepted intelligence; CMIS may verify changing chain facts. Neither learning, presentation, diagnostics, roadmap state, nor an open PR self-promotes into a new authority boundary. Fresh accepted CMIS/provider evidence wins for freshness-sensitive state, and every public-service, Scout-reliance, operational-trust, wallet, or execution promotion remains separately gated.**
