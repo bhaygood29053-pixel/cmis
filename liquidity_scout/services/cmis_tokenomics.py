@@ -134,6 +134,30 @@ def _warnings(report: Mapping[str, Any]) -> list:
                 "comparisons": unavailable_comparisons,
             })
 
+    burn_metrics = report.get("burn_metrics")
+    burn_metrics = burn_metrics if isinstance(burn_metrics, Mapping) else {}
+    valuation = burn_metrics.get("valuation")
+    valuation = valuation if isinstance(valuation, Mapping) else {}
+    if valuation.get("valuation_coverage_complete") is not True:
+        warnings.append({
+            "code": "burn_time_valuation_incomplete",
+            "message": (
+                "Historical burn-time valuation is incomplete or unavailable; "
+                "no current-price substitution is used."
+            ),
+            "reason": _text(valuation.get("reason")),
+            "native_status": (
+                valuation.get("native", {}).get("status")
+                if isinstance(valuation.get("native"), Mapping)
+                else None
+            ),
+            "usd_status": (
+                valuation.get("usd", {}).get("status")
+                if isinstance(valuation.get("usd"), Mapping)
+                else None
+            ),
+        })
+
     if report.get("circulating_supply_verified") is not True:
         circulating = report.get("circulating_supply_details")
         circulating = circulating if isinstance(circulating, Mapping) else {}
@@ -176,6 +200,7 @@ def build_tokenomics_response(
     get_mint_info=None,
     activity_report: Optional[Mapping[str, Any]] = None,
     circulating_supply_report: Optional[Mapping[str, Any]] = None,
+    burn_valuation_report: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Return ``tokenomics`` through the shared CMIS response contract.
 
@@ -205,6 +230,7 @@ def build_tokenomics_response(
         "name": name,
         "activity_report": activity_report,
         "circulating_supply_report": circulating_supply_report,
+        "burn_valuation_report": burn_valuation_report,
     }
     if rpc_url is not None:
         kwargs["rpc_url"] = rpc_url
