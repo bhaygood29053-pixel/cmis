@@ -200,7 +200,7 @@ def _warnings(comparison: Mapping[str, Any], confidence: Mapping[str, Any]) -> l
             if isinstance(onchain, Mapping):
                 onchain_reason = _text(onchain.get("reason"))
                 if (
-                    onchain.get("status") != "full"
+                    onchain.get("status") not in {"full", "not_requested"}
                     and onchain_reason
                     and not any(
                         item.get("code") == onchain_reason
@@ -237,6 +237,7 @@ def _attach_x1_all_available_coverage(
     rpc_provider: Any,
     page_size: int,
     max_signatures: int,
+    onchain_requested: bool = True,
 ) -> Dict[str, Any]:
     result = dict(comparison)
     asset = result.get("asset")
@@ -264,7 +265,24 @@ def _attach_x1_all_available_coverage(
         ),
     }
 
-    if mint:
+    if not onchain_requested:
+        onchain_coverage = {
+            "chain": "x1",
+            "status": "not_requested",
+            "reason": "onchain_coverage_not_requested",
+            "coverage_scope": "x1_rpc_visible_mint_address_history",
+            "subject_kind": "mint_address",
+            "mint": mint,
+            "source": None,
+            "rpc_visible_mint_history_complete": False,
+            "asset_wide_activity_verified": False,
+            "asset_lifetime_start_verified": False,
+            "full_asset_lifetime_verified": False,
+            "continuous_coverage_verified": False,
+            "archival_completeness_verified": False,
+            "limitations": [],
+        }
+    elif mint:
         onchain_coverage = build_rpc_visible_mint_history_coverage(
             mint,
             rpc_provider=rpc_provider,
@@ -326,6 +344,7 @@ def build_historical_compare_response(
     onchain_coverage_provider: Any = None,
     onchain_page_size: int = 1000,
     onchain_max_signatures: int = 5000,
+    include_onchain_coverage: bool = True,
 ) -> Dict[str, Any]:
     """Return deterministic window or all-available history through CMIS."""
 
@@ -429,6 +448,7 @@ def build_historical_compare_response(
                 rpc_provider=onchain_coverage_provider,
                 page_size=onchain_page_size,
                 max_signatures=onchain_max_signatures,
+                onchain_requested=include_onchain_coverage,
             )
         except (AttributeError, KeyError, TypeError, ValueError) as exc:
             comparison = dict(comparison)
