@@ -95,3 +95,10 @@ jobs:
           print("PUBLIC_FALLBACK_USED=FALSE")
           print("EXECUTION_AUTHORIZED=FALSE")
           PY
+
+      - name: Run public CMIS 1.14 history contract regressions
+        run: |
+          python -m pytest -q \
+            tests/test_cmis_capabilities.py \
+            tests/test_cmis_all_available_history.py \
+            tests/test_cmis_instant_x1_scan_v2_contract.py
