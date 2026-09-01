@@ -43,13 +43,13 @@ The manifest preserves:
 
 A Scout fails closed if these declarations are missing, malformed, or weakened.
 
-## Instant X1 Scan — CMIS 1.13.0
+## Instant X1 Scan — CMIS 1.14.0
 
-CMIS 1.13.0 adds one bounded X1-only composition service:
+CMIS 1.14.0 promotes the bounded X1-only composition service to:
 
 ```text
 service = instant_x1_scan
-service_contract_version = instant_x1_scan/v1
+service_contract_version = instant_x1_scan/v2
 chain = x1
 read_only = true
 public_service_promoted = true
@@ -57,11 +57,15 @@ scout_reliance_promoted = true
 execution_authorized = false
 ```
 
-The service composes accepted CMIS outputs for exact identity, current market, tokenomics, CMIS-stored verified history, and deterministic risk. It does not introduce a new provider or a second truth path.
+The service composes accepted CMIS outputs for exact identity, current market, tokenomics, verified historical observations, deterministic risk, and runtime evidence-quality metadata. It does not introduce a new truth authority.
 
-The scan's history section is local-only: it does not trigger XDEX/X1.Ninja historical backfill or X1 RPC history-coverage expansion. A separate local 24h verified-price comparison may be supplied to the existing deterministic risk core.
+Instant X1 Scan v2 may invoke the already accepted bounded XDEX/X1.Ninja price-history backfill before constructing the all-available history section. Imported observations are cross-corroborated under the existing provider-price contract and remain price-only. The scan exposes exact verified observation bounds, observation counts, gap diagnostics, and provider-backfill metadata.
 
-Holder-looking provider values remain unverified unless the existing holder semantic/coverage contract passes. Current top-account concentration is explicitly unavailable in `instant_x1_scan/v1`; internal Phase 11 foundations are not used as a public shortcut.
+Provider range/archive completeness, source independence, complete asset lifetime, and continuous historical coverage remain unverified unless separate deterministic proof gates establish them. v2 must not turn a longer bounded series into a lifetime or continuity claim.
+
+The scan intentionally does not expand X1 RPC mint-address coverage. Omitted on-chain coverage is represented as `not_requested`, not as a missing-provider error. This distinction does not weaken ordinary `historical_compare` coverage semantics.
+
+Holder-looking provider values remain unverified unless the existing holder semantic/coverage contract passes. Current top-account concentration is explicitly unavailable in `instant_x1_scan/v2`; internal intelligence foundations are not used as a public shortcut.
 
 The runtime EvidenceQualityMixin attaches the scan Evidence Receipt and Proof Score after the deterministic service result is complete. Proof Score remains separate from risk and cannot rewrite facts, scan status, or authority.
 
