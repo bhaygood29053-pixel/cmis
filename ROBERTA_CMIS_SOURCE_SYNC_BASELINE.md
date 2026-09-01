@@ -21,7 +21,7 @@ This file is the compact cross-project synchronization baseline and is intention
 
 ### ROBERTA public `main`
 
-Current accepted public head at reconciliation: `9b3de1de8ba5033df046657fc936bee8d496c6a3`.
+Current accepted public head at reconciliation: `ef62246b49ef9ecca3d3e7546691e86e89bb0818`.
 
 Accepted product milestones include:
 
@@ -31,7 +31,7 @@ Accepted product milestones include:
 - deterministic `x1_compare/v1` product contract;
 - first-class X1 Compare workflow using two validated Instant X1 Scan views and, only for explicit full-history intent, one capability-gated CMIS `all_available_pair` request;
 - Human ROBERTA + Machine ROBERTA two-face roadmap under one canonical intelligence/decision layer;
-- planned BURN workflow consumption of CMIS burn intelligence and period-over-period burn change without Roberta recomputation;
+- planned BURN workflow consumption of accepted CMIS burn intelligence without Roberta recomputation;
 - Learning System Phases 1-10, autonomous source-grounded Learning Plane, mastered-run replay protection, and authoritative read-only training telemetry;
 - public-shell/private-core migration closure.
 
@@ -39,7 +39,7 @@ Roberta does not gain a direct provider or direct product-level CMIS shortcut fr
 
 ### CMIS public `main`
 
-Current accepted public head at reconciliation: `dfae29c48ad013e12ea3498dfcd63cc3df855783`.
+Current accepted public head at reconciliation: `aba62285c3074f2d0628111eb33a8db0e9725782`.
 
 Current capability contract remains `1.13.0`. Accepted milestones include:
 
@@ -51,33 +51,34 @@ Current capability contract remains `1.13.0`. Accepted milestones include:
 - deterministic X1 burn metrics for 1h/24h/7d/30d windows, burn event/count amounts, burn-to-emission and net-issuance state, and 24h/7d/30d period-over-period burn change;
 - verified scanner fact-time coverage wired into CMIS tokenomics burn metrics;
 - deterministic circulating-supply evidence based only on a complete independently verified excluded-token-account universe, while preserving verified total supply if circulation is unavailable;
+- deterministic historical burn-time valuation under `verified_burn_time_price_evidence_v1`, requiring exact verified burn identity and exact compatible burn-time price fact time, with native/XNT and USD completeness independently gated and no current-price/nearest-price/interpolation fallback;
 - public-shell/private-core migration closure.
 
-Accepted burn metrics do not imply complete lifetime burn coverage. Current on-chain supply is not reduced a second time by burn totals.
+Accepted burn metrics do not imply complete lifetime burn coverage. Current on-chain supply is not reduced a second time by burn totals. Burn valuation is complete only where every burn event in the asserted scope has compatible verified price evidence for the denomination being claimed.
 
 ## Active cross-project work
 
-### 1. CMIS burn intelligence completion
+### 1. Roberta burn-intelligence consumption
 
-CMIS PR #377 is pending for deterministic historical burn-time valuation. It requires exact verified burn events and exact compatible burn-time price evidence; current price, nearest price, interpolated price, or unverified stable-quote equivalence must not be substituted. Native/XNT and USD completeness remain independently gated.
+CMIS PR #377 is accepted on `main`. Historical burn-time valuation now belongs to CMIS and remains evidence-bound and fail-closed.
 
-Roberta may consume this only after CMIS acceptance and a separately valid X1 Scout consumption path. Roberta must not calculate historical burn valuation independently.
+The next burn-product gate is a separately reviewed X1 Scout/Roberta consumption path for BURN and WHAT CHANGED? views. Roberta must preserve CMIS amounts, period-over-period changes, valuation completeness, Evidence Receipt / Proof Score lineage, and unknown/partial states without recalculating burn or price values.
 
 ### 2. CMIS delayed catalog-departure evidence — PR #363
 
 PR #363 remains open. Reconciled exact head: `208756f4880a9d6e47d377b19abab37701a83f2a`.
 
 - deterministic/full Liquidity Scout tests are green on that head;
-- X1.Ninja Delayed Vault Departure Evidence run #16 failed;
+- X1.Ninja Delayed Vault Departure Evidence remains an evidence-accumulation gate, not a software-success shortcut;
 - the five-independent-departure floor, fixed 900-second pre-BEFORE lookback, max 100 signatures per exact vault, unique-latest-swap rule, and fail-closed ambiguity handling remain unchanged;
-- PR #371 and its routed XDEX target-leg work from PR #376 are integrated into the #363 branch, not accepted on CMIS `main` by implication;
-- secondary archival-RPC cross-checking and run-to-run evidence-ledger support are evidence aids only and do not establish provider source independence or loosen the classifier.
+- current collection settings may monitor up to 150 pools, collect up to 400 snapshots, and target 40 price-only candidates; 40 candidates is a collection target, not a promotion threshold;
+- routed/multi-AMM evidence does not authorize classifier widening without a separately accepted deterministic contract.
 
 Do not merge #363 until its exact-head live evidence gate and review requirements are satisfied. Do not lower evidence thresholds merely to obtain a passing workflow.
 
 ### 3. XDEX automated-order/routed-family investigation — Issue #374
 
-Issue #374 remains open and diagnostic-only. PR #376 proved a bounded routed target-leg development set, but issue #374 still does not authorize TWAP, limit, take-profit, stop-loss, or other user-level execution-family labels without family-specific deterministic evidence. `classification_change_authorized=false` remains authoritative.
+Issue #374 remains open and diagnostic-only. Bounded routed-target evidence does not authorize TWAP, limit, take-profit, stop-loss, or other user-level execution-family labels without family-specific deterministic evidence. `classification_change_authorized=false` remains authoritative.
 
 ### 4. X1 Discovery Ledger
 
@@ -85,7 +86,7 @@ Public CMIS PR #365 and protected `cmis-core` PR #6 remain pending.
 
 The intended `x1_discovery_ledger/v1` foundation preserves exact X1 mint identity, immutable first/subsequent verified observation semantics, verified fact time separate from recorded time, deterministic replay/idempotency, Evidence Receipt / Proof Score lineage, and explicit non-lifetime/non-launch semantics.
 
-Protected `cmis-core` PR #6 has local deterministic/package validation evidence but remains blocked by the required private GitHub Actions runner/startup gate. The public/private boundary must not be weakened to bypass that blocker.
+The public/private boundary must not be weakened to bypass protected-runtime validation requirements.
 
 ### 5. Roberta Learning Plane operational hardening
 
@@ -100,7 +101,7 @@ Native Telegram adapter PR #264 remains pending. Telegram is a transport boundar
 ## Near-term synchronized roadmap
 
 1. **X1 flagship productization:** keep Instant X1 Scan and Compare as accepted Roberta foundations; build the canonical Roberta Decision Object and Human/Machine renderers without creating a second fact authority.
-2. **Burn intelligence:** finish and accept CMIS burn-time valuation, then add a separately gated Scout/Roberta consumption path for BURN and WHAT CHANGED? views.
+2. **Burn intelligence productization:** add a separately gated X1 Scout/Roberta consumption path for accepted CMIS burn metrics and burn-time valuation, then expose BURN and WHAT CHANGED? views without Roberta-side recomputation.
 3. **Delayed price evidence:** resolve #363 using the existing strict evidence thresholds; consume routed target-leg evidence only through a separately reviewed classifier change if the evidence supports it.
 4. **Discovery:** finish public #365 + protected `cmis-core` #6, then build Scout-facing discovery/history workflows only after the foundation is accepted.
 5. **Early Warning / What Changed?:** build deterministic CMIS evidence contracts on accepted Discovery/history primitives; keep presentation/policy in Roberta.
