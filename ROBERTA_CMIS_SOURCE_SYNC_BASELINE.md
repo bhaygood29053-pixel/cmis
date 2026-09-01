@@ -129,3 +129,33 @@ Both projects have completed the public-shell/private-core migration and histori
 ## Core sync rule
 
 **Roberta may learn, orchestrate, and project accepted intelligence; CMIS may verify changing chain facts. Neither learning, presentation, diagnostics, roadmap state, nor an open PR self-promotes into a new authority boundary. Fresh accepted CMIS/provider evidence wins for freshness-sensitive state, and every public-service, Scout-reliance, operational-trust, wallet, or execution promotion remains separately gated.**
+
+## Live repository reconciliation — 2026-09-01 11:20 America/New_York
+
+These heads were observed after the repository-local roadmap/status updates and immediately before this mirrored baseline commit:
+
+- CMIS public `main`: `0000f0e11dcba5f4349f9ee4b2a6ef573dbfdb4d`
+- ROBERTA public `main`: `556f969d71ece156378a8d4eaa3879ab0fbb1d2f`
+- protected `roberta-core` `main`: `822d0be6537f9dba8cb5dc12a6b947f24ca75e0b`
+- protected `cmis-core` `main`: `b044a651e8aa99337365e6114e10df1c2fd6e9ee`
+
+### Live synchronized gate state
+
+- **CMIS burn valuation:** PR #377 is merged/accepted.
+- **ROBERTA BURN productization:** PR #295 is open, clean, and CI green; this is the immediate ROBERTA product gate.
+- **CMIS delayed departure evidence:** PR #363 is open; deterministic tests are green while the live X1.Ninja Delayed Vault Departure Evidence workflow remains in progress. Strict evidence thresholds remain unchanged.
+- **Discovery Ledger:** CMIS public #365 is clean and public tests pass; protected `cmis-core` #6 still has failing private-core CI, so the pair is not accepted.
+- **Learning Plane:** protected `roberta-core` #11 still has failing private-core CI; broader unattended scheduling remains blocked.
+- **Telegram:** ROBERTA #264 remains open and dirty/non-mergeable. Telegram is transport only and no OpenClaw dependency is accepted.
+- **Controlled Execution:** locked/not started; `execution_authorized=false`.
+
+### Synchronized priority order
+
+1. Accept ROBERTA #295 and complete the BURN Decision Object tracer over CMIS-owned burn evidence.
+2. Keep CMIS #363 running under the existing evidence contract; diagnose failures without weakening thresholds.
+3. Repair `cmis-core` #6 CI and accept Discovery Ledger public/private pair.
+4. Repair `roberta-core` #11 CI and accept bounded one-cycle training orchestration.
+5. Add Discovery, WHAT CHANGED?, and Early Warning only after their CMIS evidence foundations are accepted.
+6. Accumulate execution-quality evidence before any expected-slippage contract.
+7. Rebase/repair Telegram after the core intelligence gates.
+8. Keep Solana secondary/read-only and Controlled Execution locked.
