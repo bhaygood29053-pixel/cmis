@@ -198,8 +198,30 @@ def all_available_history_envelope():
             "asset_lifetime_start_verified": False,
             "full_asset_lifetime_verified": False,
             "continuous_coverage_verified": False,
+            "provider_history_imported": True,
+            "provider_price_history": {
+                "available": True,
+                "usable_observation_count": 24,
+                "first_observed_at": 100,
+                "last_observed_at": 1000,
+            },
+            "provider_history_backfill": {
+                "status": "partial",
+                "provider_history_imported": True,
+                "stored_verified_provider_observation_count": 24,
+                "full_asset_lifetime_verified": False,
+                "continuous_coverage_verified": False,
+            },
             "metrics": {
-                "price": metric(1.0, 0.8, 25.0, -8.0),
+                "price": {
+                    **metric(1.0, 0.8, 25.0, -8.0),
+                    "coverage_seconds": 900,
+                    "observed_gap_count": 0,
+                    "largest_observed_gap_seconds": 300,
+                    "gap_threshold_seconds": 129600,
+                    "provider_backfill_observation_count": 24,
+                    "provider_history_imported": True,
+                },
                 "liquidity": metric(5000.0, 4000.0, 25.0),
                 "volume": metric(1200.0, 1000.0, 20.0),
                 "transactions": metric(42.0, 30.0, 40.0),
@@ -241,6 +263,7 @@ class _ScanBase:
         self.lookup = identity_envelope()
         self.market = market_envelope()
         self.tokenomics = tokenomics_envelope()
+        self.provider_backfill_calls = []
 
     def _asset_lookup(self, _asset):
         return self.lookup
@@ -251,6 +274,19 @@ class _ScanBase:
     def _tokenomics(self, _asset, params):
         self.tokenomics_params = dict(params)
         return self.tokenomics
+
+    def _maybe_backfill_verified_xdex_price_history(self, market, **kwargs):
+        self.provider_backfill_calls.append((market, dict(kwargs)))
+        return {
+            "status": "partial",
+            "reason": "verified_provider_price_history_backfilled",
+            "provider_history_imported": True,
+            "stored_verified_provider_observation_count": 24,
+            "first_imported_observed_at": 100,
+            "last_imported_observed_at": 1000,
+            "full_asset_lifetime_verified": False,
+            "continuous_coverage_verified": False,
+        }
 
     def _historical_from_market(self, question, market, **kwargs):
         self.history_calls.append((question, market, dict(kwargs)))
@@ -365,6 +401,15 @@ class InstantX1ScanTests(unittest.TestCase):
         self.assertEqual(history["metrics"]["price"]["observation_count"], 3)
         self.assertEqual(history["metrics"]["price"]["total_change_pct"], 25.0)
         self.assertFalse(history["full_asset_lifetime_verified"])
+        self.assertTrue(history["provider_history_imported"])
+        self.assertEqual(
+            history["coverage_scope"],
+            "cmis_verified_observations_with_bounded_provider_price_backfill",
+        )
+        self.assertEqual(
+            history["metrics"]["price"]["provider_backfill_observation_count"],
+            24,
+        )
 
         self.assertEqual(sections["risk"]["recommendation"], "WARN")
         self.assertFalse(sections["risk"]["score_verified"])
@@ -375,7 +420,7 @@ class InstantX1ScanTests(unittest.TestCase):
             ]
         )
 
-    def test_runtime_composition_uses_local_history_only_and_adds_evidence_quality(self):
+    def test_runtime_composition_uses_bounded_price_backfill_without_onchain_expansion(self):
         gateway = _ScanGateway()
         response = gateway.dispatch({
             "service": "instant_x1_scan",
@@ -385,6 +430,11 @@ class InstantX1ScanTests(unittest.TestCase):
         })
 
         self.assertEqual(response["status"], "partial")
+        self.assertEqual(len(gateway.provider_backfill_calls), 1)
+        _market, backfill_kwargs = gateway.provider_backfill_calls[0]
+        self.assertEqual(backfill_kwargs["lookback_days"], 300)
+        self.assertEqual(backfill_kwargs["min_refresh_seconds"], 21600)
+        self.assertEqual(backfill_kwargs["rel_tolerance"], 0.005)
         self.assertEqual(len(gateway.history_calls), 2)
 
         question, _market, kwargs = gateway.history_calls[0]
@@ -399,7 +449,12 @@ class InstantX1ScanTests(unittest.TestCase):
         self.assertEqual(kwargs["mode"], "window")
         self.assertFalse(kwargs["include_onchain_coverage"])
         self.assertFalse(kwargs["include_supply_lookup"])
-        self.assertNotIn("provider_history_backfill", kwargs)
+        history_section = response["data"]["sections"]["history"]
+        self.assertTrue(history_section["provider_history_imported"])
+        self.assertEqual(
+            history_section["provider_history_backfill"]["status"],
+            "partial",
+        )
 
         self.assertEqual(gateway.tokenomics_params, {})
         self.assertIn("evidence_receipt", response)
