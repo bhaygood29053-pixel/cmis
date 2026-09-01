@@ -237,7 +237,6 @@ def _attach_x1_all_available_coverage(
     rpc_provider: Any,
     page_size: int,
     max_signatures: int,
-    onchain_requested: bool = True,
 ) -> Dict[str, Any]:
     result = dict(comparison)
     asset = result.get("asset")
@@ -265,7 +264,7 @@ def _attach_x1_all_available_coverage(
         ),
     }
 
-    if not onchain_requested:
+    if rpc_provider is None:
         onchain_coverage = {
             "chain": "x1",
             "status": "not_requested",
@@ -344,7 +343,6 @@ def build_historical_compare_response(
     onchain_coverage_provider: Any = None,
     onchain_page_size: int = 1000,
     onchain_max_signatures: int = 5000,
-    include_onchain_coverage: bool = True,
 ) -> Dict[str, Any]:
     """Return deterministic window or all-available history through CMIS."""
 
@@ -448,7 +446,6 @@ def build_historical_compare_response(
                 rpc_provider=onchain_coverage_provider,
                 page_size=onchain_page_size,
                 max_signatures=onchain_max_signatures,
-                onchain_requested=include_onchain_coverage,
             )
         except (AttributeError, KeyError, TypeError, ValueError) as exc:
             comparison = dict(comparison)
