@@ -865,3 +865,14 @@ No accepted CMIS roadmap item authorizes:
 - autonomous value movement.
 
 Controlled Execution remains unauthorized.
+
+## Live reconciliation — 2026-09-01 11:20 America/New_York
+
+The following state supersedes any older "pending" language in this file:
+
+- Historical burn-time valuation is **COMPLETE / accepted** via merged CMIS PR #377.
+- Current flagship CMIS blocker is **PR #363**, whose deterministic test suite is green while the live delayed-vault evidence workflow remains in progress under the strict five-event contract.
+- **Discovery Ledger v1** remains paired work: public #365 is clean; protected `cmis-core` #6 still fails private-core CI and therefore blocks acceptance.
+- No routed/automated-order family classifier is promoted from issue #374 diagnostics.
+- Next accepted-service sequence is: Discovery Ledger -> Scout-facing Discovery -> WHAT CHANGED? / Early Warning -> execution-quality statistics.
+- Controlled Execution remains locked and `execution_authorized=false`.
