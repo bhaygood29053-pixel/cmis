@@ -66,3 +66,14 @@ Roberta public `main` has already adopted Instant X1 Scan and first-class X1 Com
 ## Safety boundary
 
 `read_only=true` for the evidence work described here. `execution_authorized=false`. No roadmap item authorizes transaction construction, signing, broadcasting, custody, trading, bridge movement, or autonomous value movement.
+
+## Live status — 2026-09-01 11:20 America/New_York
+
+- Repository: `bhaygood29053-pixel/cmis`
+- Current main head observed before this status commit: `b8bb2af4653a3c55d52efc2c8d954fc0d390183d`
+- PR #377 burn-time valuation: **MERGED / ACCEPTED**
+- PR #363 delayed departure evidence: **OPEN / LIVE EVIDENCE WORKFLOW IN PROGRESS**; deterministic tests pass; mergeable state unstable
+- PR #365 Discovery Ledger public contract: **OPEN / CLEAN / PUBLIC TESTS PASS**
+- Private companion `bhaygood29053-pixel/cmis-core#6`: **OPEN / PRIVATE CI FAILING**
+- Routed/automated-order classification: **NOT PROMOTED**
+- Execution authorization: **FALSE**
