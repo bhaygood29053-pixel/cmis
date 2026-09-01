@@ -21,8 +21,8 @@ This file is the compact cross-project synchronization baseline and is intention
 
 ### ROBERTA public + protected core
 
-Current accepted public head at reconciliation: `ecad683bdc2f8e8474e33a476b3f2f758b84f183`.
-Current accepted protected `roberta-core` head at reconciliation: `c57aac701ea112fff3fc25bba28c55a4a8219adb`.
+Current accepted public head observed before this baseline update: `c5c1ecc3b106d6a2111156b09a4d24f1c910bd4b`.
+Current accepted protected `roberta-core` head observed before this baseline update: `822d0be6537f9dba8cb5dc12a6b947f24ca75e0b`.
 
 Accepted product milestones include:
 
@@ -34,7 +34,7 @@ Accepted product milestones include:
 - deterministic Human ROBERTA and Machine ROBERTA projections from the same canonical Decision Object for the first Instant X1 Scan tracer bullet;
 - Machine projection contract `roberta_intelligence/v1` with explicit null/unavailable preservation and bounded evidence depth;
 - no new ROBERTA trade-decision policy in the Decision Object tracer: source risk recommendation is preserved, `reason_codes=[]`, and `policy_applied=false`;
-- planned BURN / WHAT CHANGED? consumption of accepted CMIS burn intelligence without Roberta recomputation;
+- merged X1 Scout `x1_burn_intelligence/v1` tracer over accepted CMIS tokenomics, with follow-up hardening PR #295 as the immediate acceptance gate before Canonical Decision Object / Human-Machine BURN integration;
 - Learning System Phases 1-10, autonomous source-grounded Learning Plane, mastered-run replay protection, authoritative read-only training telemetry, and bounded scheduler/queue foundation;
 - repaired protected-core CI that validates Python 3.11, Python 3.12, and the pinned public-shell overlay rather than testing the protected overlay as a standalone host;
 - public-shell/private-core migration closure.
@@ -43,7 +43,7 @@ Roberta does not gain a direct provider or direct product-level CMIS shortcut fr
 
 ### CMIS public `main`
 
-Current accepted public head at reconciliation: `c4e55265d11186da50ec809d896cac7a44e575c2`.
+Current accepted public head observed before this baseline update: `9392eb45983eea816701babbe39b29c2d85850f4`.
 
 Current capability contract remains `1.13.0`. Accepted milestones include:
 
@@ -64,11 +64,11 @@ Accepted burn metrics do not imply complete lifetime burn coverage. Current on-c
 
 ### 1. Roberta burn-intelligence consumption
 
-CMIS burn arithmetic, coverage semantics, period-over-period changes, circulating-supply context, and exact burn-time valuation are accepted upstream.
+CMIS burn arithmetic, coverage semantics, period-over-period changes, circulating-supply context, and exact burn-time valuation are accepted upstream. The first X1 Scout `x1_burn_intelligence/v1` tracer is merged on Roberta `main`.
 
-The next flagship product gate is a separately reviewed X1 Scout/Roberta consumption path for **BURN** and **WHAT CHANGED?**. Roberta must preserve CMIS amounts, comparison denominators/states, valuation completeness, Evidence Receipt / Proof Score lineage, and unknown/partial states without recalculating burns or historical prices.
+Follow-up hardening PR #295 remains the immediate product gate. After that gate, BURN must be mapped into the Canonical ROBERTA Decision Object and Human/Machine renderers through a separately tested workflow adapter. Roberta must preserve CMIS amounts, comparison denominators/states, valuation completeness, Evidence Receipt / Proof Score lineage, and unknown/partial states without recalculating burns or historical prices.
 
-The accepted Decision Object should be extended only through a separately tested workflow contract; burn output must not be squeezed into Instant X1 Scan semantics by implication.
+Burn output must not be squeezed into Instant X1 Scan semantics by implication.
 
 ### 2. CMIS delayed catalog-departure evidence — PR #363
 
@@ -106,8 +106,8 @@ Native Telegram adapter PR #264 remains pending. Telegram is a transport boundar
 
 ## Near-term synchronized roadmap
 
-1. **Burn intelligence productization:** define and implement the X1 Scout/Roberta BURN + WHAT CHANGED? consumption contract over accepted CMIS burn intelligence, then project it through the canonical Decision Object without Roberta-side fact recomputation.
-2. **Decision Object expansion:** after the burn tracer is accepted, add additional workflow adapters one at a time (Compare, Discovery, Watch) while keeping one canonical intelligence basis and separate Human/Machine renderers.
+1. **Burn intelligence productization:** finish PR #295 hardening, then map the accepted X1 Scout BURN projection into the Canonical Decision Object and consistent Human/Machine renderers without Roberta-side fact recomputation.
+2. **Decision Object expansion:** keep SCAN, COMPARE, BURN, and later Discovery/Watch workflows on one canonical intelligence basis, adding adapters one at a time.
 3. **Delayed price evidence:** resolve #363 using the existing strict evidence thresholds; consume routed target-leg evidence only through a separately reviewed classifier change if the evidence supports it.
 4. **Discovery:** finish public #365 + protected `cmis-core` #6, then build Scout-facing discovery/history workflows only after the foundation is accepted.
 5. **Early Warning / What Changed?:** build deterministic CMIS evidence contracts on accepted Discovery/history primitives; keep presentation/policy in Roberta.
@@ -134,8 +134,8 @@ Both projects have completed the public-shell/private-core migration and histori
 
 These heads were observed after the repository-local roadmap/status updates and immediately before this mirrored baseline commit:
 
-- CMIS public `main`: `0000f0e11dcba5f4349f9ee4b2a6ef573dbfdb4d`
-- ROBERTA public `main`: `556f969d71ece156378a8d4eaa3879ab0fbb1d2f`
+- CMIS public `main`: `9392eb45983eea816701babbe39b29c2d85850f4`
+- ROBERTA public `main`: `c5c1ecc3b106d6a2111156b09a4d24f1c910bd4b`
 - protected `roberta-core` `main`: `822d0be6537f9dba8cb5dc12a6b947f24ca75e0b`
 - protected `cmis-core` `main`: `b044a651e8aa99337365e6114e10df1c2fd6e9ee`
 
