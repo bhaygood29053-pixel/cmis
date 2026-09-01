@@ -60,8 +60,8 @@ Accepted on `main`:
 - **Deterministic direct wallet-relationship evidence:** complete, internal/read-only/non-promoted, explicit non-ownership semantics.
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
-- **CMIS capability contract:** `1.13.0`.
-- **Instant X1 Scan `instant_x1_scan/v1`:** accepted, X1-only, read-only, composition-only, and fail-closed.
+- **CMIS capability contract:** `1.14.0`.
+- **Instant X1 Scan `instant_x1_scan/v2`:** bounded X1-only read-only composition with accepted provider-backed price-history enrichment; lifetime/archive/continuity claims remain fail-closed.
 - **X1 burn intelligence foundations:** deterministic 1h/24h/7d/30d burn metrics, period-over-period change, verified scanner fact-time coverage, deterministic circulating-supply evidence, and exact historical burn-time valuation are accepted on `main`.
 - **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
