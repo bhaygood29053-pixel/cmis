@@ -313,7 +313,6 @@ class AllAvailableHistoryTests(unittest.TestCase):
             mode="all_available",
             metrics=["price"],
             onchain_coverage_provider=None,
-            include_onchain_coverage=False,
         )
 
         onchain = response["data"]["coverage"]["onchain"]
