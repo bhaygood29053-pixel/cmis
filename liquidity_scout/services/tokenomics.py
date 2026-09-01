@@ -16,6 +16,7 @@ from liquidity_scout.tokenomics import (
     get_token_supply as core_get_token_supply,
 )
 from liquidity_scout.tokenomics.burn_metrics import build_burn_metrics
+from liquidity_scout.tokenomics.burn_valuation import build_burn_valuation
 from liquidity_scout.tokenomics.circulating_supply import (
     build_circulating_supply_metrics,
 )
@@ -414,6 +415,7 @@ def build_tokenomics_report(
     get_mint_info=core_get_mint_info,
     activity_report=None,
     circulating_supply_report=None,
+    burn_valuation_report=None,
 ):
     """Return verified current supply, authority, and bounded activity facts.
 
@@ -426,7 +428,9 @@ def build_tokenomics_report(
     come from a separate scanner boundary; this service never initiates token-
     history scanning. ``circulating_supply_report`` must come from a separate
     deterministic exclusion-evidence boundary; this service does not discover
-    or classify non-circulating accounts itself.
+    or classify non-circulating accounts itself. ``burn_valuation_report``
+    must come from a separate verified historical-price boundary; this service
+    never substitutes current prices or interpolates missing burn-time prices.
     """
     mint = _text(mint)
     if not mint:
@@ -550,17 +554,47 @@ def build_tokenomics_report(
         token_activity,
         decimals=decimals,
     )
+
+    if burn_metrics.get("available") is True:
+        burn_valuation = build_burn_valuation(
+            activity_report.get("events") if isinstance(activity_report, dict) else None,
+            burn_valuation_report,
+            mint=mint,
+            decimals=decimals,
+            observed_at=token_activity.get("observed_at"),
+            burn_events_verified=(
+                burn_metrics.get("observed_event_totals_verified") is True
+            ),
+            burn_windows=burn_metrics.get("windows"),
+        )
+    else:
+        burn_valuation = {
+            "available": False,
+            "status": "unavailable",
+            "reason": "burn_metrics_unavailable_for_valuation",
+            "valuation_coverage_complete": False,
+        }
+
+    burn_metrics["valuation"] = burn_valuation
     burn_metrics["circulating_supply"] = circulating_supply_details
     if burn_metrics.get("available") is True:
         partial_reasons = [
             reason
             for reason in list(burn_metrics.get("partial_reasons") or [])
-            if reason != "circulating_supply_contract_not_supplied"
+            if reason not in {
+                "circulating_supply_contract_not_supplied",
+                "historical_burn_time_valuation_not_supplied",
+            }
         ]
         if circulating_supply_details.get("circulating_supply_verified") is not True:
             partial_reasons.append(
                 circulating_supply_details.get("reason")
                 or "circulating_supply_unverified"
+            )
+        if burn_valuation.get("valuation_coverage_complete") is not True:
+            partial_reasons.append(
+                burn_valuation.get("reason")
+                or "burn_time_valuation_coverage_incomplete"
             )
         burn_metrics["partial_reasons"] = partial_reasons
         burn_metrics["status"] = "partial" if partial_reasons else "ok"
@@ -617,6 +651,7 @@ def build_tokenomics_report(
             "mint_account": mint_record.get("source"),
             "token_activity": token_activity.get("source"),
             "circulating_supply": circulating_supply_details.get("source"),
+            "burn_valuation": burn_valuation.get("source"),
         },
         "unavailable_reasons": unavailable_reasons,
     }

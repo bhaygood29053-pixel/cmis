@@ -7,7 +7,12 @@ from liquidity_scout.services import (
     UNAVAILABLE,
     build_tokenomics_response,
 )
-from liquidity_scout.tokenomics import CIRCULATION_CONTRACT, X1RPCError
+from liquidity_scout.tokenomics import (
+    CIRCULATION_CONTRACT,
+    FACT_TIME_POLICY,
+    VALUATION_CONTRACT,
+    X1RPCError,
+)
 
 
 MINT = "MintA"
@@ -87,6 +92,61 @@ def circulation_report(
             },
         ],
     }
+
+
+def valuation_report(*, native=True, usd=True):
+    burn_time = NOW - 300
+    event = {
+        "event_key": "burn-1",
+        "mint": MINT,
+        "raw_amount": "1000000",
+        "burn_block_time": burn_time,
+    }
+    if native:
+        event["native"] = {
+            "unit": "XNT",
+            "price": "2",
+            "price_verified": True,
+            "historical_price_verified": True,
+            "unit_verified": True,
+            "price_fact_time": burn_time,
+            "price_observed_at": burn_time + 10,
+            "fact_time_policy": FACT_TIME_POLICY,
+            "source": "verified native burn-time price",
+        }
+    if usd:
+        event["usd"] = {
+            "unit": "USD",
+            "price": "3",
+            "price_verified": True,
+            "historical_price_verified": True,
+            "unit_verified": True,
+            "price_fact_time": burn_time,
+            "price_observed_at": burn_time + 10,
+            "fact_time_policy": FACT_TIME_POLICY,
+            "source": "verified USD burn-time price",
+        }
+    return {
+        "mint": MINT,
+        "decimals": 6,
+        "contract": VALUATION_CONTRACT,
+        "contract_verified": True,
+        "source": "CMIS verified burn-time price evidence",
+        "events": [event],
+    }
+
+
+def activity_report_with_valuation_identity():
+    report = activity_report()
+    report["events"] = [
+        dict(report["events"][0]),
+        dict(report["events"][1]),
+        {
+            **report["events"][2],
+            "event_key": "burn-1",
+        },
+    ]
+    return report
 
 
 def activity_report(**overrides):
@@ -267,6 +327,80 @@ class CMISTokenomicsContractTests(unittest.TestCase):
             },
             response["sources"],
         )
+
+    def test_complete_circulation_and_burn_valuation_finish_burn_intelligence(self):
+        response = build_tokenomics_response(
+            MINT,
+            get_token_supply=lambda mint, **kwargs: supply_record(),
+            get_mint_info=lambda mint, **kwargs: mint_record(),
+            activity_report=activity_report_with_valuation_identity(),
+            circulating_supply_report=circulation_report(),
+            burn_valuation_report=valuation_report(),
+        )
+
+        self.assertEqual(response["status"], OK)
+        burn_metrics = response["data"]["burn_metrics"]
+        self.assertEqual(burn_metrics["status"], "ok")
+        self.assertEqual(burn_metrics["partial_reasons"], [])
+
+        valuation = burn_metrics["valuation"]
+        self.assertTrue(valuation["valuation_coverage_complete"])
+        self.assertEqual(
+            valuation["verified_native_value_destroyed_observed"],
+            "2",
+        )
+        self.assertEqual(
+            valuation["verified_usd_value_destroyed_observed"],
+            "3",
+        )
+        self.assertEqual(
+            valuation["windows"]["24h"]["usd"]["complete_value_destroyed"],
+            "3",
+        )
+
+        codes = {warning["code"] for warning in response["warnings"]}
+        self.assertNotIn("burn_metrics_partial", codes)
+        self.assertNotIn("burn_time_valuation_incomplete", codes)
+        self.assertNotIn("circulating_supply_unverified", codes)
+        self.assertIn("lifetime_coverage_unverified", codes)
+        self.assertIn("maximum_supply_unverified", codes)
+        self.assertIn(
+            {
+                "source": "CMIS verified burn-time price evidence",
+                "role": "tokenomics.burn_valuation",
+            },
+            response["sources"],
+        )
+
+    def test_partial_burn_valuation_warns_without_claiming_complete_total(self):
+        response = build_tokenomics_response(
+            MINT,
+            get_token_supply=lambda mint, **kwargs: supply_record(),
+            get_mint_info=lambda mint, **kwargs: mint_record(),
+            activity_report=activity_report_with_valuation_identity(),
+            circulating_supply_report=circulation_report(),
+            burn_valuation_report=valuation_report(native=False, usd=True),
+        )
+
+        burn_metrics = response["data"]["burn_metrics"]
+        valuation = burn_metrics["valuation"]
+        self.assertEqual(burn_metrics["status"], "partial")
+        self.assertEqual(valuation["status"], "partial")
+        self.assertFalse(valuation["valuation_coverage_complete"])
+        self.assertEqual(valuation["usd"]["verified_value_destroyed"], "3")
+        self.assertIsNone(valuation["native"]["complete_value_destroyed"])
+
+        warning = next(
+            item
+            for item in response["warnings"]
+            if item["code"] == "burn_time_valuation_incomplete"
+        )
+        self.assertEqual(
+            warning["reason"],
+            "burn_time_valuation_coverage_incomplete",
+        )
+        self.assertEqual(warning["native_status"], "unavailable")
+        self.assertEqual(warning["usd_status"], "ok")
 
     def test_rpc_supply_slot_mismatch_withholds_circulation(self):
         response = build_tokenomics_response(

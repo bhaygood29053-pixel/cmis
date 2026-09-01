@@ -1,6 +1,7 @@
 import unittest
 
 from liquidity_scout.services import build_tokenomics_report
+from liquidity_scout.tokenomics import FACT_TIME_POLICY, VALUATION_CONTRACT
 
 
 MINT = "MintA"
@@ -106,7 +107,74 @@ def activity_report(**overrides):
     return value
 
 
-def report_with_activity(activity, *, supply=None):
+def valuation_report(
+    *,
+    burn_time=NOW - 300,
+    native=True,
+    usd=True,
+    usd_fact_time=None,
+):
+    event = {
+        "event_key": "burn-1",
+        "mint": MINT,
+        "raw_amount": "1250000",
+        "burn_block_time": burn_time,
+    }
+    if native:
+        event["native"] = {
+            "unit": "XNT",
+            "price": "2",
+            "price_verified": True,
+            "historical_price_verified": True,
+            "unit_verified": True,
+            "price_fact_time": burn_time,
+            "price_observed_at": burn_time + 10,
+            "fact_time_policy": FACT_TIME_POLICY,
+            "source": "verified native burn-time price",
+        }
+    if usd:
+        event["usd"] = {
+            "unit": "USD",
+            "price": "3",
+            "price_verified": True,
+            "historical_price_verified": True,
+            "unit_verified": True,
+            "price_fact_time": (
+                burn_time if usd_fact_time is None else usd_fact_time
+            ),
+            "price_observed_at": burn_time + 10,
+            "fact_time_policy": FACT_TIME_POLICY,
+            "source": "verified USD burn-time price",
+        }
+    return {
+        "mint": MINT,
+        "decimals": 6,
+        "contract": VALUATION_CONTRACT,
+        "contract_verified": True,
+        "source": "CMIS verified burn-time price evidence",
+        "events": [event],
+    }
+
+
+def activity_with_valuation_identity():
+    activity = activity_report()
+    activity["events"] = [
+        dict(activity["events"][0]),
+        dict(activity["events"][1]),
+        {
+            **activity["events"][2],
+            "event_key": "burn-1",
+        },
+    ]
+    return activity
+
+
+def report_with_activity(
+    activity,
+    *,
+    supply=None,
+    burn_valuation_report=None,
+):
     return build_tokenomics_report(
         MINT,
         get_token_supply=lambda mint, **kwargs: (
@@ -114,6 +182,7 @@ def report_with_activity(activity, *, supply=None):
         ),
         get_mint_info=lambda mint, **kwargs: mint_record(),
         activity_report=activity,
+        burn_valuation_report=burn_valuation_report,
     )
 
 
@@ -178,6 +247,87 @@ class TokenomicsActivityServiceTests(unittest.TestCase):
         self.assertEqual(
             burn_metrics["circulating_supply"]["status"],
             "unavailable",
+        )
+
+    def test_complete_burn_time_valuation_is_attached(self):
+        report = report_with_activity(
+            activity_with_valuation_identity(),
+            burn_valuation_report=valuation_report(),
+        )
+
+        valuation = report["burn_metrics"]["valuation"]
+        self.assertTrue(valuation["available"])
+        self.assertEqual(valuation["status"], "ok")
+        self.assertTrue(valuation["valuation_coverage_complete"])
+        self.assertEqual(
+            valuation["verified_native_value_destroyed_observed"],
+            "2.5",
+        )
+        self.assertEqual(
+            valuation["verified_usd_value_destroyed_observed"],
+            "3.75",
+        )
+        self.assertEqual(
+            valuation["native"]["valued_burn_amount"],
+            "1.25",
+        )
+        self.assertEqual(
+            valuation["usd"]["unvalued_burn_amount"],
+            "0",
+        )
+        self.assertEqual(
+            valuation["windows"]["24h"]["native"]["complete_value_destroyed"],
+            "2.5",
+        )
+        self.assertNotIn(
+            "historical_burn_time_valuation_not_supplied",
+            report["burn_metrics"]["partial_reasons"],
+        )
+        self.assertIn(
+            "circulating_supply_contract_not_supplied",
+            report["burn_metrics"]["partial_reasons"],
+        )
+
+    def test_partial_burn_time_valuation_preserves_unvalued_amount(self):
+        report = report_with_activity(
+            activity_with_valuation_identity(),
+            burn_valuation_report=valuation_report(native=False, usd=True),
+        )
+
+        valuation = report["burn_metrics"]["valuation"]
+        self.assertEqual(valuation["status"], "partial")
+        self.assertFalse(valuation["valuation_coverage_complete"])
+        self.assertEqual(valuation["native"]["status"], "unavailable")
+        self.assertEqual(valuation["native"]["unvalued_burn_amount"], "1.25")
+        self.assertEqual(valuation["usd"]["status"], "ok")
+        self.assertEqual(
+            valuation["verified_usd_value_destroyed_observed"],
+            "3.75",
+        )
+        self.assertIn(
+            "burn_time_valuation_coverage_incomplete",
+            report["burn_metrics"]["partial_reasons"],
+        )
+
+    def test_nonexact_historical_price_fact_time_is_not_substituted(self):
+        report = report_with_activity(
+            activity_with_valuation_identity(),
+            burn_valuation_report=valuation_report(
+                native=False,
+                usd=True,
+                usd_fact_time=NOW - 299,
+            ),
+        )
+
+        valuation = report["burn_metrics"]["valuation"]
+        self.assertEqual(valuation["status"], "unavailable")
+        self.assertFalse(valuation["valuation_coverage_complete"])
+        self.assertIsNone(
+            valuation["verified_usd_value_destroyed_observed"]
+        )
+        self.assertEqual(
+            valuation["events"][0]["usd"]["reason"],
+            "usd_historical_price_unverified",
         )
 
     def test_service_does_not_upgrade_scanner_lifetime_claim(self):

@@ -3,6 +3,11 @@ from .activity import (
     scale_raw_amount,
     summarize_token_events,
 )
+from .burn_valuation import (
+    FACT_TIME_POLICY,
+    VALUATION_CONTRACT,
+    build_burn_valuation,
+)
 from .circulating_supply import (
     CIRCULATION_CONTRACT,
     build_circulating_supply_metrics,
@@ -25,8 +30,11 @@ from .scanner import (
 
 __all__ = [
     "CIRCULATION_CONTRACT",
+    "FACT_TIME_POLICY",
     "DEFAULT_X1_RPC_URL",
+    "VALUATION_CONTRACT",
     "X1RPCError",
+    "build_burn_valuation",
     "build_circulating_supply_metrics",
     "collect_signature_window",
     "extract_token_events",
