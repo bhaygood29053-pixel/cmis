@@ -41,3 +41,28 @@ This dated reconciliation advances the living CMIS product roadmap without chang
 CMIS owns evidence and deterministic facts. Roberta owns product orchestration and Human/Machine presentation. Burn, Discovery, Early Warning, and execution-quality outputs become Roberta-consumable only through separately accepted X1 Scout/CMIS contracts; roadmap intent is not capability promotion.
 
 `execution_authorized=false`
+
+## Live GitHub reconciliation — 2026-09-01 11:20 America/New_York
+
+This section is the authoritative live reconciliation for the current GitHub state and supersedes stale status text elsewhere in this dated note.
+
+### Accepted on `main`
+- Deterministic historical burn-time valuation is **accepted**; CMIS PR #377 merged on 2026-09-01.
+- Burn metrics, period-over-period burn change, scanner fact-time coverage, circulating-supply evidence, exact-mint identity, historical compare/backfill, Instant X1 Scan, Evidence Receipts/Proof Score, and analysis-only pre-trade foundations remain accepted.
+- Public-shell/private-core migration remains complete.
+
+### Active gates
+- **PR #363 — delayed catalog-departure evidence:** open, mergeable but unstable; head `7f40ca53f7ad707eaa8987f59f8627beefe77168`. Deterministic Liquidity Scout tests pass. The live **X1.Ninja Delayed Vault Departure Evidence** workflow is still in progress. Keep the 5 independent departures, 900-second lookback, max 100 signatures per exact vault, unique-latest-swap rule, fail-closed ambiguity treatment, monitoring up to 150 pools, up to 400 snapshots, and 40 price-only candidate collection target. Do not weaken the evidence threshold.
+- **PR #365 + private `cmis-core` PR #6 — Discovery Ledger:** public PR #365 is clean and its public tests pass; private PR #6 is mergeable but unstable and private-core CI is failing. The pair is not accepted until the protected implementation gate passes.
+- **Issue #374 — routed/automated-order families:** diagnostic only. No TWAP/limit/TP/SL family classification is promoted.
+- **Execution-quality evidence:** remains future work; realized slippage must be based on comparable quote-to-executed-swap evidence before any expected-slippage contract.
+
+### Ordered next actions
+1. Keep #363 running and diagnose evidence failures without reducing thresholds.
+2. Repair `cmis-core` #6 private-core CI, then accept #365/#6 together.
+3. After Discovery Ledger acceptance, expose a narrow Scout-facing Discovery workflow.
+4. Build deterministic WHAT CHANGED? and Early Warning evidence on accepted history/Discovery primitives.
+5. Accumulate quote-to-executed-swap and realized-slippage evidence.
+6. Keep Solana secondary/read-only and keep Controlled Execution unauthorized.
+
+`execution_authorized=false`
