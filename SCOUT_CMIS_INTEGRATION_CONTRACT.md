@@ -27,7 +27,7 @@ The `liquidity_scout` namespace is a migration compatibility identifier, not a s
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.13.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v1` requires `>=1.13.0`.
+Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.14.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v2` requires `>=1.14.0`.
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
@@ -67,7 +67,7 @@ A Scout must validate these exact fields before dispatch and preserve the return
 
 ## Instant X1 Scan
 
-CMIS `1.13.0` adds X1-only `instant_x1_scan/v1` as a bounded read-only composition service. Scouts must treat it as composition over already accepted identity, market, tokenomics, local verified history, deterministic risk, and runtime evidence-quality data. It does not create new underlying fact authority and must preserve explicit unknown/partial holder or current-concentration fields.
+CMIS `1.14.0` promotes X1-only `instant_x1_scan/v2` as a bounded read-only composition service. Scouts must treat it as composition over accepted identity, market, tokenomics, verified CMIS history plus bounded verified provider-price backfill, deterministic risk, and runtime evidence-quality data. Provider backfill is price-only and does not prove archive completeness, source independence, full asset lifetime, or continuity. Omitted X1 RPC coverage is `not_requested`, not a provider-configuration failure. The service creates no new underlying fact authority and preserves explicit unknown/partial holder and current-concentration fields.
 
 Solana advertises this service as unavailable. A Scout must validate exact service contract, chain, callability/read-only state, and `execution_authorized=false` before dispatch.
 

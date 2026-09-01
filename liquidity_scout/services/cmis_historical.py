@@ -200,7 +200,7 @@ def _warnings(comparison: Mapping[str, Any], confidence: Mapping[str, Any]) -> l
             if isinstance(onchain, Mapping):
                 onchain_reason = _text(onchain.get("reason"))
                 if (
-                    onchain.get("status") != "full"
+                    onchain.get("status") not in {"full", "not_requested"}
                     and onchain_reason
                     and not any(
                         item.get("code") == onchain_reason
@@ -264,7 +264,24 @@ def _attach_x1_all_available_coverage(
         ),
     }
 
-    if mint:
+    if rpc_provider is None:
+        onchain_coverage = {
+            "chain": "x1",
+            "status": "not_requested",
+            "reason": "onchain_coverage_not_requested",
+            "coverage_scope": "x1_rpc_visible_mint_address_history",
+            "subject_kind": "mint_address",
+            "mint": mint,
+            "source": None,
+            "rpc_visible_mint_history_complete": False,
+            "asset_wide_activity_verified": False,
+            "asset_lifetime_start_verified": False,
+            "full_asset_lifetime_verified": False,
+            "continuous_coverage_verified": False,
+            "archival_completeness_verified": False,
+            "limitations": [],
+        }
+    elif mint:
         onchain_coverage = build_rpc_visible_mint_history_coverage(
             mint,
             rpc_provider=rpc_provider,
