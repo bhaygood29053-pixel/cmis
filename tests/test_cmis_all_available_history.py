@@ -296,6 +296,34 @@ class AllAvailableHistoryTests(unittest.TestCase):
         self.assertEqual(onchain_sources[0]["source"], "X1 RPC")
 
 
+    def test_onchain_coverage_can_be_intentionally_omitted_without_provider_warning(self):
+        history = FakeHistory(
+            {
+                ("AGI_MINT", "price"): [
+                    {"timestamp": 1000, "value": 1.0},
+                    {"timestamp": 2000, "value": 2.0},
+                ]
+            }
+        )
+
+        response = build_historical_compare_response(
+            None,
+            snapshot("AGI", "AGI_MINT", observed_at=3000, price=3.0),
+            history_backend=history,
+            mode="all_available",
+            metrics=["price"],
+            onchain_coverage_provider=None,
+            include_onchain_coverage=False,
+        )
+
+        onchain = response["data"]["coverage"]["onchain"]
+        self.assertEqual(onchain["status"], "not_requested")
+        self.assertEqual(onchain["reason"], "onchain_coverage_not_requested")
+        warning_codes = {item["code"] for item in response["warnings"]}
+        self.assertNotIn("x1_rpc_provider_not_configured", warning_codes)
+        self.assertNotIn("onchain_coverage_not_requested", warning_codes)
+
+
     def test_verified_provider_price_backfill_expands_market_history_without_lifetime_promotion(self):
         history = FakeHistory(
             {
