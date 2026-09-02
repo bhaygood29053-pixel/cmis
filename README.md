@@ -60,9 +60,10 @@ Accepted on `main`:
 - **Deterministic direct wallet-relationship evidence:** complete, internal/read-only/non-promoted, explicit non-ownership semantics.
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
-- **CMIS capability contract:** `1.15.0`.
+- **CMIS capability contract:** `1.16.0`.
 - **Instant X1 Scan `instant_x1_scan/v2`:** bounded X1-only read-only composition with accepted provider-backed price-history enrichment; lifetime/archive/continuity claims remain fail-closed.
 - **X1 Burn Intelligence `burn_intelligence/v1`:** first-class bounded X1-only read-only service over the accepted deterministic burn foundation. It exposes cumulative verified observed burn, 1h/24h/7d/30d windows, event counts, 24h/7d/30d period-over-period changes, issuance context, circulating-supply context, and burn-time valuation without recomputation.
+- **X1 Discovery Intelligence `discovery_intelligence/v1`:** first-class bounded X1-only read-only projection over the CMIS-owned Discovery Ledger. It exposes first and most-recent verified observations, verified count, sparse evidence bounds, and elapsed observed history. First observation is explicitly not token launch time.
 - **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
@@ -127,6 +128,7 @@ The versioned CMIS service contract includes, depending on chain capability stat
 - `historical_compare`
 - `tokenomics`
 - `burn_intelligence` — bounded X1-only first-class service under CMIS `1.15.0`
+- `discovery_intelligence` — bounded X1-only first-class service under CMIS `1.16.0`
 - `risk_check`
 - `pre_trade_check`
 - `verification_evidence`
