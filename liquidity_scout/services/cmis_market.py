@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 from liquidity_scout.market.resolver import asset_key
 
 from .cmis_contract import AMBIGUOUS, ERROR, OK, PARTIAL, UNAVAILABLE, build_service_envelope
+from .cmis_market_freshness import evaluate_market_observation_freshness
 from .market_report import build_market_report
 
 
@@ -213,6 +214,11 @@ def build_market_report_response(
         observed_at
         if observed_at is not None
         else provenance.get("catalog_last_refresh_unix")
+    )
+
+    report = dict(report)
+    report["freshness"] = evaluate_market_observation_freshness(
+        effective_observed_at
     )
 
     return build_service_envelope(
