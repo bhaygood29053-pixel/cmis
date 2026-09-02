@@ -14,6 +14,10 @@ from typing import Any, Iterable, Mapping
 from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.cmis_burn_intelligence import (
+    CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
+    SERVICE as BURN_INTELLIGENCE_SERVICE,
+)
 from liquidity_scout.services.cmis_x1_asset_identity import (
     IDENTITY_CONTRACT as X1_ASSET_IDENTITY_CONTRACT,
 )
@@ -26,7 +30,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.14.0"
+CMIS_CONTRACT_VERSION = "1.15.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -42,6 +46,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "rank",
     "historical_compare",
     "tokenomics",
+    "burn_intelligence",
     "risk_check",
     "pre_trade_check",
     "trade_verification",
@@ -83,6 +88,46 @@ def _intelligence_capability(
         "scout_reliance_promoted": False,
         "requirements": list(requirements),
         "limitations": list(limitations),
+    }
+
+
+def _burn_intelligence_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": BURN_INTELLIGENCE_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": ["burn_intelligence_not_available_for_chain"],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": BURN_INTELLIGENCE_CONTRACT_VERSION,
+        "requirements": [
+            "exact_x1_mint_identity",
+            "accepted_tokenomics_burn_metrics",
+            "verified_burn_event_semantics",
+            "verified_window_coverage_for_numeric_window_claims",
+            "verified_prior_window_coverage_for_numeric_percent_change",
+        ],
+        "limitations": [
+            "observed_cumulative_burn_is_not_lifetime_without_archive_completeness",
+            "dead_address_transfers_are_not_burns_without_separate_semantic_proof",
+            "circulating_supply_requires_independent_supply_semantics",
+            "historical_value_destroyed_requires_burn_time_price_evidence",
+            "proof_score_separate_from_risk",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "execution_authorized": False,
     }
 
 
@@ -212,6 +257,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             ),
         ),
         "tokenomics": _capability("supported"),
+        BURN_INTELLIGENCE_SERVICE: _burn_intelligence_capability(available=True),
         "risk_check": _capability("supported"),
         "pre_trade_check": _capability(
             "bounded",
@@ -311,6 +357,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
                 "lifetime_mint_burn_coverage_unavailable",
             ),
         ),
+        BURN_INTELLIGENCE_SERVICE: _burn_intelligence_capability(available=False),
         "risk_check": _capability(
             "partial",
             requirements=("exact_mint",),
