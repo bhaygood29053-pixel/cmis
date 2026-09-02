@@ -44,7 +44,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.16.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.17.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -149,14 +149,19 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertTrue(x1["scout_reliance_promoted"])
         self.assertEqual(
             x1["service_contract_version"],
-            "instant_x1_scan/v2",
+            "instant_x1_scan/v3",
         )
         self.assertIn(
-            "current_top_account_concentration_not_promoted_in_v2",
+            "current_top_account_concentration_not_promoted_in_v3",
             x1["limitations"],
         )
         self.assertIn("bounded_verified_provider_price_backfill", x1["requirements"])
+        self.assertIn("field_scoped_current_market_freshness", x1["requirements"])
         self.assertIn("provider_price_backfill_is_price_only", x1["limitations"])
+        self.assertIn("current_market_freshness_is_field_scoped", x1["limitations"])
+        self.assertIn("price_freshness_uses_timestamped_provider_backfill", x1["limitations"])
+        self.assertIn("liquidity_volume_transaction_fact_time_not_verified", x1["limitations"])
+        self.assertIn("collection_time_is_not_provider_fact_time", x1["limitations"])
         self.assertIn("provider_archive_completeness_not_verified", x1["limitations"])
         self.assertIn(
             "continuous_coverage_requires_separate_archive_completeness_proof",
