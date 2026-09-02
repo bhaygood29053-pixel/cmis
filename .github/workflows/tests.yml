@@ -98,23 +98,40 @@ jobs:
           print("EXECUTION_AUTHORIZED=FALSE")
           PY
 
-      - name: Validate CMIS 1.14 Instant X1 Scan v2 source contract
+      - name: Validate CMIS 1.17 Instant X1 Scan v3 freshness contract
         run: |
           python - <<'PY'
           from pathlib import Path
 
           capabilities = Path("liquidity_scout/cmis/capabilities.py").read_text()
-          scan = Path("liquidity_scout/services/cmis_instant_x1_scan.py").read_text()
+          scan_v2 = Path("liquidity_scout/services/cmis_instant_x1_scan.py").read_text()
+          scan_v3 = Path("liquidity_scout/services/cmis_instant_x1_scan_v3.py").read_text()
+          freshness = Path("liquidity_scout/providers/x1/current_market_freshness.py").read_text()
+          policy = Path("liquidity_scout/providers/x1/instant_scan_freshness_policy.json").read_text()
           historical = Path("liquidity_scout/services/cmis_historical.py").read_text()
 
-          assert 'CMIS_CONTRACT_VERSION = "1.16.0"' in capabilities
-          assert '"service_contract_version": "instant_x1_scan/v2"' in capabilities
-          assert 'CONTRACT_VERSION = "instant_x1_scan/v2"' in scan
-          assert "provider_history_imported" in scan
-          assert "provider_archive_completeness_not_verified" in scan
-          assert '"full_asset_lifetime_verified": (' in scan
-          assert '"continuous_coverage_verified": (' in scan
+          assert 'CMIS_CONTRACT_VERSION = "1.17.0"' in capabilities
+          assert '"service_contract_version": "instant_x1_scan/v3"' in capabilities
+          assert 'CONTRACT_VERSION = "instant_x1_scan/v2"' in scan_v2
+          assert 'CONTRACT_VERSION = "instant_x1_scan/v3"' in scan_v3
+          assert "build_v2_response" in scan_v3
+          assert "x1_current_market_freshness/v1" in freshness
+          assert '"max_collection_age_seconds": 60' in policy
+          assert '"max_price_fact_age_seconds": 60' in policy
+          assert '"max_future_skew_seconds": 5' in policy
+          assert '"price_relative_tolerance": 0.005' in policy
+          assert "provider_history_imported" in scan_v2
+          assert "provider_archive_completeness_not_verified" in scan_v2
+          assert '"full_asset_lifetime_verified": (' in scan_v2
+          assert '"continuous_coverage_verified": (' in scan_v2
           assert '"status": "not_requested"' in historical
           assert '"reason": "onchain_coverage_not_requested"' in historical
-          print("CMIS_114_INSTANT_X1_SCAN_V2_SOURCE_CONTRACT=PASS")
+          print("CMIS_117_INSTANT_X1_SCAN_V3_FRESHNESS_CONTRACT=PASS")
           PY
+
+      - name: Run CMIS 1.17 freshness regressions
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_cmis_current_market_freshness_v117
+          python -m unittest -v tests.test_cmis_instant_x1_scan_v3_contract
