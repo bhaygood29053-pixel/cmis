@@ -4,6 +4,7 @@ import time
 import unittest
 from datetime import datetime, timezone
 
+from liquidity_scout.providers.x1.xdex import fetch_price_history
 from liquidity_scout.providers.x1.xdex_forward_bar_continuity import (
     scan_xdex_forward_bar_continuity,
 )
@@ -28,10 +29,77 @@ def _positive_int_env(name, default):
     return value
 
 
+def _nonnegative_float_env(name, default):
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return float(default)
+    value = float(raw)
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative")
+    return value
+
+
+def _positive_float_env(name, default):
+    value = _nonnegative_float_env(name, default)
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
 def _iso(value):
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         return None
     return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
+
+
+def _rate_limit_aware_fetcher(*, request_delay_seconds, max_retries, retry_base_seconds):
+    state = {
+        "request_count": 0,
+        "rate_limit_retry_count": 0,
+        "last_request_monotonic": None,
+        "total_retry_sleep_seconds": 0.0,
+    }
+
+    def fetcher(base, quote, *, time_from, time_to):
+        last = state["last_request_monotonic"]
+        if last is not None and request_delay_seconds > 0:
+            elapsed = time.monotonic() - last
+            remaining = request_delay_seconds - elapsed
+            if remaining > 0:
+                time.sleep(remaining)
+
+        for attempt in range(max_retries + 1):
+            state["request_count"] += 1
+            state["last_request_monotonic"] = time.monotonic()
+            try:
+                return fetch_price_history(
+                    base,
+                    quote,
+                    time_from=time_from,
+                    time_to=time_to,
+                )
+            except Exception as exc:
+                message = str(exc)
+                rate_limited = (
+                    "429" in message
+                    or "Rate limit exceeded" in message
+                    or "Too Many Requests" in message
+                )
+                if not rate_limited or attempt >= max_retries:
+                    raise
+
+                state["rate_limit_retry_count"] += 1
+                backoff = min(
+                    60.0,
+                    retry_base_seconds * (2 ** attempt),
+                )
+                state["total_retry_sleep_seconds"] += backoff
+                time.sleep(backoff)
+                state["last_request_monotonic"] = time.monotonic()
+
+        raise AssertionError("unreachable")
+
+    return fetcher, state
 
 
 @unittest.skipUnless(
@@ -51,6 +119,24 @@ class XDEXXNTForwardContinuityLiveTests(unittest.TestCase):
             "XDEX_XNT_CONTINUITY_MAX_WINDOWS",
             400,
         )
+        request_delay_seconds = _nonnegative_float_env(
+            "XDEX_XNT_CONTINUITY_REQUEST_DELAY_SECONDS",
+            1.10,
+        )
+        max_retries = _positive_int_env(
+            "XDEX_XNT_CONTINUITY_MAX_RETRIES",
+            6,
+        )
+        retry_base_seconds = _positive_float_env(
+            "XDEX_XNT_CONTINUITY_RETRY_BASE_SECONDS",
+            5.0,
+        )
+
+        fetcher, transport = _rate_limit_aware_fetcher(
+            request_delay_seconds=request_delay_seconds,
+            max_retries=max_retries,
+            retry_base_seconds=retry_base_seconds,
+        )
 
         result = scan_xdex_forward_bar_continuity(
             WRAPPED_XNT_MINT,
@@ -60,10 +146,11 @@ class XDEXXNTForwardContinuityLiveTests(unittest.TestCase):
             interval_seconds=INTERVAL_SECONDS,
             window_intervals=window_minutes,
             max_windows=max_windows,
+            fetcher=fetcher,
         )
 
         evidence = {
-            "schema": "xdex_xnt_forward_continuity_live.v1",
+            "schema": "xdex_xnt_forward_continuity_live.v2",
             "pair": f"{WRAPPED_XNT_MINT}/{USDC_X_MINT}",
             "time_from": result["time_from"],
             "time_from_utc": _iso(result["time_from"]),
@@ -104,6 +191,13 @@ class XDEXXNTForwardContinuityLiveTests(unittest.TestCase):
                 "full_asset_lifetime_verified"
             ],
             "failure_reason": result["failure_reason"],
+            "request_delay_seconds": request_delay_seconds,
+            "transport_request_count": transport["request_count"],
+            "rate_limit_retry_count": transport["rate_limit_retry_count"],
+            "total_retry_sleep_seconds": round(
+                transport["total_retry_sleep_seconds"],
+                3,
+            ),
             "first_window": result["windows"][0] if result["windows"] else None,
             "last_window": result["windows"][-1] if result["windows"] else None,
             "limitations": result["limitations"],
