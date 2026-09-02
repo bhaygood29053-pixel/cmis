@@ -60,6 +60,7 @@ jobs:
               "rank",
               "historical_compare",
               "tokenomics",
+              "burn_intelligence",
               "risk_check",
               "pre_trade_check",
               "trade_verification",
@@ -105,7 +106,7 @@ jobs:
           scan = Path("liquidity_scout/services/cmis_instant_x1_scan.py").read_text()
           historical = Path("liquidity_scout/services/cmis_historical.py").read_text()
 
-          assert 'CMIS_CONTRACT_VERSION = "1.14.0"' in capabilities
+          assert 'CMIS_CONTRACT_VERSION = "1.15.0"' in capabilities
           assert '"service_contract_version": "instant_x1_scan/v2"' in capabilities
           assert 'CONTRACT_VERSION = "instant_x1_scan/v2"' in scan
           assert "provider_history_imported" in scan
