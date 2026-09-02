@@ -12,6 +12,10 @@ from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
     validate_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.cmis_burn_intelligence import (
+    CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
+    SERVICE as BURN_INTELLIGENCE_SERVICE,
+)
 from liquidity_scout.services.cmis_verified_intelligence import (
     CONTRACT_VERSION as CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as CONCENTRATION_INTELLIGENCE_SERVICE,
@@ -36,7 +40,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.14.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.15.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -49,6 +53,45 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertIn(CONCENTRATION_INTELLIGENCE_SERVICE, SUPPORTED_SERVICES)
         self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
         self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])
+
+    def test_burn_intelligence_is_x1_only_bounded_public_service(self):
+        manifest = build_capability_manifest(
+            runtime_services=SUPPORTED_SERVICES,
+            legacy_supported_chains=SUPPORTED_CHAINS,
+            known_chains=KNOWN_CHAINS,
+        )
+        x1 = service_capability(
+            manifest,
+            chain="x1",
+            service=BURN_INTELLIGENCE_SERVICE,
+        )
+        solana = service_capability(
+            manifest,
+            chain="solana",
+            service=BURN_INTELLIGENCE_SERVICE,
+        )
+
+        self.assertEqual(x1["state"], "bounded")
+        self.assertTrue(x1["callable"])
+        self.assertTrue(x1["read_only"])
+        self.assertTrue(x1["public_service_promoted"])
+        self.assertTrue(x1["scout_reliance_promoted"])
+        self.assertEqual(
+            x1["service_contract_version"],
+            BURN_INTELLIGENCE_CONTRACT_VERSION,
+        )
+        self.assertIn("exact_x1_mint_identity", x1["requirements"])
+        self.assertIn(
+            "observed_cumulative_burn_is_not_lifetime_without_archive_completeness",
+            x1["limitations"],
+        )
+        self.assertFalse(x1["execution_authorized"])
+
+        self.assertEqual(solana["state"], "unavailable")
+        self.assertFalse(solana["callable"])
+        self.assertFalse(solana["public_service_promoted"])
+        self.assertFalse(solana["scout_reliance_promoted"])
+        self.assertFalse(solana["execution_authorized"])
 
     def test_instant_x1_scan_is_x1_only_bounded_public_service(self):
         manifest = build_capability_manifest(

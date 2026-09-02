@@ -22,6 +22,7 @@ SUPPORTED_SERVICES = (
     "rank",
     "historical_compare",
     "tokenomics",
+    "burn_intelligence",
     "risk_check",
     "pre_trade_check",
     "trade_verification",
