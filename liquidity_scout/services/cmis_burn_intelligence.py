@@ -129,7 +129,7 @@ def build_burn_intelligence_response(
     """Project one accepted CMIS tokenomics envelope into Burn Intelligence v1."""
 
     if not isinstance(tokenomics, Mapping):
-        return build_service_envelope(
+        response = build_service_envelope(
             SERVICE,
             "x1",
             ERROR,
@@ -139,6 +139,8 @@ def build_burn_intelligence_response(
                 "message": "Burn Intelligence requires a CMIS tokenomics envelope.",
             }],
         )
+        response["execution_authorized"] = False
+        return response
 
     if tokenomics.get("service") != "tokenomics":
         response = build_service_envelope(
