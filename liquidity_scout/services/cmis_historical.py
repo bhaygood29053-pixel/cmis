@@ -186,13 +186,23 @@ def _warnings(comparison: Mapping[str, Any], confidence: Mapping[str, Any]) -> l
                 if code:
                     warnings.append({"code": code})
         if comparison.get("full_asset_lifetime_verified") is not True:
-            warnings.append({
-                "code": "asset_lifetime_coverage_unverified",
-                "message": (
-                    "All-available history is bounded to verified CMIS observations; "
-                    "it is not proof of the asset's complete lifetime."
-                ),
-            })
+            if comparison.get("full_supported_pair_lifetime_verified") is True:
+                warnings.append({
+                    "code": "historical_quote_usd_equivalence_unverified",
+                    "message": (
+                        "The exact supported market-pair price lifetime is verified, "
+                        "but complete USD-denominated lifetime history remains "
+                        "unverified until historical quote-to-USD equivalence is proven."
+                    ),
+                })
+            else:
+                warnings.append({
+                    "code": "asset_lifetime_coverage_unverified",
+                    "message": (
+                        "All-available history is bounded to verified CMIS observations; "
+                        "it is not proof of the asset's complete lifetime."
+                    ),
+                })
 
         coverage = comparison.get("coverage")
         if isinstance(coverage, Mapping):
@@ -231,6 +241,81 @@ def _warnings(comparison: Mapping[str, Any], confidence: Mapping[str, Any]) -> l
 
 
 
+def _attach_x1_price_lifetime_coverage(
+    comparison: Mapping[str, Any],
+    price_lifetime_coverage: Any,
+) -> Dict[str, Any]:
+    """Attach an accepted quote-vs-USD price lifetime proof to one asset.
+
+    The proof must bind to the exact comparison asset mint. Pair-lifetime
+    promotion never upgrades legacy USD/full-asset lifetime flags unless the
+    supplied proof separately verifies historical quote-to-USD equivalence.
+    """
+
+    result = dict(comparison)
+    if not isinstance(price_lifetime_coverage, Mapping):
+        return result
+
+    candidate = dict(price_lifetime_coverage)
+    asset = result.get("asset")
+    asset_mint = _text(asset.get("mint")) if isinstance(asset, Mapping) else None
+    base_mint = _text(candidate.get("base_mint"))
+    quote_mint = _text(candidate.get("quote_mint"))
+
+    asset_identity_bound = bool(
+        asset_mint
+        and base_mint
+        and quote_mint
+        and base_mint != quote_mint
+        and asset_mint == base_mint
+    )
+
+    pair_lifetime_verified = bool(
+        asset_identity_bound
+        and candidate.get("full_supported_pair_lifetime_verified") is True
+        and candidate.get("continuous_pair_price_coverage_verified") is True
+        and candidate.get("provider_range_complete_verified") is True
+    )
+    historical_quote_usd_equivalence_verified = bool(
+        pair_lifetime_verified
+        and candidate.get("historical_quote_usd_equivalence_verified") is True
+    )
+    full_usd_lifetime_verified = bool(
+        pair_lifetime_verified
+        and historical_quote_usd_equivalence_verified
+        and candidate.get("full_usd_lifetime_verified") is True
+    )
+
+    attached = dict(candidate)
+    attached["asset_identity_bound"] = asset_identity_bound
+    attached["full_supported_pair_lifetime_verified"] = pair_lifetime_verified
+    attached["continuous_pair_price_coverage_verified"] = pair_lifetime_verified
+    attached["provider_range_complete_verified"] = pair_lifetime_verified
+    attached["historical_quote_usd_equivalence_verified"] = (
+        historical_quote_usd_equivalence_verified
+    )
+    attached["full_usd_lifetime_verified"] = full_usd_lifetime_verified
+
+    result["price_lifetime_coverage"] = attached
+    result["asset_lifetime_start_verified"] = bool(
+        result.get("asset_lifetime_start_verified") is True
+        or pair_lifetime_verified
+    )
+    result["full_supported_pair_lifetime_verified"] = pair_lifetime_verified
+    result["continuous_pair_price_coverage_verified"] = pair_lifetime_verified
+    result["provider_range_complete_verified"] = pair_lifetime_verified
+    result["historical_quote_usd_equivalence_verified"] = (
+        historical_quote_usd_equivalence_verified
+    )
+    result["full_usd_lifetime_verified"] = full_usd_lifetime_verified
+
+    if full_usd_lifetime_verified:
+        result["full_asset_lifetime_verified"] = True
+        result["continuous_coverage_verified"] = True
+
+    return result
+
+
 def _attach_x1_all_available_coverage(
     comparison: Mapping[str, Any],
     *,
@@ -253,6 +338,26 @@ def _attach_x1_all_available_coverage(
         ),
         "continuous_coverage_verified": (
             result.get("continuous_coverage_verified") is True
+        ),
+        "full_supported_pair_lifetime_verified": (
+            result.get("full_supported_pair_lifetime_verified") is True
+        ),
+        "continuous_pair_price_coverage_verified": (
+            result.get("continuous_pair_price_coverage_verified") is True
+        ),
+        "provider_range_complete_verified": (
+            result.get("provider_range_complete_verified") is True
+        ),
+        "historical_quote_usd_equivalence_verified": (
+            result.get("historical_quote_usd_equivalence_verified") is True
+        ),
+        "full_usd_lifetime_verified": (
+            result.get("full_usd_lifetime_verified") is True
+        ),
+        "price_lifetime_coverage": (
+            dict(result.get("price_lifetime_coverage"))
+            if isinstance(result.get("price_lifetime_coverage"), Mapping)
+            else None
         ),
         "provider_history_imported": (
             result.get("provider_history_imported") is True
@@ -341,6 +446,7 @@ def build_historical_compare_response(
     gap_threshold_seconds: int = 129600,
     anchor_tolerance_seconds: int = 21600,
     onchain_coverage_provider: Any = None,
+    price_lifetime_coverage: Any = None,
     onchain_page_size: int = 1000,
     onchain_max_signatures: int = 5000,
 ) -> Dict[str, Any]:
@@ -441,6 +547,10 @@ def build_historical_compare_response(
 
     if comparison is not None and normalized_mode == "all_available" and chain == "x1":
         try:
+            comparison = _attach_x1_price_lifetime_coverage(
+                comparison,
+                price_lifetime_coverage,
+            )
             comparison = _attach_x1_all_available_coverage(
                 comparison,
                 rpc_provider=onchain_coverage_provider,
