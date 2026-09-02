@@ -15,7 +15,7 @@ This file is the compact cross-project synchronization baseline and is intention
 - Proof Score remains separate from risk.
 - Controlled Execution remains locked/not started. `execution_authorized=false` remains invariant.
 
-## Accepted repository heads
+## Accepted implementation heads before this baseline-only sync
 
 - CMIS public `main`: `38e0b6c5ae231f4e8204204082c8baf850998da0`
 - protected `cmis-core` `main`: `6a1befc49162cb121c2be86e6ccc755950793d15`
