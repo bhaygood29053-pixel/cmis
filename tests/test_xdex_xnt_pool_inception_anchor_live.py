@@ -28,6 +28,7 @@ PROGRAM = XDEX_MAINNET_OBSERVED_PROGRAM_ID
 # The field names are still candidate semantics here until independently proved.
 OPEN_TIME_OFFSET = 373
 RECENT_EPOCH_OFFSET = 381
+BAR_INTERVAL_SECONDS = 60
 
 # Boundary discovered by the accepted read-only history-boundary probe.
 BOUNDARY_SEARCH_FROM = 1767238740
@@ -106,14 +107,18 @@ class XDEXXNTPoolInceptionAnchorLiveTests(unittest.TestCase):
         provider_first = provider.get("first_observed_at")
         self.assertIsNotNone(provider_first)
 
-        delta = (
-            provider_first - open_time_candidate
-            if isinstance(provider_first, int)
-            else None
+        first_interval_end = provider_first + BAR_INTERVAL_SECONDS
+        open_time_in_first_provider_bar_interval = bool(
+            provider_first
+            <= open_time_candidate
+            < first_interval_end
+        )
+        provider_bar_start_precedes_open_time_seconds = (
+            open_time_candidate - provider_first
         )
 
         evidence = {
-            "schema": "xdex_xnt_pool_inception_anchor_live.v2",
+            "schema": "xdex_xnt_pool_inception_anchor_live.v3",
             "pair": f"{WRAPPED_XNT_MINT}/{USDC_X_MINT}",
             "pool": POOL,
             "program": PROGRAM,
@@ -131,15 +136,19 @@ class XDEXXNTPoolInceptionAnchorLiveTests(unittest.TestCase):
             "provider_boundary_search_from": BOUNDARY_SEARCH_FROM,
             "provider_boundary_search_to": BOUNDARY_SEARCH_TO,
             "provider_first_bar": provider,
-            "provider_first_minus_open_time_candidate_seconds": delta,
+            "provider_bar_interval_seconds": BAR_INTERVAL_SECONDS,
+            "provider_first_bar_interval_end": first_interval_end,
+            "provider_first_bar_interval_end_utc": _iso(first_interval_end),
+            "provider_bar_start_precedes_open_time_seconds": (
+                provider_bar_start_precedes_open_time_seconds
+            ),
             "open_time_candidate_in_provider_boundary_bracket": (
                 BOUNDARY_SEARCH_FROM
                 <= open_time_candidate
                 <= BOUNDARY_SEARCH_TO
             ),
-            "provider_first_not_before_open_time_candidate": (
-                isinstance(provider_first, int)
-                and provider_first >= open_time_candidate
+            "open_time_candidate_in_first_provider_bar_interval": (
+                open_time_in_first_provider_bar_interval
             ),
             "rpc_history_exhaustion_required_for_this_probe": False,
             "first_verified_supported_market_observation": None,
@@ -152,6 +161,11 @@ class XDEXXNTPoolInceptionAnchorLiveTests(unittest.TestCase):
 
         print("XDEX XNT POOL INCEPTION ANCHOR EVIDENCE")
         print(json.dumps(evidence, sort_keys=True))
+
+        # A one-minute OHLC bar is timestamped at its interval boundary. The
+        # pool-time candidate may therefore fall after the bar timestamp while
+        # still belonging to the first observed market interval.
+        self.assertTrue(open_time_in_first_provider_bar_interval)
 
 
 if __name__ == "__main__":
