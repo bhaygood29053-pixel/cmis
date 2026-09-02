@@ -133,5 +133,5 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          python -m unittest -v tests.test_cmis_current_market_freshness_v117
-          python -m unittest -v tests.test_cmis_instant_x1_scan_v3_contract
+          python tests/test_cmis_current_market_freshness_v117.py
+          python tests/test_cmis_instant_x1_scan_v3_contract.py
