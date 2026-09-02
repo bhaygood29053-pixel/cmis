@@ -133,8 +133,17 @@ jobs:
           print("CMIS_117_INSTANT_X1_SCAN_V3_FRESHNESS_CONTRACT=PASS")
           PY
 
-      - name: Run public freshness regressions
+      - name: Test X1 field freshness evaluator
         env:
           PYTHONPATH: .
-        run: |
-          python -m pytest -q             tests/test_cmis_current_market_freshness.py             tests/test_cmis_capabilities.py             tests/test_cmis_instant_x1_scan_v2_contract.py
+        run: python -m pytest -q tests/test_cmis_current_market_freshness.py
+
+      - name: Test CMIS 1.17 capability contract
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_cmis_capabilities.py
+
+      - name: Test Instant X1 Scan v3 composition
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_cmis_instant_x1_scan_v2_contract.py
