@@ -1,6 +1,6 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-08-30 (America/New_York)
+Last reconciled: 2026-09-02 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
 
@@ -42,7 +42,7 @@ Accepted milestones on `main`:
 - **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
 - **X1 verified-provider historical price backfill: COMPLETE under the bounded CMIS `1.12.0` contract.** Backfill is price-only and preserves non-independence, non-archive-completeness, non-continuity, historical stable-quote uncertainty, and non-lifetime-completeness limits.
 - **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
-- **CMIS capability contract: `1.13.0`.**
+- **CMIS capability contract: `1.16.0`.** Burn Intelligence (`burn_intelligence/v1`) is accepted under 1.15.0 and Discovery Intelligence (`discovery_intelligence/v1`) is accepted under 1.16.0.
 - **Instant X1 Scan: IMPLEMENTED under #322 as `instant_x1_scan/v1`.** The service is X1-only, read-only, composition-only, local-history-only, and fail-closed for unverified holder/current-concentration facts; Proof Score remains separate from deterministic risk.
 - **Six-phase public-shell/private-core migration: COMPLETE.** Protected CMIS implementation is removed from active public branch/tag history, public package boundaries fail closed without the required private core, and no public reconstruction fallback is accepted.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
@@ -296,7 +296,7 @@ CMIS is now prioritized around the verified data and intelligence services requi
 2. **X1.Ninja developer API validation — next.** — open a fresh provider-verification track for the currently available machine-readable developer API. Treat all responses as candidate evidence until identity, units, freshness, scope, reproducibility, same-fact semantics, and independence are explicitly proven. Prior SSE 403 evidence does not automatically apply to a different documented API contract.
 3. **Holder and wallet intelligence promotion** — promote useful concentration, direct-wallet-relationship, and related deterministic foundations only through explicit public/Scout-reliance contracts. Direct interactions must not be relabeled as beneficial ownership, common control, intent, fraud, or manipulation.
 4. **Deterministic Token Burn Intelligence — Issue #368 / CMIS 1.15.0.** First-class `burn_intelligence/v1` promotion is implemented: exact-mint, read-only, cumulative verified-observed burn plus **1h / 24h / 7d / 30d** windows, event counts, 24h/7d/30d equal-period comparisons, issuance context, circulation context, and verified burn-time valuation. Complete lifetime burn remains claimable only when archive/signature/history completeness is independently proven; otherwise cumulative burn remains explicitly bounded to verified observed coverage.
-5. **Discovery Ledger** — add an immutable first-observation record plus subsequent verified observations for supported X1 assets/entities, preserving exact source/fact-time/proof lineage so later performance and assessment-quality analysis can be reproduced.
+5. **Discovery Intelligence — ACCEPTED under CMIS 1.16.0 / PR #391.** The immutable Discovery Ledger is now promoted through bounded read-only `discovery_intelligence/v1`, exposing first and most-recent verified fact-time observations, verified observation count, sparse coverage bounds, and elapsed observed history. First verified observation is explicitly **not** token launch time, archive completeness, or continuous lifetime coverage.
 6. **Early Warning services** — advance concentration/liquidity/wallet/activity warning candidates only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
 7. **Deterministic Compare services** — support first-class current-vs-history and entity-vs-entity comparisons without recomputing facts outside the canonical evidence store.
 8. **X1 ecosystem/network brief inputs** — expose bounded verified market, network, validator, protocol, and ecosystem observations needed for a Roberta daily intelligence brief, one field at a time under exact provenance and scope.
@@ -866,13 +866,15 @@ No accepted CMIS roadmap item authorizes:
 
 Controlled Execution remains unauthorized.
 
-## Live reconciliation — 2026-09-01 11:20 America/New_York
+## Live reconciliation — 2026-09-02 12:18 America/New_York
 
-The following state supersedes any older "pending" language in this file:
+The following state supersedes older pending/blocker language in this file:
 
-- Historical burn-time valuation is **COMPLETE / accepted** via merged CMIS PR #377.
-- Current flagship CMIS blocker is **PR #363**, whose deterministic test suite is green while the live delayed-vault evidence workflow remains in progress under the strict five-event contract.
-- **Discovery Ledger v1** remains paired work: public #365 is clean; protected `cmis-core` #6 still fails private-core CI and therefore blocks acceptance.
-- No routed/automated-order family classifier is promoted from issue #374 diagnostics.
-- Next accepted-service sequence is: Discovery Ledger -> Scout-facing Discovery -> WHAT CHANGED? / Early Warning -> execution-quality statistics.
+- **Burn Intelligence v1: COMPLETE / accepted.** CMIS public PR #389 and protected `cmis-core` #12 are accepted; ROBERTA has already consumed the dedicated service through public PR #304.
+- **Discovery Intelligence v1: COMPLETE / accepted in CMIS.** Public PR #391 merged on 2026-09-02 and promotes bounded read-only `discovery_intelligence/v1` under CMIS capability contract `1.16.0`.
+- **Historical Coverage Proof v1 (#383): COMPLETE.** The proof layer is accepted for lifetime-start/archive-completeness/continuity semantics; bounded evidence must still remain bounded when the required proof gates do not pass.
+- **Current cross-project product gate:** ROBERTA PR #306 is open, clean, and mergeable to promote Discovery Intelligence through X1 Scout. CMIS should support that integration rather than invent another parallel Discovery path.
+- **PR #363 delayed-vault departure evidence:** remains open as a strict, read-only evidence investigation. It is useful research, but it is **not the flagship product blocker** and should not delay accepted Burn/Discovery productization.
+- **PR #386 field-scoped current-market freshness:** remains a draft hardening track and should be reviewed independently of the Discovery product gate.
+- **Next accepted-service sequence:** ROBERTA Discovery adoption -> WHAT CHANGED? -> Early Warning -> execution-quality statistics.
 - Controlled Execution remains locked and `execution_authorized=false`.
