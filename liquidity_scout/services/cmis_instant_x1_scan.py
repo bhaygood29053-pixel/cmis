@@ -116,6 +116,7 @@ def _market_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "status": _status(envelope),
         "observed_at": envelope.get("observed_at"),
+        "freshness": dict(_mapping(data.get("freshness"))),
         "price_usd": data.get("price_usd"),
         "price_verified": completeness.get("price") is True,
         "liquidity_usd": data.get("liquidity_usd"),
