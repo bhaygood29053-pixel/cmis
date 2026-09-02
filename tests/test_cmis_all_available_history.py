@@ -435,6 +435,86 @@ class AllAvailableHistoryTests(unittest.TestCase):
             "aligned_common_window_anchors_unavailable",
         )
 
+    def test_pair_lifetime_proof_projects_without_usd_overclaim(self):
+        history = FakeHistory(
+            {
+                ("XNT_MINT", "price"): [
+                    {"timestamp": 1000, "value": 1.0},
+                    {"timestamp": 2000, "value": 2.0},
+                ]
+            }
+        )
+
+        response = build_historical_compare_response(
+            None,
+            snapshot("XNT", "XNT_MINT", observed_at=3000, price=3.0),
+            history_backend=history,
+            mode="all_available",
+            metrics=["price"],
+            price_lifetime_coverage={
+                "base_mint": "XNT_MINT",
+                "quote_mint": "USDCX",
+                "full_supported_pair_lifetime_verified": True,
+                "continuous_pair_price_coverage_verified": True,
+                "provider_range_complete_verified": True,
+                "historical_quote_usd_equivalence_verified": False,
+                "full_usd_lifetime_verified": False,
+            },
+        )
+
+        data = response["data"]
+        self.assertTrue(data["asset_lifetime_start_verified"])
+        self.assertTrue(data["full_supported_pair_lifetime_verified"])
+        self.assertTrue(data["continuous_pair_price_coverage_verified"])
+        self.assertTrue(data["provider_range_complete_verified"])
+        self.assertFalse(data["historical_quote_usd_equivalence_verified"])
+        self.assertFalse(data["full_usd_lifetime_verified"])
+        self.assertFalse(data["full_asset_lifetime_verified"])
+        self.assertFalse(data["continuous_coverage_verified"])
+
+        market = data["coverage"]["market"]
+        self.assertTrue(market["full_supported_pair_lifetime_verified"])
+        self.assertTrue(market["provider_range_complete_verified"])
+        self.assertFalse(market["full_usd_lifetime_verified"])
+
+        warning_codes = {item["code"] for item in response["warnings"]}
+        self.assertIn(
+            "historical_quote_usd_equivalence_unverified",
+            warning_codes,
+        )
+        self.assertNotIn(
+            "asset_lifetime_coverage_unverified",
+            warning_codes,
+        )
+
+    def test_pair_lifetime_proof_fails_closed_on_asset_mismatch(self):
+        response = build_historical_compare_response(
+            None,
+            snapshot("XNT", "XNT_MINT", observed_at=3000, price=3.0),
+            history_backend=FakeHistory(
+                {
+                    ("XNT_MINT", "price"): [
+                        {"timestamp": 1000, "value": 1.0},
+                        {"timestamp": 2000, "value": 2.0},
+                    ]
+                }
+            ),
+            mode="all_available",
+            metrics=["price"],
+            price_lifetime_coverage={
+                "base_mint": "OTHER_MINT",
+                "quote_mint": "USDCX",
+                "full_supported_pair_lifetime_verified": True,
+                "continuous_pair_price_coverage_verified": True,
+                "provider_range_complete_verified": True,
+            },
+        )
+
+        self.assertFalse(
+            response["data"]["full_supported_pair_lifetime_verified"]
+        )
+        self.assertFalse(response["data"]["provider_range_complete_verified"])
+
     def test_invalid_mode_is_explicit_error(self):
         response = build_historical_compare_response(
             None,
