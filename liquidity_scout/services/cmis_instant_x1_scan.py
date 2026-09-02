@@ -21,7 +21,7 @@ from liquidity_scout.services.cmis_contract import (
 )
 
 SERVICE = "instant_x1_scan"
-CONTRACT_VERSION = "instant_x1_scan/v2"
+CONTRACT_VERSION = "instant_x1_scan/v3"
 HISTORY_METRICS = ("price", "liquidity", "volume", "transactions")
 
 
@@ -110,31 +110,82 @@ def _identity_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _market_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
+def _market_section(
+    envelope: Mapping[str, Any],
+    freshness_assessment: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     data = _mapping(envelope.get("data"))
     completeness = _mapping(data.get("completeness"))
+    observation_freshness = dict(_mapping(data.get("freshness")))
+    freshness = _mapping(freshness_assessment)
+    if not freshness:
+        freshness = {
+            "contract_version": "x1_current_market_freshness/v1",
+            "scope": "instant_x1_scan.current_market",
+            "freshness_state": "NOT_VERIFIED",
+            "collection_freshness_verified": False,
+            "provider_price_fact_time_verified": False,
+            "current_market_freshness_verified": False,
+            "fields": {
+                "price_usd": {
+                    "freshness_verified": False,
+                    "reason": "freshness_assessment_not_supplied",
+                },
+                "liquidity_usd": {
+                    "freshness_verified": False,
+                    "reason": "liquidity_provider_fact_time_not_verified",
+                },
+                "volume_24h_usd": {
+                    "freshness_verified": False,
+                    "reason": "rolling_volume_provider_fact_time_not_verified",
+                },
+                "transactions_24h": {
+                    "freshness_verified": False,
+                    "reason": "rolling_transactions_provider_fact_time_not_verified",
+                },
+            },
+            "limitations": [
+                "collection_time_is_not_provider_fact_time",
+                "price_freshness_requires_timestamped_provider_price_match",
+                "liquidity_fact_time_not_verified",
+                "rolling_volume_fact_time_not_verified",
+                "rolling_transactions_fact_time_not_verified",
+            ],
+        }
+    fields = _mapping(freshness.get("fields"))
     return {
         "status": _status(envelope),
         "observed_at": envelope.get("observed_at"),
-        "freshness": dict(_mapping(data.get("freshness"))),
+        "observation_freshness": observation_freshness,
         "price_usd": data.get("price_usd"),
         "price_verified": completeness.get("price") is True,
+        "price_freshness_verified": (
+            _mapping(fields.get("price_usd")).get("freshness_verified") is True
+        ),
         "liquidity_usd": data.get("liquidity_usd"),
         "liquidity_verified": completeness.get("liquidity") is True,
+        "liquidity_freshness_verified": (
+            _mapping(fields.get("liquidity_usd")).get("freshness_verified") is True
+        ),
         "volume_24h_usd": data.get("volume_24h_usd"),
         "volume_24h_verified": completeness.get("volume_24h") is True,
+        "volume_24h_freshness_verified": (
+            _mapping(fields.get("volume_24h_usd")).get("freshness_verified") is True
+        ),
         "transactions_24h": data.get("transactions_24h"),
         "transactions_24h_verified": (
             completeness.get("transactions_24h") is True
+        ),
+        "transactions_24h_freshness_verified": (
+            _mapping(fields.get("transactions_24h")).get("freshness_verified") is True
         ),
         "#LPs": data.get("#LPs", data.get("lp_count")),
         "market_cap_usd_reported": data.get("market_cap_usd_reported"),
         "market_cap_verified": data.get("market_cap_verified") is True,
         "fdv_usd_reported": data.get("fdv_usd_reported"),
         "fdv_verified": data.get("fdv_verified") is True,
+        "freshness": dict(freshness),
     }
-
-
 def _activity_section(data: Mapping[str, Any]) -> dict[str, Any]:
     activity = _mapping(data.get("token_activity"))
     return {
@@ -330,6 +381,8 @@ def _confidence(
     tokenomics: Mapping[str, Any],
     history: Mapping[str, Any],
     risk_envelope: Mapping[str, Any],
+    *,
+    freshness_assessment: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     identity_confidence = _mapping(identity.get("confidence"))
     market_confidence = _mapping(market.get("confidence"))
@@ -439,7 +492,7 @@ def build_instant_x1_scan_response(
         "section": "holder_concentration",
         "message": (
             "Current top-account concentration is not promoted into Instant X1 "
-            "Scan v2; internal intelligence foundations are not used as a "
+            "Scan v3; internal intelligence foundations are not used as a "
             "public-service shortcut."
         ),
     })
@@ -456,10 +509,14 @@ def build_instant_x1_scan_response(
     limitations = [
         "missing_or_unverified_fields_remain_unknown",
         "holder_count_requires_existing_verified_holder_semantics",
-        "current_top_account_concentration_not_promoted_in_v2",
+        "current_top_account_concentration_not_promoted_in_v3",
         "history_may_include_bounded_verified_provider_price_backfill",
         "provider_price_backfill_is_price_only",
         "provider_source_independence_not_verified",
+        "current_market_freshness_is_field_scoped",
+        "price_freshness_uses_timestamped_provider_backfill",
+        "liquidity_volume_transaction_fact_time_not_verified",
+        "collection_time_is_not_provider_fact_time",
     ]
     if history_section.get("full_supported_pair_lifetime_verified") is True:
         limitations.append(
@@ -486,7 +543,10 @@ def build_instant_x1_scan_response(
         "read_only": True,
         "sections": {
             "identity": _identity_section(identity_envelope),
-            "market": _market_section(market_envelope),
+            "market": _market_section(
+                market_envelope,
+                freshness_assessment=freshness_assessment,
+            ),
             "tokenomics": _tokenomics_section(tokenomics_envelope),
             "holder_concentration": _holder_concentration_section(
                 market_envelope
