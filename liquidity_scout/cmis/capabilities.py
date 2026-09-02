@@ -34,7 +34,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.16.0"
+CMIS_CONTRACT_VERSION = "1.17.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -257,14 +257,19 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
                     "accepted_tokenomics_service",
                     "cmis_verified_history",
                     "bounded_verified_provider_price_backfill",
+                    "field_scoped_current_market_freshness",
                     "deterministic_risk_core",
                 ),
                 limitations=(
                     "holder_count_may_remain_unverified",
-                    "current_top_account_concentration_not_promoted_in_v2",
+                    "current_top_account_concentration_not_promoted_in_v3",
                     "provider_price_backfill_is_price_only",
                     "provider_source_independence_not_verified",
                     "provider_archive_completeness_not_verified",
+                    "current_market_freshness_is_field_scoped",
+                    "price_freshness_uses_timestamped_provider_backfill",
+                    "liquidity_volume_transaction_fact_time_not_verified",
+                    "collection_time_is_not_provider_fact_time",
                     "history_does_not_imply_complete_asset_lifetime",
                     "continuous_coverage_requires_separate_archive_completeness_proof",
                     "proof_score_separate_from_risk",
@@ -275,7 +280,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             ),
             "read_only": True,
             "composition_only": True,
-            "service_contract_version": "instant_x1_scan/v2",
+            "service_contract_version": "instant_x1_scan/v3",
             "public_service_promoted": True,
             "scout_reliance_promoted": True,
             "execution_authorized": False,
@@ -369,7 +374,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             ),
             "read_only": True,
             "composition_only": True,
-            "service_contract_version": "instant_x1_scan/v2",
+            "service_contract_version": "instant_x1_scan/v3",
             "public_service_promoted": False,
             "scout_reliance_promoted": False,
             "execution_authorized": False,
