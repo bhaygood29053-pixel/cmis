@@ -41,6 +41,19 @@ def complete_proof():
     }
 
 
+def interval_proof():
+    proof = complete_proof()
+    proof["lifetime_start_anchor"] = {
+        "kind": "first_verified_supported_market_interval",
+        "verified": True,
+        "observed_at": 120,
+        "interval_seconds": 60,
+        "market_open_at": 148,
+        "open_time_semantics_verified": True,
+    }
+    return proof
+
+
 def test_complete_explicit_proof_promotes_price_lifetime_and_continuity():
     result = evaluate_x1_price_historical_coverage(
         complete_proof(),
@@ -57,6 +70,56 @@ def test_complete_explicit_proof_promotes_price_lifetime_and_continuity():
     assert result["full_asset_lifetime_verified"] is True
     assert result["continuous_coverage_verified"] is True
     assert result["missing_gates"] == []
+
+
+def test_first_interval_covering_verified_market_open_is_valid_anchor():
+    result = evaluate_x1_price_historical_coverage(
+        interval_proof(),
+        metric_profile={
+            "first_observed_at": 120,
+            "last_observed_at": 220,
+        },
+    )
+
+    assert result["asset_lifetime_start_verified"] is True
+    assert result["lifetime_start_anchor_kind"] == (
+        "first_verified_supported_market_interval"
+    )
+    assert result["first_verified_supported_market_observation"] == 120
+    assert result["verified_market_open_at"] == 148
+    assert result["promotion_eligible"] is True
+
+
+def test_interval_anchor_rejects_market_open_outside_first_bar():
+    proof = interval_proof()
+    proof["lifetime_start_anchor"]["market_open_at"] = 180
+
+    result = evaluate_x1_price_historical_coverage(
+        proof,
+        metric_profile={
+            "first_observed_at": 120,
+            "last_observed_at": 220,
+        },
+    )
+
+    assert result["asset_lifetime_start_verified"] is False
+    assert "lifetime_start_anchor_verified" in result["missing_gates"]
+
+
+def test_interval_anchor_requires_verified_open_time_semantics():
+    proof = interval_proof()
+    proof["lifetime_start_anchor"]["open_time_semantics_verified"] = False
+
+    result = evaluate_x1_price_historical_coverage(
+        proof,
+        metric_profile={
+            "first_observed_at": 120,
+            "last_observed_at": 220,
+        },
+    )
+
+    assert result["asset_lifetime_start_verified"] is False
+    assert "lifetime_start_anchor_verified" in result["missing_gates"]
 
 
 def test_gap_free_sample_without_archive_proof_does_not_promote():
