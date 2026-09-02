@@ -1,6 +1,5 @@
 import json
 import os
-import struct
 import unittest
 from datetime import datetime, timezone
 
@@ -14,6 +13,10 @@ from liquidity_scout.providers.x1.transaction_semantics import (
     XDEX_MAINNET_OBSERVED_PROGRAM_ID,
 )
 from liquidity_scout.providers.x1.xdex import fetch_price_history
+from liquidity_scout.providers.x1.xdex_pool_open_time_semantics import (
+    BAR_INTERVAL_SECONDS,
+    evaluate_xdex_pool_open_time_semantics,
+)
 from liquidity_scout.providers.x1.xdex_price_history_import import (
     USDC_X_MINT,
     WRAPPED_XNT_MINT,
@@ -23,12 +26,6 @@ from liquidity_scout.providers.x1.xdex_price_history_import import (
 RUN_LIVE = os.getenv("RUN_XDEX_XNT_POOL_INCEPTION_LIVE") == "1"
 POOL = "CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR"
 PROGRAM = XDEX_MAINNET_OBSERVED_PROGRAM_ID
-
-# Exact 637-byte pool-state offsets already used by the repository XDEX parser.
-# The field names are still candidate semantics here until independently proved.
-OPEN_TIME_OFFSET = 373
-RECENT_EPOCH_OFFSET = 381
-BAR_INTERVAL_SECONDS = 60
 
 # Boundary discovered by the accepted read-only history-boundary probe.
 BOUNDARY_SEARCH_FROM = 1767238740
@@ -69,103 +66,81 @@ def _provider_first_bar():
     "set RUN_XDEX_XNT_POOL_INCEPTION_LIVE=1 to run read-only XNT pool inception evidence",
 )
 class XDEXXNTPoolInceptionAnchorLiveTests(unittest.TestCase):
-    def test_pool_state_time_candidate_against_provider_first_bar(self):
+    def test_pool_open_time_semantics_and_first_bar_anchor(self):
         structural = verify_candidate_pool_role(
             account=POOL,
             target_mint=WRAPPED_XNT_MINT,
             program_id=PROGRAM,
             signature_limit=1,
         )
-        summary = structural.get("summary") or {}
-        decoded = structural.get("decoded_state") or {}
-
-        self.assertTrue(summary.get("pool_state_structural_role_verified"))
-        self.assertEqual(
-            {decoded.get("mint_0"), decoded.get("mint_1")},
-            {WRAPPED_XNT_MINT, USDC_X_MINT},
-        )
-
         state = fetch_account_state(POOL)
-        data = state.get("data")
-        self.assertTrue(state.get("response_integrity_verified"))
-        self.assertEqual(state.get("owner"), PROGRAM)
-        self.assertIsInstance(data, bytes)
-        self.assertEqual(len(data), 637)
-
-        open_time_candidate = struct.unpack_from(
-            "<Q", data, OPEN_TIME_OFFSET
-        )[0]
-        recent_epoch_candidate = struct.unpack_from(
-            "<Q", data, RECENT_EPOCH_OFFSET
-        )[0]
-
-        # Plausibility only. This does not promote the field name/meaning.
-        self.assertGreater(open_time_candidate, 1_600_000_000)
-        self.assertLess(open_time_candidate, 2_000_000_000)
-
         provider = _provider_first_bar()
-        provider_first = provider.get("first_observed_at")
-        self.assertIsNotNone(provider_first)
 
-        first_interval_end = provider_first + BAR_INTERVAL_SECONDS
-        open_time_in_first_provider_bar_interval = bool(
-            provider_first
-            <= open_time_candidate
-            < first_interval_end
+        semantic = evaluate_xdex_pool_open_time_semantics(
+            state,
+            structural,
+            provider,
+            asset_mint=WRAPPED_XNT_MINT,
+            quote_mint=USDC_X_MINT,
         )
-        provider_bar_start_precedes_open_time_seconds = (
-            open_time_candidate - provider_first
-        )
+
+        open_time = semantic.get("open_time")
+        first_bar = semantic.get("provider_first_bar_start")
+        first_bar_end = semantic.get("provider_first_bar_interval_end")
 
         evidence = {
-            "schema": "xdex_xnt_pool_inception_anchor_live.v3",
+            "schema": "xdex_xnt_pool_inception_anchor_live.v4",
             "pair": f"{WRAPPED_XNT_MINT}/{USDC_X_MINT}",
             "pool": POOL,
             "program": PROGRAM,
-            "current_pool_structure_verified": True,
             "pool_state_response_integrity_verified": (
                 state.get("response_integrity_verified") is True
             ),
-            "pool_state_data_length": len(data),
-            "open_time_candidate_offset": OPEN_TIME_OFFSET,
-            "open_time_candidate": open_time_candidate,
-            "open_time_candidate_utc": _iso(open_time_candidate),
-            "open_time_semantics_verified": False,
-            "recent_epoch_candidate_offset": RECENT_EPOCH_OFFSET,
-            "recent_epoch_candidate": recent_epoch_candidate,
-            "provider_boundary_search_from": BOUNDARY_SEARCH_FROM,
-            "provider_boundary_search_to": BOUNDARY_SEARCH_TO,
+            "pool_state_structural_role_verified": semantic.get(
+                "pool_state_structural_role_verified"
+            ),
+            "exact_pair_identity_verified": semantic.get(
+                "exact_pair_identity_verified"
+            ),
+            "open_time": open_time,
+            "open_time_utc": _iso(open_time),
+            "open_time_semantics_verified": semantic.get(
+                "open_time_semantics_verified"
+            ),
+            "source_semantics_verified": semantic.get(
+                "source_semantics_verified"
+            ),
             "provider_first_bar": provider,
             "provider_bar_interval_seconds": BAR_INTERVAL_SECONDS,
-            "provider_first_bar_interval_end": first_interval_end,
-            "provider_first_bar_interval_end_utc": _iso(first_interval_end),
+            "provider_first_bar_interval_end": first_bar_end,
+            "provider_first_bar_interval_end_utc": _iso(first_bar_end),
             "provider_bar_start_precedes_open_time_seconds": (
-                provider_bar_start_precedes_open_time_seconds
+                open_time - first_bar
+                if isinstance(open_time, int) and isinstance(first_bar, int)
+                else None
             ),
-            "open_time_candidate_in_provider_boundary_bracket": (
-                BOUNDARY_SEARCH_FROM
-                <= open_time_candidate
-                <= BOUNDARY_SEARCH_TO
+            "provider_first_bar_covers_swap_open": semantic.get(
+                "provider_first_bar_covers_swap_open"
             ),
-            "open_time_candidate_in_first_provider_bar_interval": (
-                open_time_in_first_provider_bar_interval
+            "lifetime_start_anchor": semantic.get("lifetime_start_anchor"),
+            "asset_lifetime_start_verified": semantic.get(
+                "lifetime_start_anchor_verified"
             ),
-            "rpc_history_exhaustion_required_for_this_probe": False,
-            "first_verified_supported_market_observation": None,
-            "asset_lifetime_start_verified": False,
             "provider_range_complete_verified": False,
             "archive_exhaustion_verified": False,
             "full_asset_lifetime_verified": False,
             "continuous_coverage_verified": False,
+            "limitations": semantic.get("limitations"),
         }
 
         print("XDEX XNT POOL INCEPTION ANCHOR EVIDENCE")
         print(json.dumps(evidence, sort_keys=True))
 
-        # A one-minute OHLC bar is timestamped at its interval boundary. The
-        # pool-time candidate may therefore fall after the bar timestamp while
-        # still belonging to the first observed market interval.
-        self.assertTrue(open_time_in_first_provider_bar_interval)
+        self.assertTrue(semantic["open_time_semantics_verified"])
+        self.assertTrue(semantic["provider_first_bar_covers_swap_open"])
+        self.assertTrue(semantic["lifetime_start_anchor_verified"])
+        self.assertFalse(semantic["full_asset_lifetime_verified"])
+        self.assertFalse(semantic["continuous_coverage_verified"])
 
 
 if __name__ == "__main__":
