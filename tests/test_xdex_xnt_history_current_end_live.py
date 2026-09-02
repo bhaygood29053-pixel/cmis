@@ -17,6 +17,7 @@ from liquidity_scout.providers.x1.xdex_price_history_import import (
 
 
 RUN_LIVE = os.getenv("RUN_XDEX_XNT_CURRENT_END_LIVE") == "1"
+TAIL_INTERVAL_COUNT = 10
 
 
 def _iso(value):
@@ -41,10 +42,11 @@ class XDEXXNTCurrentEndLiveTests(unittest.TestCase):
                 (before // BAR_INTERVAL_SECONDS) * BAR_INTERVAL_SECONDS
                 - BAR_INTERVAL_SECONDS
             )
+            start = requested - (TAIL_INTERVAL_COUNT - 1) * BAR_INTERVAL_SECONDS
             rows = fetch_price_history(
                 WRAPPED_XNT_MINT,
                 USDC_X_MINT,
-                time_from=requested - 9 * BAR_INTERVAL_SECONDS,
+                time_from=start,
                 time_to=requested,
             )
             evaluated_at = int(time.time())
@@ -57,6 +59,9 @@ class XDEXXNTCurrentEndLiveTests(unittest.TestCase):
                 continue
 
             result = evaluate_xdex_history_current_end(
+                base_mint=WRAPPED_XNT_MINT,
+                quote_mint=USDC_X_MINT,
+                requested_time_from=start,
                 requested_closed_bar_start=requested,
                 provider_rows=rows,
                 evaluation_time=evaluated_at,
@@ -66,8 +71,10 @@ class XDEXXNTCurrentEndLiveTests(unittest.TestCase):
         self.assertIsNotNone(result, "minute boundary kept moving during bounded retry")
 
         evidence = {
-            "schema": "xdex_xnt_history_current_end_live.v1",
+            "schema": "xdex_xnt_history_current_end_live.v2",
             "pair": f"{WRAPPED_XNT_MINT}/{USDC_X_MINT}",
+            "requested_time_from": result["requested_time_from"],
+            "requested_time_from_utc": _iso(result["requested_time_from"]),
             "requested_closed_bar_start": result[
                 "requested_closed_bar_start"
             ],
@@ -85,6 +92,15 @@ class XDEXXNTCurrentEndLiveTests(unittest.TestCase):
             "interval_seconds": result["interval_seconds"],
             "freshness_bound_seconds": result["freshness_bound_seconds"],
             "age_seconds": result["age_seconds"],
+            "expected_timestamp_count": result["expected_timestamp_count"],
+            "unique_timestamp_count": result["unique_timestamp_count"],
+            "missing_timestamp_count": result["missing_timestamp_count"],
+            "unexpected_timestamp_count": result["unexpected_timestamp_count"],
+            "conflicting_duplicate_timestamp_count": result[
+                "conflicting_duplicate_timestamp_count"
+            ],
+            "exact_pair_identity_bound": result["exact_pair_identity_bound"],
+            "tail_continuity_verified": result["tail_continuity_verified"],
             "latest_expected_closed_bar_verified": result[
                 "latest_expected_closed_bar_verified"
             ],
@@ -114,6 +130,11 @@ class XDEXXNTCurrentEndLiveTests(unittest.TestCase):
             result["freshness_bound_seconds"],
             FRESHNESS_BOUND_SECONDS,
         )
+        self.assertTrue(result["exact_pair_identity_bound"])
+        self.assertTrue(result["tail_continuity_verified"])
+        self.assertEqual(result["missing_timestamp_count"], 0)
+        self.assertEqual(result["unexpected_timestamp_count"], 0)
+        self.assertEqual(result["conflicting_duplicate_timestamp_count"], 0)
         self.assertTrue(result["latest_expected_closed_bar_verified"])
         self.assertTrue(result["canonical_fact_timestamp_verified"])
         self.assertTrue(result["freshness_verified"])
