@@ -433,6 +433,8 @@ def build_instant_x1_scan_response(
     tokenomics_envelope: Mapping[str, Any],
     history_envelope: Mapping[str, Any],
     risk_envelope: Mapping[str, Any],
+    *,
+    freshness_assessment: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compose one compact read-only X1 scan from existing CMIS envelopes."""
 
