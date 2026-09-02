@@ -139,10 +139,9 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_cmis_current_market_freshness.py
 
-      - name: Test CMIS 1.17 capability contract
-        env:
-          PYTHONPATH: .
-        run: python -m pytest -q tests/test_cmis_capabilities.py
+      # Runtime capability validation imports protected CMIS modules and therefore
+      # runs in cmis-core CI. The public-shell source-contract gate above verifies
+      # the 1.17/v3 declaration without violating the public/private boundary.
 
       - name: Test Instant X1 Scan v3 composition
         env:
