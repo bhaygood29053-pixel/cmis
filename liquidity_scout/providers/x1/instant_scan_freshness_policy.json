@@ -1,0 +1,11 @@
+{
+  "policy_id": "cmis.x1.instant_x1_scan.current_market_freshness.v1",
+  "max_collection_age_seconds": 60,
+  "collection_age_provenance": "CMIS collection freshness contract: the market catalog must have been collected no more than 60 seconds before the scan freshness evaluation. This proves only CMIS retrieval recency, not provider fact time.",
+  "max_price_fact_age_seconds": 60,
+  "price_fact_age_provenance": "CMIS current-price fact-time contract: the latest timestamped XDEX close corroborated against the matching X1.Ninja OHLCV close must be no older than 60 seconds at scan evaluation time.",
+  "max_future_skew_seconds": 5,
+  "future_skew_provenance": "CMIS clock-reference contract: allow at most five seconds of positive source-clock skew relative to the scan evaluation clock.",
+  "price_relative_tolerance": 0.005,
+  "price_tolerance_provenance": "The current X1 market price must agree with the latest timestamped provider-backed close within 0.5 percent relative tolerance before price freshness can be promoted."
+}
