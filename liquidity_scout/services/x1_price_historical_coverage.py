@@ -15,7 +15,7 @@ from typing import Any
 
 
 POLICY_ID = "cmis.x1.price_historical_coverage.v1"
-LIFETIME_SCOPE = "first_verified_supported_market_observation_to_current"
+LIFETIME_SCOPE = "first_verified_supported_market_interval_to_current"
 
 _REQUIRED_GATES = (
     "lifetime_start_anchor_verified",
@@ -61,12 +61,27 @@ def evaluate_x1_price_historical_coverage(
 ) -> dict[str, Any]:
     """Evaluate explicit price-history proof inputs and fail closed.
 
-    Expected proof sections:
+    Accepted lifetime-start anchor forms:
 
-    - lifetime_start_anchor:
-        kind == "first_verified_supported_market_observation"
-        verified == True
-        observed_at == canonical first price observation
+    1. Exact point observation:
+       kind == "first_verified_supported_market_observation"
+       verified == True
+       observed_at == canonical first price observation
+
+    2. First provider interval covering verified market open:
+       kind == "first_verified_supported_market_interval"
+       verified == True
+       observed_at == canonical first bar start
+       interval_seconds > 0
+       market_open_at falls inside [observed_at, observed_at + interval_seconds)
+       open_time_semantics_verified == True
+
+    The interval form is required when a one-minute OHLC bucket starts before
+    the exact swap-open instant but contains that instant, as observed for the
+    XNT/USDC.X XDEX market.
+
+    Other proof sections:
+
     - archive:
         provider_range_complete_verified == True
         archive_exhaustion_verified == True
@@ -104,7 +119,10 @@ def evaluate_x1_price_historical_coverage(
     current_end = _mapping(candidate.get("current_end"))
     quote = _mapping(candidate.get("quote"))
 
+    anchor_kind = anchor.get("kind")
     anchor_observed_at = _nonnegative_int(anchor.get("observed_at"))
+    anchor_interval_seconds = _positive_int(anchor.get("interval_seconds"))
+    market_open_at = _nonnegative_int(anchor.get("market_open_at"))
     current_end_observed_at = _nonnegative_int(current_end.get("observed_at"))
 
     expected_interval = _positive_int(cadence.get("expected_interval_seconds"))
@@ -129,6 +147,29 @@ def evaluate_x1_price_historical_coverage(
         and (profile_last is None or profile_last == current_end_observed_at)
     )
 
+    exact_observation_anchor_verified = bool(
+        anchor.get("verified") is True
+        and anchor_kind == "first_verified_supported_market_observation"
+        and anchor_profile_bound
+    )
+
+    interval_anchor_verified = bool(
+        anchor.get("verified") is True
+        and anchor_kind == "first_verified_supported_market_interval"
+        and anchor_profile_bound
+        and anchor_interval_seconds is not None
+        and market_open_at is not None
+        and anchor_observed_at is not None
+        and anchor_observed_at
+        <= market_open_at
+        < anchor_observed_at + anchor_interval_seconds
+        and anchor.get("open_time_semantics_verified") is True
+    )
+
+    lifetime_start_anchor_verified = bool(
+        exact_observation_anchor_verified or interval_anchor_verified
+    )
+
     cadence_shape_complete = all(
         value is not None
         for value in (
@@ -151,12 +192,7 @@ def evaluate_x1_price_historical_coverage(
     )
 
     gates = {
-        "lifetime_start_anchor_verified": (
-            anchor.get("verified") is True
-            and anchor.get("kind")
-            == "first_verified_supported_market_observation"
-            and anchor_profile_bound
-        ),
+        "lifetime_start_anchor_verified": lifetime_start_anchor_verified,
         "provider_range_complete_verified": (
             archive.get("provider_range_complete_verified") is True
         ),
@@ -203,7 +239,9 @@ def evaluate_x1_price_historical_coverage(
         "continuous_coverage_verified": fully_verified,
         "gates": gates,
         "missing_gates": missing_gates,
+        "lifetime_start_anchor_kind": anchor_kind,
         "first_verified_supported_market_observation": anchor_observed_at,
+        "verified_market_open_at": market_open_at,
         "current_end_observed_at": current_end_observed_at,
         "expected_interval_seconds": expected_interval,
         "maximum_allowed_gap_seconds": maximum_allowed_gap,
