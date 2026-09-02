@@ -16,7 +16,7 @@ Accepted baseline:
 
 - capability schema: `1`
 - global existing-service minimum: `1.8.0`
-- current CMIS contract: `1.13.0`
+- current CMIS contract: `1.15.0`
 - request path: `/v1/cmis`
 - Evidence Receipt schema: `1`
 - Proof Score schema: `1`
@@ -70,6 +70,34 @@ Holder-looking provider values remain unverified unless the existing holder sema
 The runtime EvidenceQualityMixin attaches the scan Evidence Receipt and Proof Score after the deterministic service result is complete. Proof Score remains separate from risk and cannot rewrite facts, scan status, or authority.
 
 Solana advertises `instant_x1_scan` as unavailable. Solana product expansion and release remain deferred to a future phase.
+
+## X1 Burn Intelligence — CMIS 1.15.0
+
+CMIS 1.15.0 promotes the accepted X1 burn foundation as its own public service:
+
+```text
+service = burn_intelligence
+service_contract_version = burn_intelligence/v1
+chain = x1
+state = bounded
+callable = true
+read_only = true
+public_service_promoted = true
+scout_reliance_promoted = true
+execution_authorized = false
+```
+
+The service reuses the accepted tokenomics/burn-scanner path and does **not** create a second parser or recalculate burn facts. Exact mint is the identity root.
+
+The contract exposes the accepted cumulative verified-observed burn facts plus the exact 1h, 24h, 7d, and 30d windows. The 24h/7d/30d windows preserve their immediately preceding equal-length comparison periods and CMIS-owned percentage-change state. Undefined zero-denominator comparisons remain null with explicit state rather than infinity.
+
+`verified_burned_observed` is bounded to proven scanned/verified coverage. It is not a lifetime-total claim unless `lifetime_total_burn_verified=true`. Dead-address transfers are not burns without separately accepted burn semantics.
+
+Mint/emission facts, burn-to-emission ratio, net issuance, circulating-supply context, and historical value destroyed remain available only under their existing independent verification gates. Missing or incomplete evidence remains unavailable/partial.
+
+Runtime Evidence Receipt and Proof Score post-processing may bind the final Burn Intelligence response, but Proof Score remains separate from risk and cannot rewrite burn facts, status, completeness, or execution policy.
+
+Solana advertises `burn_intelligence` as unavailable/non-callable/non-promoted in v1.
 
 ## X1 normalized exact-mint identity — CMIS 1.11.0
 
