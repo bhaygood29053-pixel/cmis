@@ -392,6 +392,8 @@ def _unavailable(mint: str, reason: str, **extra: Any) -> dict[str, Any]:
         "imported_observation_count": 0,
         "first_imported_observed_at": None,
         "last_imported_observed_at": None,
+        "first_imported_price_usd": None,
+        "last_imported_price_usd": None,
         "full_asset_lifetime_verified": False,
         "continuous_coverage_verified": False,
         "provider_range_complete_verified": False,
@@ -615,6 +617,8 @@ def backfill_verified_xdex_usd_price_history(
         ),
         "first_imported_observed_at": summary.get("first_observed_at"),
         "last_imported_observed_at": summary.get("last_observed_at"),
+        "first_imported_price_usd": summary.get("first_value"),
+        "last_imported_price_usd": summary.get("last_value"),
         "provider_history_imported": bool(
             inserted > 0 or summary.get("available") is True
         ),
