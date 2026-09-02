@@ -17,106 +17,87 @@ This file is the compact cross-project synchronization baseline and is intention
 
 ## Accepted implementation heads before this baseline-only sync
 
-- CMIS public `main`: `38e0b6c5ae231f4e8204204082c8baf850998da0`
-- protected `cmis-core` `main`: `6a1befc49162cb121c2be86e6ccc755950793d15`
-- ROBERTA public `main`: `01ccd6d5d3950709eed9108832aa6812091bfda2`
-- protected `roberta-core` `main`: `bcd2be575a70f6ad9de43d38054e52ce8938eb54`
+- CMIS public `main`: `a412d078a05629aa09d338c117d945820b465f58`
+- protected `cmis-core` `main`: `1e39e7d1e1af19a167fc946d51f5e2a12090de99`
+- ROBERTA public `main`: `f4480ca6424f645fc02bbf4f68858fd14e543755`
+- protected `roberta-core` `main`: `bf7e6d737bb7726ead3db1b048a190fbe05c3b56`
 
-## X1 Burn Intelligence — accepted v1 architecture
+## Accepted X1 intelligence product stack
 
-Burn Intelligence is now a first-class CMIS-owned capability.
+### Historical Coverage Proof v1
 
-```text
-User
-  -> ROBERTA
-    -> X1 Scout
-      -> CMIS burn_intelligence/v1
-        -> accepted CMIS tokenomics / burn-scanner evidence
-          -> X1 provider / verified source
-```
+CMIS Issue #383 is complete. The exact supported XNT/USDC.X market has verified lifetime-start evidence, archive-start exhaustion, continuous one-minute pair-price coverage through the accepted rolling checkpoint, current-end renewal, exact pair identity, and supported provider-range completeness.
 
-### CMIS authority
+This does **not** promote historical USDC.X -> USD equivalence, full USD lifetime, global XDEX archive completeness, or legacy full-asset lifetime.
 
-CMIS capability contract `1.15.0` promotes:
+### Burn Intelligence v1
 
-```text
-service = burn_intelligence
-service_contract_version = burn_intelligence/v1
-chain = x1
-state = bounded
-callable = true
-read_only = true
-public_service_promoted = true
-scout_reliance_promoted = true
-execution_authorized = false
-```
+CMIS `burn_intelligence/v1` is accepted under capability contract 1.15.0 through public CMIS #389 and protected `cmis-core` #12.
 
-Accepted implementation gates:
+ROBERTA public #295/#304 and protected `roberta-core` #23/#24 make Burn Intelligence a first-class X1 Scout + Canonical Decision Object workflow.
 
-- CMIS public PR #389 — first-class `burn_intelligence/v1` contract and capability promotion;
-- protected `cmis-core` PR #12 — runtime dispatch through the existing deterministic tokenomics/burn-evidence path;
-- no second burn scanner, parser, arithmetic path, circulating-supply inference path, or burn-time valuation engine was introduced.
-
-CMIS owns and preserves:
-
-- cumulative verified-observed burn and observed burn-event totals;
-- explicit `lifetime_total_burn_verified`;
-- 1h / 24h / 7d / 30d windows;
-- burn and mint amounts/event counts for verified windows;
-- 24h / 7d / 30d equal-period comparison states and percentage changes;
-- null percent semantics for non-numeric zero-base/insufficient-coverage states;
-- burn-to-emission ratio, net issuance, and issuance state;
-- coverage bounds and verification state;
-- independently gated circulating-supply context;
-- exact burn-time valuation and valuation completeness;
-- Evidence Receipt / Proof Score lineage and explicit unknowns.
-
-Verified-observed cumulative burn is **not** a lifetime-total claim unless archive/signature/history completeness independently proves `lifetime_total_burn_verified=true`.
-
-### X1 Scout
-
-ROBERTA public PR #295 hardened `x1_burn_intelligence/v1`. ROBERTA public PR #304 switched X1 Scout from generic CMIS `tokenomics` consumption to the dedicated CMIS `burn_intelligence/v1` service.
-
-X1 Scout:
-
-- requires the accepted CMIS 1.15.0 Burn Intelligence capability before dispatch;
-- requires exact X1 mint agreement and the dedicated CMIS service contract;
-- preserves CMIS burn metrics without recomputation;
-- preserves unavailable/partial/null states;
-- rejects weakened coverage/comparison semantics and execution authorization;
-- exposes the validated `x1_burn_intelligence/v1` product on the Scout report.
-
-Human ROBERTA exposes the first-class workflow as:
+Human ROBERTA exposes:
 
 ```text
 /burn <asset>
 ```
 
-### Canonical ROBERTA Decision Object
+Accepted facts include cumulative verified-observed burn, 1h/24h/7d/30d windows, event counts, 24h/7d/30d equal-period comparison states/percentages, issuance context, independently gated circulation context, burn-time valuation state, and explicit lifetime-completeness limits.
 
-Protected `roberta-core` PR #23 added `x1_burn_intelligence` to `roberta_decision/v1`; PR #24 validated that protected core against the accepted public Burn Intelligence shell.
+### Discovery Intelligence v1
 
-Both Human ROBERTA and Machine ROBERTA consume the same canonical burn facts. Neither renderer recalculates burn totals, comparison percentages, circulating supply, historical valuation, risk, or Proof Score.
+CMIS Discovery Ledger v1 is accepted through public #365 and protected `cmis-core` #6. CMIS public #391 promotes bounded read-only `discovery_intelligence/v1` under capability contract 1.16.0.
 
-## Burn Intelligence v1 completion state
+ROBERTA public #306 promotes Discovery through X1 Scout. Protected `roberta-core` #25 preserves the same Discovery history in the Canonical Decision Object for Human and Machine ROBERTA.
 
-The X1 Burn Intelligence v1 productization milestone is **accepted and complete** across CMIS public/protected runtime and ROBERTA public/protected decision layers.
+First verified observation is explicitly **not** token launch time. Sparse observations do not prove continuous coverage or archive completeness.
 
-Future burn work is evidence-driven only. In particular:
+Human ROBERTA exposes:
 
-- do not claim lifetime burn until complete lifetime/archive evidence exists;
-- do not treat transfers to presumed dead addresses as burns without accepted burn semantics;
-- do not derive circulating supply from burn totals;
-- do not value historical burns with current, nearest, or interpolated prices;
-- do not create a burn-derived trade recommendation or risk score;
-- do not widen Burn Intelligence into Controlled Execution.
+```text
+/discovery <asset>
+```
+
+### WHAT CHANGED? v1
+
+ROBERTA public #308 adds first-class `x1_what_changed/v1` through X1 Scout. Protected `roberta-core` #26 adds the same workflow to `roberta_decision/v1`.
+
+The workflow composes exactly the already-validated:
+- Instant X1 Scan product;
+- Burn Intelligence product;
+- Discovery Intelligence product.
+
+It does not calculate new market deltas in ROBERTA. Market/history change values are surfaced only when accepted CMIS/Scout history already supplies them. Burn comparison states and percentages are preserved exactly, including null percentage semantics. Discovery first/latest observations and completeness limits are preserved exactly.
+
+Human ROBERTA exposes:
+
+```text
+/changed <asset>
+```
+
+Human and Machine ROBERTA consume the same canonical facts/history. No causal, manipulation, ownership, intent, or launch-time inference is added.
+
+Issue ROBERTA #293 is complete and closed.
+
+## Current synchronized capability state
+
+- CMIS capability contract: `1.16.0`.
+- Burn Intelligence: accepted.
+- Discovery Intelligence: accepted.
+- WHAT CHANGED?: accepted in ROBERTA over accepted Scan/Burn/Discovery products.
+- XNT supported-pair historical lifetime proof: accepted with USD-lifetime caveats preserved.
+- Controlled Execution: unauthorized.
 
 ## Next synchronized product direction
 
-Burn Intelligence no longer blocks the roadmap. The next intelligence work should build on separately accepted evidence foundations such as Discovery / first-observation history, WHAT CHANGED?, and Early Warning rather than adding speculative Burn Intelligence features.
+The next reliability gate is **field-scoped current-market freshness**, but the older draft family (CMIS #386 / `cmis-core` #9 / ROBERTA #301 / `roberta-core` #19) predates accepted CMIS 1.15 Burn and 1.16 Discovery. It must be reconciled onto current public/private heads and promoted under a new CMIS contract version rather than merged with stale assumptions.
+
+After freshness, advance **Early Warning** one evidence family at a time with explicit persistence, replay/deduplication, freshness, identity, severity, and delivery contracts.
+
+CMIS #363 and related X1.Ninja/vault evidence research may continue in parallel but do not block the flagship ROBERTA product roadmap.
 
 ## Core sync rule
 
-**CMIS verifies changing chain facts. X1 Scout validates and projects accepted CMIS contracts. ROBERTA orchestrates and explains them. Human and Machine ROBERTA share the same canonical Decision Object. No layer above CMIS may silently recompute Burn Intelligence or promote missing evidence into fact.**
+**CMIS verifies changing chain facts. X1 Scout validates and composes accepted CMIS contracts. ROBERTA orchestrates and explains them. Human and Machine ROBERTA share the same Canonical Decision Object. No layer above CMIS may silently recompute facts, convert missing evidence into values, or infer execution authority.**
 
 `execution_authorized=false`
