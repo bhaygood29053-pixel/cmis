@@ -241,7 +241,11 @@ def _history_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
     coverage = _mapping(data.get("coverage"))
     provider_price_history = _mapping(data.get("provider_price_history"))
     provider_backfill = _mapping(data.get("provider_history_backfill"))
+    price_lifetime_coverage = _mapping(data.get("price_lifetime_coverage"))
     provider_history_imported = data.get("provider_history_imported") is True
+    pair_lifetime_verified = (
+        data.get("full_supported_pair_lifetime_verified") is True
+    )
     coverage_scope = data.get("coverage_scope")
     if provider_history_imported:
         coverage_scope = (
@@ -266,6 +270,25 @@ def _history_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "continuous_coverage_verified": (
             data.get("continuous_coverage_verified") is True
         ),
+        "price_coverage_scope": (
+            "full_supported_pair_lifetime"
+            if pair_lifetime_verified
+            else "bounded_verified_price_observations"
+        ),
+        "full_supported_pair_lifetime_verified": pair_lifetime_verified,
+        "continuous_pair_price_coverage_verified": (
+            data.get("continuous_pair_price_coverage_verified") is True
+        ),
+        "provider_range_complete_verified": (
+            data.get("provider_range_complete_verified") is True
+        ),
+        "historical_quote_usd_equivalence_verified": (
+            data.get("historical_quote_usd_equivalence_verified") is True
+        ),
+        "full_usd_lifetime_verified": (
+            data.get("full_usd_lifetime_verified") is True
+        ),
+        "price_lifetime_coverage": dict(price_lifetime_coverage),
         "provider_history_imported": provider_history_imported,
         "provider_price_history": dict(provider_price_history),
         "provider_history_backfill": dict(provider_backfill),
@@ -429,6 +452,35 @@ def build_instant_x1_scan_response(
         (risk_envelope, "risk"),
     )
 
+    history_section = _history_section(history_envelope)
+    limitations = [
+        "missing_or_unverified_fields_remain_unknown",
+        "holder_count_requires_existing_verified_holder_semantics",
+        "current_top_account_concentration_not_promoted_in_v2",
+        "history_may_include_bounded_verified_provider_price_backfill",
+        "provider_price_backfill_is_price_only",
+        "provider_source_independence_not_verified",
+    ]
+    if history_section.get("full_supported_pair_lifetime_verified") is True:
+        limitations.append(
+            "full_supported_pair_lifetime_price_does_not_imply_other_metric_lifetimes"
+        )
+        if history_section.get("full_usd_lifetime_verified") is not True:
+            limitations.append(
+                "historical_quote_usd_equivalence_not_verified"
+            )
+    else:
+        limitations.extend([
+            "provider_archive_completeness_not_verified",
+            "history_does_not_imply_complete_asset_lifetime",
+            "continuous_coverage_requires_separate_archive_completeness_proof",
+        ])
+    limitations.extend([
+        "proof_score_does_not_modify_market_facts_or_risk",
+        "risk_score_remains_unavailable_until_separately_calibrated",
+        "execution_authorized_false",
+    ])
+
     data = {
         "contract_version": CONTRACT_VERSION,
         "read_only": True,
@@ -439,7 +491,7 @@ def build_instant_x1_scan_response(
             "holder_concentration": _holder_concentration_section(
                 market_envelope
             ),
-            "history": _history_section(history_envelope),
+            "history": history_section,
             "risk": _risk_section(risk_envelope),
             "evidence": {
                 "component_statuses": {
@@ -454,20 +506,7 @@ def build_instant_x1_scan_response(
                 "runtime_evidence_receipt_post_processing_only": True,
             },
         },
-        "limitations": [
-            "missing_or_unverified_fields_remain_unknown",
-            "holder_count_requires_existing_verified_holder_semantics",
-            "current_top_account_concentration_not_promoted_in_v2",
-            "history_may_include_bounded_verified_provider_price_backfill",
-            "provider_price_backfill_is_price_only",
-            "provider_source_independence_not_verified",
-            "provider_archive_completeness_not_verified",
-            "history_does_not_imply_complete_asset_lifetime",
-            "continuous_coverage_requires_separate_archive_completeness_proof",
-            "proof_score_does_not_modify_market_facts_or_risk",
-            "risk_score_remains_unavailable_until_separately_calibrated",
-            "execution_authorized_false",
-        ],
+        "limitations": limitations,
         "execution_authorized": False,
     }
 

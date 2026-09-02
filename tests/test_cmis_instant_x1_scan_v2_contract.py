@@ -154,3 +154,86 @@ def test_scan_v2_projects_bounded_provider_history_without_lifetime_promotion():
     assert "history_does_not_imply_complete_asset_lifetime" in limitations
     assert "continuous_coverage_requires_separate_archive_completeness_proof" in limitations
     assert response["data"]["execution_authorized"] is False
+
+
+def test_scan_v2_projects_verified_pair_lifetime_without_usd_overclaim():
+    identity = envelope(
+        "asset_lookup",
+        status="ok",
+        data={"resolved_by": "native"},
+        confidence={"complete": True},
+    )
+    market = envelope(
+        "market_report",
+        data={
+            "completeness": {
+                "price": True,
+                "liquidity": True,
+                "volume_24h": True,
+                "transactions_24h": True,
+                "holders": False,
+            }
+        },
+        confidence={"core_market_complete": True},
+    )
+    tokenomics = envelope(
+        "tokenomics",
+        data={
+            "supply_verified": True,
+            "mint_authority_verified": True,
+            "freeze_authority_verified": True,
+        },
+    )
+    history = envelope(
+        "historical_compare",
+        data={
+            "mode": "all_available",
+            "coverage_scope": "cmis_stored_verified_observations",
+            "available_metric_count": 1,
+            "multi_point_metric_count": 1,
+            "full_supported_pair_lifetime_verified": True,
+            "continuous_pair_price_coverage_verified": True,
+            "provider_range_complete_verified": True,
+            "historical_quote_usd_equivalence_verified": False,
+            "full_usd_lifetime_verified": False,
+            "full_asset_lifetime_verified": False,
+            "continuous_coverage_verified": False,
+            "price_lifetime_coverage": {
+                "base_mint": "WrappedXNT",
+                "quote_mint": "USDCX",
+                "full_supported_pair_lifetime_verified": True,
+            },
+            "metrics": {"price": {"status": "ok"}},
+        },
+    )
+    risk = envelope(
+        "risk_check",
+        risk={"recommendation": "WARN", "flags": [], "reasons": []},
+    )
+
+    response = build_instant_x1_scan_response(
+        identity,
+        market,
+        tokenomics,
+        history,
+        risk,
+    )
+
+    section = response["data"]["sections"]["history"]
+    assert section["price_coverage_scope"] == "full_supported_pair_lifetime"
+    assert section["full_supported_pair_lifetime_verified"] is True
+    assert section["continuous_pair_price_coverage_verified"] is True
+    assert section["provider_range_complete_verified"] is True
+    assert section["historical_quote_usd_equivalence_verified"] is False
+    assert section["full_usd_lifetime_verified"] is False
+    assert section["full_asset_lifetime_verified"] is False
+
+    limitations = set(response["data"]["limitations"])
+    assert "historical_quote_usd_equivalence_not_verified" in limitations
+    assert (
+        "full_supported_pair_lifetime_price_does_not_imply_other_metric_lifetimes"
+        in limitations
+    )
+    assert "provider_archive_completeness_not_verified" not in limitations
+    assert "history_does_not_imply_complete_asset_lifetime" not in limitations
+    assert response["data"]["execution_authorized"] is False

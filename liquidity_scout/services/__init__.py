@@ -28,6 +28,9 @@ from .historical_compare import (
     format_historical_comparison,
 )
 from .market_comparison import format_market_comparison
+from .x1_quote_price_historical_coverage import (
+    evaluate_x1_quote_price_historical_coverage,
+)
 from .market_context import (
     build_verified_market_context,
     liquidity_depth_label,
@@ -91,6 +94,7 @@ __all__ = [
     "build_tokenomics_response",
     "build_verification_evidence_response",
     "build_verified_market_context",
+    "evaluate_x1_quote_price_historical_coverage",
     "find_asset_rank",
     "format_field_line",
     "format_historical_comparison",
