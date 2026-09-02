@@ -18,6 +18,10 @@ from liquidity_scout.services.cmis_burn_intelligence import (
     CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as BURN_INTELLIGENCE_SERVICE,
 )
+from liquidity_scout.services.cmis_discovery_intelligence import (
+    CONTRACT_VERSION as DISCOVERY_INTELLIGENCE_CONTRACT_VERSION,
+    SERVICE as DISCOVERY_INTELLIGENCE_SERVICE,
+)
 from liquidity_scout.services.cmis_x1_asset_identity import (
     IDENTITY_CONTRACT as X1_ASSET_IDENTITY_CONTRACT,
 )
@@ -30,7 +34,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.15.0"
+CMIS_CONTRACT_VERSION = "1.16.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -47,6 +51,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "historical_compare",
     "tokenomics",
     "burn_intelligence",
+    "discovery_intelligence",
     "risk_check",
     "pre_trade_check",
     "trade_verification",
@@ -124,6 +129,45 @@ def _burn_intelligence_capability(*, available: bool) -> dict[str, Any]:
             "circulating_supply_requires_independent_supply_semantics",
             "historical_value_destroyed_requires_burn_time_price_evidence",
             "proof_score_separate_from_risk",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "execution_authorized": False,
+    }
+
+
+def _discovery_intelligence_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": DISCOVERY_INTELLIGENCE_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": ["discovery_intelligence_not_available_for_chain"],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": DISCOVERY_INTELLIGENCE_CONTRACT_VERSION,
+        "requirements": [
+            "exact_resolved_x1_mint_identity",
+            "cmis_owned_x1_discovery_ledger",
+            "verified_observation_state",
+            "verified_fact_time",
+        ],
+        "limitations": [
+            "first_verified_observation_is_not_token_launch_time",
+            "sparse_observations_do_not_prove_continuous_coverage",
+            "archive_completeness_not_verified",
+            "missing_observations_are_unknown_not_zero",
+            "no_causal_inference",
             "no_execution_authorization",
             "x1_only_initial_scope",
         ],
@@ -258,6 +302,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         ),
         "tokenomics": _capability("supported"),
         BURN_INTELLIGENCE_SERVICE: _burn_intelligence_capability(available=True),
+        DISCOVERY_INTELLIGENCE_SERVICE: _discovery_intelligence_capability(available=True),
         "risk_check": _capability("supported"),
         "pre_trade_check": _capability(
             "bounded",
@@ -358,6 +403,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             ),
         ),
         BURN_INTELLIGENCE_SERVICE: _burn_intelligence_capability(available=False),
+        DISCOVERY_INTELLIGENCE_SERVICE: _discovery_intelligence_capability(available=False),
         "risk_check": _capability(
             "partial",
             requirements=("exact_mint",),

@@ -16,6 +16,10 @@ from liquidity_scout.services.cmis_burn_intelligence import (
     CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as BURN_INTELLIGENCE_SERVICE,
 )
+from liquidity_scout.services.cmis_discovery_intelligence import (
+    CONTRACT_VERSION as DISCOVERY_INTELLIGENCE_CONTRACT_VERSION,
+    SERVICE as DISCOVERY_INTELLIGENCE_SERVICE,
+)
 from liquidity_scout.services.cmis_verified_intelligence import (
     CONTRACT_VERSION as CONCENTRATION_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as CONCENTRATION_INTELLIGENCE_SERVICE,
@@ -40,7 +44,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.15.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.16.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -91,6 +95,33 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertFalse(solana["callable"])
         self.assertFalse(solana["public_service_promoted"])
         self.assertFalse(solana["scout_reliance_promoted"])
+        self.assertFalse(solana["execution_authorized"])
+
+    def test_discovery_intelligence_is_x1_only_bounded_public_service(self):
+        manifest = build_capability_manifest(
+            runtime_services=SUPPORTED_SERVICES,
+            legacy_supported_chains=SUPPORTED_CHAINS,
+            known_chains=KNOWN_CHAINS,
+        )
+        x1 = manifest["chains"]["x1"]["services"][DISCOVERY_INTELLIGENCE_SERVICE]
+        solana = manifest["chains"]["solana"]["services"][DISCOVERY_INTELLIGENCE_SERVICE]
+
+        self.assertEqual(x1["state"], "bounded")
+        self.assertTrue(x1["callable"])
+        self.assertTrue(x1["read_only"])
+        self.assertTrue(x1["public_service_promoted"])
+        self.assertTrue(x1["scout_reliance_promoted"])
+        self.assertEqual(
+            x1["service_contract_version"],
+            DISCOVERY_INTELLIGENCE_CONTRACT_VERSION,
+        )
+        self.assertIn(
+            "first_verified_observation_is_not_token_launch_time",
+            x1["limitations"],
+        )
+        self.assertFalse(x1["execution_authorized"])
+        self.assertEqual(solana["state"], "unavailable")
+        self.assertFalse(solana["callable"])
         self.assertFalse(solana["execution_authorized"])
 
     def test_instant_x1_scan_is_x1_only_bounded_public_service(self):
