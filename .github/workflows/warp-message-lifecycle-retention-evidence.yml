@@ -1,0 +1,158 @@
+name: Warp Message Lifecycle Retention Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warp-message-lifecycle-retention:
+    name: Verify Warp 60-day lifecycle retention
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue441-warp-message-lifecycle-retention')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: .
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run deterministic lifecycle-retention tests
+        run: python -m pytest -q tests/test_x1_warp_message_lifecycle_retention.py
+
+      - name: Prove live bounded Warp lifecycle retention
+        run: |
+          python - <<'PY'
+          import json
+          import time
+
+          from liquidity_scout.providers.x1.warp_message_lifecycle_retention import (
+              capture_warp_message_lifecycle_retention,
+          )
+          from liquidity_scout.providers.x1.warp_message_retention_coverage import (
+              evaluate_warp_message_counter_closure,
+              fetch_classified_warp_config_account,
+              fetch_official_warp_config,
+          )
+          from liquidity_scout.providers.x1.warp_onchain_transfer_history import (
+              capture_warp_message_state,
+          )
+
+          official = fetch_official_warp_config()
+          classified = {
+              "solana": fetch_classified_warp_config_account(chain="solana"),
+              "x1": fetch_classified_warp_config_account(chain="x1"),
+          }
+          message_state = capture_warp_message_state()
+          counter_closure = evaluate_warp_message_counter_closure(
+              config_response=official,
+              classified_configs=classified,
+              message_state=message_state,
+          )
+
+          assert counter_closure["counter_account_closure_verified"] is True
+          assert counter_closure["current_message_universe_count_closed"] is True
+
+          as_of = int(time.time())
+          result = capture_warp_message_lifecycle_retention(
+              counter_closure=counter_closure,
+              message_state=message_state,
+              as_of=as_of,
+          )
+
+          evidence = {
+              "contract": result["contract"],
+              "program_id": result["program_id"],
+              "as_of": result["as_of"],
+              "requested_start": result["requested_start"],
+              "lookback_seconds": result["lookback_seconds"],
+              "per_chain": result["per_chain"],
+              "program_signature_trace_complete_verified": result[
+                  "program_signature_trace_complete_verified"
+              ],
+              "requested_history_boundary_verified": result[
+                  "requested_history_boundary_verified"
+              ],
+              "no_message_account_closure_observed": result[
+                  "no_message_account_closure_observed"
+              ],
+              "no_message_account_recreation_observed": result[
+                  "no_message_account_recreation_observed"
+              ],
+              "no_ambiguous_zero_zero_lifecycle_touch": result[
+                  "no_ambiguous_zero_zero_lifecycle_touch"
+              ],
+              "expected_outgoing_creations_verified": result[
+                  "expected_outgoing_creations_verified"
+              ],
+              "retention_deletion_semantics_verified": result[
+                  "retention_deletion_semantics_verified"
+              ],
+              "historical_retention_complete_verified": result[
+                  "historical_retention_complete_verified"
+              ],
+              "requested_window_coverage_verified": result[
+                  "requested_window_coverage_verified"
+              ],
+              "coverage_complete_verified": result[
+                  "coverage_complete_verified"
+              ],
+              "missing_history_zero_authorized": result[
+                  "missing_history_zero_authorized"
+              ],
+              "missing_history_zero_scope": result[
+                  "missing_history_zero_scope"
+              ],
+              "bridged_supply_verified": result["bridged_supply_verified"],
+              "public_service_promoted": result["public_service_promoted"],
+              "scout_reliance_promoted": result["scout_reliance_promoted"],
+              "execution_authorized": result["execution_authorized"],
+              "evidence_sha256": result["evidence_sha256"],
+          }
+
+          print("WARP_MESSAGE_LIFECYCLE_RETENTION_EVIDENCE")
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+
+          assert result["program_signature_trace_complete_verified"] is True
+          assert result["requested_history_boundary_verified"] is True
+          assert result["no_message_account_closure_observed"] is True
+          assert result["no_message_account_recreation_observed"] is True
+          assert result["no_ambiguous_zero_zero_lifecycle_touch"] is True
+          assert result["expected_outgoing_creations_verified"] is True
+          assert result["retention_deletion_semantics_verified"] is True
+          assert result["historical_retention_complete_verified"] is True
+          assert result["requested_window_coverage_verified"] is True
+          assert result["coverage_complete_verified"] is True
+          assert result["missing_history_zero_authorized"] is True
+          assert result["bridged_supply_verified"] is False
+          assert result["public_service_promoted"] is False
+          assert result["scout_reliance_promoted"] is False
+          assert result["execution_authorized"] is False
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Finalized read-only Warp program history only."
+          echo "No signing, broadcast, custody, transfer construction, or value movement."
+          echo "Any history gap, closure, recreation, ambiguity, or missing body fails closed."
+          echo "Missing-history zero authorization is bounded to the accepted exact message universe and lookback."
+          echo "Bridged supply remains separate and unverified by this gate."
+          echo "EXECUTION_AUTHORIZED=FALSE"
