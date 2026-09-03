@@ -91,6 +91,21 @@ read_only = true
 execution_authorized = false
 ```
 
+## Accepted live evidence
+
+Exact-head live evidence from merged PR #423 / workflow run 33731432570 established:
+
+- Solana context slot: `443921036`;
+- Solana Warp-owned accounts: `11036`;
+- X1 context slot: `76214846`;
+- X1 Warp-owned accounts: `10983`;
+- exact cross-chain pubkey overlap: `49`;
+- Solana size families: 49×6, 106×3965, 107×3, 113×785, 116×6267, 170×7, 236×1, 321×1, 335×1;
+- X1 size families: 49×1, 106×6275, 107×8, 113×705, 116×3984, 170×7, 236×1, 321×1, 335×1.
+
+The matching counts for the rare 170/236/321/335-byte families are discovery
+signals only. They do not establish account-role or layout equivalence.
+
 ## Next gate
 
 If live inventory succeeds, classify stable account-size families and select
