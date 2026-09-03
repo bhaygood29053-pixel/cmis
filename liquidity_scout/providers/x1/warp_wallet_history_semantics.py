@@ -1,14 +1,12 @@
-"""Bounded semantics for the official Warp wallet-history response.
+"""Corroborative semantics for the official Warp wallet-history response.
 
-This adapter accepts only semantics directly supported by the connected
-official History API plus previously accepted exact Warp route/config evidence.
+The connected History API is wallet-scoped and therefore cannot establish
+route-wide flow coverage. It is also not the canonical settled-event authority:
+CMIS uses the accepted on-chain `warp_onchain_transfer_history/v1` path for
+settled transfer truth.
 
-Important:
-- wallet identifiers are never returned;
-- symbol text never becomes identity by itself;
-- provider status "executed" is not enough to create a settled flow event;
-- destination settlement time must come from separate canonical X1 RPC proof;
-- wallet-scoped history never establishes route-wide coverage.
+This adapter preserves useful response semantics without retaining wallet
+identifiers or upgrading provider labels/statuses into canonical flow facts.
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ from liquidity_scout.services.cmis_bridge_route_evidence import (
 )
 
 CONTRACT = "warp_wallet_history_semantics/v1"
-DESTINATION_SETTLEMENT_CONTRACT = "warp_destination_rpc_settlement/v1"
+CANONICAL_SETTLEMENT_SOURCE_CONTRACT = "warp_onchain_transfer_history/v1"
 EXACT_RESPONSE_CANONICAL_SHA256 = (
     "e309a68509b631002c46526e772ac0b40d2381a21ff2bef46c7c56cbaa4dcca5"
 )
@@ -36,7 +34,7 @@ CHAIN_ALIASES = {"sol": "solana", "x1": "x1"}
 
 
 class WarpWalletHistorySemanticError(ValueError):
-    """Raised when the response cannot be bound to one exact accepted route."""
+    """Raised when a wallet-history response cannot be safely contextualized."""
 
 
 def _mapping(value: Any, field: str) -> Mapping[str, Any]:
@@ -162,43 +160,11 @@ def _exact_config_token(
     return token
 
 
-def _positive_millisecond_timestamp(value: Any, field: str) -> tuple[int, float]:
-    timestamp_ms = _positive_int(value, field)
-    if timestamp_ms < 1_000_000_000_000:
-        raise WarpWalletHistorySemanticError(
-            f"{field} must be Unix milliseconds"
-        )
-    return timestamp_ms, timestamp_ms / 1000.0
-
-
-def _destination_reference(raw: Mapping[str, Any]) -> dict[str, Any]:
-    dest_tx_sig = str(raw.get("destTxSig") or "").strip()
-    submission_tx_sig = str(raw.get("submissionTxSig") or "").strip()
-    try:
-        dest_slot = _nonnegative_int(raw.get("destSlot", 0), "destSlot")
-        submission_slot = _nonnegative_int(
-            raw.get("submissionSlot", 0), "submissionSlot"
-        )
-    except WarpWalletHistorySemanticError:
-        dest_slot = 0
-        submission_slot = 0
-
-    return {
-        "destination_tx_signature": dest_tx_sig or None,
-        "submission_tx_signature": submission_tx_sig or None,
-        "destination_slot": dest_slot or None,
-        "submission_slot": submission_slot or None,
-        "tx_signature_match": bool(
-            dest_tx_sig
-            and submission_tx_sig
-            and dest_tx_sig == submission_tx_sig
-        ),
-        "slot_match": bool(
-            dest_slot > 0
-            and submission_slot > 0
-            and dest_slot == submission_slot
-        ),
-    }
+def _timestamp_ms(value: Any, field: str) -> tuple[int, float]:
+    parsed = _positive_int(value, field)
+    if parsed < 1_000_000_000_000:
+        raise WarpWalletHistorySemanticError(f"{field} must be Unix milliseconds")
+    return parsed, parsed / 1000.0
 
 
 def analyze_warp_wallet_history_response(
@@ -207,16 +173,14 @@ def analyze_warp_wallet_history_response(
     route_qualification: Any,
     config_response: Any,
 ) -> dict[str, Any]:
-    """Bind one wallet-scoped response to one exact accepted Warp route."""
+    """Contextualize one official wallet-history response without promoting it."""
 
     document = _mapping(response, "response")
     route = _qualified_route(route_qualification)
 
-    source_chain = route["source"]["chain"]
-    destination_chain = route["destination"]["chain"]
-    if source_chain != "solana" or destination_chain != "x1":
+    if route["source"]["chain"] != "solana" or route["destination"]["chain"] != "x1":
         raise WarpWalletHistorySemanticError(
-            "v1 accepts only observed Solana -> X1 wallet-history semantics"
+            "v1 accepts only observed Solana -> X1 wallet-history direction"
         )
     if route["source"]["asset_id_kind"] != "mint":
         raise WarpWalletHistorySemanticError("source identity kind must be mint")
@@ -225,12 +189,12 @@ def analyze_warp_wallet_history_response(
 
     source_token = _exact_config_token(
         config_response,
-        chain=source_chain,
+        chain="solana",
         mint=route["source"]["asset_id"],
     )
     destination_token = _exact_config_token(
         config_response,
-        chain=destination_chain,
+        chain="x1",
         mint=route["destination"]["asset_id"],
     )
     source_decimals = _positive_int(source_token.get("decimals"), "source decimals")
@@ -238,9 +202,7 @@ def analyze_warp_wallet_history_response(
         destination_token.get("decimals"), "destination decimals"
     )
     if source_decimals != destination_decimals:
-        raise WarpWalletHistorySemanticError(
-            "source/destination route decimals must match"
-        )
+        raise WarpWalletHistorySemanticError("route decimals must match")
 
     wallet = _text(document.get("wallet"), "wallet")
     provider_source = _text(document.get("source"), "source")
@@ -248,15 +210,13 @@ def analyze_warp_wallet_history_response(
         raise WarpWalletHistorySemanticError(
             f"provider source must equal observed {OBSERVED_PROVIDER_SOURCE}"
         )
-
-    transactions = document.get("transactions")
-    if not isinstance(transactions, list):
+    rows = document.get("transactions")
+    if not isinstance(rows, list):
         raise WarpWalletHistorySemanticError("transactions must be a list")
     count = _nonnegative_int(document.get("count"), "count")
-    count_matches = count == len(transactions)
 
-    normalized: list[dict[str, Any]] = []
-    for index, raw in enumerate(transactions):
+    normalized = []
+    for index, raw in enumerate(rows):
         if not isinstance(raw, Mapping):
             raise WarpWalletHistorySemanticError(
                 f"transactions[{index}] must be a mapping"
@@ -265,41 +225,33 @@ def analyze_warp_wallet_history_response(
         tx_sig = _text(raw.get("txSig"), f"transactions[{index}].txSig")
         from_alias = _text(raw.get("from"), f"transactions[{index}].from").casefold()
         to_alias = _text(raw.get("to"), f"transactions[{index}].to").casefold()
-        if CHAIN_ALIASES.get(from_alias) != source_chain:
-            raise WarpWalletHistorySemanticError(
-                f"transactions[{index}] source chain does not match exact route"
-            )
-        if CHAIN_ALIASES.get(to_alias) != destination_chain:
-            raise WarpWalletHistorySemanticError(
-                f"transactions[{index}] destination chain does not match exact route"
-            )
+        if CHAIN_ALIASES.get(from_alias) != "solana":
+            raise WarpWalletHistorySemanticError("row source chain is not Solana")
+        if CHAIN_ALIASES.get(to_alias) != "x1":
+            raise WarpWalletHistorySemanticError("row destination chain is not X1")
 
         token_label = _text(raw.get("token"), f"transactions[{index}].token")
         if token_label != str(source_token["symbol"]):
             raise WarpWalletHistorySemanticError(
-                f"transactions[{index}] token label does not match exact source mint"
+                "provider token label does not match accepted route source symbol"
             )
 
-        amount_raw = _positive_int(
+        provider_amount_integer = _positive_int(
             raw.get("amount"), f"transactions[{index}].amount"
         )
-        timestamp_ms, provider_timestamp = _positive_millisecond_timestamp(
+        timestamp_ms, provider_timestamp = _timestamp_ms(
             raw.get("timestamp"), f"transactions[{index}].timestamp"
         )
-        status = _text(
-            raw.get("status"), f"transactions[{index}].status"
-        ).casefold()
+        status = _text(raw.get("status"), f"transactions[{index}].status").casefold()
         if status not in OBSERVED_STATUSES:
             raise WarpWalletHistorySemanticError(
-                f"transactions[{index}] status is outside observed v1 semantics"
+                "provider status is outside observed response semantics"
             )
 
         source_slot = _nonnegative_int(
             raw.get("sourceSlot"), f"transactions[{index}].sourceSlot"
         )
-        slot_alias = _nonnegative_int(
-            raw.get("slot"), f"transactions[{index}].slot"
-        )
+        slot_alias = _nonnegative_int(raw.get("slot"), f"transactions[{index}].slot")
         signatures_collected = _nonnegative_int(
             raw.get("signaturesCollected"),
             f"transactions[{index}].signaturesCollected",
@@ -308,64 +260,62 @@ def analyze_warp_wallet_history_response(
             raw.get("signaturesRequired"),
             f"transactions[{index}].signaturesRequired",
         )
-        destination = _destination_reference(raw)
+
+        dest_sig = str(raw.get("destTxSig") or "").strip() or None
+        submission_sig = str(raw.get("submissionTxSig") or "").strip() or None
+        dest_slot = _nonnegative_int(raw.get("destSlot", 0), "destSlot") or None
+        submission_slot = (
+            _nonnegative_int(raw.get("submissionSlot", 0), "submissionSlot") or None
+        )
 
         sender = str(raw.get("sender") or "").strip()
         recipient = str(raw.get("recipient") or "").strip()
         wallet_echo_consistent = bool(
-            sender
-            and recipient
-            and sender == wallet
-            and recipient == wallet
+            sender and recipient and sender == wallet and recipient == wallet
         )
 
         source_reference_consistent = bool(
             source_slot > 0 and slot_alias > 0 and source_slot == slot_alias
         )
-        quorum_reached = signatures_collected >= signatures_required
+        guardian_quorum_reached = signatures_collected >= signatures_required
         destination_reference_complete = bool(
-            destination["tx_signature_match"]
-            and destination["slot_match"]
-        )
-        provider_execution_evidence_present = bool(
-            status == "executed"
-            and source_reference_consistent
-            and quorum_reached
-            and destination_reference_complete
+            dest_sig
+            and submission_sig
+            and dest_sig == submission_sig
+            and dest_slot
+            and submission_slot
+            and dest_slot == submission_slot
         )
 
         normalized.append(
             {
-                "event_id": tx_sig,
-                "source_tx_signature": tx_sig,
-                "route_id": route["route_id"],
-                "source": route["source"],
-                "destination": route["destination"],
-                "direction": "inflow",
-                "token_label": token_label,
-                "amount_raw": amount_raw,
-                "decimals": source_decimals,
+                "provider_tx_signature": tx_sig,
+                "provider_from": from_alias,
+                "provider_to": to_alias,
+                "provider_token_label": token_label,
+                "route_context_id": route["route_id"],
+                "route_context_compatible": True,
+                "row_exact_mint_identity_verified": False,
+                "provider_amount_integer": provider_amount_integer,
+                "provider_amount_unit_semantics_verified": False,
+                "route_decimals_context": source_decimals,
                 "provider_status": status,
+                "provider_status_is_settlement_authority": False,
                 "provider_timestamp_ms": timestamp_ms,
                 "provider_timestamp": provider_timestamp,
-                "provider_timestamp_role": (
-                    "transaction_timestamp_not_destination_settlement_time"
-                ),
+                "provider_timestamp_is_settlement_time": False,
                 "source_slot": source_slot or None,
-                "source_slot_alias": slot_alias or None,
+                "slot_alias": slot_alias or None,
                 "source_reference_consistent": source_reference_consistent,
                 "signatures_collected": signatures_collected,
                 "signatures_required": signatures_required,
-                "guardian_quorum_reached": quorum_reached,
-                **destination,
+                "guardian_quorum_reached": guardian_quorum_reached,
+                "destination_tx_reference_present": bool(dest_sig),
+                "destination_slot_reference_present": bool(dest_slot),
+                "destination_reference_complete": destination_reference_complete,
                 "wallet_echo_consistent": wallet_echo_consistent,
-                "provider_execution_evidence_present": (
-                    provider_execution_evidence_present
-                ),
-                "settlement_verified": False,
-                "pairing_verified": False,
-                "settled_at": None,
-                "flow_event_eligible": False,
+                "flow_event_normalization_authorized": False,
+                "execution_authorized": False,
             }
         )
 
@@ -373,129 +323,42 @@ def analyze_warp_wallet_history_response(
     return {
         "contract": CONTRACT,
         "provider": "warp_bridge",
-        "route_id": route["route_id"],
+        "route_context_id": route["route_id"],
         "route_evidence_id": route["route_evidence_id"],
         "source": route["source"],
         "destination": route["destination"],
         "source_token_symbol": str(source_token["symbol"]),
         "destination_token_symbol": str(destination_token["symbol"]),
-        "decimals": source_decimals,
+        "route_decimals_context": source_decimals,
         "provider_storage_label": provider_source,
-        "wallet_scope_present": True,
-        "wallet_identifier_retained": False,
-        "sender_recipient_identifiers_retained": False,
         "response_count": count,
-        "response_count_matches_list": count_matches,
+        "response_count_matches_list": count == len(rows),
         "transactions": normalized,
         "exact_response_canonical_sha256": canonical_sha256(document),
         "sanitized_response_canonical_sha256": canonical_sha256(sanitized),
+        "wallet_identifier_retained": False,
+        "sender_recipient_identifiers_retained": False,
+        "corroboration_only": True,
+        "canonical_settlement_source_contract": (
+            CANONICAL_SETTLEMENT_SOURCE_CONTRACT
+        ),
         "route_wide_coverage_verified": False,
         "pagination_coverage_verified": False,
         "source_independence_verified": False,
-        "live_flow_normalization_authorized": False,
-        "read_only": True,
-        "execution_authorized": False,
-    }
-
-
-def build_verified_settled_flow_event(
-    *,
-    transaction_semantics: Any,
-    destination_rpc_evidence: Any,
-) -> dict[str, Any]:
-    """Promote one executed provider record only after canonical X1 RPC proof."""
-
-    transaction = _mapping(transaction_semantics, "transaction_semantics")
-    rpc = _mapping(destination_rpc_evidence, "destination_rpc_evidence")
-
-    if rpc.get("contract") != DESTINATION_SETTLEMENT_CONTRACT:
-        raise WarpWalletHistorySemanticError(
-            f"destination proof must use {DESTINATION_SETTLEMENT_CONTRACT}"
-        )
-    if transaction.get("provider_status") != "executed":
-        raise WarpWalletHistorySemanticError(
-            "only provider executed transactions can be settlement candidates"
-        )
-    if transaction.get("provider_execution_evidence_present") is not True:
-        raise WarpWalletHistorySemanticError(
-            "provider execution references are incomplete"
-        )
-
-    expected_sig = _text(
-        transaction.get("destination_tx_signature"),
-        "destination_tx_signature",
-    )
-    expected_slot = _positive_int(
-        transaction.get("destination_slot"), "destination_slot"
-    )
-    if _text(rpc.get("transaction_signature"), "rpc transaction_signature") != expected_sig:
-        raise WarpWalletHistorySemanticError(
-            "RPC transaction signature does not match provider destination signature"
-        )
-    if _positive_int(rpc.get("slot"), "rpc slot") != expected_slot:
-        raise WarpWalletHistorySemanticError(
-            "RPC slot does not match provider destination slot"
-        )
-    required_true = (
-        "transaction_found",
-        "transaction_succeeded",
-        "finalized",
-        "block_time_verified",
-    )
-    for field in required_true:
-        if rpc.get(field) is not True:
-            raise WarpWalletHistorySemanticError(
-                f"destination RPC evidence requires {field}=true"
-            )
-    block_time = rpc.get("block_time")
-    if isinstance(block_time, bool):
-        raise WarpWalletHistorySemanticError("block_time must be numeric")
-    try:
-        settled_at = float(block_time)
-    except (TypeError, ValueError) as exc:
-        raise WarpWalletHistorySemanticError("block_time must be numeric") from exc
-    if settled_at <= 0:
-        raise WarpWalletHistorySemanticError("block_time must be positive")
-
-    transfer_core = {
-        "route_id": transaction["route_id"],
-        "source_tx_signature": transaction["source_tx_signature"],
-        "destination_tx_signature": expected_sig,
-        "destination_slot": expected_slot,
-    }
-    transfer_id = "warp_" + canonical_sha256(transfer_core)[:32]
-
-    return {
-        "event_id": transaction["event_id"],
-        "transfer_id": transfer_id,
-        "route_id": transaction["route_id"],
-        "direction": transaction["direction"],
-        "amount_raw": transaction["amount_raw"],
-        "decimals": transaction["decimals"],
-        "settled_at": settled_at,
-        "source": transaction["source"],
-        "destination": transaction["destination"],
-        "lifecycle_state": "settled",
-        "settlement_verified": True,
-        "pairing_verified": True,
-        "source_tx_signature": transaction["source_tx_signature"],
-        "destination_tx_signature": expected_sig,
-        "destination_slot": expected_slot,
-        "settlement_source": "canonical_x1_rpc",
+        "flow_event_normalization_authorized": False,
         "read_only": True,
         "execution_authorized": False,
     }
 
 
 __all__ = [
+    "CANONICAL_SETTLEMENT_SOURCE_CONTRACT",
     "CONTRACT",
-    "DESTINATION_SETTLEMENT_CONTRACT",
     "EXACT_RESPONSE_CANONICAL_SHA256",
     "OBSERVED_STATUSES",
     "SANITIZED_FIXTURE_CANONICAL_SHA256",
     "WarpWalletHistorySemanticError",
     "analyze_warp_wallet_history_response",
-    "build_verified_settled_flow_event",
     "canonical_sha256",
     "sanitize_wallet_history_response",
 ]
