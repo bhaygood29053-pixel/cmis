@@ -770,6 +770,7 @@ No warning state may silently become behavioral intent, ownership, manipulation/
 ### Cross-Chain Intelligence
 
 - X1: mature active foundation;
+- FortiSwap read-only provider qualification is active under Issue #413: discovery, token, router-volume, and quote evidence only; provider trust/confidence remain assertions and no transaction build/send/signing authority is granted;
 - Solana: read-only foundation complete and maturing field-by-field;
 - Ethereum: future explicit provider/verification milestone only;
 - bridge/stablecoin/capital-flow evidence: future, only after exact source semantics are accepted.
@@ -880,5 +881,6 @@ Controlled Execution remains unauthorized.
 - **EARLY WARNING — COMPLETE THROUGH PULL-ONLY ROBERTA ADOPTION.** CMIS #399 / public #400 / protected `cmis-core` #16 promote `concentration_warning_intelligence/v1` under CMIS 1.18. ROBERTA public #318 / protected `roberta-core` #28 / Issue #317 preserve the canonical WATCH/CLEAR warning through X1 Scout and the shared Human/Machine Decision Object without recomputation or risk promotion.
 - **Push warning delivery: NOT AUTHORIZED / DEFERRED.** No subscriptions, background polling, Telegram push, webhooks, retry/acknowledgement queues, or execution authority are part of the accepted warning milestone.
 - **CROSS-CHAIN / WARP: ACTIVE NEXT EVIDENCE GATE.** Cross-chain provenance and bridge-route/Warp qualification foundations are accepted internally, but Warp remains `blocked_endpoint_semantics`. CMIS Issue #407 is the next exact endpoint/semantic-fixture gate. No bridge truth is promoted to Scout/ROBERTA yet.
+- **FORTISWAP PROVIDER: ACTIVE PARALLEL QUALIFICATION.** Issue #413 adds a bounded read-only FortiSwap observational provider for machine discovery, token data, router volume, and quote normalization. It does not qualify FortiSwap bridge semantics, does not unblock #407/#409/#410, and preserves `execution_authorized=false`.
 - **CMIS #363:** parallel read-only delayed-vault/X1.Ninja research; not the flagship blocker.
 - `execution_authorized=false`.
