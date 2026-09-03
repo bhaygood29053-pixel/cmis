@@ -40,7 +40,23 @@ DEFAULT_MAX_AGE_SECONDS = 300.0
 #       "source_timestamp_field": "...",
 #   }
 # }
-ACCEPTED_ROUTE_SEMANTIC_CONTRACTS: dict[str, dict[str, str]] = {}
+ACCEPTED_ROUTE_SEMANTIC_CONTRACTS: dict[str, dict[str, str]] = {
+    "warp_config/exact-mint-pair/v1": {
+        "provider": "warp_bridge",
+        "source_url": "https://app.bridge.x1.xyz/api/bridge/config",
+        "route_status_field": (
+            "solana.config.paused + x1.config.paused + "
+            "exact source/destination token paused"
+        ),
+        "backing_model_field": (
+            "exact source/destination token isNative topology"
+        ),
+        "custody_dependency_field": (
+            "solana.config.guardians/threshold + x1.config.guardians/threshold"
+        ),
+        "source_timestamp_field": "fetchedAt(milliseconds)",
+    }
+}
 
 
 def _required_text(value: Any, field: str) -> str:

@@ -110,3 +110,57 @@ semantic_contract_accepted = false
 warp_qualified = false
 execution_authorized = false
 ```
+
+## 2026-09-03 exact config response-body semantic fixture
+
+A direct copy of the provenance-approved exact endpoint
+
+`https://app.bridge.x1.xyz/api/bridge/config`
+
+produced a parseable JSON response with:
+
+- `fetchedAt = 1788436231329` (milliseconds; 2026-09-03T11:50:31.329Z);
+- exact Warp program id on both Solana and X1: `6JbPTuxVuoTgyQeXFb9MH8C8nUY8NBbLP1Lu4B13JfMD`;
+- per-chain global `paused` state;
+- per-token exact `mint`, `decimals`, `isNative`, and `paused` state;
+- per-chain explicit `guardians` arrays and `threshold`;
+- wSOL source mint `So11111111111111111111111111111111111111112`;
+- X1 wSOL.X destination mint `JDqX4vau2P5zJmLpuNitvR6vMURr9kYjex6oZQXz3Ja8`.
+
+Canonical JSON SHA-256:
+
+`b8ce53645c1f9495171bea65fa4a59588dfb2bae4a36227b39a05a4ae4f38687`
+
+The accepted semantic contract is `warp_config/exact-mint-pair/v1`. It uses exact chain-scoped mint identity, never symbol equivalence.
+
+For one exact route, status is `paused` if either chain config or either exact token entry is paused; otherwise it is `active`.
+
+The bounded backing semantic is the provider-declared representation topology from the exact `isNative` booleans. For Solana wSOL -> X1 wSOL.X this is:
+
+`provider_config_native_source_to_non_native_destination`
+
+This does **not** claim reserve sufficiency, solvency, legal custody, or a stronger lock/mint mechanism than the official config directly proves.
+
+The bounded custody/security dependency is the explicit guardian quorum configuration. The accepted fixture shows 7 guardians and threshold 5 on each side, represented as:
+
+`guardian_quorum:solana=5/7;x1=5/7`
+
+This does **not** prove guardian honesty or identify a legal custodian.
+
+The source fact time is `fetchedAt / 1000`; freshness remains fail-closed under the existing route-evidence freshness gate.
+
+For the exact wSOL -> wSOL.X provenance fixture, the accepted semantic adapter now reaches:
+
+```text
+endpoint_semantics_verified = true
+exact_route_identity_verified = true
+source_timestamp_semantics_verified = true
+route_status_verified = true
+backing_model_verified = true
+custody_dependency_verified = true
+qualification_state = qualified
+warp_qualified = true
+public_service_promoted = false
+scout_reliance_promoted = false
+execution_authorized = false
+```
