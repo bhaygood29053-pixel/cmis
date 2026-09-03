@@ -12,7 +12,15 @@ PROGRAM = "TokenProgram111"
 RPC = "https://rpc.example.invalid"
 
 
-def parsed_account(address, *, mint=MINT, program=PROGRAM, owner="Owner111"):
+def parsed_account(
+    address,
+    *,
+    mint=MINT,
+    program=PROGRAM,
+    owner="Owner111",
+    amount="100",
+    decimals=9,
+):
     return {
         "pubkey": address,
         "account": {
@@ -25,6 +33,12 @@ def parsed_account(address, *, mint=MINT, program=PROGRAM, owner="Owner111"):
                         "mint": mint,
                         "owner": owner,
                         "state": "initialized",
+                        "tokenAmount": {
+                            "amount": amount,
+                            "decimals": decimals,
+                            "uiAmount": None,
+                            "uiAmountString": amount,
+                        },
                     },
                 },
             },
@@ -73,6 +87,8 @@ class X1RPCTokenAccountEnumerationTests(unittest.TestCase):
         self.assertEqual(result["slot"], 12345)
         self.assertTrue(result["returned_account_identity_verified"])
         self.assertTrue(result["token_account_semantics_verified"])
+        self.assertEqual(result["accounts"][0]["raw_amount"], "100")
+        self.assertEqual(result["accounts"][0]["decimals"], 9)
         self.assertFalse(result["enumeration_complete"])
         self.assertFalse(result["truncation_absent_verified"])
         self.assertEqual(result["coverage"], "unverified")

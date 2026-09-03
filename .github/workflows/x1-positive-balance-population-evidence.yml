@@ -1,0 +1,43 @@
+name: X1 Positive-Balance Population Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xnt-population:
+    name: XNT supply-conservation population evidence
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/x1-positive-balance-population')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_POSITIVE_BALANCE_POPULATION_LIVE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run deterministic population evidence tests
+        run: |
+          python -m unittest tests.test_x1_rpc_token_account_enumeration tests.test_x1_positive_balance_population_evidence -v
+      - name: Run repeated XNT population evidence
+        run: |
+          python -m unittest tests.test_x1_positive_balance_population_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1 RPC distribution evidence only."
+          echo "Token accounts and token-account authority addresses are not beneficial owners."
+          echo "No holder semantics, risk promotion, transaction construction, signing, broadcast, custody, or execution authority."
