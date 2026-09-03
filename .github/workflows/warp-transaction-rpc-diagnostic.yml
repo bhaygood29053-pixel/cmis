@@ -1,16 +1,13 @@
-name: Warp Transaction RPC Diagnostic
+name: Warp Transaction History Volume Diagnostic
 
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  diagnose-unresolved-gettransaction:
-    if: startsWith(github.head_ref, 'feature/issue441-warp-message-lifecycle-retention')
+  measure-warp-history-volume:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
