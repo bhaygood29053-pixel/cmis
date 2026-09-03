@@ -175,3 +175,9 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_contract_capture.py
+
+
+      - name: Test FortiSwap read-only provider evidence
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_fortiswap_provider.py
