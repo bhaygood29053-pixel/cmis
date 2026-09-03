@@ -1,0 +1,107 @@
+name: Warp On-Chain Account Inventory Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warp-onchain-inventory:
+    name: Warp program accounts on Solana and X1
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue419-warp-onchain-account-inventory')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run deterministic inventory contract tests
+        run: python -m unittest tests.test_x1_warp_onchain_inventory -v
+
+      - name: Run live zero-byte Warp account inventory
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          from liquidity_scout.providers.x1.warp_onchain_inventory import (
+              inventory_warp_both_chains,
+          )
+
+          result = inventory_warp_both_chains(
+              solana_rpc_url=os.environ["SOLANA_RPC_URL"],
+              x1_rpc_url=os.environ["X1_RPC_URL"],
+              data_slice_length=0,
+          )
+
+          sol = result["solana_inventory"]
+          x1 = result["x1_inventory"]
+          cmp = result["comparison"]
+
+          assert sol["response_integrity_verified"] is True
+          assert x1["response_integrity_verified"] is True
+          assert sol["unique_account_count"] > 0
+          assert x1["unique_account_count"] > 0
+          assert sol["program_id"] == x1["program_id"]
+          assert sol["data_slice_length"] == 0
+          assert x1["data_slice_length"] == 0
+          assert result["semantic_contract_accepted"] is False
+          assert result["cmis_promotable"] is False
+          assert result["execution_authorized"] is False
+
+          summary = {
+              "contract": result["contract"],
+              "program_id": result["program_id"],
+              "solana": {
+                  "context_slot": sol["context_slot"],
+                  "unique_account_count": sol["unique_account_count"],
+                  "account_size_counts": sol["account_size_counts"],
+                  "inventory_sha256": sol["inventory_sha256"],
+                  "structural_inventory_sha256": sol["structural_inventory_sha256"],
+              },
+              "x1": {
+                  "context_slot": x1["context_slot"],
+                  "unique_account_count": x1["unique_account_count"],
+                  "account_size_counts": x1["account_size_counts"],
+                  "inventory_sha256": x1["inventory_sha256"],
+                  "structural_inventory_sha256": x1["structural_inventory_sha256"],
+              },
+              "exact_pubkey_overlap_count": cmp["exact_pubkey_overlap_count"],
+              "exact_pubkey_overlap": cmp["exact_pubkey_overlap"],
+              "semantic_contract_accepted": result["semantic_contract_accepted"],
+              "cmis_promotable": result["cmis_promotable"],
+              "execution_authorized": result["execution_authorized"],
+          }
+
+          print("WARP_ONCHAIN_ACCOUNT_INVENTORY_EVIDENCE")
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only getProgramAccounts inventory only."
+          echo "Zero-byte account data slice in the v1 live gate."
+          echo "No binary-layout, config-account, guardian-account, route, fee, cap, backing, custody, pause-state, or health semantic promotion."
+          echo "No Scout/public-service/risk/execution authority."
+          echo "No transaction construction, signing, broadcasting, custody, trading, bridging, or value movement."
