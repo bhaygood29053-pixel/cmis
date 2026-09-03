@@ -237,3 +237,136 @@ def test_scan_v2_projects_verified_pair_lifetime_without_usd_overclaim():
     assert "provider_archive_completeness_not_verified" not in limitations
     assert "history_does_not_imply_complete_asset_lifetime" not in limitations
     assert response["data"]["execution_authorized"] is False
+
+
+def test_native_xnt_distribution_satisfies_distribution_gate_without_holder_count_claim():
+    identity = envelope(
+        "asset_lookup",
+        status="ok",
+        data={
+            "resolved_by": "native",
+            "match_quality": "native",
+            "identity_key": "native:xnt",
+        },
+        confidence={"complete": True},
+    )
+    market = envelope(
+        "market_report",
+        data={
+            "price_usd": 0.39,
+            "liquidity_usd": 106000.0,
+            "volume_24h_usd": 12000.0,
+            "transactions_24h": 5000,
+            "completeness": {
+                "price": True,
+                "liquidity": True,
+                "volume_24h": True,
+                "transactions_24h": True,
+                "holders": False,
+            },
+        },
+        confidence={"core_market_complete": True},
+    )
+    tokenomics = envelope(
+        "tokenomics",
+        data={
+            "supply_verified": True,
+            "mint_authority_verified": True,
+            "freeze_authority_verified": True,
+        },
+    )
+    history = envelope(
+        "historical_compare",
+        data={
+            "available_metric_count": 1,
+            "full_supported_pair_lifetime_verified": False,
+            "continuous_coverage_verified": False,
+            "metrics": {},
+        },
+    )
+    risk = envelope(
+        "risk_check",
+        risk={
+            "recommendation": "WARN",
+            "flags": [],
+            "reasons": [],
+            "confidence": {},
+            "score": None,
+            "score_verified": False,
+            "score_reason": "risk_score_not_calibrated",
+            "policy": {},
+        },
+    )
+    native_distribution = {
+        "native_account_concentration_verified": True,
+        "cmis_promotable": True,
+        "counted_entity": "native_xnt_account_address",
+        "slot_scope_verified": True,
+        "largest_accounts_slot": 100,
+        "network_supply_slot": 111,
+        "slot_span": 11,
+        "circulating_supply_base_units": "13991098000000000",
+        "buckets": {
+            "top_20": {
+                "requested_account_count": 20,
+                "available_account_count": 20,
+                "base_units": "3190873725176641",
+                "percent_of_circulating_xnt": 22.806457320125,
+            }
+        },
+        "sources": [
+            {
+                "source": "X1 RPC getLargestAccounts(finalized,circulating)",
+                "role": "native_account_distribution",
+            },
+            {
+                "source": "X1 RPC getSupply(finalized)",
+                "role": "native_circulating_supply",
+            },
+        ],
+    }
+
+    response = build_instant_x1_scan_response(
+        identity,
+        market,
+        tokenomics,
+        history,
+        risk,
+        native_distribution=native_distribution,
+    )
+
+    holder = response["data"]["sections"]["holder_concentration"]
+    assert holder["holders"] is None
+    assert holder["holders_verified"] is False
+    assert holder["holders_state"] == "not_applicable"
+    assert holder["top_account_concentration"]["verified"] is True
+    assert holder["top_account_concentration"]["state"] == "verified"
+    assert (
+        holder["top_account_concentration"]["value"]
+        == 22.806457320125
+    )
+    assert (
+        holder["native_account_concentration"]["counted_entity"]
+        == "native_xnt_account_address"
+    )
+    assert (
+        holder["native_account_concentration"][
+            "beneficial_owner_identity_verified"
+        ]
+        is False
+    )
+
+    limitations = response["data"]["limitations"]
+    assert "holder_count_requires_existing_verified_holder_semantics" not in limitations
+    assert "current_top_account_concentration_not_promoted_in_v2" not in limitations
+    assert "native_xnt_account_concentration_not_verified" not in limitations
+    assert (
+        response["confidence"]["checks"]["distribution_evidence_satisfied"]
+        is True
+    )
+    assert response["confidence"]["complete"] is True
+    assert response["status"] == "ok"
+    assert not any(
+        warning.get("code") == "instant_x1_scan_holder_count_unverified"
+        for warning in response["warnings"]
+    )
