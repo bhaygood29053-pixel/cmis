@@ -217,3 +217,9 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_semantic_layout_discovery.py
+
+
+      - name: Test Warp transaction-history discovery
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_warp_transaction_history_discovery.py
