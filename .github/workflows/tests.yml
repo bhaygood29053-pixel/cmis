@@ -114,6 +114,11 @@ jobs:
 
           assert 'CMIS_CONTRACT_VERSION = "1.18.0"' in capabilities
           assert '"service_contract_version": "instant_x1_scan/v3"' in capabilities
+          assert '"concentration_warning_intelligence"' in capabilities
+          assert 'CONCENTRATION_WARNING_CONTRACT_VERSION' in capabilities
+          assert 'CONCENTRATION_WARNING_DELIVERY_MODE' in capabilities
+          assert '"push_delivery_authorized": False' in capabilities
+          assert '"watch_clear_are_not_risk_severity"' in capabilities
           assert 'CONTRACT_VERSION = "instant_x1_scan/v2"' in scan_v2
           assert 'CONTRACT_VERSION = "instant_x1_scan/v3"' in scan_v3
           assert "build_v2_response" in scan_v3
