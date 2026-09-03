@@ -205,6 +205,32 @@ warp_qualified = false
 execution_authorized = false
 ```
 
+
+## 2026-09-03 HAR network-observation adapter
+
+Issue #407 now also has a browser-network evidence ingestion layer under
+`warp_har_network_observation/v1`. It is intentionally narrower than a general
+HAR parser:
+
+- only exact HTTPS GET observations are eligible;
+- the HAR request must carry an HTTPS Referer or Origin from
+  `app.bridge.x1.xyz`;
+- only HTTP 200 JSON responses with parseable non-base64 bodies are candidates;
+- candidate listing returns hashes/metadata only and does not retain request
+  headers, cookies, response headers, or response bodies;
+- the operator must explicitly select the HAR entry index;
+- the selected entry is passed through the existing
+  `warp_machine_contract_capture/v1` gate;
+- no endpoint is chosen heuristically and no semantic contract is
+  self-accepted.
+
+This improves evidence acquisition but does not clear #407 by itself. A real
+official-app HAR observation still must reveal the exact Warp read URL and
+response schema, followed by separate field/timestamp semantic review.
+
+Operator procedure: [WARP_ISSUE_407_HAR_CAPTURE.md](./WARP_ISSUE_407_HAR_CAPTURE.md).
+
+
 Additional refresh sources:
 
 - https://x1report.com/article/wsol-warp-bridge-x1-solana-liquidity
