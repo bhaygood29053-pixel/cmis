@@ -4,6 +4,10 @@ from liquidity_scout.providers.x1.bridge_source_provenance import (
     BridgeSourceProof,
     evaluate_bridge_source_provenance,
 )
+from liquidity_scout.providers.x1.warp_config_semantics import (
+    WARP_CONFIG_SEMANTIC_CONTRACT_ID,
+    WARP_CONFIG_SOURCE_URL,
+)
 from liquidity_scout.services.cmis_bridge_route_evidence import (
     ACCEPTED_ROUTE_SEMANTIC_CONTRACTS,
     ROUTE_EVIDENCE_CONTRACT,
@@ -80,8 +84,16 @@ def observation(**overrides):
 
 
 class CMISBridgeRouteEvidenceTests(unittest.TestCase):
-    def test_warp_registry_starts_with_no_accepted_semantic_contract(self):
-        self.assertEqual(ACCEPTED_ROUTE_SEMANTIC_CONTRACTS, {})
+    def test_warp_registry_contains_only_reviewed_config_semantics(self):
+        self.assertEqual(
+            set(ACCEPTED_ROUTE_SEMANTIC_CONTRACTS),
+            {WARP_CONFIG_SEMANTIC_CONTRACT_ID},
+        )
+        spec = ACCEPTED_ROUTE_SEMANTIC_CONTRACTS[
+            WARP_CONFIG_SEMANTIC_CONTRACT_ID
+        ]
+        self.assertEqual(spec["provider"], "warp_bridge")
+        self.assertEqual(spec["source_url"], WARP_CONFIG_SOURCE_URL)
 
     def test_official_ui_candidate_remains_blocked_without_machine_semantics(self):
         result = qualify_warp_bridge_route(
