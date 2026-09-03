@@ -134,3 +134,8 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_cmis_current_market_freshness_v117.py
+
+      - name: Test CMIS 1.17 capability and HTTP regressions
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_cmis_capabilities.py tests/test_cmis_http_gateway.py
