@@ -141,7 +141,7 @@ class WarpLifecycleRpcRetryTests(unittest.TestCase):
             sleep=lambda _: None,
         )
         self.assertIsNotNone(response.json()[0]["error"])
-        self.assertEqual(attempts, 4)
+        self.assertEqual(attempts, MAX_ITEM_ATTEMPTS)
 
 
 if __name__ == "__main__":
