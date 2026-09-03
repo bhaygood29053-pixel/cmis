@@ -42,8 +42,8 @@ Accepted milestones on `main`:
 - **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
 - **X1 verified-provider historical price backfill: COMPLETE under the bounded CMIS `1.12.0` contract.** Backfill is price-only and preserves non-independence, non-archive-completeness, non-continuity, historical stable-quote uncertainty, and non-lifetime-completeness limits.
 - **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
-- **CMIS capability contract: `1.16.0`.** Burn Intelligence (`burn_intelligence/v1`) is accepted under 1.15.0 and Discovery Intelligence (`discovery_intelligence/v1`) is accepted under 1.16.0.
-- **Instant X1 Scan: IMPLEMENTED under #322 as `instant_x1_scan/v1`.** The service is X1-only, read-only, composition-only, local-history-only, and fail-closed for unverified holder/current-concentration facts; Proof Score remains separate from deterministic risk.
+- **CMIS capability contract: `1.17.0`.** Burn Intelligence (`burn_intelligence/v1`) remains accepted under 1.15.0, Discovery Intelligence (`discovery_intelligence/v1`) under 1.16.0, and field-scoped current-market freshness under 1.17.0.
+- **Instant X1 Scan: COMPLETE as `instant_x1_scan/v3`.** v3 wraps the accepted v2 scan rather than forking identity/history/tokenomics/risk logic, and adds only `x1_current_market_freshness/v1`. Price freshness can be verified under explicit provider fact-time/value-linkage gates; liquidity, rolling 24h volume, and rolling transaction freshness remain unverified under 1.17.
 - **Six-phase public-shell/private-core migration: COMPLETE.** Protected CMIS implementation is removed from active public branch/tag history, public package boundaries fail closed without the required private core, and no public reconstruction fallback is accepted.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**
@@ -292,15 +292,16 @@ CMIS is now prioritized around the verified data and intelligence services requi
 
 ### Productization priorities
 
-1. **Instant X1 Scan support — implemented under #322 / CMIS 1.13.0.** The compact `instant_x1_scan/v1` service composes exact identity, market, tokenomics, CMIS-stored verified history, deterministic risk, and runtime evidence quality. Unverified holder/current-concentration facts remain explicit unknown/partial values.
+1. **Instant X1 Scan support — COMPLETE through CMIS 1.17 / PR #386.** `instant_x1_scan/v3` preserves accepted exact identity, market, tokenomics, verified history, supported-pair lifetime, deterministic risk, and runtime evidence quality, while adding deterministic field-scoped current-market freshness without global freshness promotion.
 2. **X1.Ninja developer API validation — next.** — open a fresh provider-verification track for the currently available machine-readable developer API. Treat all responses as candidate evidence until identity, units, freshness, scope, reproducibility, same-fact semantics, and independence are explicitly proven. Prior SSE 403 evidence does not automatically apply to a different documented API contract.
 3. **Holder and wallet intelligence promotion** — promote useful concentration, direct-wallet-relationship, and related deterministic foundations only through explicit public/Scout-reliance contracts. Direct interactions must not be relabeled as beneficial ownership, common control, intent, fraud, or manipulation.
 4. **Deterministic Token Burn Intelligence — Issue #368 / CMIS 1.15.0.** First-class `burn_intelligence/v1` promotion is implemented: exact-mint, read-only, cumulative verified-observed burn plus **1h / 24h / 7d / 30d** windows, event counts, 24h/7d/30d equal-period comparisons, issuance context, circulation context, and verified burn-time valuation. Complete lifetime burn remains claimable only when archive/signature/history completeness is independently proven; otherwise cumulative burn remains explicitly bounded to verified observed coverage.
 5. **Discovery Intelligence — ACCEPTED under CMIS 1.16.0 / PR #391.** The immutable Discovery Ledger is now promoted through bounded read-only `discovery_intelligence/v1`, exposing first and most-recent verified fact-time observations, verified observation count, sparse coverage bounds, and elapsed observed history. First verified observation is explicitly **not** token launch time, archive completeness, or continuous lifetime coverage.
-6. **Early Warning services** — advance concentration/liquidity/wallet/activity warning candidates only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
-7. **Deterministic Compare services** — support first-class current-vs-history and entity-vs-entity comparisons without recomputing facts outside the canonical evidence store.
-8. **X1 ecosystem/network brief inputs** — expose bounded verified market, network, validator, protocol, and ecosystem observations needed for a Roberta daily intelligence brief, one field at a time under exact provenance and scope.
-9. **Machine ROBERTA support contracts** — after service contracts stabilize, CMIS should expose only the deterministic backend services/evidence needed by a separately owned Machine ROBERTA interface. The external agent/DApp API, schemas, authentication, quotas, and SDK belong to Roberta; CMIS must not become the general agent product. Premium/access policy must never change truth, verification, Proof Score, risk, or evidence semantics.
+6. **Field-scoped current-market freshness — COMPLETE under CMIS 1.17 / public #386 + protected `cmis-core` #9.** Collection recency is separate from provider fact time. Price freshness may be verified only when the explicit CMIS gates pass. Liquidity, rolling 24h volume, and rolling transactions remain freshness-unverified until field-specific fact-time contracts exist.
+7. **Early Warning services — ACTIVE NEXT GATE.** Advance one warning family at a time only after explicit multi-observation persistence, delivery, replay/deduplication, freshness, identity, and severity-semantics contracts are accepted.
+8. **Deterministic Compare services** — support first-class current-vs-history and entity-vs-entity comparisons without recomputing facts outside the canonical evidence store.
+9. **X1 ecosystem/network brief inputs** — expose bounded verified market, network, validator, protocol, and ecosystem observations needed for a Roberta daily intelligence brief, one field at a time under exact provenance and scope.
+10. **Machine ROBERTA support contracts** — after service contracts stabilize, CMIS should expose only the deterministic backend services/evidence needed by a separately owned Machine ROBERTA interface. The external agent/DApp API, schemas, authentication, quotas, and SDK belong to Roberta; CMIS must not become the general agent product. Premium/access policy must never change truth, verification, Proof Score, risk, or evidence semantics.
 
 ### Scope discipline
 
@@ -866,15 +867,16 @@ No accepted CMIS roadmap item authorizes:
 
 Controlled Execution remains unauthorized.
 
-## Live reconciliation — 2026-09-02 12:18 America/New_York
+## Live reconciliation — 2026-09-02 America/New_York
 
 The following state supersedes older pending/blocker language in this file:
 
-- **Burn Intelligence v1: COMPLETE / accepted.** CMIS public PR #389 and protected `cmis-core` #12 are accepted; ROBERTA has already consumed the dedicated service through public PR #304.
-- **Discovery Intelligence v1: COMPLETE / accepted in CMIS.** Public PR #391 merged on 2026-09-02 and promotes bounded read-only `discovery_intelligence/v1` under CMIS capability contract `1.16.0`.
-- **Historical Coverage Proof v1 (#383): COMPLETE.** The proof layer is accepted for lifetime-start/archive-completeness/continuity semantics; bounded evidence must still remain bounded when the required proof gates do not pass.
-- **Current cross-project product gate:** ROBERTA PR #306 is open, clean, and mergeable to promote Discovery Intelligence through X1 Scout. CMIS should support that integration rather than invent another parallel Discovery path.
-- **PR #363 delayed-vault departure evidence:** remains open as a strict, read-only evidence investigation. It is useful research, but it is **not the flagship product blocker** and should not delay accepted Burn/Discovery productization.
-- **PR #386 field-scoped current-market freshness:** remains a draft hardening track and should be reviewed independently of the Discovery product gate.
-- **Next accepted-service sequence:** ROBERTA Discovery adoption -> WHAT CHANGED? -> Early Warning -> execution-quality statistics.
+- **Historical Coverage Proof v1 (#383): COMPLETE.** XNT supported-pair lifetime/range/continuity proof remains accepted with historical quote-to-USD/full-USD lifetime caveats preserved.
+- **Burn Intelligence v1: COMPLETE.** Public CMIS #389 and protected `cmis-core` #12 remain accepted under CMIS 1.15.
+- **Discovery Ledger / Discovery Intelligence v1: COMPLETE.** Public #365/#391 and protected `cmis-core` #6 remain accepted under CMIS 1.16.
+- **WHAT CHANGED? v1 consumption: COMPLETE in ROBERTA.** Public ROBERTA #308 and protected `roberta-core` #26 compose accepted Scan/Burn/Discovery evidence without introducing a second CMIS fact authority.
+- **Field-scoped current-market freshness: COMPLETE under CMIS 1.17.** Public CMIS #386 merged as `instant_x1_scan/v3`; protected `cmis-core` #9 supplies the runtime freshness proof. Collection time remains distinct from provider fact time. Price may be freshness-verified while liquidity, rolling 24h volume, and rolling transactions remain NOT VERIFIED.
+- **ROBERTA freshness consumption: COMPLETE.** Public ROBERTA #301 and protected `roberta-core` #19 validate/preserve/render the same CMIS freshness object for Human and Machine ROBERTA without recomputation.
+- **EARLY WARNING: ACTIVE NEXT GATE.** Promote one warning family at a time with explicit identity, observation persistence, freshness, comparator, replay/deduplication, severity, evidence, and delivery semantics.
+- **PR #363 delayed-vault/X1.Ninja evidence:** remains parallel strict read-only research and is not the flagship product blocker.
 - Controlled Execution remains locked and `execution_authorized=false`.
