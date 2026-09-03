@@ -31,6 +31,15 @@ from .fortiswap import (
     normalize_token_detail_response as normalize_fortiswap_token_detail_response,
     normalize_tokens_response as normalize_fortiswap_tokens_response,
 )
+from .theo_advisory import (
+    ACCEPTED_THEO_TRANSPORT_CONTRACTS,
+    THEO_ADVISORY_CONTRACT,
+    THEO_PROVIDER_ID,
+    TheoAdvisoryError,
+    collect_theo_advisory,
+    require_accepted_theo_transport,
+    theo_connection_status,
+)
 from .health import (
     HEALTH_SOURCE,
     HEALTH_URL,
