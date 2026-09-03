@@ -206,3 +206,9 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_rare_account_capture.py
+
+
+      - name: Test Warp on-chain semantic-layout corroboration
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_warp_semantic_layout_discovery.py
