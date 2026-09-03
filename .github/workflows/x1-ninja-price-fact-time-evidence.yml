@@ -1,4 +1,4 @@
-name: X1.Ninja priceNative Fact-Time Evidence
+name: X1.Ninja Current-Market Fact-Time Evidence
 
 on:
   pull_request:
@@ -11,8 +11,8 @@ permissions:
 
 jobs:
   price-fact-time:
-    name: Repeated Ninja price/reserve timestamp evidence
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue345-ninja-price-native-fact-time'
+    name: Repeated Ninja current-market timestamp evidence
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/x1-current-market-fact-time')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -43,5 +43,5 @@ jobs:
         if: always()
         run: |
           echo "Read-only timestamp/update evidence only."
-          echo "No priceNative, priceUsd, liquidity, TVL, volume, market-cap, freshness or source-independence promotion."
+          echo "No price, liquidity, rolling volume/transaction freshness, holder, history-completeness, or source-independence promotion."
           echo "No Scout/public-service/risk/execution authority."
