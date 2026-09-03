@@ -234,6 +234,97 @@ def evaluate_x1_positive_balance_population_observation(
     }
 
 
+def evaluate_x1_positive_balance_population_bracket(
+    enumeration: Mapping[str, Any],
+    supply_before: Mapping[str, Any],
+    supply_after: Mapping[str, Any],
+    *,
+    max_bracket_span: int = 20,
+) -> dict[str, Any]:
+    """Evaluate enumeration against a stable mint-supply slot bracket."""
+
+    if (
+        isinstance(max_bracket_span, bool)
+        or not isinstance(max_bracket_span, int)
+        or max_bracket_span < 0
+    ):
+        raise ValueError("max_bracket_span must be a non-negative integer")
+
+    before_slot = _slot(supply_before.get("slot"))
+    after_slot = _slot(supply_after.get("slot"))
+    enum_slot = _slot(enumeration.get("slot"))
+    before_amount = _raw_amount(supply_before.get("amount"))
+    after_amount = _raw_amount(supply_after.get("amount"))
+    before_decimals = supply_before.get("decimals")
+    after_decimals = supply_after.get("decimals")
+
+    bracket_errors: list[str] = []
+    if before_slot is None or after_slot is None or enum_slot is None:
+        bracket_errors.append("bracket_slot_invalid")
+    elif not (before_slot <= enum_slot <= after_slot):
+        bracket_errors.append("enumeration_slot_outside_supply_bracket")
+
+    bracket_span = (
+        after_slot - before_slot
+        if before_slot is not None and after_slot is not None
+        else None
+    )
+    bracket_bounded = (
+        bracket_span is not None
+        and bracket_span >= 0
+        and bracket_span <= max_bracket_span
+    )
+    if not bracket_bounded:
+        bracket_errors.append("supply_bracket_too_wide")
+
+    supply_stable = (
+        before_amount is not None
+        and before_amount == after_amount
+        and before_decimals == after_decimals
+    )
+    if not supply_stable:
+        bracket_errors.append("mint_supply_changed_across_bracket")
+
+    if _text(supply_before.get("mint")) != _text(supply_after.get("mint")):
+        bracket_errors.append("supply_bracket_mint_mismatch")
+    if _text(enumeration.get("mint")) != _text(supply_before.get("mint")):
+        bracket_errors.append("enumeration_supply_mint_mismatch")
+
+    base = evaluate_x1_positive_balance_population_observation(
+        enumeration,
+        supply_before,
+        max_slot_span=max_bracket_span,
+    )
+    conservation = base.get("supply_conservation_observed") is True
+    bracket_candidate_complete = (
+        not bracket_errors
+        and conservation
+        and base.get("errors") == []
+    )
+
+    result = dict(base)
+    result.update(
+        {
+            "service": "x1_positive_balance_population_bracket",
+            "status": "ok" if bracket_candidate_complete else "partial",
+            "supply_before_slot": before_slot,
+            "supply_after_slot": after_slot,
+            "supply_bracket_span": bracket_span,
+            "max_supply_bracket_span": max_bracket_span,
+            "supply_bracket_bounded": bracket_bounded,
+            "mint_supply_stable_across_bracket": supply_stable,
+            "positive_balance_population_candidate_complete": (
+                bracket_candidate_complete
+            ),
+            "positive_balance_population_coverage_verified": False,
+            "errors": list(
+                dict.fromkeys(list(base.get("errors") or []) + bracket_errors)
+            ),
+        }
+    )
+    return result
+
+
 def verify_x1_positive_balance_population_series(
     observations: Sequence[Mapping[str, Any]],
     *,
@@ -297,6 +388,7 @@ __all__ = [
     "DEFAULT_MAX_SLOT_SPAN",
     "DEFAULT_MINIMUM_OBSERVATIONS",
     "VERSION",
+    "evaluate_x1_positive_balance_population_bracket",
     "evaluate_x1_positive_balance_population_observation",
     "verify_x1_positive_balance_population_series",
 ]
