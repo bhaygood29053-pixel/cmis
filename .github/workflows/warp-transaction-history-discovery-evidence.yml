@@ -12,7 +12,7 @@ permissions:
 jobs:
   warp-transaction-history-discovery:
     name: Probe Warp read-only transaction history semantics
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue433-warp-transaction-history-source')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue433-warp-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
