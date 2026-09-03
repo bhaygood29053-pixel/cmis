@@ -1,0 +1,145 @@
+name: Warp Rare Account Capture Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warp-rare-account-capture:
+    name: Bounded Warp rare-account capture on Solana and X1
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue425-warp-rare-account-capture')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run deterministic rare-account capture tests
+        run: python -m pytest -q tests/test_x1_warp_rare_account_capture.py
+
+      - name: Capture bounded live rare-account evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          from liquidity_scout.providers.x1.warp_rare_account_capture import (
+              MAX_CANDIDATES_PER_CHAIN,
+              RARE_ACCOUNT_SPACES,
+              capture_warp_rare_both_chains,
+          )
+
+          result = capture_warp_rare_both_chains(
+              solana_rpc_url=os.environ["SOLANA_RPC_URL"],
+              x1_rpc_url=os.environ["X1_RPC_URL"],
+              include_raw_base64=True,
+          )
+
+          sol = result["solana_capture"]
+          x1 = result["x1_capture"]
+          cmp = result["comparison"]
+
+          for capture in (sol, x1):
+              assert 0 < capture["candidate_count"] <= MAX_CANDIDATES_PER_CHAIN
+              assert capture["capture_count"] == capture["candidate_count"]
+              assert capture["rare_spaces"] == sorted(RARE_ACCOUNT_SPACES)
+              assert capture["all_owner_verified"] is True
+              assert capture["all_data_lengths_verified"] is True
+              assert capture["all_non_executable_verified"] is True
+              assert capture["raw_material_retained"] is True
+              for account in capture["captures"]:
+                  assert account["owner_verified"] is True
+                  assert account["data_length_verified"] is True
+                  assert account["non_executable_verified"] is True
+                  assert account["data_base64"]
+                  assert len(account["data_sha256"]) == 64
+                  assert len(account["prefix_hex"]) <= 64
+                  assert len(account["suffix_hex"]) <= 64
+
+          assert result["account_role_verified"] is False
+          assert result["binary_layout_verified"] is False
+          assert result["semantic_contract_accepted"] is False
+          assert result["cmis_promotable"] is False
+          assert result["execution_authorized"] is False
+
+          # The full base64 material exists only in this runner process. Do not
+          # print it or upload it as an artifact; emit bounded structural evidence.
+          summary = {
+              "contract": result["contract"],
+              "program_id": result["program_id"],
+              "rare_spaces": sorted(RARE_ACCOUNT_SPACES),
+              "solana": {
+                  "candidate_count": sol["candidate_count"],
+                  "captures": [
+                      {
+                          "pubkey": row["pubkey"],
+                          "space": row["inventory_space"],
+                          "slot": row["context_slot"],
+                          "lamports": row["lamports"],
+                          "executable": row["executable"],
+                          "sha256": row["data_sha256"],
+                          "prefix_hex": row["prefix_hex"],
+                          "suffix_hex": row["suffix_hex"],
+                      }
+                      for row in sol["captures"]
+                  ],
+              },
+              "x1": {
+                  "candidate_count": x1["candidate_count"],
+                  "captures": [
+                      {
+                          "pubkey": row["pubkey"],
+                          "space": row["inventory_space"],
+                          "slot": row["context_slot"],
+                          "lamports": row["lamports"],
+                          "executable": row["executable"],
+                          "sha256": row["data_sha256"],
+                          "prefix_hex": row["prefix_hex"],
+                          "suffix_hex": row["suffix_hex"],
+                      }
+                      for row in x1["captures"]
+                  ],
+              },
+              "exact_pubkey_overlap_count": cmp["exact_pubkey_overlap_count"],
+              "exact_pubkey_overlaps": cmp["exact_pubkey_overlaps"],
+              "account_role_verified": False,
+              "binary_layout_verified": False,
+              "semantic_contract_accepted": False,
+              "cmis_promotable": False,
+              "execution_authorized": False,
+          }
+
+          print("WARP_RARE_ACCOUNT_CAPTURE_EVIDENCE")
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only getProgramAccounts + getAccountInfo evidence only."
+          echo "Candidate families are exactly 170/236/321/335 bytes and capped at 16 per chain."
+          echo "Full base64 account material is neither committed nor uploaded as a workflow artifact."
+          echo "Account role, binary layout, field offsets/types, route, backing, custody, pause/health, fee/cap, mint, and timestamp semantics remain unverified."
+          echo "CMIS promotion and execution remain unauthorized."
