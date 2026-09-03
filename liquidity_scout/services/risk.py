@@ -17,6 +17,13 @@ PASS = "PASS"
 WARN = "WARN"
 BLOCK = "BLOCK"
 _STATUS_ORDER = {PASS: 0, WARN: 1, BLOCK: 2}
+CURRENT_MARKET_FRESHNESS_CONTRACT = "x1_current_market_freshness/v1"
+_RISK_FRESHNESS_FIELDS = (
+    ("price_usd", "price_freshness_unverified", "Current price freshness is not verified."),
+    ("liquidity_usd", "liquidity_freshness_unverified", "Liquidity freshness is not verified."),
+    ("volume_24h_usd", "volume_24h_freshness_unverified", "Rolling 24h volume freshness is not verified."),
+    ("transactions_24h", "transactions_24h_freshness_unverified", "Rolling 24h transaction freshness is not verified."),
+)
 
 DEFAULT_RISK_POLICY = {
     # Monetary/activity/historical thresholds are intentionally unset by
@@ -474,10 +481,59 @@ def _assess_history(
     return _component(PASS, available=True, evidence=evidence)
 
 
+
+def _assess_freshness(
+    freshness_report: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Assess accepted field-level current-market freshness without widening it."""
+
+    if freshness_report.get("contract_version") != CURRENT_MARKET_FRESHNESS_CONTRACT:
+        raise ValueError(
+            "freshness_report must use x1_current_market_freshness/v1"
+        )
+    fields = freshness_report.get("fields")
+    if not isinstance(fields, Mapping):
+        raise ValueError("freshness_report.fields must be a mapping")
+
+    flags = []
+    reasons = []
+    field_evidence: Dict[str, Any] = {}
+    for field_name, flag, message in _RISK_FRESHNESS_FIELDS:
+        raw = fields.get(field_name)
+        entry = raw if isinstance(raw, Mapping) else {}
+        verified = entry.get("freshness_verified") is True
+        field_evidence[field_name] = {
+            "freshness_verified": verified,
+            "reason": _text(entry.get("reason")),
+        }
+        if not verified:
+            flags.append(flag)
+            reasons.append(message)
+
+    evidence = {
+        "contract_version": freshness_report.get("contract_version"),
+        "freshness_state": _text(freshness_report.get("freshness_state")),
+        "evaluated_at": freshness_report.get("evaluated_at"),
+        "current_market_freshness_verified": (
+            freshness_report.get("current_market_freshness_verified") is True
+        ),
+        "verified_field_count": freshness_report.get("verified_field_count"),
+        "total_field_count": freshness_report.get("total_field_count"),
+        "fields": field_evidence,
+    }
+    return _component(
+        WARN if flags else PASS,
+        available=True,
+        flags=flags,
+        reasons=reasons,
+        evidence=evidence,
+    )
+
 def _confidence(
     market_report: Mapping[str, Any],
     tokenomics_report: Optional[Mapping[str, Any]],
     historical_report: Optional[Mapping[str, Any]],
+    freshness_report: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     _, liquidity_verified = _verified_market_metric(
         market_report, "liquidity_usd", "liquidity"
@@ -506,6 +562,17 @@ def _confidence(
         ),
         "historical_price_verified": historical_price_verified,
     }
+    if isinstance(freshness_report, Mapping):
+        freshness_fields = freshness_report.get("fields")
+        freshness_fields = (
+            freshness_fields if isinstance(freshness_fields, Mapping) else {}
+        )
+        for field_name, _, _ in _RISK_FRESHNESS_FIELDS:
+            field = freshness_fields.get(field_name)
+            checks[f"{field_name}_freshness_verified"] = (
+                isinstance(field, Mapping)
+                and field.get("freshness_verified") is True
+            )
     verified = sum(1 for value in checks.values() if value)
     total = len(checks)
     ratio = verified / total
@@ -529,6 +596,7 @@ def build_risk_check(
     market_report: Mapping[str, Any],
     tokenomics_report: Optional[Mapping[str, Any]] = None,
     historical_report: Optional[Mapping[str, Any]] = None,
+    freshness_report: Optional[Mapping[str, Any]] = None,
     *,
     chain: str = "x1",
     policy: Optional[Mapping[str, Any]] = None,
@@ -548,6 +616,8 @@ def build_risk_check(
     """
     if not isinstance(market_report, Mapping):
         raise ValueError("market_report must be a mapping")
+    if freshness_report is not None and not isinstance(freshness_report, Mapping):
+        raise ValueError("freshness_report must be a mapping or None")
     chain_name = (_text(chain) or "").lower()
     if not chain_name:
         raise ValueError("chain is required")
@@ -559,14 +629,15 @@ def build_risk_check(
         "tokenomics": _assess_tokenomics(tokenomics_report, normalized_policy),
         "history": _assess_history(historical_report, normalized_policy),
     }
+    if isinstance(freshness_report, Mapping):
+        components["freshness"] = _assess_freshness(freshness_report)
     recommendation = _merge_status(
         *(component["status"] for component in components.values())
     )
 
     flags = []
     reasons = []
-    for name in ("liquidity", "activity", "tokenomics", "history"):
-        component = components[name]
+    for component in components.values():
         flags.extend(component["flags"])
         reasons.extend(component["reasons"])
 
@@ -582,6 +653,7 @@ def build_risk_check(
             market_report,
             tokenomics_report,
             historical_report,
+            freshness_report,
         ),
         "flags": flags,
         "reasons": reasons,
@@ -598,6 +670,11 @@ def build_risk_check(
                 "bounded_token_activity",
                 "historical_price_movement",
                 "source_completeness",
+                *(
+                    ["current_market_freshness"]
+                    if isinstance(freshness_report, Mapping)
+                    else []
+                ),
             ],
             "not_yet_included": [
                 "holder_distribution",
@@ -610,6 +687,7 @@ def build_risk_check(
 
 __all__ = [
     "BLOCK",
+    "CURRENT_MARKET_FRESHNESS_CONTRACT",
     "DEFAULT_RISK_POLICY",
     "PASS",
     "WARN",
