@@ -126,6 +126,25 @@ class FortiSwapReadOnlyProviderTests(unittest.TestCase):
             ],
         )
 
+    def test_discovery_does_not_qualify_external_resource_host(self):
+        result = normalize_discovery_catalog(
+            {
+                "x402Version": 2,
+                "items": [
+                    {
+                        "resource": "https://example.invalid/api/tokens",
+                        "method": "GET",
+                        "routeTemplate": "/api/tokens",
+                    }
+                ],
+            }
+        )
+
+        item = result["items"][0]
+        self.assertFalse(item["resource_host_verified"])
+        self.assertEqual(item["qualification"], "unqualified")
+        self.assertEqual(result["allowed_read_only_count"], 0)
+
     def test_discovery_hash_is_stable_across_json_key_order(self):
         first = {
             "x402Version": 2,
@@ -313,6 +332,22 @@ class FortiSwapReadOnlyProviderTests(unittest.TestCase):
         self.assertFalse(result["transaction_build_allowed"])
         self.assertTrue(result["analysis_only"])
 
+    def test_exact_out_requires_raw_amount_out(self):
+        with self.assertRaises(FortiSwapAPIError):
+            normalize_quote_response(
+                {
+                    "mode": "exactOut",
+                    "inputMint": XNT_MINT,
+                    "outputMint": USDC_X_MINT,
+                    "route": [
+                        {
+                            "venue": "xdex",
+                            "address": POOL,
+                        }
+                    ],
+                }
+            )
+
     def test_quote_rejects_non_raw_amounts(self):
         with self.assertRaises(FortiSwapAPIError):
             normalize_quote_response(
@@ -321,6 +356,23 @@ class FortiSwapReadOnlyProviderTests(unittest.TestCase):
                     "inputMint": XNT_MINT,
                     "outputMint": USDC_X_MINT,
                     "amountIn": "1.0",
+                    "route": [
+                        {
+                            "venue": "xdex",
+                            "address": POOL,
+                        }
+                    ],
+                }
+            )
+
+    def test_quote_rejects_empty_route(self):
+        with self.assertRaises(FortiSwapAPIError):
+            normalize_quote_response(
+                {
+                    "mode": "exactIn",
+                    "inputMint": XNT_MINT,
+                    "outputMint": USDC_X_MINT,
+                    "amountIn": "1000",
                     "route": [],
                 }
             )
