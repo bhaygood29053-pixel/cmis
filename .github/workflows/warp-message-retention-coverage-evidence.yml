@@ -1,0 +1,114 @@
+name: Warp Message Retention Coverage Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warp-message-retention-coverage:
+    name: Verify Warp message counter closure
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue437-warp-message-retention-coverage')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run deterministic counter-closure tests
+        run: python -m pytest -q tests/test_x1_warp_message_retention_coverage.py
+
+      - name: Verify live official counters against on-chain Config and message accounts
+        run: |
+          python - <<'PY'
+          import json
+
+          from liquidity_scout.providers.x1.warp_message_retention_coverage import (
+              evaluate_warp_message_counter_closure,
+              fetch_classified_warp_config_account,
+              fetch_official_warp_config,
+          )
+          from liquidity_scout.providers.x1.warp_onchain_transfer_history import (
+              capture_warp_message_state,
+          )
+
+          official = fetch_official_warp_config()
+          classified = {
+              "solana": fetch_classified_warp_config_account(chain="solana"),
+              "x1": fetch_classified_warp_config_account(chain="x1"),
+          }
+          message_state = capture_warp_message_state()
+
+          result = evaluate_warp_message_counter_closure(
+              config_response=official,
+              classified_configs=classified,
+              message_state=message_state,
+          )
+
+          assert result["official_onchain_counter_values_match"] is True
+          assert result["counter_account_closure_verified"] is True
+          assert result["current_message_universe_count_closed"] is True
+
+          # This slice intentionally does NOT promote retention or window coverage.
+          assert result["retention_deletion_semantics_verified"] is False
+          assert result["historical_retention_complete_verified"] is False
+          assert result["requested_window_coverage_verified"] is False
+          assert result["coverage_complete_verified"] is False
+          assert result["missing_history_zero_authorized"] is False
+          assert result["execution_authorized"] is False
+
+          evidence = {
+              "contract": result["contract"],
+              "program_id": result["program_id"],
+              "per_chain": result["per_chain"],
+              "official_onchain_counter_values_match": True,
+              "counter_account_closure_verified": True,
+              "current_message_universe_count_closed": True,
+              "observed_earliest_message_source_timestamp": result[
+                  "observed_earliest_message_source_timestamp"
+              ],
+              "observed_latest_message_source_timestamp": result[
+                  "observed_latest_message_source_timestamp"
+              ],
+              "required_flow_lookback_seconds": result[
+                  "required_flow_lookback_seconds"
+              ],
+              "retention_deletion_semantics_verified": False,
+              "historical_retention_complete_verified": False,
+              "requested_window_coverage_verified": False,
+              "coverage_complete_verified": False,
+              "missing_history_zero_authorized": False,
+              "execution_authorized": False,
+          }
+
+          print("WARP_MESSAGE_RETENTION_COVERAGE_EVIDENCE")
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "GET/read-only RPC counter-closure evidence only."
+          echo "Counter equality does not by itself prove historical retention."
+          echo "Missing history remains unknown; zero-fill is unauthorized."
+          echo "No transfer construction, signing, broadcast, custody, or value movement."
+          echo "EXECUTION_AUTHORIZED=FALSE"

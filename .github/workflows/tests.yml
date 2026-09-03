@@ -239,3 +239,8 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_onchain_transfer_history.py
+
+      - name: Test Warp message retention coverage
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_warp_message_retention_coverage.py
