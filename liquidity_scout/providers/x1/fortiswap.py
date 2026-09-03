@@ -27,6 +27,7 @@ CHAIN = "x1"
 NETWORK = "x1-mainnet"
 FORTISWAP_BASE_URL = "https://app.fortiblox.com"
 FORTISWAP_SOURCE = "app.fortiblox.com"
+FORTISWAP_HOST = "app.fortiblox.com"
 FORTISWAP_DISCOVERY_PATH = "/api/x402/discovery"
 
 READ_ONLY_ROUTE_TEMPLATES = frozenset(
@@ -237,7 +238,19 @@ def normalize_discovery_catalog(payload: Any) -> dict[str, Any]:
         if not route_template:
             route_template = _route_template_from_url(resource_url)
 
+        resource_host_verified = False
+        if resource_url:
+            parsed_resource = urlsplit(resource_url)
+            resource_host_verified = (
+                parsed_resource.scheme.casefold() == "https"
+                and (parsed_resource.hostname or "").casefold() == FORTISWAP_HOST
+            )
+
         route_policy = classify_route(method, route_template or resource_url)
+        qualification = route_policy["status"]
+        if qualification == "allowed_read_only" and not resource_host_verified:
+            qualification = "unqualified"
+
         accepts = item.get("accepts")
         if accepts is not None and not isinstance(accepts, list):
             raise FortiSwapAPIError("FortiSwap discovery accepts must be a JSON list.")
@@ -247,7 +260,8 @@ def normalize_discovery_catalog(payload: Any) -> dict[str, Any]:
                 "method": route_policy["method"],
                 "route_template": route_policy["route_template"],
                 "resource_url": resource_url,
-                "qualification": route_policy["status"],
+                "qualification": qualification,
+                "resource_host_verified": resource_host_verified,
                 "analysis_only": True,
                 "execution_authorized": False,
                 "accepts": list(accepts or []),
@@ -424,6 +438,8 @@ def normalize_quote_response(payload: Any) -> dict[str, Any]:
         raise FortiSwapAPIError("FortiSwap quote mode must be exactIn or exactOut.")
 
     route_records = _require_list(payload.get("route"), "FortiSwap quote route")
+    if not route_records:
+        raise FortiSwapAPIError("FortiSwap quote route must contain at least one leg.")
     route: list[dict[str, Any]] = []
     for raw_leg in route_records:
         leg = _require_object(raw_leg, "FortiSwap quote route leg")
@@ -460,7 +476,11 @@ def normalize_quote_response(payload: Any) -> dict[str, Any]:
         "input_mint": input_mint,
         "output_mint": output_mint,
         "amount_in_raw": _raw_amount(payload.get("amountIn"), field="amountIn", required=mode == "exactIn"),
-        "amount_out_raw": _raw_amount(payload.get("amountOut"), field="amountOut"),
+        "amount_out_raw": _raw_amount(
+            payload.get("amountOut"),
+            field="amountOut",
+            required=mode == "exactOut",
+        ),
         "amount_out_net_raw": _raw_amount(payload.get("amountOutNet"), field="amountOutNet"),
         "minimum_amount_out_raw": _raw_amount(payload.get("minimumAmountOut"), field="minimumAmountOut"),
         "slippage_bps": _nonnegative_int(payload.get("slippageBps")),
@@ -570,6 +590,7 @@ __all__ = [
     "FORTISWAP_BASE_URL",
     "FORTISWAP_DISCOVERY_PATH",
     "FORTISWAP_SOURCE",
+    "FORTISWAP_HOST",
     "READ_ONLY_ROUTE_TEMPLATES",
     "EXECUTION_ROUTE_TEMPLATES",
     "FortiSwapAPIError",
