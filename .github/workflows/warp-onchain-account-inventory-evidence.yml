@@ -36,7 +36,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run deterministic inventory contract tests
-        run: python -m pytest -q tests/test_x1_warp_onchain_inventory.py
+        run: python -m unittest tests.test_x1_warp_onchain_inventory -v
 
       - name: Run live zero-byte Warp account inventory
         run: |
