@@ -1,0 +1,138 @@
+name: Warp Semantic Layout Discovery Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warp-semantic-layout:
+    name: Verify Warp account types and IDL-corroborated layout
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue428-warp-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run deterministic semantic-layout tests
+        run: python -m pytest -q tests/test_x1_warp_semantic_layout_discovery.py
+
+      - name: Run live semantic-layout discovery
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          from liquidity_scout.providers.x1.warp_rare_account_capture import (
+              capture_warp_rare_both_chains,
+          )
+          from liquidity_scout.providers.x1.warp_semantic_layout_discovery import (
+              discover_warp_semantic_layout,
+          )
+
+          capture = capture_warp_rare_both_chains(
+              solana_rpc_url=os.environ["SOLANA_RPC_URL"],
+              x1_rpc_url=os.environ["X1_RPC_URL"],
+              include_raw_base64=True,
+          )
+          result = discover_warp_semantic_layout(capture)
+
+          assert result["account_type_identity_verified"] is True
+          assert result["pda_identity_verified"] is True
+          assert result["field_layout_corroborated"] is True
+          assert result["field_semantics_verified"] is False
+          assert result["account_role_verified"] is False
+          assert result["route_semantics_verified"] is False
+          assert result["bridge_health_verified"] is False
+          assert result["semantic_contract_accepted"] is False
+          assert result["cmis_promotable"] is False
+          assert result["execution_authorized"] is False
+
+          for chain in ("solana", "x1"):
+              side = result[chain]
+              assert side["all_account_type_identities_verified"] is True
+              assert side["all_pda_identities_verified"] is True
+              assert side["account_type_counts"]["Config"] == 1
+              assert side["account_type_counts"]["GuardianSet"] == 1
+              assert side["account_type_counts"]["Roles"] == 1
+              assert side["account_type_counts"]["TokenRegistryEntry"] >= 1
+
+          # Do not print ephemeral base64. Emit only classified account identity
+          # and bounded decoded discovery fields.
+          summary = {
+              "contract": result["contract"],
+              "program_id": result["program_id"],
+              "comparison": result["comparison"],
+              "solana": {
+                  "account_type_counts": result["solana"]["account_type_counts"],
+                  "accounts": [
+                      {
+                          "pubkey": row["pubkey"],
+                          "space": row["space"],
+                          "account_name": row["account_name"],
+                          "anchor_discriminator_hex": row["anchor_discriminator_hex"],
+                          "pda_bump_expected": row["pda_bump_expected"],
+                          "decoded_fields": row["decoded_fields"],
+                      }
+                      for row in result["solana"]["accounts"]
+                  ],
+              },
+              "x1": {
+                  "account_type_counts": result["x1"]["account_type_counts"],
+                  "accounts": [
+                      {
+                          "pubkey": row["pubkey"],
+                          "space": row["space"],
+                          "account_name": row["account_name"],
+                          "anchor_discriminator_hex": row["anchor_discriminator_hex"],
+                          "pda_bump_expected": row["pda_bump_expected"],
+                          "decoded_fields": row["decoded_fields"],
+                      }
+                      for row in result["x1"]["accounts"]
+                  ],
+              },
+              "account_type_identity_verified": True,
+              "pda_identity_verified": True,
+              "field_layout_corroborated": True,
+              "field_semantics_verified": False,
+              "account_role_verified": False,
+              "route_semantics_verified": False,
+              "semantic_contract_accepted": False,
+              "cmis_promotable": False,
+              "execution_authorized": False,
+          }
+
+          print("WARP_SEMANTIC_LAYOUT_DISCOVERY_EVIDENCE")
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only account classification and layout discovery only."
+          echo "Pinned public IDL is corroborating evidence, not an official authority."
+          echo "Account type requires exact owner + size + Anchor discriminator + reproducible PDA."
+          echo "Field names remain IDL-corroborated candidates; field semantics are not accepted."
+          echo "No route qualification, custody/backing promotion, Scout reliance, or execution authority."
