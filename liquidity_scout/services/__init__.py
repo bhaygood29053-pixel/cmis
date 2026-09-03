@@ -17,8 +17,6 @@ from .cmis_pre_trade import build_pre_trade_check_response
 from .cmis_rank import SUPPORTED_RANK_METRICS, build_rank_response
 from .cmis_risk import build_risk_check_response
 from .cmis_tokenomics import build_tokenomics_response
-from .cmis_verification_evidence import build_verification_evidence_response
-from .cmis_verification_evidence_lookup import lookup_verification_evidence
 from .historical_compare import (
     DEFAULT_PROFILE_METRICS,
     SUPPORTED_PROFILE_METRICS,
@@ -59,6 +57,20 @@ from .risk import (
     build_risk_check,
 )
 from .tokenomics import build_tokenomics_report
+
+
+def __getattr__(name: str):
+    """Resolve verification helpers lazily across the public/private boundary."""
+
+    if name == "build_verification_evidence_response":
+        from .cmis_verification_evidence import build_verification_evidence_response
+
+        return build_verification_evidence_response
+    if name == "lookup_verification_evidence":
+        from .cmis_verification_evidence_lookup import lookup_verification_evidence
+
+        return lookup_verification_evidence
+    raise AttributeError(name)
 
 __all__ = [
     "AMBIGUOUS",
