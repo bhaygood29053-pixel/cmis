@@ -186,6 +186,11 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_wallet_history_observation.py
 
+      - name: Test Warp wallet-history response semantics v1
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_warp_wallet_history_semantics.py
+
       - name: Test accepted Warp config semantics v1
         env:
           PYTHONPATH: .
