@@ -46,7 +46,7 @@ Chain Provider -> CMIS -> Chain Scout -> Roberta
 
 CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, learning-workflow coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
 
-## Current roadmap position — reconciled 2026-09-01
+## Current roadmap position — reconciled 2026-09-02
 
 Accepted on `main`:
 
@@ -60,8 +60,8 @@ Accepted on `main`:
 - **Deterministic direct wallet-relationship evidence:** complete, internal/read-only/non-promoted, explicit non-ownership semantics.
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
-- **CMIS capability contract:** `1.16.0`.
-- **Instant X1 Scan `instant_x1_scan/v2`:** bounded X1-only read-only composition with accepted provider-backed price-history enrichment; lifetime/archive/continuity claims remain fail-closed.
+- **CMIS capability contract:** `1.17.0`.
+- **Instant X1 Scan `instant_x1_scan/v3`:** bounded X1-only read-only composition preserving accepted v2 identity/history/risk semantics while adding field-scoped `x1_current_market_freshness/v1`. Price freshness may be verified only from timestamped provider-backed price evidence; liquidity, rolling 24h volume, and rolling transaction freshness remain explicitly unverified under 1.17.
 - **X1 Burn Intelligence `burn_intelligence/v1`:** first-class bounded X1-only read-only service over the accepted deterministic burn foundation. It exposes cumulative verified observed burn, 1h/24h/7d/30d windows, event counts, 24h/7d/30d period-over-period changes, issuance context, circulating-supply context, and burn-time valuation without recomputation.
 - **X1 Discovery Intelligence `discovery_intelligence/v1`:** first-class bounded X1-only read-only projection over the CMIS-owned Discovery Ledger. It exposes first and most-recent verified observations, verified count, sparse evidence bounds, and elapsed observed history. First observation is explicitly not token launch time.
 - **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
@@ -83,7 +83,7 @@ Not accepted/promoted:
 
 CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing, but Solana product expansion and release work are deferred to a future phase. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
 
-Current live ordering is narrower: historical burn-time valuation is complete; delayed catalog-departure evidence remains under its accepted fail-closed gate; Discovery Ledger public #365 is blocked on protected `cmis-core` #6 private CI; WHAT CHANGED? / Early Warning and execution-quality statistics follow only after their evidence foundations are accepted.
+Current live ordering is narrower: Historical Coverage Proof v1, Burn Intelligence v1, Discovery Ledger/Intelligence v1, WHAT CHANGED? v1 consumption, and CMIS 1.17 field-scoped current-market freshness are complete. Early Warning is the active next service family. PR #363 delayed-vault/X1.Ninja evidence research remains a parallel fail-closed investigation and is not the flagship product blocker.
 
 
 
@@ -140,7 +140,7 @@ The live capability manifest is authoritative:
 GET /v1/cmis/capabilities
 ```
 
-The current accepted X1 normalized-identity contract is `x1_asset_identity/v1`, introduced in CMIS 1.11.0 and retained by the current contract. CMIS 1.13.0 added the bounded read-only `instant_x1_scan/v1` composition service for ROBERTA on X1; it composes accepted identity, market, tokenomics, local verified history, deterministic risk, and runtime evidence-quality metadata without inventing missing holder/concentration facts. For an externally reachable Roberta readiness deployment, keep the CMIS Python process on loopback and use the hardened HTTPS reverse-proxy profile in [`docs/CMIS_PUBLIC_HTTPS.md`](./docs/CMIS_PUBLIC_HTTPS.md).
+The current accepted X1 normalized-identity contract is `x1_asset_identity/v1`, introduced in CMIS 1.11.0 and retained by the current contract. CMIS 1.17.0 now exposes bounded read-only `instant_x1_scan/v3` for ROBERTA on X1. v3 preserves the accepted scan composition and supported-pair history semantics while adding field-scoped current-market freshness without converting collection time into provider fact time or promoting one fresh field into global freshness. For an externally reachable Roberta readiness deployment, keep the CMIS Python process on loopback and use the hardened HTTPS reverse-proxy profile in [`docs/CMIS_PUBLIC_HTTPS.md`](./docs/CMIS_PUBLIC_HTTPS.md).
 
 Every chain/service combination is classified explicitly. A capability available on X1 is never assumed to exist on Solana, and vice versa.
 
