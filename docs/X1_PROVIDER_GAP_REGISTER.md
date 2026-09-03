@@ -81,3 +81,26 @@ Before any PARTIAL, CANDIDATE, BLOCKED, or MISSING capability is promoted:
 6. **X1.Ninja SSE** — current credential access is denied; only after authenticated access is established should event schema/order/finality/reconnect/backfill semantics be tested.
 
 All work remains read-only/fail-closed and does not authorize execution.
+
+## Warp #409 historical-retention coverage gate — 2026-09-03
+
+Real Warp settled-event normalization is accepted through `warp_onchain_transfer_history/v1`, and the connected wallet-history response is pinned only as corroboration through `warp_wallet_history_semantics/v1`.
+
+Issue #437 / the rebased message-retention coverage slice now tests the necessary three-way closure invariant:
+
+- official Warp config sequence counters;
+- exact on-chain Config sequence counters;
+- full exact-PDA-verified OutgoingMsg/IncomingMsg account counts and unique sequence keys.
+
+Even exact equality does not by itself prove that message accounts cannot be deleted, closed, or recycled. Until lifecycle retention semantics are independently established:
+
+```text
+retention_deletion_semantics_verified = false
+historical_retention_complete_verified = false
+requested_window_coverage_verified = false
+coverage_complete_verified = false
+missing_history_zero_authorized = false
+execution_authorized = false
+```
+
+#409 requires a complete 60-day lookback for current/prior 30-day comparisons unless complete bridge lifetime is separately proven shorter.
