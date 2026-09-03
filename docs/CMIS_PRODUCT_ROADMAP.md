@@ -42,6 +42,7 @@ Accepted milestones on `main`:
 - **X1 all-available verified historical profiles and overlapping pair comparison: COMPLETE under `historical_compare` modes in CMIS `1.10.0`.**
 - **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
 - **Cross-chain asset provenance foundation: COMPLETE under `cross_chain_asset_provenance/v1` via Issue #402 / PR #403.** The primitive validates exact chain-scoped origin/current identities, ordered cross-chain hop continuity, representation depth, and bridge/custody dependency labels while rejecting symbol/name identity shortcuts. It is structural evidence only: live bridge state, backing, custody truth, source independence, supply/flow, public-service promotion, Scout reliance, and execution remain unverified/unauthorized.
+- **Verified Bridge Route Evidence / Warp Qualification foundation: COMPLETE internally via Issue #405 / PR #406 under `bridge_route_evidence/v1` and `warp_bridge_qualification/v1`.** Exact provenance-hop route id, source/destination chain-scoped asset identity, exact source URL binding, source-vs-collection timestamps, freshness, deterministic evidence identity, and candidate route/backing/custody fields are fail-closed. Warp itself is **not provider-qualified**: `warp_qualified=false`, `qualification_state=blocked_endpoint_semantics`, and the accepted Warp semantic-contract registry has zero entries. Issue #407 is the next exact gate.
 - **X1 verified-provider historical price backfill: COMPLETE under the bounded CMIS `1.12.0` contract.** Backfill is price-only and preserves non-independence, non-archive-completeness, non-continuity, historical stable-quote uncertainty, and non-lifetime-completeness limits.
 - **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
 - **CMIS capability contract: `1.18.0`.** Burn Intelligence (`burn_intelligence/v1`) remains accepted under 1.15.0, Discovery Intelligence (`discovery_intelligence/v1`) under 1.16.0, field-scoped current-market freshness under 1.17.0, and pull-only Concentration Warning Intelligence (`concentration_warning_intelligence/v1`) under 1.18.0.
@@ -231,8 +232,8 @@ Those observations do **not** establish:
 - provider/RPC enumeration completeness;
 - source independence.
 
-Warp Bridge machine-readable operational state remains unavailable until an exact provenance-approved read contract is accepted.
-The accepted `cross_chain_asset_provenance/v1` foundation does not change that provider gate; it supplies the deterministic identity/lineage structure that any future Warp evidence must satisfy.
+Warp Bridge machine-readable operational state remains unavailable until an exact provenance-approved read contract and semantic fixture are accepted.
+The accepted `cross_chain_asset_provenance/v1`, `bridge_route_evidence/v1`, and `warp_bridge_qualification/v1` foundations now define the deterministic identity, route, source, timestamp, backing, and custody gates any future Warp evidence must satisfy. They do **not** verify current Warp operational state. Issue #407 owns the remaining exact-endpoint semantic-contract blocker.
 
 ## Public-shell/private-core migration closure
 
