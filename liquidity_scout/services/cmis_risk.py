@@ -126,6 +126,7 @@ def build_risk_check_response(
     market_report: Optional[Mapping[str, Any]],
     tokenomics_report: Optional[Mapping[str, Any]] = None,
     historical_report: Optional[Mapping[str, Any]] = None,
+    freshness_report: Optional[Mapping[str, Any]] = None,
     *,
     chain: str = "x1",
     policy: Optional[Mapping[str, Any]] = None,
@@ -171,6 +172,7 @@ def build_risk_check_response(
             market_report,
             tokenomics_report,
             historical_report,
+            freshness_report,
             chain=chain,
             policy=policy,
         )

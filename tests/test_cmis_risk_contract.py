@@ -127,6 +127,50 @@ class CMISRiskContractTests(unittest.TestCase):
         self.assertEqual(response["risk"]["confidence"], response["confidence"])
         self.assertEqual(response["errors"], [])
 
+    def test_field_freshness_flows_into_risk_envelope_and_service_status(self):
+        freshness = {
+            "contract_version": "x1_current_market_freshness/v1",
+            "freshness_state": "PARTIAL",
+            "evaluated_at": 3000,
+            "current_market_freshness_verified": False,
+            "verified_field_count": 1,
+            "total_field_count": 4,
+            "fields": {
+                "price_usd": {
+                    "freshness_verified": True,
+                    "reason": "timestamped_provider_price_matches_current_market_price",
+                },
+                "liquidity_usd": {
+                    "freshness_verified": False,
+                    "reason": "liquidity_provider_fact_time_not_verified",
+                },
+                "volume_24h_usd": {
+                    "freshness_verified": False,
+                    "reason": "rolling_volume_provider_fact_time_not_verified",
+                },
+                "transactions_24h": {
+                    "freshness_verified": False,
+                    "reason": "rolling_transactions_provider_fact_time_not_verified",
+                },
+            },
+        }
+        response = build_risk_check_response(
+            market_report(),
+            tokenomics_report(),
+            historical_report(),
+            freshness,
+        )
+
+        self.assertEqual(response["status"], PARTIAL)
+        self.assertEqual(response["risk"]["recommendation"], "WARN")
+        self.assertEqual(response["risk"]["components"]["freshness"]["status"], "WARN")
+        codes = {warning["code"] for warning in response["warnings"]}
+        self.assertIn("liquidity_freshness_unverified", codes)
+        self.assertIn("volume_24h_freshness_unverified", codes)
+        self.assertIn("transactions_24h_freshness_unverified", codes)
+        self.assertNotIn("price_freshness_unverified", codes)
+        self.assertEqual(response["confidence"]["total_checks"], 12)
+
     def test_fully_verified_block_is_still_successful_service_response(self):
         response = build_risk_check_response(
             market_report(liquidity_usd=0.0),

@@ -61,7 +61,104 @@ def historical_report(**overrides):
     return value
 
 
+def freshness_report(*, unverified=()):
+    fields = {
+        "price_usd": {
+            "freshness_verified": True,
+            "reason": "timestamped_provider_price_matches_current_market_price",
+        },
+        "liquidity_usd": {
+            "freshness_verified": True,
+            "reason": "verified_test_fixture",
+        },
+        "volume_24h_usd": {
+            "freshness_verified": True,
+            "reason": "verified_test_fixture",
+        },
+        "transactions_24h": {
+            "freshness_verified": True,
+            "reason": "verified_test_fixture",
+        },
+    }
+    for name in unverified:
+        fields[name] = {
+            "freshness_verified": False,
+            "reason": f"{name}_freshness_not_verified",
+        }
+    verified = sum(
+        1 for item in fields.values() if item["freshness_verified"] is True
+    )
+    return {
+        "contract_version": "x1_current_market_freshness/v1",
+        "freshness_state": "VERIFIED" if verified == 4 else ("PARTIAL" if verified else "NOT_VERIFIED"),
+        "evaluated_at": 3000,
+        "current_market_freshness_verified": verified == 4,
+        "verified_field_count": verified,
+        "total_field_count": 4,
+        "fields": fields,
+    }
+
+
 class RiskCheckCoreTests(unittest.TestCase):
+    def test_verified_current_market_freshness_is_included_without_changing_pass(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(),
+            freshness_report(),
+        )
+
+        self.assertEqual(result["recommendation"], PASS)
+        self.assertEqual(result["components"]["freshness"]["status"], PASS)
+        self.assertEqual(result["confidence"]["verified_checks"], 12)
+        self.assertEqual(result["confidence"]["total_checks"], 12)
+        self.assertIn(
+            "current_market_freshness",
+            result["assessment_scope"]["included"],
+        )
+
+    def test_unverified_market_freshness_warns_fail_closed(self):
+        result = build_risk_check(
+            market_report(),
+            tokenomics_report(),
+            historical_report(),
+            freshness_report(
+                unverified=(
+                    "liquidity_usd",
+                    "volume_24h_usd",
+                    "transactions_24h",
+                )
+            ),
+        )
+
+        self.assertEqual(result["recommendation"], WARN)
+        self.assertEqual(result["components"]["freshness"]["status"], WARN)
+        self.assertIn("liquidity_freshness_unverified", result["flags"])
+        self.assertIn("volume_24h_freshness_unverified", result["flags"])
+        self.assertIn("transactions_24h_freshness_unverified", result["flags"])
+        self.assertNotIn("price_freshness_unverified", result["flags"])
+        self.assertFalse(
+            result["confidence"]["checks"]["liquidity_usd_freshness_verified"]
+        )
+        self.assertTrue(
+            result["confidence"]["checks"]["price_usd_freshness_verified"]
+        )
+
+    def test_malformed_freshness_contract_fails_closed(self):
+        invalid = freshness_report()
+        invalid["contract_version"] = "made_up_freshness/v1"
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "x1_current_market_freshness/v1",
+        ):
+            build_risk_check(
+                market_report(),
+                tokenomics_report(),
+                historical_report(),
+                invalid,
+            )
+
     def test_verified_low_risk_facts_pass_without_inventing_score(self):
         result = build_risk_check(
             market_report(),
