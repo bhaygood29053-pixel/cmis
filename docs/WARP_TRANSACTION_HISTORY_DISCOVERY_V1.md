@@ -112,3 +112,86 @@ It never:
 - promotes the source to Scout/ROBERTA.
 
 `execution_authorized=false`.
+
+
+## 2026-09-03 live API observation
+
+The first exact-head discovery run established that the candidate API is live
+and returns executed records, but it is not sufficient by itself for accepted
+history coverage.
+
+Observed page 1 for `status=executed&limit=50&page=1`:
+
+- HTTP 200 / `application/json`;
+- `total=61`;
+- `page=1`;
+- `pageSize=50`;
+- 50 executed transaction records;
+- fields included `txSig`, `destTxSig`, `from`, `to`, `token`,
+  `amount`, `sourceSlot`, `destSlot`, `timestamp`, sender/recipient and
+  signature-count fields.
+
+The corresponding page-2 request returned HTTP 200 but an empty page with
+`total=0`. Therefore pagination semantics and complete retention cannot be
+accepted from this API response.
+
+The per-transaction `/signatures` response for an executed sample also
+contained no guardian messages. Therefore the executed-list API alone does not
+supply the sequence number or exact mint identity needed for deterministic
+route pairing.
+
+This is a useful negative result. CMIS must not treat the API's `total`,
+token symbol, or first page as complete bridge-flow history.
+
+## On-chain transfer-state path
+
+The pinned Warp IDL and already accepted program identity expose a stronger
+read-only source directly from chain state:
+
+- `OutgoingMsg` account discriminator with current size 106;
+- `IncomingMsg` account discriminator with current size 116;
+- legacy `IncomingMsg` size 107;
+- `OutgoingMsg` PDA seeds `["evt_out", seq]`;
+- `IncomingMsg` PDA seeds `["evt_in", source_seq]`.
+
+The on-chain normalizer requires:
+
+1. exact Warp program owner;
+2. exact Anchor account discriminator;
+3. exact supported account length;
+4. reproducible PDA including the stored bump;
+5. exact source sequence pairing;
+6. exact sender equality;
+7. exact amount equality;
+8. exact source timestamp equality;
+9. exact source and destination mints from the accepted route;
+10. expected lock/burn and mint/release operation topology;
+11. destination `processed=true`;
+12. a positive destination execution timestamp for immediate transfers.
+
+Only then may it emit a normalized settled event for
+`bridge_flow_intelligence/v1`.
+
+### Delayed claims
+
+A processed delayed transfer is not given an invented settlement time.
+
+If `claimable_after > 0`, the event remains unresolved in this slice even when
+`claimed=true`, because the current account layout does not itself expose the
+actual claim transaction timestamp. A later transaction-history proof may
+resolve that timestamp.
+
+## Coverage remains separate
+
+Current program-account enumeration can prove that the paired accounts exist
+now. It does not yet prove that every historical message account has been
+retained since the beginning of the requested 24h/7d/30d windows.
+
+Therefore even after real paired events are accepted:
+
+`historical_retention_complete_verified=false`
+
+`coverage_complete_verified=false`
+
+The merged flow calculator may ingest those real events, but its primary window
+totals remain `null` until the coverage gate is separately satisfied.
