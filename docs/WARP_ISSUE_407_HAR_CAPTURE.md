@@ -8,7 +8,9 @@ This workflow exists to resolve the remaining blocker in Issue #407 without gues
 
 A browser-exported HAR can now be processed through `warp_har_network_observation/v1`.
 
-The parser accepts only entries that are:
+The parser has two fail-closed layers. `list_warp_har_observations(...)` preserves exact endpoint provenance even when Chrome omits response-body text; `list_warp_har_candidates(...)` remains stricter and requires a parseable JSON body before semantic capture.
+
+The semantic-candidate parser accepts only entries that are:
 
 - initiated from the official `https://app.bridge.x1.xyz` application as established by an exact HTTPS Referer or Origin;
 - exact HTTPS URLs;
@@ -17,7 +19,7 @@ The parser accepts only entries that are:
 - JSON content types;
 - non-base64 response bodies containing parseable JSON.
 
-Candidate listing is sanitized. It does **not** return request headers, cookies, authorization material, response headers, or response bodies.
+Both listings are sanitized. They do **not** return request headers, cookies, authorization material, response headers, or response bodies. Metadata-only observations explicitly return `semantic_capture_eligible=false`, `json_parse_verified=false`, and `response_sha256=null` until the actual response body is present.
 
 A candidate is not a verified semantic contract. The selected HAR entry is submitted to the already-merged `warp_machine_contract_capture/v1` gate, which still requires explicit field mapping and timestamp-unit declaration and still returns:
 
@@ -76,4 +78,35 @@ Warp semantic contract = NOT ACCEPTED
 CMIS #409 = BLOCKED
 CMIS #410 = BLOCKED
 ROBERTA #314 = BLOCKED ON ACCEPTED CMIS BRIDGE EVIDENCE
+```
+
+## 2026-09-03 real Chrome HAR result
+
+A clean official Info-page HAR established exact same-origin Warp read endpoints:
+
+- `GET https://app.bridge.x1.xyz/api/bridge/config`
+- `GET https://app.bridge.x1.xyz/api/bridge/guardians`
+- `GET https://app.bridge.x1.xyz/api/bridge/tvl?chain=sol&token=<token>`
+
+Observed TVL token values included `xencat`, `USDC`, `wSOL`, `cbBTC`, `ETH`, and `DGN`.
+
+For the exact config endpoint, the capture recorded six repeated observations from the official `/info` page, each with HTTP 200, `application/json`, response size 7,746 bytes, and Next.js matched path `/api/bridge/[...path]`. The guardian endpoint similarly returned HTTP 200 JSON with a 4,682-byte response.
+
+The browser export omitted `response.content.text`, so no response-body SHA-256 or field-level semantic fixture can yet be produced from that HAR alone. Response size is **not** a substitute for a response hash.
+
+Sanitized metadata observation SHA-256:
+
+`a1e0e4bf4bbc83f2313a6e396912fc6f509310792cc5d9e969cada87a669b9da`
+
+This clears the exact endpoint-provenance discovery subproblem but does not clear #407 semantic acceptance:
+
+```text
+exact_official_config_url = verified_by_official_app_har
+http_200_json = verified
+response_body_present = false
+response_sha256 = unavailable
+field_semantics = not_verified
+semantic_contract_accepted = false
+warp_qualified = false
+execution_authorized = false
 ```
