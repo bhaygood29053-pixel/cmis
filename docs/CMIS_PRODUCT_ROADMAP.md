@@ -54,7 +54,7 @@ Accepted milestones on `main`:
 - **Parallel X1 provider-gap work (#30): OPEN, read-only/fail-closed.**
 - **Controlled transaction execution: UNAUTHORIZED / not an active CMIS milestone.**
 
-**Concentration Warning Intelligence v1 is now an accepted X1 public CMIS service and Scout-reliance capability under CMIS 1.18.** It remains pull-only. X1 Scout/ROBERTA product adoption and any push/delivery mechanism remain separate downstream gates.
+**Concentration Warning Intelligence v1 is accepted end-to-end through ROBERTA.** CMIS 1.18 remains the deterministic warning authority; public ROBERTA #318 and protected `roberta-core` #28 preserve the same pull-only WATCH/CLEAR evidence through X1 Scout and the Canonical Decision Object without recomputation. Push/delivery mechanisms remain a separate future gate.
 
 ## Phase 11 foundation
 
@@ -874,18 +874,11 @@ No accepted CMIS roadmap item authorizes:
 
 Controlled Execution remains unauthorized.
 
-## Live reconciliation — 2026-09-02 America/New_York
+## Live reconciliation — 2026-09-03 America/New_York
 
-The following state supersedes older pending language in this file:
-
-- **Historical Coverage Proof v1: COMPLETE.**
-- **Burn Intelligence v1: COMPLETE.**
-- **Discovery Ledger / Discovery Intelligence v1: COMPLETE.**
-- **WHAT CHANGED? v1: COMPLETE in ROBERTA.**
-- **Field-scoped current-market freshness: COMPLETE under CMIS 1.17 / Instant X1 Scan v3.**
-- **Persistent concentration Early Warning foundation: COMPLETE.** Issue #396 / public #397 / protected `cmis-core` #15 remain the accepted two-observation evidence foundation.
-- **Concentration Warning Intelligence v1: COMPLETE / PROMOTED under CMIS 1.18.** Public CMIS #400 and protected `cmis-core` #16 expose X1 `concentration_warning_intelligence/v1` as a bounded, read-only, pull-only public service with Scout reliance. WATCH/CLEAR remain non-risk states; exact Receipt/Proof lineage is preserved; caller-supplied trust material is rejected.
-- **X1 Scout / ROBERTA Early Warning adoption: ACTIVE NEXT GATE.** ROBERTA must validate and preserve the accepted CMIS service without recomputing warning state.
-- **Push notification delivery: NOT AUTHORIZED.** No scheduler, webhook, Telegram push, subscription, or autonomous monitor is created by CMIS 1.18.
-- **CMIS #363 delayed-vault/X1.Ninja evidence:** remains parallel read-only research and is not the flagship blocker.
-- Controlled Execution remains locked and `execution_authorized=false`.
+- **Historical Coverage Proof, Burn, Discovery, WHAT CHANGED?, and Field-Scoped Freshness: COMPLETE.**
+- **EARLY WARNING — COMPLETE THROUGH PULL-ONLY ROBERTA ADOPTION.** CMIS #399 / public #400 / protected `cmis-core` #16 promote `concentration_warning_intelligence/v1` under CMIS 1.18. ROBERTA public #318 / protected `roberta-core` #28 / Issue #317 preserve the canonical WATCH/CLEAR warning through X1 Scout and the shared Human/Machine Decision Object without recomputation or risk promotion.
+- **Push warning delivery: NOT AUTHORIZED / DEFERRED.** No subscriptions, background polling, Telegram push, webhooks, retry/acknowledgement queues, or execution authority are part of the accepted warning milestone.
+- **CROSS-CHAIN / WARP: ACTIVE NEXT EVIDENCE GATE.** Cross-chain provenance and bridge-route/Warp qualification foundations are accepted internally, but Warp remains `blocked_endpoint_semantics`. CMIS Issue #407 is the next exact endpoint/semantic-fixture gate. No bridge truth is promoted to Scout/ROBERTA yet.
+- **CMIS #363:** parallel read-only delayed-vault/X1.Ninja research; not the flagship blocker.
+- `execution_authorized=false`.
