@@ -1,0 +1,43 @@
+name: X1 Native Account Concentration Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-xnt-concentration:
+    name: Finalized native XNT account concentration
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/x1-native-account-concentration')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NATIVE_ACCOUNT_CONCENTRATION_LIVE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run deterministic native distribution tests
+        run: |
+          python -m unittest tests.test_x1_native_account_concentration -v
+      - name: Run live native XNT concentration evidence
+        run: |
+          python -m unittest tests.test_x1_native_account_concentration_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only finalized native-XNT account evidence only."
+          echo "Native account addresses are not persons, wallet groups, or beneficial owners."
+          echo "No holder-total claim, risk promotion, transaction construction, signing, broadcast, custody, or execution authority."
