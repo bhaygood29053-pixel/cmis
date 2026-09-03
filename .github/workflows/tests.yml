@@ -181,3 +181,8 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_fortiswap_provider.py
+
+      - name: Test Theo advisory-provider connection boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_theo_advisory_provider.py
