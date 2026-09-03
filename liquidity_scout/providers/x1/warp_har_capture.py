@@ -23,6 +23,7 @@ from liquidity_scout.providers.x1.warp_contract_capture import (
 )
 
 HAR_OBSERVATION_CONTRACT = "warp_har_network_observation/v1"
+HAR_METADATA_OBSERVATION_CONTRACT = "warp_har_network_metadata_observation/v1"
 OFFICIAL_BRIDGE_APP_HOST = "app.bridge.x1.xyz"
 _ALLOWED_JSON_CONTENT_TYPES = frozenset(
     {
@@ -187,6 +188,127 @@ def _entry_payload(entry: Any, entry_index: int) -> dict[str, Any] | None:
     }
 
 
+def list_warp_har_observations(har_document: Any) -> list[dict[str, Any]]:
+    """Return sanitized official-app GET+200+JSON network observations.
+
+    This preserves exact endpoint provenance when a Chrome HAR contains
+    response metadata but omits response.content.text. Metadata-only
+    observations are never semantic capture candidates.
+    """
+
+    observations: list[dict[str, Any]] = []
+    for index, entry in enumerate(_entries(har_document)):
+        if not isinstance(entry, Mapping):
+            continue
+
+        request = entry.get("request")
+        response = entry.get("response")
+        if not isinstance(request, Mapping) or not isinstance(response, Mapping):
+            continue
+
+        method = str(request.get("method") or "").strip().upper()
+        if method != "GET":
+            continue
+
+        source_url = str(request.get("url") or "").strip()
+        parsed = urlsplit(source_url)
+        if (
+            parsed.scheme.casefold() != "https"
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.fragment
+        ):
+            continue
+
+        referrer = _official_app_referrer(request)
+        if referrer is None:
+            continue
+
+        try:
+            status_code = int(response.get("status"))
+        except (TypeError, ValueError):
+            continue
+        if status_code != 200:
+            continue
+
+        content_type = _content_type(response)
+        if content_type not in _ALLOWED_JSON_CONTENT_TYPES:
+            continue
+
+        content = response.get("content")
+        if not isinstance(content, Mapping):
+            continue
+        encoding = str(content.get("encoding") or "").strip().casefold()
+        if encoding == "base64":
+            continue
+
+        proof = BridgeSourceProof(
+            proof_type="official_app_network_observation",
+            reference=f"HAR entry {index}; referrer={referrer}",
+            exact_url=source_url,
+        )
+        try:
+            provenance = evaluate_bridge_source_provenance(
+                url=source_url,
+                proofs=[proof],
+            )
+        except (TypeError, ValueError):
+            continue
+        if not (
+            provenance.source_provenance_verified
+            and provenance.read_probe_eligible
+        ):
+            continue
+
+        response_text = content.get("text")
+        response_body_present = (
+            isinstance(response_text, str) and bool(response_text.strip())
+        )
+        json_parse_verified = False
+        response_sha256 = None
+        response_size = content.get("size")
+        if not isinstance(response_size, (int, float)) or response_size < 0:
+            response_size = None
+        else:
+            response_size = int(response_size)
+
+        if response_body_present:
+            encoded = response_text.encode("utf-8")
+            if len(encoded) <= 1_000_000:
+                try:
+                    parsed_json = json.loads(response_text)
+                except json.JSONDecodeError:
+                    parsed_json = None
+                if isinstance(parsed_json, (Mapping, list)):
+                    json_parse_verified = True
+                    response_sha256 = hashlib.sha256(encoded).hexdigest()
+                    response_size = len(encoded)
+
+        observations.append(
+            {
+                "contract": HAR_METADATA_OBSERVATION_CONTRACT,
+                "entry_index": index,
+                "source_url": source_url,
+                "app_referrer": referrer,
+                "method": "GET",
+                "status_code": status_code,
+                "content_type": content_type,
+                "response_size_bytes": response_size,
+                "response_body_present": response_body_present,
+                "response_sha256": response_sha256,
+                "json_parse_verified": json_parse_verified,
+                "semantic_capture_eligible": json_parse_verified,
+                "official_app_network_observation": True,
+                "request_headers_retained": False,
+                "response_headers_retained": False,
+                "response_body_retained": False,
+                "read_only": True,
+                "execution_authorized": False,
+            }
+        )
+    return observations
+
 def list_warp_har_candidates(har_document: Any) -> list[dict[str, Any]]:
     """Return sanitized metadata for exact GET+JSON observations.
 
@@ -271,7 +393,9 @@ def capture_warp_machine_contract_from_har(
 
 __all__ = [
     "HAR_OBSERVATION_CONTRACT",
+    "HAR_METADATA_OBSERVATION_CONTRACT",
     "OFFICIAL_BRIDGE_APP_HOST",
     "capture_warp_machine_contract_from_har",
     "list_warp_har_candidates",
+    "list_warp_har_observations",
 ]
