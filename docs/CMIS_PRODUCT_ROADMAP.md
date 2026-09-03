@@ -37,6 +37,7 @@ Accepted milestones on `main`:
 - **Deterministic descriptive intelligence classification: COMPLETE, internal/read-only/non-promoted.**
 - **Deterministic direct wallet-relationship evidence with explicit non-ownership semantics: COMPLETE, internal/read-only/non-promoted.**
 - **Deterministic concentration-threshold alert evidence (#263/#264): COMPLETE, internal/read-only/non-promoted.**
+- **Persistent concentration Early Warning foundation (#396 / public #397 / protected `cmis-core` #15): COMPLETE, internal/read-only/non-promoted.** Exactly two distinct compatible CMIS-owned concentration-change intelligence observations are required; strict fact-time order, persistence-window bounds, latest-evidence freshness, duplicate/replay rejection, and exact Evidence Receipt / Proof Score lineage are enforced. `WATCH`/`CLEAR` are warning states, not risk severity.
 - **CMIS deterministic engineering workflow / three-axis review: ADOPTED and repository-authoritative.**
 - **X1 all-available verified historical profiles and overlapping pair comparison: COMPLETE under `historical_compare` modes in CMIS `1.10.0`.**
 - **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
@@ -51,7 +52,7 @@ Accepted milestones on `main`:
 - **Parallel X1 provider-gap work (#30): OPEN, read-only/fail-closed.**
 - **Controlled transaction execution: UNAUTHORIZED / not an active CMIS milestone.**
 
-There is currently **no accepted next public alert service, Scout-reliance promotion, or broader Verified Intelligence promotion milestone**. Any next promotion requires a separate issue/spec/roadmap gate.
+There is currently **no accepted public Early Warning service or Scout-reliance promotion**. The internal two-observation persistence foundation is accepted, but a separate service-promotion issue/spec is still required before X1 Scout or ROBERTA may consume it.
 
 ## Phase 11 foundation
 
@@ -104,6 +105,7 @@ Three additional contracts are accepted on `main` without public-service or Scou
 1. **Descriptive intelligence classification** — classifies only the exact verified concentration direction supported by canonical CMIS evidence and does not infer behavior, ownership, intent, fraud, manipulation, scam, or risk.
 2. **Direct wallet-relationship evidence** — represents verified observed direct token-transfer interactions between exact chain identities and explicitly preserves non-ownership/non-beneficial-owner semantics.
 3. **Concentration-threshold alert evidence** — evaluates one canonical concentration-change evidence object against exact chain/asset identity, explicit `basis_points` threshold units, deterministic GT/GTE comparator semantics, canonical freshness, single-observation persistence, and content-addressed evidence/alert identity.
+4. **Persistent concentration Early Warning evidence** — requires exactly two distinct compatible CMIS-owned concentration-change intelligence evidence ids, strict increasing fact-time order, explicit persistence-window and latest-age policies, verified Receipt freshness with no unresolved fields, duplicate/replay protection, preserved Receipt/Proof lineage, deterministic `cw_...` identity, and `WATCH`/`CLEAR` state. It remains non-promoted and non-deliverable.
 
 These foundations remain equivalent to:
 
@@ -756,9 +758,11 @@ No broader public/Scout promotion is active. Any future alert/public wrapper req
 
 ### Early Warning
 
-The first internal alert evidence foundation is complete. Future candidates may include multi-observation persistence, delivery semantics, or public service promotion only after a separate accepted contract proves exact evidence/freshness/identity/replay semantics.
+The single-observation alert primitive and the two-observation persistent concentration warning foundation are complete internally. Issue #396 / public PR #397 / protected `cmis-core` #15 prove exact subject compatibility, strict ordering, bounded persistence, current evidence freshness, duplicate/replay safety, and preserved Evidence Receipt / Proof Score lineage.
 
-No alert state may silently become behavioral intent, manipulation/fraud attribution, risk severity, or imminent-price prediction.
+The **next gate is public-service promotion**, not additional hidden inference. A separate contract must define a bounded pull-only CMIS service, explicit request fields, capability-manifest promotion, stable warning-state semantics, deterministic errors, and continued delivery/execution denial before Scout reliance.
+
+No warning state may silently become behavioral intent, ownership, manipulation/fraud attribution, risk severity, causality, or imminent-price prediction.
 
 ### Cross-Chain Intelligence
 
@@ -869,14 +873,14 @@ Controlled Execution remains unauthorized.
 
 ## Live reconciliation — 2026-09-02 America/New_York
 
-The following state supersedes older pending/blocker language in this file:
+The following state supersedes older pending language in this file:
 
-- **Historical Coverage Proof v1 (#383): COMPLETE.** XNT supported-pair lifetime/range/continuity proof remains accepted with historical quote-to-USD/full-USD lifetime caveats preserved.
-- **Burn Intelligence v1: COMPLETE.** Public CMIS #389 and protected `cmis-core` #12 remain accepted under CMIS 1.15.
-- **Discovery Ledger / Discovery Intelligence v1: COMPLETE.** Public #365/#391 and protected `cmis-core` #6 remain accepted under CMIS 1.16.
-- **WHAT CHANGED? v1 consumption: COMPLETE in ROBERTA.** Public ROBERTA #308 and protected `roberta-core` #26 compose accepted Scan/Burn/Discovery evidence without introducing a second CMIS fact authority.
-- **Field-scoped current-market freshness: COMPLETE under CMIS 1.17.** Public CMIS #386 merged as `instant_x1_scan/v3`; protected `cmis-core` #9 supplies the runtime freshness proof. Collection time remains distinct from provider fact time. Price may be freshness-verified while liquidity, rolling 24h volume, and rolling transactions remain NOT VERIFIED.
-- **ROBERTA freshness consumption: COMPLETE.** Public ROBERTA #301 and protected `roberta-core` #19 validate/preserve/render the same CMIS freshness object for Human and Machine ROBERTA without recomputation.
-- **EARLY WARNING: ACTIVE NEXT GATE.** Promote one warning family at a time with explicit identity, observation persistence, freshness, comparator, replay/deduplication, severity, evidence, and delivery semantics.
-- **PR #363 delayed-vault/X1.Ninja evidence:** remains parallel strict read-only research and is not the flagship product blocker.
+- **Historical Coverage Proof v1: COMPLETE.**
+- **Burn Intelligence v1: COMPLETE.**
+- **Discovery Ledger / Discovery Intelligence v1: COMPLETE.**
+- **WHAT CHANGED? v1: COMPLETE in ROBERTA.**
+- **Field-scoped current-market freshness: COMPLETE under CMIS 1.17 / Instant X1 Scan v3.**
+- **Persistent concentration Early Warning foundation: COMPLETE.** Public CMIS #397 defines the contract and protected `cmis-core` #15 implements two-distinct-observation persistence with strict ordering, bounded persistence window, latest-evidence freshness, duplicate/replay rejection, and exact Receipt/Proof lineage. `WATCH`/ `CLEAR` remain non-risk warning states.
+- **Public Early Warning service: NOT YET PROMOTED / ACTIVE NEXT GATE.** A separate service contract and capability-manifest promotion are required before X1 Scout or ROBERTA consumption. Delivery remains unauthorized.
+- **CMIS #363 delayed-vault/X1.Ninja evidence:** remains parallel read-only research and is not the flagship blocker.
 - Controlled Execution remains locked and `execution_authorized=false`.
