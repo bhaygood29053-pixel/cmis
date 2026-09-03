@@ -6,6 +6,7 @@ Collect repeated snapshots of the same exact X1 pools while preserving:
 - X1.Ninja global lastUpdated raw value;
 - X1.Ninja row lastSyncedAt raw value;
 - provider priceNative / pooledBase / pooledQuote;
+- provider liquidity / rolling 24h volume / rolling 24h transaction candidates;
 - independently read X1 RPC gross vault reserves and their exact ratio.
 
 This module intentionally does not assign timestamp units or source semantics.
@@ -223,6 +224,10 @@ def collect_ninja_price_fact_time_snapshot(
                         "priceNative": row.get("priceNative"),
                         "pooledBase": row.get("pooledBase"),
                         "pooledQuote": row.get("pooledQuote"),
+                        "liquidity": row.get("liquidity"),
+                        "volume24h": row.get("volume24h"),
+                        "txns24h": row.get("txns24h"),
+                        "transactions24h": row.get("transactions24h"),
                         "lastSyncedAt_raw": row.get("lastSyncedAt"),
                         "createdAt_raw": row.get("createdAt"),
                     },
@@ -247,6 +252,10 @@ def collect_ninja_price_fact_time_snapshot(
                         "priceNative": row.get("priceNative"),
                         "pooledBase": row.get("pooledBase"),
                         "pooledQuote": row.get("pooledQuote"),
+                        "liquidity": row.get("liquidity"),
+                        "volume24h": row.get("volume24h"),
+                        "txns24h": row.get("txns24h"),
+                        "transactions24h": row.get("transactions24h"),
                         "lastSyncedAt_raw": row.get("lastSyncedAt"),
                         "createdAt_raw": row.get("createdAt"),
                     },
@@ -392,8 +401,165 @@ def classify_ninja_price_fact_time_series(
     }
 
 
+def classify_ninja_current_market_fact_time_series(
+    snapshots: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Classify candidate update coupling for all current-market fields.
+
+    This is evidence collection only. It never treats lastSyncedAt/lastUpdated
+    as verified fact time and never promotes freshness from correlation alone.
+    """
+
+    usable = [dict(row) for row in snapshots if isinstance(row, Mapping)]
+    if len(usable) < 3:
+        raise ValueError("at least three snapshots are required")
+
+    metric_names = (
+        "priceNative",
+        "liquidity",
+        "volume24h",
+        "transactions24h",
+    )
+
+    addresses: list[str] = []
+    seen: set[str] = set()
+    for snap in usable:
+        for raw in snap.get("pools") or []:
+            if not isinstance(raw, Mapping):
+                continue
+            address = _text(raw.get("pool_address"))
+            if address and address not in seen:
+                seen.add(address)
+                addresses.append(address)
+
+    pool_series: list[dict[str, Any]] = []
+    aggregate_changes = {name: 0 for name in metric_names}
+    aggregate_changes_with_row_sync = {name: 0 for name in metric_names}
+    aggregate_changes_without_row_sync = {name: 0 for name in metric_names}
+
+    for address in addresses:
+        observations: list[dict[str, Any]] = []
+        for index, snap in enumerate(usable):
+            match = None
+            for raw in snap.get("pools") or []:
+                if (
+                    isinstance(raw, Mapping)
+                    and _text(raw.get("pool_address")) == address
+                ):
+                    match = raw
+                    break
+            if not isinstance(match, Mapping):
+                continue
+
+            provider = (
+                match.get("provider")
+                if isinstance(match.get("provider"), Mapping)
+                else {}
+            )
+            tx24 = provider.get("transactions24h")
+            if tx24 is None:
+                tx24 = provider.get("txns24h")
+
+            observations.append(
+                {
+                    "snapshot_index": index,
+                    "status": match.get("status"),
+                    "priceNative": provider.get("priceNative"),
+                    "liquidity": provider.get("liquidity"),
+                    "volume24h": provider.get("volume24h"),
+                    "transactions24h": tx24,
+                    "lastSyncedAt_raw": provider.get("lastSyncedAt_raw"),
+                }
+            )
+
+        transitions: list[dict[str, Any]] = []
+        for before, after in zip(observations, observations[1:]):
+            row_sync_changed = (
+                str(before.get("lastSyncedAt_raw"))
+                != str(after.get("lastSyncedAt_raw"))
+            )
+            changed: dict[str, bool] = {}
+            for name in metric_names:
+                field_changed = str(before.get(name)) != str(after.get(name))
+                changed[name] = field_changed
+                if field_changed:
+                    aggregate_changes[name] += 1
+                    if row_sync_changed:
+                        aggregate_changes_with_row_sync[name] += 1
+                    else:
+                        aggregate_changes_without_row_sync[name] += 1
+
+            transitions.append(
+                {
+                    "before_snapshot_index": before.get("snapshot_index"),
+                    "after_snapshot_index": after.get("snapshot_index"),
+                    "row_sync_candidate_changed": row_sync_changed,
+                    "changed_fields": changed,
+                }
+            )
+
+        pool_series.append(
+            {
+                "pool_address": address,
+                "observations": observations,
+                "transitions": transitions,
+            }
+        )
+
+    global_values = [
+        snap.get("provider_timestamp_candidates", {}).get(
+            "global_lastUpdated_raw"
+        )
+        for snap in usable
+        if isinstance(snap.get("provider_timestamp_candidates"), Mapping)
+    ]
+
+    field_summary = {}
+    for name in metric_names:
+        field_summary[name] = {
+            "change_events": aggregate_changes[name],
+            "changes_with_row_sync_candidate_change": (
+                aggregate_changes_with_row_sync[name]
+            ),
+            "changes_without_row_sync_candidate_change": (
+                aggregate_changes_without_row_sync[name]
+            ),
+            "row_sync_candidate_covers_all_observed_changes": (
+                aggregate_changes[name] > 0
+                and aggregate_changes_without_row_sync[name] == 0
+            ),
+            "provider_fact_time_verified": False,
+            "freshness_verified": False,
+        }
+
+    return {
+        "service": "x1_ninja_current_market_fact_time_series",
+        "version": VERSION,
+        "chain": "x1",
+        "status": "partial",
+        "snapshot_count": len(usable),
+        "global_lastUpdated_changed": (
+            len({str(value) for value in global_values}) > 1
+        ),
+        "field_summary": field_summary,
+        "pool_series": pool_series,
+        "provider_timestamp_units_verified": False,
+        "provider_fact_time_verified": False,
+        "update_source_semantics_verified": False,
+        "current_market_freshness_verified": False,
+        "warnings": [
+            "timestamp_field_names_do_not_prove_fact_time_semantics",
+            "update_correlation_does_not_prove_field_fact_time",
+            "collection_time_is_not_provider_fact_time",
+        ],
+        "cmis_promotable": False,
+        "execution_authorized": False,
+    }
+
+
 __all__ = [
     "VERSION",
+    "classify_ninja_current_market_fact_time_series",
     "classify_ninja_price_fact_time_series",
     "collect_ninja_price_fact_time_snapshot",
 ]
