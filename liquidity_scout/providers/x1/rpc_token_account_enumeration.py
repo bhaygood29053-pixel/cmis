@@ -160,6 +160,26 @@ def fetch_token_accounts_by_mint_raw(
                 "X1 RPC returned a token account for a different mint."
             )
 
+        token_amount = info.get("tokenAmount")
+        if not isinstance(token_amount, Mapping):
+            raise X1RPCTokenAccountEnumerationError(
+                f"token account entry {index} tokenAmount is malformed."
+            )
+        raw_amount = token_amount.get("amount")
+        decimals = token_amount.get("decimals")
+        if not isinstance(raw_amount, str) or not raw_amount.isdigit():
+            raise X1RPCTokenAccountEnumerationError(
+                f"token account entry {index} raw amount is invalid."
+            )
+        if (
+            isinstance(decimals, bool)
+            or not isinstance(decimals, int)
+            or decimals < 0
+        ):
+            raise X1RPCTokenAccountEnumerationError(
+                f"token account entry {index} decimals are invalid."
+            )
+
         seen.add(pubkey)
         accounts.append(
             {
@@ -168,6 +188,8 @@ def fetch_token_accounts_by_mint_raw(
                 "token_program_id": owner_program,
                 "owner": info.get("owner"),
                 "state": info.get("state"),
+                "raw_amount": raw_amount,
+                "decimals": decimals,
             }
         )
 
