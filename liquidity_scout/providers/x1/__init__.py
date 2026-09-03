@@ -17,6 +17,20 @@ from .agents_radio import (
 from .canonical_pool_vault_coupling import prove_canonical_pool_vault_coupling
 from .cross_pool_trusted_semantics import qualify_cross_pool_trusted_semantics
 from .exact_pool_leg_semantics_v14104 import prove_exact_pool_leg_semantics
+from .fortiswap import (
+    FORTISWAP_BASE_URL,
+    FORTISWAP_DISCOVERY_PATH,
+    FORTISWAP_SOURCE,
+    FortiSwapAPIError,
+    FortiSwapReadOnlyProvider,
+    classify_route as classify_fortiswap_route,
+    fetch_discovery as fetch_fortiswap_discovery,
+    normalize_discovery_catalog as normalize_fortiswap_discovery_catalog,
+    normalize_quote_response as normalize_fortiswap_quote_response,
+    normalize_router_volume_response as normalize_fortiswap_router_volume_response,
+    normalize_token_detail_response as normalize_fortiswap_token_detail_response,
+    normalize_tokens_response as normalize_fortiswap_tokens_response,
+)
 from .health import (
     HEALTH_SOURCE,
     HEALTH_URL,
