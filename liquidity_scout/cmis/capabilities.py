@@ -22,6 +22,11 @@ from liquidity_scout.services.cmis_discovery_intelligence import (
     CONTRACT_VERSION as DISCOVERY_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as DISCOVERY_INTELLIGENCE_SERVICE,
 )
+from liquidity_scout.services.cmis_concentration_warning_intelligence import (
+    CONTRACT_VERSION as CONCENTRATION_WARNING_CONTRACT_VERSION,
+    DELIVERY_MODE as CONCENTRATION_WARNING_DELIVERY_MODE,
+    SERVICE as CONCENTRATION_WARNING_SERVICE,
+)
 from liquidity_scout.services.cmis_x1_asset_identity import (
     IDENTITY_CONTRACT as X1_ASSET_IDENTITY_CONTRACT,
 )
@@ -34,7 +39,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.17.0"
+CMIS_CONTRACT_VERSION = "1.18.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -59,6 +64,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "instant_x1_scan",
     "verification_evidence",
     "concentration_change_intelligence",
+    "concentration_warning_intelligence",
 )
 PUBLIC_SUPPORTED_CHAINS = ("x1",)
 PUBLIC_KNOWN_CHAINS = ("x1", "solana")
@@ -168,6 +174,66 @@ def _discovery_intelligence_capability(*, available: bool) -> dict[str, Any]:
             "archive_completeness_not_verified",
             "missing_observations_are_unknown_not_zero",
             "no_causal_inference",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "execution_authorized": False,
+    }
+
+
+def _concentration_warning_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": CONCENTRATION_WARNING_CONTRACT_VERSION,
+            "delivery_mode": CONCENTRATION_WARNING_DELIVERY_MODE,
+            "push_delivery_authorized": False,
+            "requirements": [],
+            "limitations": [
+                "concentration_warning_intelligence_not_available_for_chain"
+            ],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": CONCENTRATION_WARNING_CONTRACT_VERSION,
+        "delivery_mode": CONCENTRATION_WARNING_DELIVERY_MODE,
+        "push_delivery_authorized": False,
+        "requirements": [
+            "x1_only",
+            "exact_x1_asset_id",
+            "exactly_two_cmis_owned_intelligence_evidence_ids",
+            "trusted_internal_intelligence_evidence_resolver",
+            "persistent_concentration_warning_v1",
+            "strict_fact_time_order",
+            "bounded_persistence_window",
+            "verified_latest_evidence_freshness",
+            "verified_evidence_receipt_freshness",
+            "no_unresolved_evidence_fields",
+            "content_addressed_evidence_receipts",
+            "exact_recomputed_proof_scores",
+            "explicit_basis_points_threshold_policy",
+            "explicit_gt_or_gte_comparator",
+        ],
+        "limitations": [
+            "pull_only_request_response_service",
+            "push_delivery_not_authorized",
+            "watch_clear_are_not_risk_severity",
+            "warning_does_not_establish_behavior_or_ownership",
+            "warning_does_not_establish_manipulation_fraud_intent_or_causality",
+            "warning_does_not_predict_imminent_price_movement",
+            "token_accounts_are_not_unique_holder_identities",
+            "observed_top_account_scope_is_incomplete",
+            "proof_strength_remains_separate_from_risk",
+            "caller_supplied_trust_material_not_accepted",
             "no_execution_authorization",
             "x1_only_initial_scope",
         ],
@@ -341,6 +407,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         CONCENTRATION_INTELLIGENCE_SERVICE: _promoted_concentration_intelligence_capability(
             available=True
         ),
+        CONCENTRATION_WARNING_SERVICE: _concentration_warning_capability(
+            available=True
+        ),
     },
     "solana": {
         "asset_lookup": _capability(
@@ -435,6 +504,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             limitations=("solana_persisted_verification_lookup_not_promoted",),
         ),
         CONCENTRATION_INTELLIGENCE_SERVICE: _promoted_concentration_intelligence_capability(
+            available=False
+        ),
+        CONCENTRATION_WARNING_SERVICE: _concentration_warning_capability(
             available=False
         ),
     },
