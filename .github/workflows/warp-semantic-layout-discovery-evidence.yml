@@ -12,7 +12,7 @@ permissions:
 jobs:
   warp-semantic-layout:
     name: Verify Warp account types and IDL-corroborated layout
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue428-warp-semantic-layout-discovery')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue428-warp-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
