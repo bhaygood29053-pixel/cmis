@@ -31,6 +31,7 @@ SUPPORTED_SERVICES = (
     "instant_x1_scan",
     "verification_evidence",
     "concentration_change_intelligence",
+    "concentration_warning_intelligence",
 )
 SUPPORTED_CHAINS = ("x1",)
 KNOWN_CHAINS = ("x1", "solana")
