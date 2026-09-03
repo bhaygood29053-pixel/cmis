@@ -1,6 +1,6 @@
 # Roberta ↔ CMIS Accepted Baseline
 
-Last reconciled: 2026-08-30 (America/New_York)
+Last reconciled: 2026-09-03 (America/New_York)
 
 ## Purpose
 
@@ -29,7 +29,7 @@ Roberta Learning System sources, autonomous source-mastery plans, Pyramid traini
 ```text
 schema_version = 1
 global existing-service minimum = 1.8.0
-current CMIS contract = 1.13.0
+current CMIS contract = 1.18.0
 ```
 
 Accepted manifest semantics include:
@@ -50,6 +50,41 @@ Accepted manifest semantics include:
 Accepted internal/non-promoted deterministic foundations also include descriptive concentration-direction classification, direct wallet-relationship evidence with explicit non-ownership semantics, and concentration-threshold alert evidence.
 
 None of those internal foundations creates a capability-manifest service or Scout dispatch authority.
+
+## September 3 cross-chain checkpoint
+
+The accepted baseline now also includes the following bounded CMIS cross-chain
+foundations:
+
+- exact Warp config semantics under `warp_config/exact-mint-pair/v1`;
+- deterministic bridge-flow calculation under `bridge_flow_intelligence/v1`;
+- canonical settled Warp events through exact on-chain
+  `warp_onchain_transfer_history/v1` OutgoingMsg/IncomingMsg pairing;
+- connected wallet-history endpoint/response semantics as corroboration only;
+- current Warp message-universe counter/account closure under
+  `warp_message_retention_coverage/v1`.
+
+These foundations do **not** yet establish complete route-wide historical
+coverage or verified bridged supply.
+
+Current boundary:
+
+```text
+retention_deletion_semantics_verified = false
+historical_retention_complete_verified = false
+requested_60d_window_coverage_verified = false
+coverage_complete_verified = false
+missing_history_zero_authorized = false
+verified_bridged_supply = false
+public_service_promoted = false
+scout_reliance_promoted = false
+execution_authorized = false
+```
+
+Issue #441 is the active lifecycle-retention proof required before #409 may
+treat the current/prior 30-day history window as complete. After #409, the
+sequence is #410 Bridge-to-XDEX Utilization and then ROBERTA #314 adoption
+through X1 Scout.
 
 ## First promoted Verified Intelligence service — bounded X1 only
 
