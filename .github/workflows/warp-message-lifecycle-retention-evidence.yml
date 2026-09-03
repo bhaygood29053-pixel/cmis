@@ -34,7 +34,10 @@ jobs:
           python -m pip install pytest
 
       - name: Run deterministic lifecycle-retention tests
-        run: python -m pytest -q tests/test_x1_warp_message_lifecycle_retention.py
+        run: |
+          python -m pytest -q \
+            tests/test_x1_warp_message_lifecycle_retention.py \
+            tests/test_x1_warp_lifecycle_rpc_retry.py
 
   warp-message-lifecycle-retention-live:
     name: Verify live Warp 60-day lifecycle retention
@@ -66,6 +69,9 @@ jobs:
           import json
           import time
 
+          from liquidity_scout.providers.x1.warp_lifecycle_rpc_retry import (
+              resilient_get_transaction_post,
+          )
           from liquidity_scout.providers.x1.warp_message_lifecycle_retention import (
               capture_warp_message_lifecycle_retention,
           )
@@ -98,6 +104,7 @@ jobs:
               counter_closure=counter_closure,
               message_state=message_state,
               as_of=as_of,
+              post=resilient_get_transaction_post,
           )
 
           evidence = {
@@ -174,6 +181,8 @@ jobs:
         if: always()
         run: |
           echo "Finalized read-only Warp program history only."
+          echo "Transient getTransaction batch rows receive bounded individual retries only."
+          echo "Unresolved transaction bodies still fail closed after bounded retries."
           echo "No signing, broadcast, custody, transfer construction, or value movement."
           echo "Any history gap, closure, recreation, ambiguity, or missing body fails closed."
           echo "Missing-history zero authorization is bounded to the accepted exact message universe and lookback."
