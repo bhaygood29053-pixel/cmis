@@ -1,0 +1,146 @@
+name: Warp Transaction History Discovery Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warp-transaction-history-discovery:
+    name: Probe Warp read-only transaction history semantics
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue433-warp-transaction-history-source')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run deterministic discovery tests
+        run: python -m pytest -q tests/test_x1_warp_transaction_history_discovery.py
+
+      - name: Probe live executed transaction page
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          from liquidity_scout.providers.x1.warp_transaction_history_discovery import (
+              build_signatures_url,
+              build_transactions_url,
+              summarize_signatures_response,
+              summarize_transactions_page,
+          )
+
+          def get_json(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/json",
+                      "User-Agent": "CMIS-Warp-ReadOnly-Evidence/1.0",
+                  },
+                  method="GET",
+              )
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  status = int(response.status)
+                  content_type = str(response.headers.get("Content-Type") or "")
+                  body = response.read()
+              assert status == 200, (url, status)
+              assert "json" in content_type.casefold(), (url, content_type)
+              return json.loads(body.decode("utf-8")), {
+                  "status": status,
+                  "content_type": content_type,
+              }
+
+          url = build_transactions_url(status="executed", limit=50, page=1)
+          payload, http = get_json(url)
+          summary = summarize_transactions_page(
+              payload,
+              requested_status="executed",
+          )
+          assert summary["transaction_count"] > 0, "no executed records available"
+          assert "txSig" in summary["transaction_record_field_union"]
+          assert "status" in summary["transaction_record_field_union"]
+
+          first_tx = next(
+              row
+              for row in summary["sample_transactions"]
+              if isinstance(row.get("txSig"), str) and row.get("txSig")
+          )
+          signatures_payload, signatures_http = get_json(
+              build_signatures_url(first_tx["txSig"])
+          )
+          signatures_summary = summarize_signatures_response(
+              signatures_payload,
+              tx_sig=first_tx["txSig"],
+          )
+
+          page2 = None
+          total = summary["pagination_metadata"].get("total")
+          page_size = (
+              summary["pagination_metadata"].get("pageSize")
+              or summary["pagination_metadata"].get("limit")
+          )
+          if (
+              isinstance(total, int)
+              and isinstance(page_size, int)
+              and total > page_size
+          ):
+              payload2, http2 = get_json(
+                  build_transactions_url(
+                      status="executed",
+                      limit=50,
+                      page=2,
+                  )
+              )
+              page2 = {
+                  "http": http2,
+                  "summary": summarize_transactions_page(
+                      payload2,
+                      requested_status="executed",
+                  ),
+              }
+
+          evidence = {
+              "transactions_http": http,
+              "transactions": summary,
+              "signatures_http": signatures_http,
+              "signatures": signatures_summary,
+              "page2": page2,
+              "field_semantics_verified": False,
+              "pagination_semantics_verified": False,
+              "coverage_complete_verified": False,
+              "flow_event_normalization_authorized": False,
+              "execution_authorized": False,
+          }
+
+          print("WARP_TRANSACTION_HISTORY_DISCOVERY_EVIDENCE")
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "GET/read-only Warp transaction-history evidence only."
+          echo "No POST, transfer construction, signing, broadcast, custody, or value movement."
+          echo "Raw response bodies and guardian signatures are not retained as artifacts."
+          echo "Discovery does not itself authorize bridge-flow normalization or coverage claims."
+          echo "EXECUTION_AUTHORIZED=FALSE"
