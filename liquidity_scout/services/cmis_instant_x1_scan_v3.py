@@ -71,6 +71,7 @@ def build_instant_x1_scan_v3_response(
     risk_envelope: Mapping[str, Any],
     *,
     freshness_assessment: Mapping[str, Any] | None = None,
+    native_distribution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project v2 facts into v3 while preserving every existing fact boundary."""
 
@@ -80,6 +81,7 @@ def build_instant_x1_scan_v3_response(
         tokenomics_envelope,
         history_envelope,
         risk_envelope,
+        native_distribution=native_distribution,
     )
     result = deepcopy(response)
     data = result.get("data")
