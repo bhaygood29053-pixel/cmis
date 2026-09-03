@@ -1,6 +1,8 @@
 import unittest
 
 from liquidity_scout.providers.x1.warp_lifecycle_rpc_retry import (
+    MAX_ITEM_ATTEMPTS,
+    SOLANA_MICRO_BATCH_SIZE,
     SOLANA_PUBLIC_RPC_URL,
     resilient_get_transaction_post,
 )
@@ -20,34 +22,7 @@ class FakeResponse:
 
 
 class WarpLifecycleRpcRetryTests(unittest.TestCase):
-    def test_solana_public_rpc_serializes_batch_members_with_pacing(self):
-        calls = []
-        sleeps = []
-
-        def post(url, *, json, headers=None, timeout=None):
-            calls.append(json)
-            self.assertNotIsInstance(json, list)
-            return FakeResponse(
-                {"jsonrpc": "2.0", "id": json["id"], "result": {"slot": json["id"]}}
-            )
-
-        response = resilient_get_transaction_post(
-            SOLANA_PUBLIC_RPC_URL,
-            json=[
-                {"jsonrpc": "2.0", "id": 1, "method": "getTransaction"},
-                {"jsonrpc": "2.0", "id": 2, "method": "getTransaction"},
-                {"jsonrpc": "2.0", "id": 3, "method": "getTransaction"},
-            ],
-            post=post,
-            sleep=sleeps.append,
-        )
-        rows = response.json()
-        self.assertEqual([row["id"] for row in rows], [1, 2, 3])
-        self.assertEqual(len(calls), 3)
-        self.assertEqual(len(sleeps), 2)
-        self.assertTrue(all(delay > 0 for delay in sleeps))
-
-    def test_retries_only_failed_batch_member_on_other_rpc(self):
+    def test_non_solana_retries_only_failed_batch_member(self):
         calls = []
 
         def post(url, *, json, headers=None, timeout=None):
@@ -142,6 +117,69 @@ class WarpLifecycleRpcRetryTests(unittest.TestCase):
         )
         self.assertIsNotNone(response.json()[0]["error"])
         self.assertEqual(attempts, MAX_ITEM_ATTEMPTS)
+
+    def test_solana_transport_uses_bounded_micro_batches(self):
+        calls = []
+        sleeps = []
+
+        def post(url, *, json, headers=None, timeout=None):
+            calls.append(json)
+            self.assertIsInstance(json, list)
+            return FakeResponse(
+                [
+                    {"jsonrpc": "2.0", "id": row["id"], "result": {"slot": row["id"]}}
+                    for row in json
+                ]
+            )
+
+        requests = [
+            {"jsonrpc": "2.0", "id": i + 1, "method": "getTransaction"}
+            for i in range(SOLANA_MICRO_BATCH_SIZE + 2)
+        ]
+        response = resilient_get_transaction_post(
+            SOLANA_PUBLIC_RPC_URL,
+            json=requests,
+            post=post,
+            sleep=sleeps.append,
+        )
+
+        rows = response.json()
+        self.assertEqual([row["id"] for row in rows], list(range(1, len(requests) + 1)))
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(len(call) <= SOLANA_MICRO_BATCH_SIZE for call in calls))
+        self.assertEqual(len(sleeps), 1)
+
+    def test_solana_micro_batch_retries_only_unresolved_member(self):
+        calls = []
+
+        def post(url, *, json, headers=None, timeout=None):
+            calls.append(json)
+            if isinstance(json, list):
+                return FakeResponse(
+                    [
+                        {"jsonrpc": "2.0", "id": 1, "result": {"slot": 1}},
+                        {"jsonrpc": "2.0", "id": 2, "result": None},
+                    ]
+                )
+            return FakeResponse(
+                {"jsonrpc": "2.0", "id": json["id"], "result": {"slot": 2}}
+            )
+
+        response = resilient_get_transaction_post(
+            SOLANA_PUBLIC_RPC_URL,
+            json=[
+                {"jsonrpc": "2.0", "id": 1, "method": "getTransaction"},
+                {"jsonrpc": "2.0", "id": 2, "method": "getTransaction"},
+            ],
+            post=post,
+            sleep=lambda _: None,
+        )
+        self.assertEqual(response.json()[0]["result"]["slot"], 1)
+        self.assertEqual(response.json()[1]["result"]["slot"], 2)
+        self.assertEqual(len(calls), 2)
+        self.assertIsInstance(calls[0], list)
+        self.assertNotIsInstance(calls[1], list)
+        self.assertEqual(calls[1]["id"], 2)
 
 
 if __name__ == "__main__":
