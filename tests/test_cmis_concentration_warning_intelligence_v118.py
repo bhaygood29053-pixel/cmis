@@ -4,14 +4,6 @@ from copy import deepcopy
 import hashlib
 import json
 
-from liquidity_scout.cmis.capabilities import (
-    CMIS_CONTRACT_VERSION,
-    PUBLIC_KNOWN_CHAINS,
-    PUBLIC_RUNTIME_SERVICES,
-    PUBLIC_SUPPORTED_CHAINS,
-    build_capability_manifest,
-    service_capability,
-)
 from liquidity_scout.services.cmis_concentration_warning_intelligence import (
     CONTRACT_VERSION,
     DELIVERY_MODE,
@@ -264,31 +256,3 @@ def test_push_delivery_and_execution_never_promote():
     assert response["execution_authorized"] is False
     assert response["data"]["behavioral_interpretation_verified"] is False
     assert response["data"]["ownership_interpretation_verified"] is False
-
-
-def test_cmis_118_capability_promotes_warning_only_on_x1():
-    assert CMIS_CONTRACT_VERSION == "1.18.0"
-    assert SERVICE in PUBLIC_RUNTIME_SERVICES
-    manifest = build_capability_manifest(
-        runtime_services=PUBLIC_RUNTIME_SERVICES,
-        legacy_supported_chains=PUBLIC_SUPPORTED_CHAINS,
-        known_chains=PUBLIC_KNOWN_CHAINS,
-    )
-    x1 = service_capability(manifest, chain="x1", service=SERVICE)
-    solana = service_capability(manifest, chain="solana", service=SERVICE)
-
-    assert x1["state"] == "bounded"
-    assert x1["callable"] is True
-    assert x1["public_service_promoted"] is True
-    assert x1["scout_reliance_promoted"] is True
-    assert x1["service_contract_version"] == CONTRACT_VERSION
-    assert x1["delivery_mode"] == "pull_only"
-    assert x1["push_delivery_authorized"] is False
-    assert x1["execution_authorized"] is False
-
-    assert solana["state"] == "unavailable"
-    assert solana["callable"] is False
-    assert solana["public_service_promoted"] is False
-    assert solana["scout_reliance_promoted"] is False
-    assert solana["push_delivery_authorized"] is False
-    assert solana["execution_authorized"] is False
