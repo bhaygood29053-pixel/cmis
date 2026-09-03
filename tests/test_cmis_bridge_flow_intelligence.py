@@ -123,6 +123,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
 
         self.assertEqual(result["contract"], CONTRACT_VERSION)
@@ -155,6 +156,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         current = result["windows"]["24h"]["current"]
         prior = result["windows"]["24h"]["prior"]
@@ -176,6 +178,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         self.assertEqual(result["windows"]["24h"]["current"]["inflow_raw"], 10)
         self.assertEqual(result["event_accounting"]["accepted_settled_event_count"], 1)
@@ -204,6 +207,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         self.assertEqual(result["windows"]["24h"]["current"]["inflow_raw"], 10)
         counts = result["event_accounting"]["unresolved_counts"]
@@ -220,6 +224,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 2 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         self.assertEqual(result["windows"]["24h"]["current"]["inflow_raw"], 10)
         self.assertTrue(result["windows"]["24h"]["current"]["coverage_complete"])
@@ -237,6 +242,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         inflow_change = result["windows"]["24h"]["changes"]["inflow_raw"]
         outflow_change = result["windows"]["24h"]["changes"]["outflow_raw"]
@@ -254,6 +260,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         self.assertEqual(result["event_accounting"]["accepted_settled_event_count"], 0)
         self.assertEqual(
@@ -272,6 +279,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         self.assertEqual(result["decimals"], 9)
         self.assertEqual(result["windows"]["24h"]["current"]["inflow_raw"], 1_000_000_000)
@@ -280,6 +288,21 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             1,
         )
 
+    def test_unverified_coverage_never_turns_no_events_into_zero(self):
+        result = build_bridge_flow_intelligence(
+            route_qualification=qualification(),
+            events=[],
+            as_of=AS_OF,
+            coverage_start=AS_OF - 60 * DAY,
+            coverage_end=AS_OF,
+            coverage_verified=False,
+        )
+        self.assertFalse(result["coverage"]["coverage_verified"])
+        self.assertIsNone(result["windows"]["24h"]["current"]["inflow_raw"])
+        self.assertIsNone(result["windows"]["7d"]["current"]["outflow_raw"])
+        self.assertIsNone(result["windows"]["30d"]["prior"]["net_flow_raw"])
+        self.assertEqual(result["status"], "partial")
+
     def test_supply_is_unavailable_without_separate_verified_supply_evidence(self):
         result = build_bridge_flow_intelligence(
             route_qualification=qualification(),
@@ -287,6 +310,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         self.assertEqual(result["bridged_supply"]["status"], "unavailable")
         self.assertFalse(result["bridged_supply"]["verified"])
@@ -301,6 +325,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             coverage_end=AS_OF,
             supply_evidence={
                 "verified": True,
+                "semantic_contract_accepted": True,
                 "amount_raw": 123_000_000_000,
                 "decimals": 9,
                 "basis": "accepted_external_supply_contract/v1",
@@ -322,6 +347,7 @@ class BridgeFlowIntelligenceTests(unittest.TestCase):
             as_of=AS_OF,
             coverage_start=AS_OF - 60 * DAY,
             coverage_end=AS_OF,
+            coverage_verified=True,
         )
         first = build_bridge_flow_intelligence(events=[a, b], **kwargs)
         second = build_bridge_flow_intelligence(events=[b, a], **kwargs)
