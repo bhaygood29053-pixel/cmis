@@ -3,8 +3,10 @@ import unittest
 
 from liquidity_scout.providers.x1.warp_har_capture import (
     HAR_OBSERVATION_CONTRACT,
+    HAR_METADATA_OBSERVATION_CONTRACT,
     capture_warp_machine_contract_from_har,
     list_warp_har_candidates,
+    list_warp_har_observations,
 )
 
 
@@ -46,16 +48,21 @@ def har_entry(
     body=None,
     referer="https://app.bridge.x1.xyz/info",
     encoding=None,
+    include_body=True,
+    content_size=None,
 ):
     headers = []
     if referer is not None:
         headers.append({"name": "Referer", "value": referer})
     headers.append({"name": "Cookie", "value": "must-not-be-retained"})
 
+    serialized = json.dumps(response() if body is None else body)
     content = {
         "mimeType": mime_type,
-        "text": json.dumps(response() if body is None else body),
+        "size": len(serialized.encode("utf-8")) if content_size is None else content_size,
     }
+    if include_body:
+        content["text"] = serialized
     if encoding is not None:
         content["encoding"] = encoding
 
@@ -82,6 +89,56 @@ def har(*entries):
 
 
 class WarpHarCaptureTests(unittest.TestCase):
+    def test_metadata_only_observation_preserves_endpoint_without_semantic_promotion(self):
+        observations = list_warp_har_observations(
+            har(
+                har_entry(
+                    url="https://app.bridge.x1.xyz/api/bridge/config",
+                    include_body=False,
+                    content_size=7746,
+                )
+            )
+        )
+
+        self.assertEqual(len(observations), 1)
+        observation = observations[0]
+        self.assertEqual(
+            observation["contract"],
+            HAR_METADATA_OBSERVATION_CONTRACT,
+        )
+        self.assertEqual(
+            observation["source_url"],
+            "https://app.bridge.x1.xyz/api/bridge/config",
+        )
+        self.assertEqual(observation["response_size_bytes"], 7746)
+        self.assertFalse(observation["response_body_present"])
+        self.assertFalse(observation["json_parse_verified"])
+        self.assertIsNone(observation["response_sha256"])
+        self.assertFalse(observation["semantic_capture_eligible"])
+        self.assertTrue(observation["official_app_network_observation"])
+        self.assertFalse(observation["execution_authorized"])
+
+    def test_metadata_only_observation_is_not_a_semantic_capture_candidate(self):
+        document = har(
+            har_entry(
+                url="https://app.bridge.x1.xyz/api/bridge/config",
+                include_body=False,
+                content_size=7746,
+            )
+        )
+        self.assertEqual(list_warp_har_candidates(document), [])
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "not an official-app GET\\+200\\+JSON observation",
+        ):
+            capture_warp_machine_contract_from_har(
+                har_document=document,
+                entry_index=0,
+                field_map=field_map(),
+                timestamp_unit="seconds",
+                collected_at=1788420010,
+            )
     def test_lists_only_sanitized_official_app_get_json_candidates(self):
         candidates = list_warp_har_candidates(har(har_entry()))
 
