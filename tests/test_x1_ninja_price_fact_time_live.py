@@ -5,6 +5,7 @@ import unittest
 
 from liquidity_scout.providers.x1.market import fetch_all_pools
 from liquidity_scout.providers.x1.ninja_price_fact_time import (
+    classify_ninja_current_market_fact_time_series,
     classify_ninja_price_fact_time_series,
     collect_ninja_price_fact_time_snapshot,
 )
@@ -51,6 +52,9 @@ class NinjaPriceFactTimeLiveTests(unittest.TestCase):
                 time.sleep(5)
 
         result = classify_ninja_price_fact_time_series(snapshots)
+        current_market = classify_ninja_current_market_fact_time_series(
+            snapshots
+        )
 
         print(
             "[X1.Ninja price fact-time snapshots] "
@@ -60,8 +64,15 @@ class NinjaPriceFactTimeLiveTests(unittest.TestCase):
             "[X1.Ninja price fact-time series] "
             + json.dumps(result, sort_keys=True, default=str)
         )
+        print(
+            "[X1.Ninja current-market fact-time series] "
+            + json.dumps(current_market, sort_keys=True, default=str)
+        )
 
         self.assertEqual(result["snapshot_count"], 3)
+        self.assertEqual(current_market["snapshot_count"], 3)
+        self.assertFalse(current_market["provider_fact_time_verified"])
+        self.assertFalse(current_market["current_market_freshness_verified"])
         self.assertFalse(result["provider_timestamp_units_verified"])
         self.assertFalse(result["provider_fact_time_verified"])
         self.assertFalse(result["update_source_semantics_verified"])
