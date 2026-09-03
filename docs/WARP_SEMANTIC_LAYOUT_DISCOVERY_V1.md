@@ -1,12 +1,13 @@
 # Warp semantic layout discovery v1
 
 Issue: #428  
-Parent: #407  
-Depends on: #425 / PR #426
+Historical evidence lineage: #407  
+Depends on: #425 / PR #426  
+Runs after accepted #407 / PR #429 and does not block #409
 
 ## Purpose
 
-Move Warp rare-account work from structural byte families into reproducible account-type identity without treating a third-party IDL as truth.
+Move Warp rare-account work from structural byte families into reproducible account-type identity without treating a third-party IDL as truth. This is an on-chain corroboration/hardening layer for the already accepted official-config semantics from #407 / PR #429; it does not replace that accepted contract and is not a prerequisite for #409.
 
 Contract:
 
@@ -126,7 +127,7 @@ Raw base64 is never committed as a source fixture or workflow artifact.
 
 ## Next evidence target
 
-If the live gate confirms the expected Config, GuardianSet, Roles and TokenRegistryEntry identities, the next #407 slice should independently corroborate specific fields:
+If the live gate confirms the expected Config, GuardianSet, Roles and TokenRegistryEntry identities, later hardening may independently corroborate specific on-chain fields while #409 proceeds from the already accepted official-config semantic contract:
 
 1. `Config.chain_id` against the observed chain;
 2. `GuardianSet` threshold/cardinality against independently observed bridge signing behavior;
