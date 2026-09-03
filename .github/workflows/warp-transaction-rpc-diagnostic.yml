@@ -1,0 +1,98 @@
+name: Warp Transaction RPC Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-unresolved-gettransaction:
+    if: startsWith(github.head_ref, 'feature/issue441-warp-message-lifecycle-retention')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check exact unresolved signatures on both read-only RPCs
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+          import urllib.error
+
+          signatures = [
+              "455yoQkcqhDfcicKqc7VbVpNxrgBzyWY2BXyyBrTU2Xn5wb1w58toYQpzxkTZ1bbJwiLxybiiMPn9WSG62tcQrWk",
+              "5CpwmbHYEpxB87JPaXwfhN9k589BpShPfCVAZfsncgzmwP8SVhMxfHyruohU1DcdtrJ3imTPnn9rcfpFFZEBPH82",
+              "25eQAQ9rHweFWfpnXpUYYk7PydE4VCQzNykbqwetxfBfq62gzfke9o8cmuVz2pNcq9jWdcaBfH1aCtHogrVcezkJ",
+          ]
+          rpcs = {
+              "solana": "https://api.mainnet-beta.solana.com",
+              "x1": "https://rpc.mainnet.x1.xyz",
+          }
+
+          for chain, url in rpcs.items():
+              for signature in signatures:
+                  observations = []
+                  for attempt in range(3):
+                      payload = json.dumps({
+                          "jsonrpc": "2.0",
+                          "id": attempt + 1,
+                          "method": "getTransaction",
+                          "params": [signature, {
+                              "encoding": "json",
+                              "commitment": "finalized",
+                              "maxSupportedTransactionVersion": 0,
+                          }],
+                      }).encode("utf-8")
+                      req = urllib.request.Request(
+                          url,
+                          data=payload,
+                          headers={
+                              "content-type": "application/json",
+                              "user-agent": "CMIS-Warp-RPC-Diagnostic/1.0",
+                          },
+                          method="POST",
+                      )
+                      try:
+                          with urllib.request.urlopen(req, timeout=30) as response:
+                              body = json.loads(response.read().decode("utf-8"))
+                              error = body.get("error") if isinstance(body, dict) else None
+                              result = body.get("result") if isinstance(body, dict) else None
+                              observations.append({
+                                  "attempt": attempt + 1,
+                                  "http_status": response.status,
+                                  "error_code": error.get("code") if isinstance(error, dict) else None,
+                                  "error_message": error.get("message") if isinstance(error, dict) else None,
+                                  "result_state": "present" if result is not None else "null_or_missing",
+                              })
+                      except urllib.error.HTTPError as exc:
+                          raw = exc.read().decode("utf-8", errors="replace")
+                          try:
+                              body = json.loads(raw)
+                          except Exception:
+                              body = None
+                          error = body.get("error") if isinstance(body, dict) else None
+                          observations.append({
+                              "attempt": attempt + 1,
+                              "http_status": exc.code,
+                              "error_code": error.get("code") if isinstance(error, dict) else None,
+                              "error_message": error.get("message") if isinstance(error, dict) else raw[:200],
+                              "result_state": "http_error",
+                          })
+                      except Exception as exc:
+                          observations.append({
+                              "attempt": attempt + 1,
+                              "http_status": None,
+                              "error_code": type(exc).__name__,
+                              "error_message": str(exc)[:200],
+                              "result_state": "transport_error",
+                          })
+                      time.sleep(0.5)
+                  print(json.dumps({
+                      "chain": chain,
+                      "signature": signature,
+                      "observations": observations,
+                  }, sort_keys=True))
+          PY
