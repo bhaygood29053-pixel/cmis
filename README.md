@@ -60,10 +60,11 @@ Accepted on `main`:
 - **Deterministic direct wallet-relationship evidence:** complete, internal/read-only/non-promoted, explicit non-ownership semantics.
 - **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
 - **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
-- **CMIS capability contract:** `1.17.0`.
+- **CMIS capability contract:** `1.18.0`.
 - **Instant X1 Scan `instant_x1_scan/v3`:** bounded X1-only read-only composition preserving accepted v2 identity/history/risk semantics while adding field-scoped `x1_current_market_freshness/v1`. Price freshness may be verified only from timestamped provider-backed price evidence; liquidity, rolling 24h volume, and rolling transaction freshness remain explicitly unverified under 1.17.
 - **X1 Burn Intelligence `burn_intelligence/v1`:** first-class bounded X1-only read-only service over the accepted deterministic burn foundation. It exposes cumulative verified observed burn, 1h/24h/7d/30d windows, event counts, 24h/7d/30d period-over-period changes, issuance context, circulating-supply context, and burn-time valuation without recomputation.
 - **X1 Discovery Intelligence `discovery_intelligence/v1`:** first-class bounded X1-only read-only projection over the CMIS-owned Discovery Ledger. It exposes first and most-recent verified observations, verified count, sparse evidence bounds, and elapsed observed history. First observation is explicitly not token launch time.
+- **X1 Concentration Warning Intelligence `concentration_warning_intelligence/v1`:** first-class bounded X1-only pull-only service over the accepted persistent concentration warning foundation. It exposes deterministic WATCH/CLEAR state with exact two-observation persistence and Evidence Receipt / Proof Score lineage. WATCH/CLEAR are not risk severity; push delivery is not authorized.
 - **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
@@ -72,7 +73,7 @@ Accepted on `main`:
 
 Not accepted/promoted:
 
-- no public alert service;
+- no push/subscription alert delivery service;
 - no Scout-reliance promotion for the internal classification/relationship/alert foundations;
 - no Solana promotion of `concentration_change_intelligence/v1`;
 - no behavioral/ownership/intent/fraud/manipulation inference from the internal foundations;
@@ -83,7 +84,7 @@ Not accepted/promoted:
 
 CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing, but Solana product expansion and release work are deferred to a future phase. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
 
-Current live ordering is narrower: Historical Coverage Proof v1, Burn Intelligence v1, Discovery Ledger/Intelligence v1, WHAT CHANGED? v1 consumption, and CMIS 1.17 field-scoped current-market freshness are complete. Early Warning is the active next service family. PR #363 delayed-vault/X1.Ninja evidence research remains a parallel fail-closed investigation and is not the flagship product blocker.
+Current live ordering is narrower: Historical Coverage Proof v1, Burn Intelligence v1, Discovery Ledger/Intelligence v1, WHAT CHANGED? v1 consumption, CMIS 1.17 field-scoped current-market freshness, and CMIS 1.18 pull-only Concentration Warning Intelligence are complete. X1 Scout/ROBERTA Early Warning adoption is next. Push delivery remains a separate future gate. PR #363 delayed-vault/X1.Ninja evidence research remains parallel and is not the flagship product blocker.
 
 
 

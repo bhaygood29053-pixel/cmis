@@ -43,7 +43,7 @@ Accepted milestones on `main`:
 - **X1 exact-mint normalized asset identity: COMPLETE under `x1_asset_identity/v1` in CMIS `1.11.0`.** Exact mint is the fungible identity root; Metaplex and XDEX descriptors remain separately sourced; same-mint descriptor conflict is partial; XDEX unavailability is not misreported as mint absence.
 - **X1 verified-provider historical price backfill: COMPLETE under the bounded CMIS `1.12.0` contract.** Backfill is price-only and preserves non-independence, non-archive-completeness, non-continuity, historical stable-quote uncertainty, and non-lifetime-completeness limits.
 - **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
-- **CMIS capability contract: `1.17.0`.** Burn Intelligence (`burn_intelligence/v1`) remains accepted under 1.15.0, Discovery Intelligence (`discovery_intelligence/v1`) under 1.16.0, and field-scoped current-market freshness under 1.17.0.
+- **CMIS capability contract: `1.18.0`.** Burn Intelligence (`burn_intelligence/v1`) remains accepted under 1.15.0, Discovery Intelligence (`discovery_intelligence/v1`) under 1.16.0, field-scoped current-market freshness under 1.17.0, and pull-only Concentration Warning Intelligence (`concentration_warning_intelligence/v1`) under 1.18.0.
 - **Instant X1 Scan: COMPLETE as `instant_x1_scan/v3`.** v3 wraps the accepted v2 scan rather than forking identity/history/tokenomics/risk logic, and adds only `x1_current_market_freshness/v1`. Price freshness can be verified under explicit provider fact-time/value-linkage gates; liquidity, rolling 24h volume, and rolling transaction freshness remain unverified under 1.17.
 - **Six-phase public-shell/private-core migration: COMPLETE.** Protected CMIS implementation is removed from active public branch/tag history, public package boundaries fail closed without the required private core, and no public reconstruction fallback is accepted.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
@@ -52,7 +52,7 @@ Accepted milestones on `main`:
 - **Parallel X1 provider-gap work (#30): OPEN, read-only/fail-closed.**
 - **Controlled transaction execution: UNAUTHORIZED / not an active CMIS milestone.**
 
-There is currently **no accepted public Early Warning service or Scout-reliance promotion**. The internal two-observation persistence foundation is accepted, but a separate service-promotion issue/spec is still required before X1 Scout or ROBERTA may consume it.
+**Concentration Warning Intelligence v1 is now an accepted X1 public CMIS service and Scout-reliance capability under CMIS 1.18.** It remains pull-only. X1 Scout/ROBERTA product adoption and any push/delivery mechanism remain separate downstream gates.
 
 ## Phase 11 foundation
 
@@ -760,7 +760,7 @@ No broader public/Scout promotion is active. Any future alert/public wrapper req
 
 The single-observation alert primitive and the two-observation persistent concentration warning foundation are complete internally. Issue #396 / public PR #397 / protected `cmis-core` #15 prove exact subject compatibility, strict ordering, bounded persistence, current evidence freshness, duplicate/replay safety, and preserved Evidence Receipt / Proof Score lineage.
 
-The **next gate is public-service promotion**, not additional hidden inference. A separate contract must define a bounded pull-only CMIS service, explicit request fields, capability-manifest promotion, stable warning-state semantics, deterministic errors, and continued delivery/execution denial before Scout reliance.
+The pull-only public service is now accepted as `concentration_warning_intelligence/v1` under CMIS 1.18 through public #400 and protected `cmis-core` #16. The **next gate is X1 Scout / ROBERTA adoption**, not additional hidden inference. Push delivery remains separately unauthorized.
 
 No warning state may silently become behavioral intent, ownership, manipulation/fraud attribution, risk severity, causality, or imminent-price prediction.
 
@@ -880,7 +880,9 @@ The following state supersedes older pending language in this file:
 - **Discovery Ledger / Discovery Intelligence v1: COMPLETE.**
 - **WHAT CHANGED? v1: COMPLETE in ROBERTA.**
 - **Field-scoped current-market freshness: COMPLETE under CMIS 1.17 / Instant X1 Scan v3.**
-- **Persistent concentration Early Warning foundation: COMPLETE.** Public CMIS #397 defines the contract and protected `cmis-core` #15 implements two-distinct-observation persistence with strict ordering, bounded persistence window, latest-evidence freshness, duplicate/replay rejection, and exact Receipt/Proof lineage. `WATCH`/ `CLEAR` remain non-risk warning states.
-- **Public Early Warning service: NOT YET PROMOTED / ACTIVE NEXT GATE.** A separate service contract and capability-manifest promotion are required before X1 Scout or ROBERTA consumption. Delivery remains unauthorized.
+- **Persistent concentration Early Warning foundation: COMPLETE.** Issue #396 / public #397 / protected `cmis-core` #15 remain the accepted two-observation evidence foundation.
+- **Concentration Warning Intelligence v1: COMPLETE / PROMOTED under CMIS 1.18.** Public CMIS #400 and protected `cmis-core` #16 expose X1 `concentration_warning_intelligence/v1` as a bounded, read-only, pull-only public service with Scout reliance. WATCH/CLEAR remain non-risk states; exact Receipt/Proof lineage is preserved; caller-supplied trust material is rejected.
+- **X1 Scout / ROBERTA Early Warning adoption: ACTIVE NEXT GATE.** ROBERTA must validate and preserve the accepted CMIS service without recomputing warning state.
+- **Push notification delivery: NOT AUTHORIZED.** No scheduler, webhook, Telegram push, subscription, or autonomous monitor is created by CMIS 1.18.
 - **CMIS #363 delayed-vault/X1.Ninja evidence:** remains parallel read-only research and is not the flagship blocker.
 - Controlled Execution remains locked and `execution_authorized=false`.
