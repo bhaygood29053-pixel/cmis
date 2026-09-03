@@ -1,6 +1,7 @@
 import unittest
 
 from liquidity_scout.providers.x1.positive_balance_population_evidence import (
+    evaluate_x1_positive_balance_population_bracket,
     evaluate_x1_positive_balance_population_observation,
     verify_x1_positive_balance_population_series,
 )
@@ -102,6 +103,43 @@ class X1PositiveBalancePopulationEvidenceTests(unittest.TestCase):
         )
         self.assertFalse(wide["slot_scope_bounded"])
         self.assertFalse(wide["positive_balance_population_candidate_complete"])
+
+    def test_stable_supply_bracket_accepts_enumeration_inside_bracket(self):
+        result = evaluate_x1_positive_balance_population_bracket(
+            enumeration(slot=105),
+            supply(slot=100),
+            supply(slot=108),
+            max_bracket_span=10,
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(result["supply_bracket_bounded"])
+        self.assertTrue(result["mint_supply_stable_across_bracket"])
+        self.assertTrue(result["supply_conservation_observed"])
+        self.assertTrue(result["positive_balance_population_candidate_complete"])
+        self.assertFalse(result["positive_balance_population_coverage_verified"])
+
+    def test_supply_change_or_out_of_bracket_rejects_population_candidate(self):
+        changed = evaluate_x1_positive_balance_population_bracket(
+            enumeration(slot=105),
+            supply(slot=100, amount="100"),
+            supply(slot=108, amount="101"),
+            max_bracket_span=10,
+        )
+        self.assertFalse(changed["mint_supply_stable_across_bracket"])
+        self.assertFalse(changed["positive_balance_population_candidate_complete"])
+
+        outside = evaluate_x1_positive_balance_population_bracket(
+            enumeration(slot=99),
+            supply(slot=100),
+            supply(slot=108),
+            max_bracket_span=10,
+        )
+        self.assertIn(
+            "enumeration_slot_outside_supply_bracket",
+            outside["errors"],
+        )
+        self.assertFalse(outside["positive_balance_population_candidate_complete"])
 
     def test_repeated_bounded_conservation_verifies_positive_balance_coverage(self):
         observations = [
