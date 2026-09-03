@@ -143,8 +143,8 @@ jobs:
           capabilities_test = Path("tests/test_cmis_capabilities.py").read_text()
           http_test = Path("tests/test_cmis_http_gateway.py").read_text()
 
-          assert 'CMIS_CONTRACT_VERSION == "1.17.0"' in capabilities_test
-          assert 'CMIS_CONTRACT_VERSION == "1.16.0"' not in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.17.0")' in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.16.0")' not in capabilities_test
           assert 'response["contract_version"], "1.17.0"' in http_test
           assert 'response["contract_version"], "1.16.0"' not in http_test
           print("CMIS_117_REGRESSION_EXPECTATIONS=PASS")
