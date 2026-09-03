@@ -1,6 +1,7 @@
 import unittest
 
 from liquidity_scout.providers.x1.warp_lifecycle_rpc_retry import (
+    SOLANA_PUBLIC_RPC_URL,
     resilient_get_transaction_post,
 )
 
@@ -19,7 +20,34 @@ class FakeResponse:
 
 
 class WarpLifecycleRpcRetryTests(unittest.TestCase):
-    def test_retries_only_failed_batch_member(self):
+    def test_solana_public_rpc_serializes_batch_members_with_pacing(self):
+        calls = []
+        sleeps = []
+
+        def post(url, *, json, headers=None, timeout=None):
+            calls.append(json)
+            self.assertNotIsInstance(json, list)
+            return FakeResponse(
+                {"jsonrpc": "2.0", "id": json["id"], "result": {"slot": json["id"]}}
+            )
+
+        response = resilient_get_transaction_post(
+            SOLANA_PUBLIC_RPC_URL,
+            json=[
+                {"jsonrpc": "2.0", "id": 1, "method": "getTransaction"},
+                {"jsonrpc": "2.0", "id": 2, "method": "getTransaction"},
+                {"jsonrpc": "2.0", "id": 3, "method": "getTransaction"},
+            ],
+            post=post,
+            sleep=sleeps.append,
+        )
+        rows = response.json()
+        self.assertEqual([row["id"] for row in rows], [1, 2, 3])
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(sleeps), 2)
+        self.assertTrue(all(delay > 0 for delay in sleeps))
+
+    def test_retries_only_failed_batch_member_on_other_rpc(self):
         calls = []
 
         def post(url, *, json, headers=None, timeout=None):
