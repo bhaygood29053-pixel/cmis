@@ -1,6 +1,7 @@
 # X1 Warp Bridge source discovery
 
-Research date: **2026-08-17**
+Research date: **2026-08-17**  
+Latest refresh: **2026-09-03**
 
 Refresh note: this discovery boundary is carried forward onto the current accepted CMIS `main`. It does not promote any bridge host, endpoint, UI label, asset representation, fee, capacity, guardian state, or transfer state into CMIS truth.
 
@@ -19,6 +20,22 @@ The official bridge application exposes these user-facing routes:
 - `https://app.bridge.x1.xyz/info` — described by the official UI as real-time bridge status and configuration.
 
 The public server-rendered/search-visible pages establish that structured bridge concepts exist in the application. They do **not** identify the underlying API, on-chain account, cache, RPC method, or indexer used to supply those values.
+
+### 2026-09-03 refresh evidence
+
+A fresh public check still shows the official `https://app.bridge.x1.xyz/info` page describing itself as **real-time status and configuration of the Warp Bridge**, while the main bridge page renders route, exchange-rate, fee, and bridge-status concepts.
+
+Separately, X1 Report's 2026-09-01 wSOL article and 2026-09-02 cbBTC/ETH article both state that the publication pulled the bridge's live configuration and health endpoints. Those reports provide strong third-party corroboration that machine-readable endpoints exist, but the articles do **not** publish the exact endpoint URLs, request contract, response schema, field paths, timestamp units, or response fixtures.
+
+Therefore this refresh narrows the blocker but does not clear it:
+
+```text
+machine-readable endpoint existence = CORROBORATED BY THIRD PARTY
+exact endpoint URL = NOT VERIFIED
+exact source provenance = NOT VERIFIED
+endpoint semantics = NOT VERIFIED
+Warp provider qualification = BLOCKED
+```
 
 Do not promote a displayed `Offline`, `Checking`, fee, capacity, guardian, or token status label as a current CMIS fact from this discovery record.
 
@@ -145,7 +162,7 @@ The official Warp Bridge clearly has structured bridge state/configuration/histo
 
 The candidate hostname `bridge-api.x1.xyz` is worth direct application-network inspection, but remains unverified and must not be treated as current bridge truth.
 
-Next engineering action: capture the official bridge application's read-only network calls (without connecting/signing a wallet where not required), then implement narrowly scoped contract probes for the exact observed endpoints.
+Next engineering action: capture the official bridge application's read-only network calls (without connecting/signing a wallet where not required), then submit the exact GET/JSON response through `warp_machine_contract_capture/v1`. The capture gate records exact source provenance, HTTP/content-type state, response SHA-256, required semantic field presence, timestamp-unit declaration, and deterministic capture identity. A review-ready capture still has `semantic_contract_accepted=false` and cannot mutate the accepted semantic registry by itself.
 
 ## Research sources
 
@@ -158,3 +175,37 @@ Official X1 bridge UI:
 Non-authoritative discovery lead only:
 
 - Chrome extension metadata index for the X1 Wallet, which reports historical host permissions including `bridge-api.x1.xyz`.
+
+## 2026-09-03 capture-gate implementation
+
+Issue #407 now has a deterministic capture primitive:
+
+- `warp_machine_contract_capture/v1`
+- GET/read-only only;
+- exact HTTPS source URL;
+- exact source-provenance proof binding;
+- HTTP status + normalized content type;
+- JSON parse requirement for machine-contract review;
+- response SHA-256 + byte count;
+- credential-like response-key rejection;
+- required semantic paths for route id, source asset id, destination asset id, route status, backing model, custody dependency, and source timestamp;
+- explicit timestamp-unit declaration;
+- deterministic capture id;
+- no automatic semantic acceptance or provider promotion.
+
+The official `/info` HTML page is deliberately **not** treated as a machine contract by this gate.
+
+Current result remains:
+
+```text
+issue_407_endpoint_capture_harness = READY
+exact_warp_machine_read_url = NOT YET CAPTURED
+semantic_contract_accepted = false
+warp_qualified = false
+execution_authorized = false
+```
+
+Additional refresh sources:
+
+- https://x1report.com/article/wsol-warp-bridge-x1-solana-liquidity
+- https://x1report.com/article/btc-eth-warp-bridge-x1-cbbtc
