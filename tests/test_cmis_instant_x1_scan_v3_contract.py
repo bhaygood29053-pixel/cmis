@@ -29,7 +29,11 @@ def fixtures():
     identity = envelope(
         "asset_lookup",
         status="ok",
-        data={"resolved_by": "native", "match_quality": "native"},
+        data={
+            "resolved_by": "native",
+            "match_quality": "native",
+            "identity_key": "native:xnt",
+        },
         confidence={"complete": True},
     )
     market = envelope(
@@ -145,3 +149,68 @@ def test_v3_without_assessment_fails_closed_to_not_verified_freshness():
     assert market["liquidity_freshness_verified"] is False
     assert market["volume_24h_freshness_verified"] is False
     assert market["transactions_24h_freshness_verified"] is False
+
+
+def test_v3_preserves_verified_native_xnt_distribution():
+    args = fixtures()
+    freshness = {
+        "contract_version": "x1_current_market_freshness/v1",
+        "scope": "instant_x1_scan.current_market",
+        "freshness_state": "NOT_VERIFIED",
+        "collection_freshness_verified": False,
+        "provider_price_fact_time_verified": False,
+        "current_market_freshness_verified": False,
+        "verified_field_count": 0,
+        "total_field_count": 4,
+        "fields": {
+            "price_usd": {
+                "freshness_verified": False,
+                "reason": "not_verified",
+            },
+            "liquidity_usd": {
+                "freshness_verified": False,
+                "reason": "not_verified",
+            },
+            "volume_24h_usd": {
+                "freshness_verified": False,
+                "reason": "not_verified",
+            },
+            "transactions_24h": {
+                "freshness_verified": False,
+                "reason": "not_verified",
+            },
+        },
+        "limitations": [],
+    }
+    distribution = {
+        "native_account_concentration_verified": True,
+        "cmis_promotable": True,
+        "counted_entity": "native_xnt_account_address",
+        "slot_scope_verified": True,
+        "largest_accounts_slot": 100,
+        "network_supply_slot": 110,
+        "slot_span": 10,
+        "circulating_supply_base_units": "1000",
+        "buckets": {
+            "top_20": {
+                "percent_of_circulating_xnt": 22.8,
+                "available_account_count": 20,
+            }
+        },
+        "sources": [],
+    }
+
+    v3 = build_instant_x1_scan_v3_response(
+        *args,
+        freshness_assessment=freshness,
+        native_distribution=distribution,
+    )
+
+    holder = v3["data"]["sections"]["holder_concentration"]
+    assert holder["holders_state"] == "not_applicable"
+    assert holder["top_account_concentration"]["verified"] is True
+    assert holder["top_account_concentration"]["value"] == 22.8
+    assert (
+        "holder_count_requires_existing_verified_holder_semantics"
+        not in v3["data"]["limitations"]
+    )

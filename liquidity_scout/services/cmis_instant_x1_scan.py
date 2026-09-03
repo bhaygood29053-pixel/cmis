@@ -180,15 +180,96 @@ def _tokenomics_section(envelope: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _is_native_xnt_identity(identity_envelope: Mapping[str, Any]) -> bool:
+    data = _mapping(identity_envelope.get("data"))
+    asset = _mapping(identity_envelope.get("asset"))
+    return bool(
+        data.get("identity_key") == "native:xnt"
+        and str(asset.get("symbol") or "").strip().upper() == "XNT"
+    )
+
+
+def _native_xnt_distribution_section(
+    native_distribution: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    value = _mapping(native_distribution)
+    verified = bool(
+        value.get("native_account_concentration_verified") is True
+        and value.get("cmis_promotable") is True
+        and value.get("counted_entity") == "native_xnt_account_address"
+    )
+    buckets = _mapping(value.get("buckets"))
+    top_20 = _mapping(buckets.get("top_20"))
+    top_20_value = (
+        top_20.get("percent_of_circulating_xnt")
+        if verified
+        else None
+    )
+    return {
+        "holders": None,
+        "holders_verified": False,
+        "holders_state": "not_applicable",
+        "holders_reason": "xnt_is_native_currency_not_spl_holder_population",
+        "holders_reported": None,
+        "holders_observed": None,
+        "holder_semantics": {
+            "state": "not_applicable",
+            "counted_entity": "native_xnt_account_address",
+            "token_holder_count_applicable": False,
+            "beneficial_owner_identity_verified": False,
+            "person_or_wallet_group_count_verified": False,
+        },
+        "top_account_concentration": {
+            "value": top_20_value,
+            "verified": verified,
+            "state": "verified" if verified else "unavailable",
+            "reason": (
+                "finalized_native_xnt_top20_accounts_percent_of_circulating_supply"
+                if verified
+                else "native_xnt_account_concentration_not_verified"
+            ),
+            "basis": "top_20_native_xnt_accounts_percent_of_circulating_xnt",
+            "counted_entity": "native_xnt_account_address",
+        },
+        "native_account_concentration": {
+            "verified": verified,
+            "counted_entity": "native_xnt_account_address",
+            "holder_count_state": "not_applicable",
+            "slot_scope_verified": value.get("slot_scope_verified") is True,
+            "largest_accounts_slot": value.get("largest_accounts_slot"),
+            "network_supply_slot": value.get("network_supply_slot"),
+            "slot_span": value.get("slot_span"),
+            "circulating_supply_base_units": value.get(
+                "circulating_supply_base_units"
+            ),
+            "buckets": dict(buckets),
+            "beneficial_owner_identity_verified": False,
+            "person_or_wallet_group_count_verified": False,
+        },
+    }
+
+
 def _holder_concentration_section(
     market_envelope: Mapping[str, Any],
+    *,
+    native_xnt: bool = False,
+    native_distribution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if native_xnt:
+        return _native_xnt_distribution_section(native_distribution)
+
     data = _mapping(market_envelope.get("data"))
     completeness = _mapping(data.get("completeness"))
     holders_verified = completeness.get("holders") is True
     return {
         "holders": data.get("holders") if holders_verified else None,
         "holders_verified": holders_verified,
+        "holders_state": "verified" if holders_verified else "unavailable",
+        "holders_reason": (
+            None
+            if holders_verified
+            else "holder_count_requires_existing_verified_holder_semantics"
+        ),
         "holders_reported": data.get("holders_reported"),
         "holders_observed": data.get("holders_observed"),
         "holder_semantics": (
@@ -202,6 +283,7 @@ def _holder_concentration_section(
             "state": "unavailable",
             "reason": "current_concentration_not_promoted_for_instant_x1_scan_v2",
         },
+        "native_account_concentration": None,
     }
 
 
@@ -330,6 +412,8 @@ def _confidence(
     tokenomics: Mapping[str, Any],
     history: Mapping[str, Any],
     risk_envelope: Mapping[str, Any],
+    *,
+    native_distribution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     identity_confidence = _mapping(identity.get("confidence"))
     market_confidence = _mapping(market.get("confidence"))
@@ -339,6 +423,14 @@ def _confidence(
     history_data = _mapping(history.get("data"))
     risk = _mapping(risk_envelope.get("risk"))
 
+    native_xnt = _is_native_xnt_identity(identity)
+    native_distribution_verified = bool(
+        native_xnt
+        and _mapping(native_distribution).get(
+            "native_account_concentration_verified"
+        ) is True
+        and _mapping(native_distribution).get("cmis_promotable") is True
+    )
     checks = {
         "identity_verified": identity_confidence.get("complete") is True,
         "core_market_complete": (
@@ -358,7 +450,11 @@ def _confidence(
         "history_available": (
             int(history_data.get("available_metric_count") or 0) > 0
         ),
-        "holder_count_verified": completeness.get("holders") is True,
+        "distribution_evidence_satisfied": (
+            native_distribution_verified
+            if native_xnt
+            else completeness.get("holders") is True
+        ),
         "deterministic_risk_available": (
             risk.get("recommendation") in {"PASS", "WARN", "BLOCK"}
         ),
@@ -380,6 +476,8 @@ def build_instant_x1_scan_response(
     tokenomics_envelope: Mapping[str, Any],
     history_envelope: Mapping[str, Any],
     risk_envelope: Mapping[str, Any],
+    *,
+    native_distribution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compose one compact read-only X1 scan from existing CMIS envelopes."""
 
@@ -402,12 +500,14 @@ def build_instant_x1_scan_response(
         "mint": market_asset.get("mint") or identity_asset.get("mint"),
     }
 
+    native_xnt = _is_native_xnt_identity(identity_envelope)
     confidence = _confidence(
         identity_envelope,
         market_envelope,
         tokenomics_envelope,
         history_envelope,
         risk_envelope,
+        native_distribution=native_distribution,
     )
     risk = (
         dict(risk_envelope["risk"])
@@ -425,24 +525,42 @@ def build_instant_x1_scan_response(
     ):
         warnings.extend(_component_warnings(envelope, section=section))
 
-    if _mapping(market_data.get("completeness")).get("holders") is not True:
+    native_distribution_verified = bool(
+        native_xnt
+        and _mapping(native_distribution).get(
+            "native_account_concentration_verified"
+        ) is True
+        and _mapping(native_distribution).get("cmis_promotable") is True
+    )
+    if native_xnt:
+        if not native_distribution_verified:
+            warnings.append({
+                "code": "instant_x1_scan_native_distribution_unavailable",
+                "section": "holder_concentration",
+                "message": (
+                    "Native XNT account concentration could not be verified from "
+                    "finalized circulating account/supply evidence."
+                ),
+            })
+    else:
+        if _mapping(market_data.get("completeness")).get("holders") is not True:
+            warnings.append({
+                "code": "instant_x1_scan_holder_count_unverified",
+                "section": "holder_concentration",
+                "message": (
+                    "Verified holder count is unavailable; provider holder-looking "
+                    "observations remain unverified and are not promoted."
+                ),
+            })
         warnings.append({
-            "code": "instant_x1_scan_holder_count_unverified",
+            "code": "instant_x1_scan_current_concentration_unavailable",
             "section": "holder_concentration",
             "message": (
-                "Verified holder count is unavailable; provider holder-looking "
-                "observations remain unverified and are not promoted."
+                "Current top-account concentration is not promoted into Instant X1 "
+                "Scan v2; internal intelligence foundations are not used as a "
+                "public-service shortcut."
             ),
         })
-    warnings.append({
-        "code": "instant_x1_scan_current_concentration_unavailable",
-        "section": "holder_concentration",
-        "message": (
-            "Current top-account concentration is not promoted into Instant X1 "
-            "Scan v2; internal intelligence foundations are not used as a "
-            "public-service shortcut."
-        ),
-    })
 
     sources = _merge_sources(
         (identity_envelope, "identity"),
@@ -451,16 +569,35 @@ def build_instant_x1_scan_response(
         (history_envelope, "history"),
         (risk_envelope, "risk"),
     )
+    if native_distribution_verified:
+        for source in _mapping(native_distribution).get("sources") or []:
+            if not isinstance(source, Mapping):
+                continue
+            record = dict(source)
+            role = str(record.get("role") or "").strip()
+            record["role"] = "instant_x1_scan.holder_concentration" + (
+                f".{role}" if role else ""
+            )
+            if record not in sources:
+                sources.append(record)
 
     history_section = _history_section(history_envelope)
     limitations = [
         "missing_or_unverified_fields_remain_unknown",
-        "holder_count_requires_existing_verified_holder_semantics",
-        "current_top_account_concentration_not_promoted_in_v2",
         "history_may_include_bounded_verified_provider_price_backfill",
         "provider_price_backfill_is_price_only",
         "provider_source_independence_not_verified",
     ]
+    if native_xnt:
+        if not native_distribution_verified:
+            limitations.append(
+                "native_xnt_account_concentration_not_verified"
+            )
+    else:
+        limitations.extend([
+            "holder_count_requires_existing_verified_holder_semantics",
+            "current_top_account_concentration_not_promoted_in_v2",
+        ])
     if history_section.get("full_supported_pair_lifetime_verified") is True:
         limitations.append(
             "full_supported_pair_lifetime_price_does_not_imply_other_metric_lifetimes"
@@ -489,7 +626,9 @@ def build_instant_x1_scan_response(
             "market": _market_section(market_envelope),
             "tokenomics": _tokenomics_section(tokenomics_envelope),
             "holder_concentration": _holder_concentration_section(
-                market_envelope
+                market_envelope,
+                native_xnt=native_xnt,
+                native_distribution=native_distribution,
             ),
             "history": history_section,
             "risk": _risk_section(risk_envelope),
