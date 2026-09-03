@@ -299,12 +299,17 @@ def _window_metric(
 
 def _coverage_complete(
     *,
+    coverage_verified: bool,
     coverage_start: float,
     coverage_end: float,
     start: float,
     end: float,
 ) -> bool:
-    return coverage_start <= start and coverage_end >= end
+    return bool(
+        coverage_verified
+        and coverage_start <= start
+        and coverage_end >= end
+    )
 
 
 def _supply_projection(
@@ -323,14 +328,17 @@ def _supply_projection(
         }
 
     evidence = _mapping(supply_evidence, "supply_evidence")
-    if evidence.get("verified") is not True:
+    if (
+        evidence.get("verified") is not True
+        or evidence.get("semantic_contract_accepted") is not True
+    ):
         return {
             "status": "unavailable",
             "amount_raw": None,
             "amount": None,
             "decimals": decimals,
             "verified": False,
-            "reason": "supply_evidence_not_verified",
+            "reason": "accepted_supply_semantics_not_verified",
         }
 
     evidence_decimals = _nonnegative_int(
@@ -367,6 +375,7 @@ def build_bridge_flow_intelligence(
     coverage_start: Any,
     coverage_end: Any,
     supply_evidence: Any = None,
+    coverage_verified: bool = False,
     source_independence_verified: bool = False,
 ) -> dict[str, Any]:
     """Compute deterministic bridge flow windows for one qualified route."""
@@ -379,6 +388,8 @@ def build_bridge_flow_intelligence(
         raise BridgeFlowContractError("coverage_start cannot exceed coverage_end")
     if coverage_end_epoch < as_of_epoch:
         raise BridgeFlowContractError("coverage_end must reach as_of")
+    if not isinstance(coverage_verified, bool):
+        raise BridgeFlowContractError("coverage_verified must be boolean")
     if not isinstance(source_independence_verified, bool):
         raise BridgeFlowContractError(
             "source_independence_verified must be boolean"
@@ -450,12 +461,14 @@ def build_bridge_flow_intelligence(
         current_start = as_of_epoch - seconds
         prior_start = current_start - seconds
         current_complete = _coverage_complete(
+            coverage_verified=coverage_verified,
             coverage_start=coverage_start_epoch,
             coverage_end=coverage_end_epoch,
             start=current_start,
             end=as_of_epoch,
         )
         prior_complete = _coverage_complete(
+            coverage_verified=coverage_verified,
             coverage_start=coverage_start_epoch,
             coverage_end=coverage_end_epoch,
             start=prior_start,
@@ -565,6 +578,7 @@ def build_bridge_flow_intelligence(
         "coverage": {
             "start": coverage_start_epoch,
             "end": coverage_end_epoch,
+            "coverage_verified": coverage_verified,
             "source_independence_verified": source_independence_verified,
             "complete_for_all_current_and_prior_windows": not any_incomplete,
         },
