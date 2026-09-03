@@ -1,0 +1,97 @@
+name: Warp Transaction History Volume Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure-warp-history-volume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Measure exact Warp 60-day program signature volume
+        run: |
+          python - <<'PY'
+          import datetime
+          import json
+          import time
+          import urllib.request
+
+          PROGRAM = "6JbPTuxVuoTgyQeXFb9MH8C8nUY8NBbLP1Lu4B13JfMD"
+          LOOKBACK = 60 * 24 * 60 * 60
+          as_of = int(time.time())
+          start = as_of - LOOKBACK
+          rpcs = {
+              "solana": "https://api.mainnet-beta.solana.com",
+              "x1": "https://rpc.mainnet.x1.xyz",
+          }
+
+          def rpc(url, method, params):
+              payload = json.dumps({
+                  "jsonrpc": "2.0",
+                  "id": 1,
+                  "method": method,
+                  "params": params,
+              }).encode("utf-8")
+              req = urllib.request.Request(
+                  url,
+                  data=payload,
+                  headers={
+                      "content-type": "application/json",
+                      "user-agent": "CMIS-Warp-RPC-Diagnostic/1.0",
+                  },
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  body = json.loads(response.read().decode("utf-8"))
+              if body.get("error") is not None:
+                  raise RuntimeError(body["error"])
+              return body.get("result")
+
+          for chain, url in rpcs.items():
+              before = None
+              count = 0
+              pages = 0
+              oldest_time = None
+              reached = False
+              exhausted = False
+              while pages < 100:
+                  cfg = {"commitment": "finalized", "limit": 1000}
+                  if before:
+                      cfg["before"] = before
+                  rows = rpc(url, "getSignaturesForAddress", [PROGRAM, cfg])
+                  pages += 1
+                  if not rows:
+                      exhausted = True
+                      break
+                  count += len(rows)
+                  oldest = rows[-1]
+                  oldest_time = oldest.get("blockTime")
+                  before = oldest.get("signature")
+                  if oldest_time is not None and oldest_time <= start:
+                      reached = True
+                      break
+                  if len(rows) < 1000:
+                      exhausted = True
+                      break
+                  time.sleep(0.5)
+              first_slot = rpc(url, "getFirstAvailableBlock", [])
+              first_time = rpc(url, "getBlockTime", [first_slot])
+              print(json.dumps({
+                  "chain": chain,
+                  "as_of": as_of,
+                  "requested_start": start,
+                  "requested_start_iso": datetime.datetime.fromtimestamp(start, datetime.UTC).isoformat(),
+                  "signature_count_captured": count,
+                  "pages": pages,
+                  "oldest_captured_block_time": oldest_time,
+                  "oldest_captured_iso": datetime.datetime.fromtimestamp(oldest_time, datetime.UTC).isoformat() if oldest_time else None,
+                  "reached_requested_start": reached,
+                  "pagination_exhausted": exhausted,
+                  "first_available_slot": first_slot,
+                  "first_available_block_time": first_time,
+                  "first_available_iso": datetime.datetime.fromtimestamp(first_time, datetime.UTC).isoformat() if first_time else None,
+              }, sort_keys=True))
+          PY
