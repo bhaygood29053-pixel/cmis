@@ -256,3 +256,9 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_bridged_supply_evidence.py
+
+
+      - name: Test final Warp bridge-flow integration
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_warp_bridge_flow_integration.py
