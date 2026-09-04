@@ -1,0 +1,134 @@
+name: X1.Ninja Liquidity USD Semantics Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  liquidity-usd-semantics:
+    name: Live RPC-backed X1.Ninja liquidity evidence
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'evidence/x1-liquidity-461-live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_LIQUIDITY_USD_SEMANTICS_LIVE: "1"
+      RUN_X1_NINJA_LIQUIDITY_ACCOUNTING_LIVE: "1"
+      RUN_X1_NINJA_LIQUIDITY_CHAIN_HISTORY_LIVE: "1"
+      RUN_X1_NINJA_LIQUIDITY_MARK_PRICE_LIVE: "1"
+      RUN_X1_NINJA_LIQUIDITY_FIELD_TIMING_LIVE: "1"
+      RUN_X1_EXPLORER_GWWCYLS4_ANCHORS_LIVE: "1"
+      RUN_X1_XDEX_PROGRAM_TX_CLASSIFIER_LIVE: "1"
+      RUN_X1_NINJA_461_POOL_DETAIL_LIVE: "1"
+      RUN_X1_CANDIDATE_TX_BATCH_LIVE: "1"
+      RUN_X1_461_CANDIDATE_ACCOUNT_LIVE: "1"
+      RUN_X1_NINJA_LIQUIDITY_TRANSITION_LIVE: "1"
+      X1_NINJA_LIQUIDITY_TRANSITION_MAX_WAIT_SECONDS: "600"
+      X1_NINJA_LIQUIDITY_TRANSITION_POLL_SECONDS: "20"
+      X1_NINJA_LIQUIDITY_TRANSITION_LOOKBACK_SLOTS: "2500"
+      X1_NINJA_LIQUIDITY_TRANSITION_RATE_LIMIT_BACKOFF_SECONDS: "65"
+      X1_NINJA_LIQUIDITY_TIMING_SNAPSHOTS: "8"
+      X1_NINJA_LIQUIDITY_TIMING_INTERVAL_SECONDS: "15"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Classify user-provided recent XDEX program transactions
+        continue-on-error: true
+        run: |
+          python -m unittest tests.test_x1_xdex_program_recent_transactions_live -v
+
+      - name: Classify new user candidate transaction batch
+        continue-on-error: true
+        run: |
+          python -m unittest tests.test_x1_candidate_transaction_batch_live -v
+
+      - name: Probe user-supplied candidate X1 account
+        continue-on-error: true
+        run: |
+          python -m unittest tests.test_x1_461_candidate_account_live -v
+
+      - name: Probe direct GwwCyLS4 Ninja pool-detail shape
+        if: always()
+        continue-on-error: true
+        run: |
+          python -m unittest tests.test_x1_ninja_461_pool_detail_live -v
+
+      - name: Run deterministic liquidity semantic tests
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_usd_semantics -v
+
+      - name: Run deterministic liquidity revaluation tests
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_revaluation -v
+
+      - name: Reconstruct user-exported GwwCyLS4 Explorer anchors
+        if: always()
+        run: |
+          python -m unittest tests.test_x1_explorer_gwwcyls4_transaction_anchors_live -v
+
+      - name: Capture next liquidity transition across 14 active #461 pools
+        if: always()
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_transition_capture_live -v
+
+      - name: Run #461 Ninja mark-price formula diagnostic
+        if: always()
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_mark_price_live -v
+
+      - name: Run live #461 real-pool evidence
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_usd_semantics_live -v
+
+      - name: Run #461 fee-excluded pool-accounting diagnostic
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_accounting_live -v
+
+      - name: Run #461 failing-vs-control chain-history diagnostic
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_chain_history_live -v
+
+      - name: Run #461 repeated field-timing diagnostic
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_field_timing_live -v
+
+      - name: Safety and promotion boundary
+        if: always()
+        run: |
+          echo "Read-only X1.Ninja/XDEX/X1 RPC evidence only."
+          echo "Arbitrary same-snapshot liquidity comparisons are diagnostic only after proven asynchronous field timing."
+          echo "Observed price-only revaluation events may support the provider-internal formula, but not USD/freshness promotion."
+          echo "USDC.X->USD equivalence remains unverified unless separately accepted by CMIS."
+          echo "No liquidity freshness, source-independence, Scout, risk, or execution promotion from this job alone."
+          echo "No transaction construction, signing, broadcasting, custody, trading, or value movement."

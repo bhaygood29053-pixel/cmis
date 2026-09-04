@@ -1,0 +1,109 @@
+{
+  "schema": "x1_explorer_gwwcyls4_page1.v1",
+  "source": "User-exported X1 Blockchain Explorer CSV",
+  "pool_address": "GwwCyLS4VEeZXyPWPYRNiVSuVur6ntioxBmjDQHHHv9x",
+  "exported_page": 1,
+  "rows": [
+    {
+      "date": "2026-09-04",
+      "time": "15:27:02",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "4WKb6f68j72djmuf6jhBduDZxDVqUpwNrPALo8JE4Up44hbRrKvsybjWHeNCSeuhbqNEChRrKyZN8FjzDEt4x3g5",
+      "slot": 76521904
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:26:56",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "5S95DR2mE4c6iWaVeVsaS6BNwPghTzcN7nY43kRVP3gfr46fRNYpGJzV94dq9PQGxQPMBvQa3ZLiWWrvVKKUhBJK",
+      "slot": 76521889
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:26:52",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "48bgxAJf8vBZrtkwvNwxj5PEw2M7HePLjdCmvuvMEBV7rw8Fu4YRjZgWQrMdZLyGZDez12Yr2uS7jcV8gbzQKaLq",
+      "slot": 76521878
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:25:54",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "2GUwAEcr8JVXP13FmePHud7ixuLKyaAUaPL3Nfb79kApk38wzXrqfX3pDFg7Jxd9b72Es15d91YyKYuNe2dQT7GD",
+      "slot": 76521721
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:25:52",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "xR1fcj9SUH5DZE2U4UGQQJQbnwJmhcpkKCqQX2tyNscrpuRyGoXCddzpb3YazbiTs6uH1VBNFQsKphuWEcaM8hj",
+      "slot": 76521713
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:25:06",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "4cZcseVx88iGPtcfyostTfwNXJn87Ghc7nfntfKZt7DT6R2aeo4mH3mVZuKG1XYWZb2cfB3wVRoL4QaMQ5NKu1rN",
+      "slot": 76521591
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:25:00",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "2va51o2wqezgSYCgs3XJ3NqjbuYPMszJ7rG36BejXWWEGji6rR73VK7XrGLMAXB5cnGwgWyD68RM9riBCdaRd1N5",
+      "slot": 76521574
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:24:42",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00110311",
+      "fee_lamports": 1103110,
+      "signature": "5RxYtHp53ozcwVz29mDMJ8ao3W93KpSvEnnNgosjhLPxt7Atrr7xUT97Btz8odcHcAeYj7vvybXRs1chAhxRr8Y2",
+      "slot": 76521523
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:23:55",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "4v7ZLBcpwHzgeVudeEELNRZE4jc1QCrwQyomdpNqJoB3sspupTziVZaojFJiMcWH2VCiZFvrgELst2UpZbKUfrSX",
+      "slot": 76521396
+    },
+    {
+      "date": "2026-09-04",
+      "time": "15:23:52",
+      "type": "receive",
+      "status": "success",
+      "amount_xnt": "0.00090399",
+      "fee_lamports": 903990,
+      "signature": "3FgqssLXmG4PzXkPLwEbxxUosCGwJK63jgoYawPvvofWTrXRgrTjaBBqQEBVt9W4gYAPsQNwHWj6Mxcj3K6VskHn",
+      "slot": 76521387
+    }
+  ],
+  "source_sha256": "9936b373b927f769c664817d38aaf9b7c074683e959b6ae8645aec98be2c1669"
+}

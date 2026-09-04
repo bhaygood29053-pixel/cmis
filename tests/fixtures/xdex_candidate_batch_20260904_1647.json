@@ -1,0 +1,296 @@
+{
+  "schema": "x1_explorer_candidate_batch_20260904.v1",
+  "source": "User-provided X1 Explorer transaction list",
+  "row_count": 41,
+  "slot_min": 76530600,
+  "slot_max": 76535005,
+  "rows": [
+    {
+      "signature": "4UE7zQkTbYantXoxgnBu6Q3SZ8uT78WisHGMpLzLz2UzPFSSbaaGzPqEfDfiX9Jv4kDsVu33ho3MSg7yXMbQ7n1N",
+      "slot": 76535005,
+      "minutes_ago": 13,
+      "timestamp": "16:47:29 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "2XArS1v43kHVArCTa88MGjmNRcUKadWfTj8YTT87h1KsyJNGzDH3NEeTwoZw8AoZQFirX3KqrgGY24KXsUTybQ9p",
+      "slot": 76534994,
+      "minutes_ago": 13,
+      "timestamp": "16:47:25 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5TeaULA8F6pc9nyq1iADczSArGcyZunxxAGnjcvwZeYKQS7E6LMShfQQj2nmXSdHLsHSKZ8wkFJzWhJbMxCofLgR",
+      "slot": 76534986,
+      "minutes_ago": 13,
+      "timestamp": "16:47:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3XiC37BqC4VytBfByt9JTyoF2DZYFPkYU9qY3ZPqveMtTtNnTmyQvpbRjhR4iPtCEV8ewMg4wmKprn8SXYKjiz5D",
+      "slot": 76534945,
+      "minutes_ago": 13,
+      "timestamp": "16:47:07 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "WPEdo9g3nkCMaBB4xqjEZkjwLhv7ctQBEo3Jk4Jk5Jmo37SaERWVfvzKB6jqqVAGVjKwjHfZzRHbbBURtt4hMU9",
+      "slot": 76534821,
+      "minutes_ago": 14,
+      "timestamp": "16:46:21 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "4tVWYUjb6syBcDCqTca4dtQBatQ5ovUWanBdWVTqNC6KJJamSJ7exzyYccPsq7qu2NNY31D2NB7r4ny1kxCAUGEL",
+      "slot": 76534659,
+      "minutes_ago": 15,
+      "timestamp": "16:45:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "4ZBAgHN3t7FLWP7gu4UfDzZfo8pMxkWhKJF3DaQU96wAPnhshTYyiVeZMkfzwaCsdPpmE31gZSQKE7ujGp5Z5fQS",
+      "slot": 76534507,
+      "minutes_ago": 16,
+      "timestamp": "16:44:26 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "2S4ctJX1yP3nB121dP9DTDZFtHKw1SKJQBTfU1p3VPiqKSnCteuSyYt2WRMqMBrfewW62TJ84wW9ajNJ7zFpeSNH",
+      "slot": 76534497,
+      "minutes_ago": 16,
+      "timestamp": "16:44:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3hDaevWNSSe4hfZ4TKoNnrG7MwLKjUdbazWP2jjCBFxrG3YPMowEq93u5bJxDPQ8QuMsZyTq6K1sTJcYBkb8Ht9S",
+      "slot": 76534361,
+      "minutes_ago": 17,
+      "timestamp": "16:43:32 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5XVjqbUUAHN9xtNnMuvHaFigmLSckQxGPfoCxAHF85owfdAuNXA5USqpD8tFETXrSNFPvYBjthQHA9uL83AeAWox",
+      "slot": 76534341,
+      "minutes_ago": 17,
+      "timestamp": "16:43:25 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3RsMS7ja6pHyRd5xgAs5577KhWRo9jDV2Q4q32uHqJPRxiSNoze9iHYkxiSJ6R3V6tS3V1sbD2mzjnofmz7GWLuM",
+      "slot": 76534332,
+      "minutes_ago": 17,
+      "timestamp": "16:43:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "4ifZ5YQkCrxU6YTG1rKCNBh4MkCuJjqSuJV5YkHK26c6kRhM7y2erShCfmbkyQZ82ihWQx6YTqn2pS2EfDLKvb9a",
+      "slot": 76534173,
+      "minutes_ago": 18,
+      "timestamp": "16:42:23 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "31ETKPUdgrcXZfm2qMBPVS4E4p3s6WT3dianazbvQSHf82384gpMeSAw24SFoCPjM5SmMoYiEswNYiHFKsy2SJ69",
+      "slot": 76534010,
+      "minutes_ago": 19,
+      "timestamp": "16:41:23 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "KHKbEZXiTQUFVNgZGmyhBkAZq83r5EHiHfLQGixwBFXdgdh43Q8W4dY1EAtDgn1bh55v4XaztsBYZhA5z5YpEmu",
+      "slot": 76533847,
+      "minutes_ago": 20,
+      "timestamp": "16:40:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "2Umzxj8HuJFdyHW9QZ9iHrkm1qirByz4ofM9mBm7PejGkYFWoTdCiVb7oSuQn9JFqhBHVd6U3KVexb6WFBsk9mAX",
+      "slot": 76533683,
+      "minutes_ago": 21,
+      "timestamp": "16:39:21 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5h3zJiFAKjSLXE9ZGMg4BjDEi8v1E8BAmR2t6tRTq31hmGY16xtVrPoZs6YWw25EavyMb6DyXyyYMaKzrjJSLU1F",
+      "slot": 76533524,
+      "minutes_ago": 22,
+      "timestamp": "16:38:23 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3D3fdGG5dGi9NNcMfXRMie8cnTC8T3eELqMxiZGYN7qLxxBaxuvLnKTVzGKXBpx3ZDDbtC93B1HM26jwKWmXPe4U",
+      "slot": 76533367,
+      "minutes_ago": 23,
+      "timestamp": "16:37:25 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5J9Y9f35qRjdNZrAyzyAtRfuBjbwwWSWvaD9QLqdXWGF31owwtYChJYq9Z1mw8rcN8WBujE7TGCxYJj2L1y56MtZ",
+      "slot": 76533359,
+      "minutes_ago": 23,
+      "timestamp": "16:37:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3axKxEKyN8EyTCujSWKgUaXxxdiE5tSXTcXfd9XpDvaSeLju3ZtqjESezN4Q3p8BM7GuDvczL64esJPAyihbFMCj",
+      "slot": 76533195,
+      "minutes_ago": 24,
+      "timestamp": "16:36:21 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3fVDw3uFhg5tigiYdV2wcNG956AkcGaxqMa6U4SWuBaNiC6BTCYjk6VscphbdDtJTio3u6NYMNa7V1RfAkv4FnzF",
+      "slot": 76533036,
+      "minutes_ago": 25,
+      "timestamp": "16:35:23 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3uSwZjSofeEBXTrUVhZ2y8Q3RNo31SYBxNrMDpVb5SZVdP6f57KYD2Bbp75HeGaST8sgtJn4Y2rPhRUHC7cDDfYo",
+      "slot": 76532873,
+      "minutes_ago": 26,
+      "timestamp": "16:34:23 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "36L4vcB8oUBHAF1s2fNpskEDC62q84CJHX3MBXr5df6e7o75MoFmu6UHhWhN4BXrTyPGYEL8nzHUvShxAvmCzn4i",
+      "slot": 76532707,
+      "minutes_ago": 27,
+      "timestamp": "16:33:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "3E49fNtT6Fu7U4TWtpTAPB3cGnhnbdae12cz7sP6GXER3YwuYYwSWCFJ18CsgZG5kciuX31pKwCnj2wWeeXTxyVR",
+      "slot": 76532544,
+      "minutes_ago": 28,
+      "timestamp": "16:32:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "ifDrXG7mWxcF7dGhF1xvJwp1GZYNBMdRovo3gANgsqyNUbhew3mdWJNB9sVpM8SkbgVged9jAmGxBDqda4QKRhw",
+      "slot": 76532471,
+      "minutes_ago": 29,
+      "timestamp": "16:31:55 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "nmDXoG3a5NqRsP7xYSbjW6HtAaLgdnM5DvFLDiUn1962dP8wTsKhZpv979cXchfUzL1c1E8AVMu6uEzGLEv3rd4",
+      "slot": 76532381,
+      "minutes_ago": 29,
+      "timestamp": "16:31:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5GuMLjyLnvVYbwaY1fGm2etnqZzvM6Ngw8FM5Qv65Brn9cGdmq5MFB5QpsYG8AsvrKBJMwJCYkpFjc86V3rzisgL",
+      "slot": 76532220,
+      "minutes_ago": 30,
+      "timestamp": "16:30:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "4yNmyWrg5tJ41wpkSbLiJc8wgAtwJHWoHh4GFmUGUXAjtvJ6zYubGYA2bv3zhEG5u9ttw75xJNvhxXUmUz8cQAba",
+      "slot": 76532059,
+      "minutes_ago": 31,
+      "timestamp": "16:29:23 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5eWjHhEwec13Cz64o27kMytEhmopLv4GTPZyUMSP8jiy82jMPjFG8BoBjdwwPVMG8WHpcrKgQaGRCbTuPqor9jqw",
+      "slot": 76531894,
+      "minutes_ago": 32,
+      "timestamp": "16:28:23 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "cA2JF5G1DnjhduSXqMrHQmkJd1CPgEASmsA8vD4DuPGYmgP4WfUc1r1ATcvjDqzbwLHS7328xy13p2Wyr9G99Le",
+      "slot": 76531739,
+      "minutes_ago": 33,
+      "timestamp": "16:27:26 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "2im7h2S4RcxchNZgwVeHsX9LVYsbGSdhfibeHGfWDm3NaNfXM7ejF2o3M3ygyquuy4Ky6Xq44g9NdaZtX9j2ZQVh",
+      "slot": 76531732,
+      "minutes_ago": 33,
+      "timestamp": "16:27:24 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5D8nXhqMbVZivA9FN9qUDcCErCHq7oKZC2Cb6QVFcc9YvNK38mXQdAj5kWEAkDeAyeRTu43uTu6uwodpRCKmAUTt",
+      "slot": 76531700,
+      "minutes_ago": 34,
+      "timestamp": "16:27:11 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5yeTuL9HxYGpBZ6PW3A5dKQtquqMC92JAzegTeCJJPPTiGWCeg6AgCtd8p8WVeHdU99YgL7PXjEAWEDWH3B1jtVz",
+      "slot": 76531575,
+      "minutes_ago": 34,
+      "timestamp": "16:26:25 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "2qvgye6QnfK7B4xqy2wdr4fB9rztx2VuGEAKWA6t1goHkD8ZXBBc1VB1zKQfKKAdFGoDnjpX867rsVdNoLPUiEtK",
+      "slot": 76531568,
+      "minutes_ago": 34,
+      "timestamp": "16:26:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "5Khcu9pMC5nBF3UejeEhXEjJybAGy5emok2AVZbw3eiYVymhEebiCRziYTVqj5aNrrStPmBw527Q8ovw8zubTjpF",
+      "slot": 76531406,
+      "minutes_ago": 35,
+      "timestamp": "16:25:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "328za5uA6RTJgjgWJToGTvbSsHYm343Lo9fJpjM8sTaik5J8s25CUaTy2Jnrsd81u5R4wDwnhWFkF2WgwSRPuJkd",
+      "slot": 76531244,
+      "minutes_ago": 36,
+      "timestamp": "16:24:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "xHWb1xdoMRSQmhsRaszmzgSgmWfHWuGi4KHayhdKUwkQJdUeRnhkJzb7UMrFWQzRascEaJNxL6wHUhsBRVeWpzr",
+      "slot": 76531079,
+      "minutes_ago": 37,
+      "timestamp": "16:23:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "4pNhKguJrSm4ye1mJPcXtBTiWdvvQ8CvbzxVvM8uwjFfundfZp5Z9YWiTnVYt3XAJukLC4KiqYyP1c7QCffAvmAo",
+      "slot": 76530916,
+      "minutes_ago": 38,
+      "timestamp": "16:22:22 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "387w84ytJuegygLqgPV3qHD8XJUJi9Ra8nGah7tpkPXdQfLYBmCEXiNKSDkwVa8hbawWStqAuupNhWr35LFy5645",
+      "slot": 76530815,
+      "minutes_ago": 39,
+      "timestamp": "16:21:45 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "49g64vDPqo93tEwZNQK2UZw8XRgZNwDfbm71RcbUBAVF3m21AofL8Rc9A8Nks6vHTYZ48uEnjycajZpTf8tH55rW",
+      "slot": 76530782,
+      "minutes_ago": 39,
+      "timestamp": "16:21:33 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "ir8sdWychML2RGwhzVdztQxaFYQwiwxphRDWADesCMuRqX75CCLFb1V7FFGwHpi2FBNd17z6N86x8XGLDErZGKk",
+      "slot": 76530768,
+      "minutes_ago": 39,
+      "timestamp": "16:21:27 UTC",
+      "status": "Success"
+    },
+    {
+      "signature": "2EMGYC8ovZ1VLWVd9BfDLdVQp6Vu56oRQnMbERkUF3g8KDcio99Zt469HURCx3h4PMFVJQHxJg7gKD9y8espcnB9",
+      "slot": 76530600,
+      "minutes_ago": 40,
+      "timestamp": "16:20:25 UTC",
+      "status": "Success"
+    }
+  ]
+}

@@ -39,6 +39,11 @@ DIRECT_MAPPING = "pooledBase_to_vault1__pooledQuote_to_vault0"
 REVERSED_MAPPING = "pooledBase_to_vault0__pooledQuote_to_vault1"
 
 
+def _text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
 def _decimal(value: Any, *, name: str) -> Decimal:
     if value is None or isinstance(value, bool):
         raise ValueError(f"{name} must be a finite number")

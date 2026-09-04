@@ -12,13 +12,14 @@ permissions:
 jobs:
   pooled-reserve-semantics:
     name: X1.Ninja pooledBase/pooledQuote vs RPC reserves
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue341-ninja-pooled-reserve-semantics'
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue341-ninja-pooled-reserve-semantics' || github.head_ref == 'evidence/x1-liquidity-461-live'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
       RUN_X1_NINJA_POOLED_RESERVE_SEMANTICS_LIVE: "1"
+      RUN_X1_NINJA_LIQUIDITY_USD_SEMANTICS_LIVE: "1"
 
     steps:
       - name: Check out repository
@@ -50,6 +51,12 @@ jobs:
       - name: Run live read-only pooled-reserve semantic evidence
         run: |
           python -m unittest tests.test_x1_ninja_pooled_reserve_semantics_live -v
+
+      - name: Run live #461 liquidity valuation evidence
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_usd_semantics -v
+          python -m unittest tests.test_x1_ninja_liquidity_usd_semantics_live -v
 
       - name: Safety boundary
         if: always()
