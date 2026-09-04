@@ -317,6 +317,10 @@ def verify_ninja_pooled_reserve_semantics(
             samples.append(
                 {
                     "pool_address": pool_address,
+                    "mint_0": _text(raw.get("mint_0")),
+                    "mint_1": _text(raw.get("mint_1")),
+                    "vault_0": _text(raw.get("vault_0")),
+                    "vault_1": _text(raw.get("vault_1")),
                     "rpc_vault_0_reserve": format(vault_0, "f"),
                     "rpc_vault_1_reserve": format(vault_1, "f"),
                     "x1_ninja_pooledBase": format(pooled_base, "f"),
