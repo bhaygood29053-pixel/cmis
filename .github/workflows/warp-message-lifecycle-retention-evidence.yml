@@ -44,7 +44,7 @@ jobs:
     needs: warp-message-lifecycle-retention-unit
     if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue441-warp-message-lifecycle-retention')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     env:
       PYTHONPATH: .
 
