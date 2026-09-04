@@ -207,6 +207,11 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_fortiswap_provider.py
 
+      - name: Test X1Scroll archival transaction provider
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1scroll_archive_provider.py
+
       - name: Test Theo advisory-provider connection boundary
         env:
           PYTHONPATH: .

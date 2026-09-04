@@ -137,6 +137,17 @@ from .rpc import (
     parse_token_supply_result,
     rpc_request,
 )
+from .x1scroll_archive import (
+    DEFAULT_X1SCROLL_BASE_URL,
+    DOCUMENTED_METHODS as X1SCROLL_DOCUMENTED_METHODS,
+    X1SCROLL_PROVIDER_ID,
+    X1SCROLL_SOURCE,
+    X1ScrollArchiveError,
+    X1ScrollArchiveProvider,
+    build_x1scroll_rpc_url,
+    parse_transaction_result as parse_x1scroll_transaction_result,
+    x1scroll_rpc_request,
+)
 from .self_hosted_readonly_node import (
     FINALIZED as X1_SELF_HOSTED_FINALIZED,
     REQUIRED_READ_ONLY_FLAGS as X1_SELF_HOSTED_REQUIRED_READ_ONLY_FLAGS,
@@ -259,6 +270,12 @@ __all__ = [
     "X1_SELF_HOSTED_FINALIZED",
     "X1_SELF_HOSTED_REQUIRED_READ_ONLY_FLAGS",
     "X1_SELF_HOSTED_SOURCE",
+    "DEFAULT_X1SCROLL_BASE_URL",
+    "X1SCROLL_DOCUMENTED_METHODS",
+    "X1SCROLL_PROVIDER_ID",
+    "X1SCROLL_SOURCE",
+    "X1ScrollArchiveError",
+    "X1ScrollArchiveProvider",
     "X1SupplyAPIError",
     "X1SupplyProvider",
     "X1_NINJA_API_BASE_URL",
@@ -335,4 +352,7 @@ __all__ = [
     "prove_exact_pool_leg_semantics",
     "qualify_cross_pool_trusted_semantics",
     "rpc_request",
+    "build_x1scroll_rpc_url",
+    "parse_x1scroll_transaction_result",
+    "x1scroll_rpc_request",
 ]
