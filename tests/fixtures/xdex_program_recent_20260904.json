@@ -1,0 +1,224 @@
+{
+  "schema": "x1_explorer_xdex_program_recent_20260904.v1",
+  "source": "User-provided X1 Blockchain Explorer / FortiBlox table",
+  "program_account": "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN",
+  "program_owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+  "rows": [
+    {
+      "signature": "4vRsa6FYi7u26oUNMPsotrhCDLsbXtuNkabzp33wrBYGt4h9pjNdanqUaZt1CAJL7TEUVWdUYHXWwbp4gdPNtpDg",
+      "slot": 76529110,
+      "fee_lamports": 1003100,
+      "compute_units": 85291,
+      "top_level_instructions": 5,
+      "inner_instructions": 6
+    },
+    {
+      "signature": "3ZqfLVmgqyNCRLDQsPpvM7ipDLEHyuYuSrzRfdBmVmHktPKabYm4kC4aVkTk2oWPwKfMD5eGhZYRvmwrPaHvKQ2p",
+      "slot": 76529110,
+      "fee_lamports": 1003100,
+      "compute_units": 85426,
+      "top_level_instructions": 5,
+      "inner_instructions": 6
+    },
+    {
+      "signature": "4Lncie1s5XNjdFVAWB6G91wSqhg838vrgJPAi91fo3EK8XDxDERwsYuWuFmnqq4qntkUen8jnzCuyZLecGwg3aRp",
+      "slot": 76529090,
+      "fee_lamports": 903990,
+      "compute_units": 26964,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "5MBe5hifX3Pb8MYDQYiXEy8j7R1oas5PJsJ68J7XN2ZncAFAumaBZ3NKegEkMu6nRLeRXFEzifxrheCDhXNzzb62",
+      "slot": 76529081,
+      "fee_lamports": 1603001,
+      "compute_units": 112373,
+      "top_level_instructions": 6,
+      "inner_instructions": 8
+    },
+    {
+      "signature": "67bUBe2dKesujXTDPFpRQ1SjgEr6RVcnQoRtMzSoXCwouPMRHU582noptgaxPANhAGgG9CoY2FTK5nJ4S4C1GsaM",
+      "slot": 76529079,
+      "fee_lamports": 1003100,
+      "compute_units": 86039,
+      "top_level_instructions": 5,
+      "inner_instructions": 6
+    },
+    {
+      "signature": "53iEbEoaXnsysHMKc2ZZTjLRYSiGqCWReu3aQizpqJuih2hzdLqq2xZVVkCaWdebRB5JPk2U9We86Kw1g4TvpzkZ",
+      "slot": 76529079,
+      "fee_lamports": 1003100,
+      "compute_units": 85398,
+      "top_level_instructions": 5,
+      "inner_instructions": 6
+    },
+    {
+      "signature": "4wgc4DKSQeWfEDoucnYBSHz434XHJM4g8iA954YwSxGKtGWziwJhbb7pZvKdMGSzNGE6qRvmM6y4fPT28AfvqEyu",
+      "slot": 76529072,
+      "fee_lamports": 903990,
+      "compute_units": 30195,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "fd2XXXYnR18mfe1m9VzVP2zgGfC39nDosa5nsKNj4tkbwziRpwGPpcF7xrjjQbLQDaU6QmjNXidGZ26UrajSe57",
+      "slot": 76528926,
+      "fee_lamports": 903990,
+      "compute_units": 30210,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "476ZfZCRcZ8RtWPvYLRTMx6b5vadRteZDLkaFELvBNYRZq6spsQSbfUbAJStEDZFucTXe7r9nxabTHRF6u52gS71",
+      "slot": 76528897,
+      "fee_lamports": 903990,
+      "compute_units": 29757,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "3gmQtJKeW15sXSZdFWT4CozZ3KNvvaLZqHye1PrdmfbJheHu3NYez63QbDS5UPk8Fs9Xn67uL1gocZUixbp8qNkB",
+      "slot": 76528877,
+      "fee_lamports": 903990,
+      "compute_units": 30078,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "2EQbjt5RtF86U3UF6bcrCCBCZLsrPpyz2WC9r5MiYR19kUDY9zVqz7EXMEYX1txj65CEES1HXufhd3GnJ2aT7hLo",
+      "slot": 76528865,
+      "fee_lamports": 903990,
+      "compute_units": 26997,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "uWHr11ZdfGfTMGyJLsgyHmXcVV9EYTNdCCiQn5FBdqpRueMQLkJaopasAZUMVXqFCRoP2voq3uRtZzckZSbuk3d",
+      "slot": 76528722,
+      "fee_lamports": 903990,
+      "compute_units": 29757,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "23szrJikiQhVaMwnGYAUnvJdikpjm1RiQ7AAPMKmbikXrVQobLLCKZGB8CVGceYiYH3gFYcDASJdkwxG97MuX1YG",
+      "slot": 76528714,
+      "fee_lamports": 903990,
+      "compute_units": 30078,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "5Lkvdxf4rjaV7UgY4gJLRQj23XQ7dHcd8ALPFmnpiSwGv6GVzEv3NTMQB4k3XZYrS4q4s5zjzuDsRAYSHLT453Dt",
+      "slot": 76528561,
+      "fee_lamports": 903990,
+      "compute_units": 29757,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "3eQxC1R8FFz6RstN7czeA7EfnKKKhw2q5t17PkqMnoxvRw6CPiur4BTfMydW6ouUn9qfxZEbwXxgUAtKF6Zb49Y6",
+      "slot": 76528553,
+      "fee_lamports": 903990,
+      "compute_units": 30078,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "2A9kHu3kdXU1YhAHN4DM7QK4L5j2ZpaUVyyAzAvpiDTkHCJjdzLhcQZL7etamLxNNXQNdLqkD7JbY3bZstb4YZVm",
+      "slot": 76528490,
+      "fee_lamports": 903990,
+      "compute_units": 30209,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "S15Ggo1sxYphuBA1V1Mb85HDi54QZ5cKtwmTx7dTbE6gfRmBJ2ceA7HMsqd6ANBAfHQsb6e3ioQQvQjNyJoGQa1",
+      "slot": 76528411,
+      "fee_lamports": 903990,
+      "compute_units": 29757,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "5euPbj5EJtoPXJb8MjVkhfaWuZ2vF6JsK7i7zanhiN6dtZzxG4PasfNDjAd1Zk7C4NYq2zSo7BHqYKejjR7YtKuP",
+      "slot": 76528401,
+      "fee_lamports": 903990,
+      "compute_units": 29888,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "56yTjUkdBTJCnfByYEMz7V6praY3YsGueKHTaTe71jQmYGgGDy3s4mEeRAMKNzxUjbDJYCnrrWpYB5QoXJjTVYvh",
+      "slot": 76528392,
+      "fee_lamports": 903990,
+      "compute_units": 30075,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "63jxo2wcjzZnrFWu5kssox2s1yQUmNhoSNVmzpRXhJ5iq6mD6cCTP4fRTEQfqDwjxcwAGDY6Ft3Gi7dwGxhe5suE",
+      "slot": 76528296,
+      "fee_lamports": 903990,
+      "compute_units": 30177,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "22WS8o7MVaccHataRRngnYBGob2dbRQiHJcJHE5kvAidxtJtpQcYvacVPgVJpPiAxYffbY6iDrX6R5hZwgrvAGyh",
+      "slot": 76528245,
+      "fee_lamports": 903990,
+      "compute_units": 29754,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "3J81RNdLL6iLjvzWHy8DdGTvyh4vdfTFpk3Lmutn67M3t5QjVg2F9sGeTZkckQF1WxXg6Pkk1Zn5uK1roHNPUGFC",
+      "slot": 76528235,
+      "fee_lamports": 903990,
+      "compute_units": 26966,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "2otJ1wk34CEPF45ziSZEKeqnFUE7HfFDqxyCMhuRxLqa9bNoyFq5jpDK31rXuSrjTEij1X6aZA2fqJBVT9eNRjJM",
+      "slot": 76528228,
+      "fee_lamports": 903990,
+      "compute_units": 30077,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "3UTHU2UaAs5jUPV3N6tJxKCcypKgoLed5cTSSfSvqQWecyt6tQi8Z9VGTq3rPXJu839YoMSBTTWrchNd3AtZUR2H",
+      "slot": 76528101,
+      "fee_lamports": 903990,
+      "compute_units": 30089,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    },
+    {
+      "signature": "44Zh2mHd2wHt2KjJDT7NuMHmBvS7wYC9hyiJGWe9hSi7hda8REEWtGBDqwkfv2ip3yNRjTA2UCM1yfizWJvJez2H",
+      "slot": 76528084,
+      "fee_lamports": 903990,
+      "compute_units": 30210,
+      "top_level_instructions": 3,
+      "inner_instructions": 2
+    }
+  ],
+  "program_information": {
+    "status": "Executable",
+    "data_size_bytes": 36,
+    "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "upgradeable": true
+  },
+  "explorer_recent_stats": {
+    "transaction_count": 25,
+    "successful": 17,
+    "failed": 8,
+    "average_compute_units": 69587,
+    "max_compute_units": 112654,
+    "min_compute_units": 29754,
+    "average_fee_lamports": 1015234,
+    "total_fees_xnt": "0.025381"
+  }
+}
