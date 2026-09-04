@@ -150,6 +150,26 @@ class X1ScrollArchiveProviderTests(unittest.TestCase):
         self.assertNotIn(secret, str(ctx.exception))
         self.assertNotIn(provider.rpc_url, str(ctx.exception))
 
+    def test_transport_exception_cannot_echo_secret_bearing_rpc_url(self):
+        secret = "transport-secret-key"
+
+        def post(url, json, timeout):
+            raise RuntimeError(f"connection failed for {url}")
+
+        provider = X1ScrollArchiveProvider(
+            api_key=secret,
+            retries=1,
+            post=post,
+            sleep=lambda _seconds: None,
+        )
+
+        with self.assertRaises(X1ScrollArchiveError) as ctx:
+            provider.get_transaction("SigA")
+
+        self.assertNotIn(secret, str(ctx.exception))
+        self.assertNotIn(provider.rpc_url, str(ctx.exception))
+        self.assertIn("RuntimeError", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
