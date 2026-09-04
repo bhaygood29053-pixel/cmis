@@ -250,3 +250,9 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_message_lifecycle_retention.py tests/test_x1_warp_lifecycle_rpc_retry.py
+
+
+      - name: Test Warp bridged supply evidence
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_warp_bridged_supply_evidence.py
