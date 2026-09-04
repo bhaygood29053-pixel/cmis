@@ -1,6 +1,6 @@
 # X1 Provider Gap Register
 
-Status date: **2026-09-03**
+Status date: **2026-09-04**
 
 This register tracks capability gaps beneath CMIS for the X1 Provider. It is a planning and verification document, not a source of live market facts.
 
@@ -34,7 +34,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-prom
 | ID | Capability | Status | Current evidence / next action |
 |---|---|---|---|
 | X1-RPC-01 | Core X1 RPC coverage | VERIFIED | Existing X1 RPC path is active; preserve provenance/tests. |
-| X1-RPC-02 | Historical transaction RPC | PARTIAL | Historical comparison contracts are accepted; still requires live independent retention/finality/reconnect/backfill evidence. |
+| X1-RPC-02 | Historical transaction RPC | PARTIAL / X1SCROLL FOUNDATION #456 | Historical comparison contracts remain accepted. #456 adds a bounded read-only X1Scroll adapter for the provider-documented known-signature `getTransaction` contract, but live activation, config compatibility, retention completeness, and source independence remain unverified. |
 | X1-RPC-03 | RPC redundancy / failover | DEFERRED / OPTIONAL | Official X1 RPC is the selected production RPC path. Self-hosted redundancy is not required for current CMIS operation; no redundancy or independence claim is made. |
 | X1-IDX-01 | General transaction / wallet indexer | PARTIAL | X1.Ninja indexing exists, but complete wallet/indexer semantics remain unproven. |
 | X1-DEX-01 | Pool catalog / liquidity / volume | VERIFIED | CMIS has accepted provider/direct XDEX paths within their exact scopes. |
@@ -56,6 +56,7 @@ Oracle V2 (`jacklevin74/oracle-v2`) remains tracked under issue #272 as non-prom
 | X1-BRIDGE-06 | Bridge-flow / TVL cross-check | CANDIDATE | Independent candidate only until provenance/API semantics are verified. |
 | X1-ALT-01 | Self-hosted X1 read-only node history / streaming redundancy | OPTIONAL / DEFERRED | #301 contract/probes exist, but live deployment verification is deferred after selecting Official X1 RPC as the production path. Node redundancy remains separate from independent market-source evidence. |
 | X1-ALT-02 | FortiBlox explorer / RPC ecosystem | ARCHIVED / UNVERIFIED | PR #227 closed as candidate research; no reproducible provider-owned endpoint/response contract is accepted. Reopen only with new exact evidence. |
+| X1-ALT-03 | X1Scroll archival transaction lookup | FOUNDATION / LIVE GATE REQUIRED | Issue #456. Adapter accepts only known-signature `getTransaction` by default, redacts the secret-bearing URL, and explicitly leaves address discovery/archive completeness/source independence false until live proof. |
 
 ## Promotion rules
 
@@ -78,7 +79,8 @@ Before any PARTIAL, CANDIDATE, BLOCKED, or MISSING capability is promoted:
 3. **Optional RPC redundancy** — #301 self-hosted verification may resume later if operational redundancy becomes a requirement; Official X1 RPC remains the selected primary path.
 4. **Oracle V2 #272 conditional recheck** — only when new policy-eligible live slots appear, rerun freshness and then exact same-fact price-correctness/source-independence gates.
 5. **Warp Bridge / #409** — route/config semantics, official wallet-history endpoint provenance, and real on-chain settled-event pairing are accepted foundations. Next prove historical retention/coverage for requested flow windows and a separate current bridged-supply semantic contract; until then window totals/supply remain unavailable.
-6. **X1.Ninja SSE** — current credential access is denied; only after authenticated access is established should event schema/order/finality/reconnect/backfill semantics be tested.
+6. **X1Scroll #456 activation** — obtain/configure a runtime API key and run a bounded known-signature `getTransaction` compatibility probe before any protected-runtime historical fallback is enabled.
+7. **X1.Ninja SSE** — current credential access is denied; only after authenticated access is established should event schema/order/finality/reconnect/backfill semantics be tested.
 
 All work remains read-only/fail-closed and does not authorize execution.
 
