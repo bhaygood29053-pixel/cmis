@@ -77,12 +77,16 @@ Earlier public research recorded advertised archival RPC and streaming capabilit
 
 Consequences:
 
-- no X1Scroll provider adapter is accepted on `main`;
-- no X1Scroll live-verification workflow is accepted on `main`;
-- X1Scroll is not an active archive, backup-RPC, streaming, or source-independence candidate for CMIS;
-- historical advertised claims remain research history only and must not be interpreted as current capability.
+Issue #456 reopens X1Scroll narrowly because the provider now publishes a reproducible credential-backed HTTP JSON-RPC contract for known-signature `getTransaction` at `https://rpc.x1scroll.io/v1/<API_KEY>`.
 
-A future reconsideration would require a new explicit issue, reproducible provider-owned access contract, available credentials where required, bounded read-only evidence, and normal CMIS promotion gates.
+Current bounded state:
+- a read-only X1Scroll provider adapter is being added under #456;
+- only the provider-documented known-signature `getTransaction` method is accepted by default;
+- undocumented methods such as `getSignaturesForAddress` fail closed unless used by an explicit bounded probe;
+- provider claims about genesis-to-present retention, no-gap coverage, account-history completeness, source independence, and production fallback remain unverified;
+- canonical X1 RPC remains the accepted discovery/current-state path.
+
+Production use still requires a live credentialed verification gate and normal CMIS promotion semantics.
 
 ## Official Warp Bridge
 
