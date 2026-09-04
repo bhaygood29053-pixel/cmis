@@ -1,0 +1,472 @@
+name: X1.Ninja Delayed Vault Departure Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  delayed-vault-departure:
+    name: Price-only departures vs earlier exact vault swaps
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue360-delayed-vault-swap-departure-link'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      X1_SECONDARY_RPC_URL: https://x1scroll.io/rpc
+      RUN_X1_NINJA_DELAYED_DEPARTURE_LIVE: "1"
+      X1_NINJA_DELAYED_DEPARTURE_MAX_SNAPSHOTS: "400"
+      X1_NINJA_DELAYED_DEPARTURE_POLL_SECONDS: "8"
+      X1_NINJA_DELAYED_DEPARTURE_CATALOG_LIMIT: "500"
+      X1_NINJA_DELAYED_DEPARTURE_MAX_POOLS: "150"
+      X1_NINJA_DELAYED_DEPARTURE_TARGET_EVENTS: "3"
+      X1_NINJA_DELAYED_DEPARTURE_TARGET_DISTINCT_POOLS: "2"
+      X1_NINJA_DELAYED_DEPARTURE_TARGET_CANDIDATES: "40"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify X1.Ninja key
+        run: |
+          test -n "${X1_NINJA_API_KEY:-}"
+      - name: Run required deterministic delayed-departure tests
+        run: |
+          python -m unittest tests.test_x1_ninja_delayed_vault_departure_link -v
+      - name: Collect and classify bounded live delayed-departure evidence
+        shell: bash
+        run: |
+          set +e
+          python -m unittest tests.test_x1_ninja_delayed_vault_departure_link_live -v 2>&1 | tee delayed-vault-live.log
+          live_rc=${PIPESTATUS[0]}
+          set -e
+
+          LIVE_TEST_RC="$live_rc" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          prefix = "[X1.Ninja delayed vault departure evidence] "
+          log_path = Path("delayed-vault-live.log")
+          evidence_path = Path("delayed-vault-evidence.json")
+          summary_path = Path(os.environ.get("GITHUB_STEP_SUMMARY", "delayed-vault-summary.md"))
+
+          lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+          payload_lines = []
+          for line in lines:
+              marker = line.find(prefix)
+              if marker >= 0:
+                  payload_lines.append(line[marker + len(prefix):])
+          if not payload_lines:
+              raise SystemExit(
+                  "live evidence harness produced no structured evidence payload; "
+                  f"raw test exit={os.environ.get('LIVE_TEST_RC')}"
+              )
+
+          try:
+              decoder = json.JSONDecoder()
+              payload, end = decoder.raw_decode(payload_lines[-1])
+              trailing = payload_lines[-1][end:].strip()
+          except json.JSONDecodeError as exc:
+              raise SystemExit(f"live evidence payload is malformed JSON: {exc}") from exc
+
+          # unittest may append the success token to the same logical line after
+          # a very large stdout payload. Accept only the exact known suffix.
+          if trailing not in {"", "ok"}:
+              raise SystemExit(
+                  f"live evidence payload has unexpected trailing content: {trailing!r}"
+              )
+
+          aggregate = payload.get("aggregate")
+          if not isinstance(aggregate, dict):
+              raise SystemExit("live evidence payload has no aggregate object")
+
+          status = aggregate.get("status")
+          if status not in {"unavailable", "partial", "verified"}:
+              raise SystemExit(f"unexpected aggregate status: {status!r}")
+
+          counts = aggregate.get("outcome_counts")
+          if not isinstance(counts, dict):
+              raise SystemExit("live evidence aggregate has no outcome_counts object")
+
+          complete_counterexamples = (
+              int(counts.get("latest_swap_matches_before", 0) or 0)
+              + int(counts.get("latest_swap_matches_neither", 0) or 0)
+          )
+          verified_departures = int(aggregate.get("verified_departure_count", 0) or 0)
+          distinct_events = int(aggregate.get("distinct_event_count", 0) or 0)
+          delayed_links = int(aggregate.get("delayed_link_count", 0) or 0)
+          distinct_swaps = int(aggregate.get("distinct_linked_swap_count", 0) or 0)
+          minimum = int(aggregate.get("minimum_supported_departures", 3) or 3)
+          minimum_pools = int(aggregate.get("minimum_supported_distinct_pools", 2) or 2)
+          distinct_delayed_pools = int(aggregate.get("distinct_delayed_pool_count", 0) or 0)
+          pattern_supported = aggregate.get("departure_pattern_supported") is True
+          maturity = str(aggregate.get("evidence_maturity") or "unavailable")
+          candidates = int(payload.get("catalog_price_only_candidate_count", 0) or 0)
+          target_candidates = int(payload.get("target_price_only_candidate_count", 40) or 40)
+          monitored_pools = int(payload.get("monitored_pool_count", 0) or 0)
+          snapshots = int(payload.get("snapshot_count", 0) or 0)
+
+          integrity_errors = []
+          if distinct_events != verified_departures:
+              integrity_errors.append(
+                  "verified departure events are not uniquely keyed"
+              )
+          # Linked-swap uniqueness is a bounded-pattern support condition.
+          # Duplicate linked swaps must not erase otherwise verified event-level
+          # evidence when the aggregate correctly refuses pattern support.
+          if pattern_supported and distinct_swaps != delayed_links:
+              integrity_errors.append(
+                  "supported delayed links do not map to unique linked swaps"
+              )
+          if aggregate.get("cmis_promotable") is not False:
+              integrity_errors.append("live evidence unexpectedly became CMIS-promotable")
+          if aggregate.get("execution_authorized") is not False:
+              integrity_errors.append("live evidence unexpectedly authorized execution")
+
+          evidence_path.write_text(
+              json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
+              encoding="utf-8",
+          )
+
+          if status == "verified":
+              if not pattern_supported:
+                  integrity_errors.append(
+                      "verified aggregate does not mark the bounded pattern supported"
+                  )
+              if delayed_links < minimum:
+                  integrity_errors.append(
+                      "supported aggregate does not meet the clean-link threshold"
+                  )
+              if distinct_delayed_pools < minimum_pools:
+                  integrity_errors.append(
+                      "supported aggregate does not meet the distinct-pool threshold"
+                  )
+              if complete_counterexamples:
+                  integrity_errors.append(
+                      "supported aggregate contains a complete counterexample"
+                  )
+              if aggregate.get("delayed_vault_swap_execution_link_verified") is not True:
+                  integrity_errors.append(
+                      "supported aggregate has no verified event-level delayed link"
+                  )
+
+          if aggregate.get("departure_pattern_verified") is not False:
+              integrity_errors.append(
+                  "bounded sample unexpectedly verified the longitudinal pattern"
+              )
+          if aggregate.get(
+              "pattern_verification_from_bounded_sample_authorized"
+          ) is not False:
+              integrity_errors.append(
+                  "bounded sample unexpectedly authorized pattern verification"
+              )
+
+          observation_state = maturity
+
+          summary = [
+              "## X1.Ninja delayed vault departure live evidence",
+              "",
+              f"- Observation state: **{observation_state}**",
+              f"- Aggregate status: `{status}`",
+              f"- Pools monitored: **{monitored_pools}/150**",
+              f"- Snapshots collected: **{snapshots}/400**",
+              f"- Price-only candidates: **{candidates}/{target_candidates}**",
+              f"- Verified departure events: **{verified_departures}**",
+              f"- Clean delayed links: **{delayed_links}/{minimum}** for bounded support",
+              f"- Distinct clean delayed-link pools: **{distinct_delayed_pools}/{minimum_pools}**",
+              f"- Bounded pattern supported: **{pattern_supported}**",
+              f"- Longitudinal pattern verified: **{aggregate.get('departure_pattern_verified') is True}**",
+              f"- Complete counterexamples: **{complete_counterexamples}**",
+              f"- Incomplete/ambiguous observations: **{int(counts.get('unavailable_or_incomplete', 0) or 0) + int(counts.get('same_slot_ambiguity', 0) or 0)}**",
+              f"- Raw live unittest exit: `{os.environ.get('LIVE_TEST_RC')}`",
+              "",
+              "A single clean delayed link is valid event-level evidence and does not require a pattern threshold. Three clean links across at least two distinct pools, with zero complete counterexamples, support the bounded pattern. departure_pattern_verified is reserved for a separate accumulated-evidence verifier. Counterexamples block pattern support but are scientific evidence, not CI failure by themselves.",
+          ]
+          summary_path.write_text("\n".join(summary) + "\n", encoding="utf-8")
+
+          if integrity_errors:
+              raise SystemExit("; ".join(integrity_errors))
+
+          live_test_rc = int(os.environ.get("LIVE_TEST_RC", "1"))
+          if live_test_rc != 0:
+              raise SystemExit(
+                  f"live delayed-departure unittest failed with exit code {live_test_rc}"
+              )
+          PY
+
+      - name: Cross-check evidence signatures on independent archival RPC
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f delayed-vault-evidence.json ]; then
+            echo "No structured live evidence available for secondary RPC corroboration."
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          evidence = json.loads(Path("delayed-vault-evidence.json").read_text(encoding="utf-8"))
+          rpc_url = os.environ["X1_SECONDARY_RPC_URL"]
+          observations = {}
+
+          def walk(value):
+              if isinstance(value, dict):
+                  signature = value.get("signature")
+                  if isinstance(signature, str) and signature.strip():
+                      signature = signature.strip()
+                      slot = value.get("slot")
+                      block_time = value.get("block_time")
+                      current = observations.setdefault(signature, {"expected_slots": set(), "expected_block_times": set()})
+                      if isinstance(slot, int) and not isinstance(slot, bool):
+                          current["expected_slots"].add(slot)
+                      if isinstance(block_time, (int, float)) and not isinstance(block_time, bool):
+                          current["expected_block_times"].add(int(block_time))
+                  for child in value.values():
+                      walk(child)
+              elif isinstance(value, list):
+                  for child in value:
+                      walk(child)
+
+          walk(evidence)
+          contradictions = []
+          rows = []
+          for signature in sorted(observations)[:50]:
+              expected = observations[signature]
+              if len(expected["expected_slots"]) > 1:
+                  contradictions.append(f"{signature}: conflicting primary evidence slots")
+              if len(expected["expected_block_times"]) > 1:
+                  contradictions.append(f"{signature}: conflicting primary evidence block times")
+
+              payload = json.dumps({
+                  "jsonrpc": "2.0",
+                  "id": 1,
+                  "method": "getTransaction",
+                  "params": [signature, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
+              }).encode("utf-8")
+              request = urllib.request.Request(
+                  rpc_url,
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              row = {
+                  "signature": signature,
+                  "secondary_rpc": rpc_url,
+                  "explorer_url": f"https://explorer.x1.xyz/tx/{signature}",
+                  "expected_slots": sorted(expected["expected_slots"]),
+                  "expected_block_times": sorted(expected["expected_block_times"]),
+                  "status": "unavailable",
+              }
+              try:
+                  with urllib.request.urlopen(request, timeout=12) as response:
+                      body = json.loads(response.read().decode("utf-8"))
+                  result = body.get("result") if isinstance(body, dict) else None
+                  if isinstance(result, dict):
+                      row["status"] = "corroborated"
+                      row["secondary_slot"] = result.get("slot")
+                      row["secondary_block_time"] = result.get("blockTime")
+                      if expected["expected_slots"] and result.get("slot") not in expected["expected_slots"]:
+                          contradictions.append(f"{signature}: secondary RPC slot mismatch")
+                      secondary_time = result.get("blockTime")
+                      if expected["expected_block_times"] and isinstance(secondary_time, (int, float)) and int(secondary_time) not in expected["expected_block_times"]:
+                          contradictions.append(f"{signature}: secondary RPC block-time mismatch")
+                  else:
+                      row["warning"] = "secondary_rpc_transaction_unavailable"
+              except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+                  row["warning"] = f"secondary_rpc_unavailable: {type(exc).__name__}"
+              rows.append(row)
+
+          report = {
+              "service": "x1_delayed_departure_secondary_rpc_corroboration",
+              "secondary_rpc": rpc_url,
+              "signature_count": len(rows),
+              "corroborated_count": sum(1 for row in rows if row.get("status") == "corroborated"),
+              "contradiction_count": len(contradictions),
+              "contradictions": contradictions,
+              "source_independence_promoted": False,
+              "cmis_promotable": False,
+              "execution_authorized": False,
+              "rows": rows,
+          }
+          Path("delayed-vault-secondary-rpc.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          summary_path = Path(os.environ.get("GITHUB_STEP_SUMMARY", "delayed-vault-summary.md"))
+          with summary_path.open("a", encoding="utf-8") as handle:
+              handle.write("\n## Independent archival RPC corroboration\n\n")
+              handle.write(f"- Signatures checked: **{len(rows)}**\n")
+              handle.write(f"- Corroborated: **{report['corroborated_count']}**\n")
+              handle.write(f"- Contradictions: **{len(contradictions)}**\n")
+              handle.write("- Explorer transaction links are retained per signature for human inspection.\n")
+              handle.write("- Secondary availability alone does not promote source independence.\n")
+          if contradictions:
+              raise SystemExit("; ".join(contradictions))
+          PY
+
+      - name: Restore accumulated evidence ledger
+        if: always()
+        uses: actions/cache/restore@v4
+        with:
+          path: .evidence-ledger/x1-delayed-departure-ledger.jsonl
+          key: x1-delayed-vault-ledger-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            x1-delayed-vault-ledger-
+
+      - name: Append current evidence to deterministic ledger
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f delayed-vault-evidence.json ]; then
+            echo "No structured live evidence available to append."
+            exit 0
+          fi
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = json.loads(Path("delayed-vault-evidence.json").read_text(encoding="utf-8"))
+          aggregate = evidence.get("aggregate") if isinstance(evidence, dict) else None
+          events = aggregate.get("events") if isinstance(aggregate, dict) else []
+          if not isinstance(events, list):
+              raise SystemExit("aggregate events are malformed")
+
+          ledger_path = Path(".evidence-ledger/x1-delayed-departure-ledger.jsonl")
+          ledger_path.parent.mkdir(parents=True, exist_ok=True)
+          existing = {}
+          if ledger_path.exists():
+              for number, line in enumerate(ledger_path.read_text(encoding="utf-8").splitlines(), 1):
+                  if not line.strip():
+                      continue
+                  try:
+                      row = json.loads(line)
+                  except json.JSONDecodeError as exc:
+                      raise SystemExit(f"ledger line {number} is malformed: {exc}") from exc
+                  key = row.get("event_key")
+                  if not isinstance(key, str) or not key:
+                      raise SystemExit(f"ledger line {number} has no event_key")
+                  existing[key] = row
+
+          appended = 0
+          duplicate = 0
+          conflicts = []
+          for event in events:
+              if not isinstance(event, dict):
+                  continue
+              event_key = event.get("event_key")
+              if not isinstance(event_key, str) or not event_key:
+                  continue
+              canonical = json.dumps(event, sort_keys=True, separators=(",", ":"), default=str)
+              event_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+              current = existing.get(event_key)
+              if current is not None:
+                  if current.get("event_sha256") != event_hash:
+                      conflicts.append(event_key)
+                  else:
+                      duplicate += 1
+                  continue
+              existing[event_key] = {
+                  "event_key": event_key,
+                  "event_sha256": event_hash,
+                  "source_run_id": os.environ.get("GITHUB_RUN_ID"),
+                  "source_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+                  "source_head_sha": os.environ.get("GITHUB_SHA"),
+                  "pool_address": event.get("pool_address"),
+                  "outcome": event.get("outcome"),
+                  "price_only_reserve_ratio_departure_verified": event.get("price_only_reserve_ratio_departure_verified") is True,
+                  "delayed_vault_swap_execution_link_verified": event.get("delayed_vault_swap_execution_link_verified") is True,
+                  "event": event,
+              }
+              appended += 1
+
+          if conflicts:
+              raise SystemExit("ledger event-key content conflict: " + ", ".join(conflicts))
+
+          ordered = [existing[key] for key in sorted(existing)]
+          ledger_path.write_text(
+              "".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in ordered),
+              encoding="utf-8",
+          )
+          outcomes = {}
+          for row in ordered:
+              outcome = str(row.get("outcome") or "unknown")
+              outcomes[outcome] = outcomes.get(outcome, 0) + 1
+          report = {
+              "service": "x1_delayed_departure_evidence_ledger",
+              "schema_version": 1,
+              "ledger_event_count": len(ordered),
+              "appended_event_count": appended,
+              "duplicate_event_count": duplicate,
+              "outcome_counts": outcomes,
+              "promotion_computed_from_ledger": False,
+              "cmis_promotable": False,
+              "execution_authorized": False,
+          }
+          Path("delayed-vault-ledger-summary.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          summary_path = Path(os.environ.get("GITHUB_STEP_SUMMARY", "delayed-vault-summary.md"))
+          with summary_path.open("a", encoding="utf-8") as handle:
+              handle.write("\n## Accumulated evidence ledger\n\n")
+              handle.write(f"- Ledger events retained: **{len(ordered)}**\n")
+              handle.write(f"- New events this run: **{appended}**\n")
+              handle.write(f"- Exact duplicates ignored: **{duplicate}**\n")
+              handle.write("- Ledger is evidentiary only; promotion is still computed by the bounded verifier, not by selectively pooling rows.\n")
+          PY
+
+      - name: Save accumulated evidence ledger
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .evidence-ledger/x1-delayed-departure-ledger.jsonl
+          key: x1-delayed-vault-ledger-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload bounded live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-ninja-delayed-vault-departure-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            delayed-vault-evidence.json
+            delayed-vault-live.log
+            delayed-vault-secondary-rpc.json
+            delayed-vault-ledger-summary.json
+            .evidence-ledger/x1-delayed-departure-ledger.jsonl
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1.Ninja/X1 RPC/XDEX delayed-departure evidence only."
+          echo "Primary on-chain proof uses exact X1 RPC pool/vault histories and verified XDEX transactions."
+          echo "A separate archival RPC may corroborate immutable signature/slot/block-time facts but cannot promote source independence by itself."
+          echo "Official X1 Explorer links are retained only as human-readable corroboration references."
+          echo "The cache-backed ledger preserves observations across runs but never cherry-picks rows for promotion."
+          echo "Live collection bounds: up to 150 exact-XNT pools, 400 snapshots, and a 40 price-only-candidate collection target."
+          echo "Fixed pre-BEFORE lookback: 900 seconds, max 100 signatures per exact vault."
+          echo "One clean delayed link is valid event-level evidence below any pattern threshold."
+          echo "Three clean delayed links across at least two distinct pools support the bounded pattern."
+          echo "Longitudinal departure_pattern_verified remains reserved for a separate accumulated-evidence verifier."
+          echo "Insufficient live observations and complete counterexamples are evidence states, not software failure by themselves."
+          echo "Contradictory immutable facts and evidence-integrity violations still fail closed."
+          echo "No provider source/fact-time/freshness inference from timing correlation."
+          echo "No priceUsd, liquidity, TVL, transaction construction, signing, broadcasting, custody, trading, or execution promotion."

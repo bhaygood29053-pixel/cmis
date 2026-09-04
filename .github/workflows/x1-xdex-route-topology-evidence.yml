@@ -1,0 +1,48 @@
+name: X1 XDEX Route Topology Evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/issue367-routed-multi-amm-ambiguity
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xdex-route-topology:
+    name: Characterize bounded XDEX route topology
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/issue374-xdex-route-topology'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_XDEX_ROUTE_TOPOLOGY_LIVE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run deterministic route-topology tests
+        run: |
+          python -m unittest tests.test_x1_xdex_route_topology -v
+      - name: Run eight-signature live development evidence
+        run: |
+          python -m unittest tests.test_x1_xdex_route_topology_live -v
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only X1 RPC route-topology evidence only."
+          echo "Development set is signatures #1-#8 from the failed #363 window."
+          echo "Holdout signatures #9-#12 are intentionally not consumed by this workflow."
+          echo "No #363 classifier, lookback, signature cap, tolerance, or five-event threshold changes."
+          echo "No TWAP/limit/TP/SL origin claim without independent evidence."
+          echo "classification_change_authorized=false"
+          echo "cmis_promotable=false"
+          echo "execution_authorized=false"
