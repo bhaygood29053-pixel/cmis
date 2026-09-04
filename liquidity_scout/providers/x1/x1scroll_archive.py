@@ -115,9 +115,13 @@ def x1scroll_rpc_request(
                 break
             sleep(0.75 * (2 ** attempt))
 
-    # Never echo rpc_url: the API key is part of that URL.
+    # Never echo the underlying exception text here. HTTP client exceptions
+    # commonly include the request URL, and the X1Scroll API key is embedded in
+    # that URL path.
+    failure_type = type(last_error).__name__ if last_error is not None else "UnknownError"
     raise X1ScrollArchiveError(
-        f"X1Scroll archival RPC {method} failed after {retries} attempts: {last_error}"
+        f"X1Scroll archival RPC {method} failed after {retries} attempts "
+        f"({failure_type})."
     ) from last_error
 
 
