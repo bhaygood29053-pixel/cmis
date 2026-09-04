@@ -182,7 +182,7 @@ Provider-gap work remains read-only and fail-closed. Closed research branches an
 ### Closed provider-candidate cleanup
 
 - **PR #242 — Warp Bridge:** closed as not currently verifiable. No exact provenance-approved machine-readable read contract is accepted.
-- **PR #229 — X1Scroll:** closed and removed from CMIS integration scope because the required API key was unavailable; the verification job stopped before any provider request.
+- **PR #229 — historical X1Scroll attempt:** closed because the required API key was unavailable at that time. **Issue #456** reopens only the now-reproducible provider-documented known-signature `getTransaction` surface as a bounded archival-provider foundation; live activation, discovery methods, archive completeness, and source independence remain separate gates.
 - **PR #227 — FortiBlox:** closed/archive candidate research. No exact reproducible provider-owned endpoint/response contract is accepted.
 
 ### Issue #272 — Oracle V2 read-only price evidence ⚠️ Freshness governance complete; current price still unavailable
