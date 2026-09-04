@@ -198,6 +198,12 @@ jobs:
 
           if integrity_errors:
               raise SystemExit("; ".join(integrity_errors))
+
+          live_test_rc = int(os.environ.get("LIVE_TEST_RC", "1"))
+          if live_test_rc != 0:
+              raise SystemExit(
+                  f"live delayed-departure unittest failed with exit code {live_test_rc}"
+              )
           PY
 
       - name: Cross-check evidence signatures on independent archival RPC
