@@ -16,7 +16,7 @@ Accepted baseline:
 
 - capability schema: `1`
 - global existing-service minimum: `1.8.0`
-- current CMIS contract: `1.15.0`
+- current CMIS contract: `1.19.0`
 - request path: `/v1/cmis`
 - Evidence Receipt schema: `1`
 - Proof Score schema: `1`
@@ -209,3 +209,35 @@ The live `/v1/cmis/capabilities` response is authoritative for deployed eligibil
 ## Safety boundary
 
 This capability contract authorizes no transaction construction, simulation as an execution precursor, signing, broadcasting, custody, swap execution, autonomous trading, bridge transfer, or autonomous value movement.
+
+
+## Bridge-to-XDEX Utilization — CMIS 1.19.0
+
+Issue #482 promotes the already accepted `bridge_to_xdex_utilization/v1`
+contract for X1 as a bounded read-only public service and authorizes X1 Scout
+reliance on that exact CMIS result.
+
+```text
+service = bridge_to_xdex_utilization
+service_contract_version = bridge_to_xdex_utilization/v1
+chain = x1
+state = bounded
+callable = true
+read_only = true
+public_service_promoted = true
+scout_reliance_promoted = true
+execution_authorized = false
+```
+
+The public response accepts only a CMIS-owned canonical #410 record resolved
+inside the protected runtime. It revalidates the content hash, exact route,
+source/destination mints, verified XDEX program-family scope, 24h coverage,
+USD-unit compatibility, fact-time freshness, comparable value basis, and
+non-promotion guardrails.
+
+This promotion does not make the verified XDEX program family every X1 DEX.
+A bounded zero wSOL.X result is not a global zero. Bridge activity is not
+adoption. Liquidity is not volume. No causal inference or automatic risk
+conclusion is authorized. Global on-chain DEX discovery and recognized-program
+registry exhaustiveness remain false; source independence remains false unless
+separately proven.

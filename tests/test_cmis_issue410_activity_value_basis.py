@@ -344,6 +344,11 @@ class FinalIssue410CompositionTests(unittest.TestCase):
         bridge = {
             "contract": "warp_bridge_flow_integration/v1",
             "route_id": WSOL_ROUTE_ID,
+            "source": {
+                "chain": "solana",
+                "asset_id": WSOL_MINT,
+                "asset_id_kind": "mint",
+            },
             "destination": {
                 "chain": "x1",
                 "asset_id": WSOL_X_DESTINATION_MINT,
@@ -379,6 +384,12 @@ class FinalIssue410CompositionTests(unittest.TestCase):
             value_basis=basis,
         )
         self.assertTrue(result["final_zero_pool_composition_verified"])
+        self.assertEqual(result["source_chain"], "solana")
+        self.assertEqual(result["source_mint"], WSOL_MINT)
+        self.assertEqual(result["destination_chain"], "x1")
+        self.assertEqual(result["destination_mint"], WSOL_X_DESTINATION_MINT)
+        self.assertFalse(result["recognized_program_registry_globally_exhaustive"])
+        self.assertFalse(result["global_onchain_pool_discovery_proven"])
         self.assertTrue(result["issue_410_acceptance_verified"])
         self.assertEqual(result["verified_xdex_liquidity_value"], "0")
         self.assertEqual(result["verified_xdex_volume_24h_value"], "0")

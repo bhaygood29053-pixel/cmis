@@ -894,3 +894,17 @@ Controlled Execution remains unauthorized.
 - **CMIS Web Discovery v1-v5: COMPLETE internally through PR #481.**
 - **CMIS #363:** parallel delayed-vault/X1.Ninja research; not the flagship blocker.
 - `execution_authorized=false`.
+
+
+### Priority 1 — #482 Bridge-to-XDEX public promotion
+
+**ACTIVE.** #410 is accepted. The remaining gate is the CMIS 1.19 public
+projection and protected runtime pass-through for
+`bridge_to_xdex_utilization/v1`. Promotion is bounded to the verified XDEX
+program family and preserves exact route/mint identity, 24h coverage, USD value
+basis, evidence hash/fact time, and explicit unknown/global-scope limits.
+
+The promotion must not convert bounded zero wSOL.X activity into a global X1
+DEX claim, bridge flow into adoption, liquidity into volume, descriptive ratios
+into causality, or any result into an automatic risk conclusion. ROBERTA #314
+remains blocked until the paired public/protected #482 gate is accepted.
