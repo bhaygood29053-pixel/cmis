@@ -39,7 +39,7 @@ jobs:
   warp-bridged-supply-live:
     name: Verify live exact Warp vault/mint supply closure
     needs: warp-bridged-supply-unit
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue451-warp-bridged-supply-evidence')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue451-warp-bridged-supply-evidence') || startsWith(github.head_ref, 'evidence/x1-usdcx-bridge-parity')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -147,6 +147,89 @@ jobs:
           assert result["provider_tvl_label_promoted"] is False
           assert result["public_service_promoted"] is False
           assert result["scout_reliance_promoted"] is False
+          assert result["execution_authorized"] is False
+          PY
+
+      - name: Prove current exact USDC -> USDC.X Warp backing closure
+        run: |
+          python - <<'PY'
+          import json
+          import time
+
+          from liquidity_scout.providers.x1.warp_bridged_supply_evidence import (
+              USDC_ROUTE_ID,
+              USDC_SOURCE_MINT,
+              USDC_X_DESTINATION_MINT,
+              build_warp_bridged_supply_evidence,
+              capture_destination_mint_observation,
+              capture_source_vault_observation,
+          )
+          from liquidity_scout.providers.x1.warp_config_semantics import (
+              build_warp_config_route_observation,
+          )
+          from liquidity_scout.providers.x1.warp_message_retention_coverage import (
+              fetch_official_warp_config,
+          )
+
+          def endpoint(chain, mint):
+              return {
+                  "chain": chain,
+                  "asset_id": mint,
+                  "asset_id_kind": "mint",
+              }
+
+          official = fetch_official_warp_config()
+          route = build_warp_config_route_observation(
+              config_response=official,
+              route_id=USDC_ROUTE_ID,
+              source=endpoint("solana", USDC_SOURCE_MINT),
+              destination=endpoint("x1", USDC_X_DESTINATION_MINT),
+          )
+          source = capture_source_vault_observation(
+              source_mint=USDC_SOURCE_MINT,
+          )
+          destination = capture_destination_mint_observation(
+              destination_mint=USDC_X_DESTINATION_MINT,
+          )
+          result = build_warp_bridged_supply_evidence(
+              route_observation=route,
+              source_vault=source,
+              destination_mint=destination,
+              evaluated_at=time.time(),
+          )
+
+          evidence = {
+              "contract": result["contract"],
+              "route_id": result["route_id"],
+              "source": result["source"],
+              "destination": result["destination"],
+              "decimals_verified": result["decimals_verified"],
+              "observation_skew_seconds": result["observation_skew_seconds"],
+              "observation_time_compatible": result["observation_time_compatible"],
+              "source_vault_balance_equals_destination_supply": result[
+                  "source_vault_balance_equals_destination_supply"
+              ],
+              "current_backing_closure_verified": result[
+                  "current_backing_closure_verified"
+              ],
+              "bridged_supply_verified": result["bridged_supply_verified"],
+              "amount_raw": result["amount_raw"],
+              "amount": result["amount"],
+              "decimals": result["decimals"],
+              "execution_authorized": result["execution_authorized"],
+              "evidence_sha256": result["evidence_sha256"],
+          }
+          print("WARP_USDC_USDCX_BACKING_EVIDENCE")
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+
+          assert result["source"]["identity_verified"] is True
+          assert result["destination"]["identity_verified"] is True
+          assert result["decimals_verified"] is True
+          assert result["observation_time_compatible"] is True
+          assert result["source_vault_balance_equals_destination_supply"] is True
+          assert result["current_backing_closure_verified"] is True
+          assert result["bridged_supply_verified"] is True
+          assert result["supply_evidence"]["verified"] is True
           assert result["execution_authorized"] is False
           PY
 
