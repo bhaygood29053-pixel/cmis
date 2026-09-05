@@ -86,6 +86,11 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_ninja_semantic_coverage_reconciliation.py
 
+      - name: Test X1.Ninja bulk revaluation watch selection
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_ninja_revaluation_watch.py
+
       - name: Validate Phase 6 public boundary
         shell: bash
         run: |
