@@ -54,7 +54,7 @@ Until #470 merges, `x1_ninja_liquidity_usd_semantics_verified` remains unpromote
 
 ## Web Discovery
 
-CMIS Web Discovery v1-v5 is complete internally through PR #481.
+CMIS Web Discovery v1-v5 is complete internally through PR #481; Issue #483 is the active v6 XDEX network-gap registry. Issue #483 is the active v6 XDEX network-gap registry.
 
 Current discovery stack includes:
 
