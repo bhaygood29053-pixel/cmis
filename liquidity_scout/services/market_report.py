@@ -155,6 +155,22 @@ def build_market_report(term: str, matches: Sequence[Match], catalog: Any) -> Di
 
     holder_observed_max = max(holder_observations) if holder_observations else None
 
+    contributing_pools = []
+    for pool in pools:
+        address = pool_address(pool) or None
+        contributing_pools.append(
+            {
+                "address": address,
+                "pair": pair_name(pool),
+                "liquidity_usd": _first_number(pool, ("liquidity",)),
+                "volume_24h_usd": _first_number(pool, ("volume24h",)),
+                "transactions_24h": _first_number(
+                    pool,
+                    ("txns24h", "transactions24h"),
+                ),
+            }
+        )
+
     return {
         "symbol": symbol,
         "name": name or None,
@@ -189,6 +205,7 @@ def build_market_report(term: str, matches: Sequence[Match], catalog: Any) -> Di
         "safety_score": _first_number(primary_pool, ("safetyScore",)),
         "created_at": primary_pool.get("createdAt"),
         "lp_count": len(pools),
+        "contributing_pools": contributing_pools,
         "primary_pool": {
             "address": pool_address(primary_pool) or None,
             "pair": pair_name(primary_pool),
