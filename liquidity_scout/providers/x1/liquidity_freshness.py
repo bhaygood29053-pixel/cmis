@@ -29,9 +29,11 @@ from liquidity_scout.providers.x1.ninja_pooled_reserve_semantics import (
     DEFAULT_RELATIVE_TOLERANCE as RESERVE_RELATIVE_TOLERANCE,
 )
 from liquidity_scout.providers.x1.xdex_price_history_import import WRAPPED_XNT_MINT
+from liquidity_scout.market.resolver import find_matches_for_term, pool_address
 
 
 VERSION = "x1_ninja_liquidity_freshness/v1"
+POOL_SCOPE_VERSION = "x1_ninja_current_pool_scope/v1"
 REFERENCE_POOL_ADDRESS = "CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR"
 ACCEPTED_SEMANTIC_PR = 470
 ACCEPTED_SEMANTIC_MERGE_COMMIT = "e39182295d1c6c7da295280ef05a0bd457f12d93"
@@ -254,11 +256,93 @@ def _xnt_usd_from_reference(
     }
 
 
+def evaluate_x1_ninja_current_pool_scope(
+    *,
+    market_envelope: Mapping[str, Any],
+    catalog_pools: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Verify that the market report includes every current exact-mint Ninja pool.
+
+    This is provider-scoped completeness only. It does not prove XDEX global
+    pool-universe completeness, on-chain program exhaustiveness, or source
+    independence.
+    """
+
+    asset = _mapping(market_envelope.get("asset"))
+    data = _mapping(market_envelope.get("data"))
+    mint = _text(asset.get("mint") or data.get("mint"))
+    expected = _contributing_pool_addresses(market_envelope)
+
+    failures: list[str] = []
+    if not mint:
+        failures.append("market_asset_mint_unavailable")
+    if not expected:
+        failures.append("market_contributing_pool_set_unavailable")
+
+    current_matches = []
+    if mint:
+        current_matches = [
+            match
+            for match in find_matches_for_term(mint, catalog_pools)
+            if len(match) >= 4 and match[3] >= 90
+        ]
+
+    matched_addresses = []
+    seen = set()
+    duplicate = False
+    for match in current_matches:
+        pool = match[0]
+        if not isinstance(pool, Mapping):
+            failures.append("catalog_match_pool_malformed")
+            continue
+        address = _text(pool_address(dict(pool)))
+        if not address:
+            failures.append("catalog_match_pool_address_unavailable")
+            continue
+        if address in seen:
+            duplicate = True
+            continue
+        seen.add(address)
+        matched_addresses.append(address)
+
+    if duplicate:
+        failures.append("catalog_exact_mint_pool_duplicate")
+    if mint and not matched_addresses:
+        failures.append("catalog_exact_mint_pool_set_empty")
+
+    exact_set_match = bool(
+        expected
+        and matched_addresses
+        and set(expected) == set(matched_addresses)
+        and len(expected) == len(matched_addresses)
+    )
+    if not exact_set_match:
+        failures.append("market_pool_set_does_not_match_current_catalog_exact_mint_set")
+
+    verified = not failures
+    return {
+        "contract_version": POOL_SCOPE_VERSION,
+        "chain": "x1",
+        "asset_mint": mint,
+        "market_contributing_pool_addresses": expected,
+        "current_catalog_exact_mint_pool_addresses": matched_addresses,
+        "market_pool_count": len(expected),
+        "current_catalog_exact_mint_pool_count": len(matched_addresses),
+        "provider_scoped_pool_universe_verified": verified,
+        "global_xdex_pool_universe_verified": False,
+        "onchain_program_pool_universe_verified": False,
+        "source_independence_verified": False,
+        "failures": list(dict.fromkeys(failures)),
+        "execution_authorized": False,
+    }
+
+
 def evaluate_x1_ninja_liquidity_freshness(
     *,
     market_envelope: Mapping[str, Any],
     snapshot: Mapping[str, Any],
     current_usdcx_usd_equivalence: Mapping[str, Any],
+    pool_scope_evidence: Mapping[str, Any],
     evaluated_at: float,
     max_pools: int = DEFAULT_MAX_POOLS,
     max_rpc_age_seconds: int = DEFAULT_MAX_RPC_AGE_SECONDS,
@@ -304,6 +388,18 @@ def evaluate_x1_ninja_liquidity_freshness(
         failures.append("contributing_pool_count_mismatch")
     if len(addresses) > max_pools:
         failures.append("contributing_pool_count_exceeds_corroboration_bound")
+
+    scope = _mapping(pool_scope_evidence)
+    pool_scope_verified = bool(
+        scope.get("contract_version") == POOL_SCOPE_VERSION
+        and scope.get("provider_scoped_pool_universe_verified") is True
+        and scope.get("global_xdex_pool_universe_verified") is False
+        and scope.get("execution_authorized") is False
+        and set(scope.get("market_contributing_pool_addresses") or []) == set(addresses)
+        and set(scope.get("current_catalog_exact_mint_pool_addresses") or []) == set(addresses)
+    )
+    if not pool_scope_verified:
+        failures.append("provider_scoped_pool_universe_unverified")
 
     bracket = _rpc_bracket(
         snapshot,
@@ -500,6 +596,9 @@ def evaluate_x1_ninja_liquidity_freshness(
         },
         "contributing_pool_count": len(addresses),
         "max_pool_count": max_pools,
+        "pool_scope_evidence": dict(scope),
+        "provider_scoped_pool_universe_verified": pool_scope_verified,
+        "global_xdex_pool_universe_verified": False,
         "all_contributing_pools_corroborated": all_pools_verified,
         "rpc_freshness": bracket,
         "current_usdcx_usd_equivalence_verified": (
@@ -532,8 +631,10 @@ __all__ = [
     "ACCEPTED_SEMANTIC_PR",
     "DEFAULT_MAX_POOLS",
     "DEFAULT_MAX_RPC_AGE_SECONDS",
+    "POOL_SCOPE_VERSION",
     "DEFAULT_MAX_FUTURE_SKEW_SECONDS",
     "REFERENCE_POOL_ADDRESS",
     "VERSION",
+    "evaluate_x1_ninja_current_pool_scope",
     "evaluate_x1_ninja_liquidity_freshness",
 ]
