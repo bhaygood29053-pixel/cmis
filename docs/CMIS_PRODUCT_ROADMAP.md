@@ -834,6 +834,7 @@ Future candidates — **not active milestones until separately accepted**:
 34. further field-by-field Solana maturity;
 35. Ethereum under an explicit capability/acceptance plan;
 36. investigation/evidence export and premium access.
+37. verified X1 trade attribution + pool price-impact intelligence under Issue #498: exact wallet/transaction/time, swap direction/amounts, pre-trade spot price, average execution price, post-trade pool spot price, next verified trade price, and measured-window volume contribution, with pool-local causality only and no wallet-owner/manipulation/whole-market inference.
 
 None authorizes execution.
 
