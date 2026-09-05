@@ -16,7 +16,7 @@ Accepted baseline:
 
 - capability schema: `1`
 - global existing-service minimum: `1.8.0`
-- current CMIS contract: `1.19.0`
+- current CMIS contract: `1.20.0`
 - request path: `/v1/cmis`
 - Evidence Receipt schema: `1`
 - Proof Score schema: `1`
@@ -241,3 +241,30 @@ adoption. Liquidity is not volume. No causal inference or automatic risk
 conclusion is authorized. Global on-chain DEX discovery and recognized-program
 registry exhaustiveness remain false; source independence remains false unless
 separately proven.
+
+
+## Cross-Chain Asset Provenance — CMIS 1.20.0
+
+Issue #491 promotes the accepted `cross_chain_asset_provenance/v1` foundation
+through a bounded X1-only public service.
+
+```text
+service = cross_chain_asset_provenance
+service_contract_version = cross_chain_asset_provenance/v1
+chain = x1
+state = bounded
+callable = true
+read_only = true
+public_service_promoted = true
+scout_reliance_promoted = true
+execution_authorized = false
+```
+
+The protected runtime owns the canonical provenance resolver. Scout callers may
+select a CMIS-owned content-addressed record and bind it to an exact current X1
+asset id/kind, but may not submit or reconstruct lineage, representation depth,
+bridge/custody dependencies, or verification claims.
+
+The service proves structural identity continuity only. It does not prove live
+bridge state, backing, solvency, safety, custody truth, adoption, causality,
+source independence, or risk. Symbol/name equality never establishes identity.
