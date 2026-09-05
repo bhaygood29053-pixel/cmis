@@ -126,7 +126,7 @@ jobs:
           print("EXECUTION_AUTHORIZED=FALSE")
           PY
 
-      - name: Validate CMIS 1.18 capability and Instant X1 Scan v3 freshness contract
+      - name: Validate CMIS 1.19 capability and Instant X1 Scan v3 freshness contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -159,7 +159,7 @@ jobs:
           assert '"continuous_coverage_verified": (' in scan_v2
           assert '"status": "not_requested"' in historical
           assert '"reason": "onchain_coverage_not_requested"' in historical
-          print("CMIS_118_CAPABILITY_AND_INSTANT_X1_SCAN_V3=PASS")
+          print("CMIS_119_CAPABILITY_AND_INSTANT_X1_SCAN_V3=PASS")
           PY
 
       - name: Test field-scoped freshness evaluator
@@ -167,7 +167,7 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_cmis_current_market_freshness_v117.py
 
-      - name: Validate CMIS 1.18 regression expectations
+      - name: Validate CMIS 1.19 regression expectations
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -175,11 +175,11 @@ jobs:
           capabilities_test = Path("tests/test_cmis_capabilities.py").read_text()
           http_test = Path("tests/test_cmis_http_gateway.py").read_text()
 
-          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.18.0")' in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.19.0")' in capabilities_test
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.17.0")' not in capabilities_test
-          assert 'response["contract_version"], "1.18.0"' in http_test
+          assert 'response["contract_version"], "1.19.0"' in http_test
           assert 'response["contract_version"], "1.17.0"' not in http_test
-          print("CMIS_118_REGRESSION_EXPECTATIONS=PASS")
+          print("CMIS_119_REGRESSION_EXPECTATIONS=PASS")
           PY
 
       - name: Test concentration warning intelligence v1
