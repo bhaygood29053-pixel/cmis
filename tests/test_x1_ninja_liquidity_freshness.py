@@ -1,4 +1,5 @@
 import unittest
+from decimal import Decimal
 
 from liquidity_scout.providers.x1.liquidity_freshness import (
     POOL_SCOPE_VERSION,
@@ -153,7 +154,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
         self.assertTrue(result["all_contributing_pools_corroborated"])
         self.assertTrue(result["rpc_freshness"]["rpc_block_time_fresh"])
         self.assertEqual(result["xnt_usd_basis"]["derived_xnt_usd"], "2")
-        self.assertEqual(result["derived_current_liquidity_sum_usd"], "500")
+        self.assertEqual(Decimal(result["derived_current_liquidity_sum_usd"]), Decimal("500"))
         self.assertTrue(
             result["market_vs_derived_current_aggregate"]["within_tolerance"]
         )
