@@ -33,6 +33,7 @@ DEFAULT_MAX_LINKS = 100
 DEFAULT_MAX_PAGES = 5
 DEFAULT_MAX_DEPTH = 1
 MAX_ALLOWED_DEPTH = 2
+MAX_REDIRECTS = 5
 MAX_QUERY_LENGTH = 500
 MAX_EXCERPT_CHARS = 8_000
 
@@ -419,30 +420,61 @@ class CMISWebDiscoveryProvider:
         requested_url = self.source.validate_url(url or self.source.default_url)
 
         response = None
-        try:
-            response = self.session.get(
-                requested_url,
-                timeout=self.timeout,
-                allow_redirects=True,
-                headers={
-                    "User-Agent": USER_AGENT,
-                    "Accept": "text/html,application/json,text/plain;q=0.9,*/*;q=0.1",
-                },
-            )
-        except Exception as exc:
-            raise WebDiscoveryHTTPError(
-                f"{self.source.source_id} discovery request failed: {exc}"
-            ) from exc
+        current_url = requested_url
+        redirect_chain: list[dict[str, Any]] = []
 
-        status = getattr(response, "status_code", None)
-        if isinstance(status, bool) or not isinstance(status, int):
-            raise WebDiscoveryHTTPError("response status code is missing or invalid")
-        if status < 200 or status >= 300:
-            raise WebDiscoveryHTTPError(
-                f"{self.source.source_id} discovery request returned HTTP {status}"
-            )
+        for redirect_index in range(MAX_REDIRECTS + 1):
+            try:
+                response = self.session.get(
+                    current_url,
+                    timeout=self.timeout,
+                    allow_redirects=False,
+                    headers={
+                        "User-Agent": USER_AGENT,
+                        "Accept": "text/html,application/json,text/plain;q=0.9,*/*;q=0.1",
+                    },
+                )
+            except Exception as exc:
+                raise WebDiscoveryHTTPError(
+                    f"{self.source.source_id} discovery request failed: {exc}"
+                ) from exc
 
-        raw_final_url = str(getattr(response, "url", "") or requested_url)
+            status = getattr(response, "status_code", None)
+            if isinstance(status, bool) or not isinstance(status, int):
+                raise WebDiscoveryHTTPError(
+                    "response status code is missing or invalid"
+                )
+
+            if status in {301, 302, 303, 307, 308}:
+                if redirect_index >= MAX_REDIRECTS:
+                    raise WebDiscoveryHTTPError(
+                        f"redirect count exceeds MAX_REDIRECTS={MAX_REDIRECTS}"
+                    )
+                location = _header(response, "Location")
+                if location is None:
+                    raise WebDiscoveryHTTPError(
+                        f"HTTP {status} redirect is missing Location"
+                    )
+                next_url = self.source.validate_url(urljoin(current_url, location))
+                redirect_chain.append(
+                    {
+                        "status_code": status,
+                        "from_url": current_url,
+                        "to_url": next_url,
+                    }
+                )
+                current_url = next_url
+                continue
+
+            if status < 200 or status >= 300:
+                raise WebDiscoveryHTTPError(
+                    f"{self.source.source_id} discovery request returned HTTP {status}"
+                )
+            break
+        else:
+            raise WebDiscoveryHTTPError("redirect handling exhausted unexpectedly")
+
+        raw_final_url = str(getattr(response, "url", "") or current_url)
         final_url = self.source.validate_url(raw_final_url)
 
         body = _response_bytes(response)
@@ -482,6 +514,7 @@ class CMISWebDiscoveryProvider:
                 "content_type": content_type or None,
                 "body_bytes": len(body),
                 "body_sha256": sha256(body).hexdigest(),
+                "redirects": redirect_chain,
             },
             "content": {
                 "kind": extracted["kind"],
@@ -579,6 +612,7 @@ __all__ = [
     "DEFAULT_TIMEOUT_SECONDS",
     "DISCOVERED",
     "MAX_ALLOWED_DEPTH",
+    "MAX_REDIRECTS",
     "MAX_QUERY_LENGTH",
     "SourceBoundaryError",
     "WebDiscoveryContentError",
