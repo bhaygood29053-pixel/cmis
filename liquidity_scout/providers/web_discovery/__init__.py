@@ -45,6 +45,14 @@ from .x1_explorer_structured import (
     parse_x1_explorer_url,
 )
 from .x1_ninja import X1_NINJA_WEB_SOURCE, X1NinjaWebDiscoveryProvider
+from .x1_ninja_semantic_coverage import (
+    BLOCKED as X1_NINJA_SEMANTIC_BLOCKED,
+    PARTIAL as X1_NINJA_SEMANTIC_PARTIAL,
+    SEMANTIC_COVERAGE_CONTRACT as X1_NINJA_SEMANTIC_COVERAGE_CONTRACT,
+    UNAVAILABLE as X1_NINJA_SEMANTIC_UNAVAILABLE,
+    VERIFIED as X1_NINJA_SEMANTIC_VERIFIED,
+    x1_ninja_semantic_coverage_reconciliation,
+)
 from .x1_ninja_network_gaps import (
     ACCESS_LIMITED_ROUTE as X1_NINJA_ACCESS_LIMITED_ROUTE,
     CAPABILITY_WITHOUT_MACHINE_CONTRACT as X1_NINJA_CAPABILITY_WITHOUT_MACHINE_CONTRACT,
@@ -130,6 +138,11 @@ __all__ = [
     "X1_NINJA_WEB_SOURCE",
     "X1_NINJA_STRUCTURED_CONTRACT",
     "X1_NINJA_NETWORK_API_GAP_INVENTORY_CONTRACT",
+    "X1_NINJA_SEMANTIC_COVERAGE_CONTRACT",
+    "X1_NINJA_SEMANTIC_VERIFIED",
+    "X1_NINJA_SEMANTIC_PARTIAL",
+    "X1_NINJA_SEMANTIC_BLOCKED",
+    "X1_NINJA_SEMANTIC_UNAVAILABLE",
     "X1_NINJA_COVERED_READ_ONLY_ROUTE",
     "X1_NINJA_ACCESS_LIMITED_ROUTE",
     "X1_NINJA_SEMANTIC_GAP_NOT_ROUTE_GAP",
@@ -172,6 +185,7 @@ __all__ = [
     "X1NinjaWebDiscoveryProvider",
     "parse_x1_ninja_url",
     "x1_ninja_network_api_gap_inventory",
+    "x1_ninja_semantic_coverage_reconciliation",
     "X1ReportDiscoveryProvider",
     "XDEXWebDiscoveryProvider",
     "parse_xdex_url",
