@@ -35,7 +35,7 @@ jobs:
 
       - name: Run #410 deterministic tests
         run: |
-          python -m pytest -q             tests/test_cmis_issue410_activity_value_basis.py             tests/test_cmis_bridge_to_xdex_utilization.py             tests/test_x1_verified_program_pool_set.py
+          python -m pytest -q tests/test_cmis_issue410_activity_value_basis.py tests/test_cmis_bridge_to_xdex_utilization.py tests/test_x1_xdex_representation_pool_universe.py tests/test_x1_verified_program_pool_set.py
 
   issue410-live-24h:
     name: Prove live wSOL.X 24h XDEX program activity window
