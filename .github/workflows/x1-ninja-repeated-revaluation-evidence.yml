@@ -1,0 +1,71 @@
+name: X1.Ninja Repeated Revaluation Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repeated-revaluation:
+    name: Live repeated same-fact X1.Ninja revaluation evidence
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'evidence/x1-liquidity-461-repeated-live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_LIQUIDITY_REVALUATION_SERIES_LIVE: "1"
+      X1_NINJA_LIQUIDITY_REVALUATION_SERIES_MAX_WAIT_SECONDS: "900"
+      X1_NINJA_LIQUIDITY_REVALUATION_SERIES_POLL_SECONDS: "20"
+      X1_NINJA_LIQUIDITY_REVALUATION_SERIES_MIN_EVENTS: "3"
+      X1_NINJA_LIQUIDITY_REVALUATION_SERIES_MIN_POOLS: "2"
+      X1_NINJA_LIQUIDITY_REFERENCE_REL_TOL: "0.000001"
+      X1_NINJA_LIQUIDITY_TRANSITION_LOOKBACK_SLOTS: "2500"
+      X1_NINJA_LIQUIDITY_TRANSITION_RATE_LIMIT_BACKOFF_SECONDS: "65"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Run deterministic revaluation-series policy tests
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_revaluation_series -v
+
+      - name: Capture repeated same-fact revaluation evidence
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_revaluation_series_live -v
+
+      - name: Safety and promotion boundary
+        if: always()
+        run: |
+          echo "Read-only X1.Ninja/XDEX/X1 RPC evidence only."
+          echo "Repeated revaluation may establish fact-time only after the explicit series thresholds pass."
+          echo "USDC.X/USD destination reserve/redemption/value equivalence remains separately required."
+          echo "current_usdcx_usd_equivalence_verified=false"
+          echo "x1_ninja_liquidity_usd_semantics_verified=false"
+          echo "liquidity_freshness_verified=false"
+          echo "cmis_promotable=false"
+          echo "execution_authorized=false"
