@@ -12,6 +12,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - **PR #469 is the final #410 evidence slice.** Its current exact-head deterministic/regression CI, bounded 24h XDEX-program activity window, comparable wSOL.X USD value basis, and dedicated Bridge-to-XDEX Final workflow are green. The PR remains unmerged, so final #410 acceptance and any ROBERTA reliance are still pending merge/reconciliation plus separate public-service / Scout-reliance promotion.
 - Existing promoted CMIS services and capability contract `1.18.0` remain unchanged by these open evidence PRs.
 - **CMIS Web Discovery v1-v4: COMPLETE as internal DISCOVERED-only foundations.** PR #472 added bounded six-source discovery; PR #474 added X1 Explorer structured discovery; PR #476 added sanitized network observation; PR #478 added operator-controlled one-page passive browser capture with optional lazy Playwright and no clicks/forms/wallet interaction/replay/raw HAR retention. None of these layers is public-service or Scout-reliance promoted.
+- **Issue #479 — XDEX Structured Discovery v1: ACTIVE.** The next source-specific Web Discovery slice recognizes only the four already accepted read-only XDEX API paths plus XDEX GitBook documentation, validates exact query identity/bounds, and hands candidate endpoints back to the existing `XDEXReadOnlyProvider` and X1 RPC/semantic verification contracts rather than creating a second XDEX truth or quote path.
 - Controlled Execution remains locked: `execution_authorized=false`.
 
 ## Product naming invariant
