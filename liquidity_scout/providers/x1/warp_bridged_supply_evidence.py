@@ -31,6 +31,9 @@ from liquidity_scout.providers.x1.warp_config_semantics import (
 from liquidity_scout.providers.x1.warp_semantic_layout_discovery import (
     find_program_address,
 )
+from liquidity_scout.providers.x1.warp_onchain_transfer_history import (
+    CONTRACT as WARP_TRANSFER_HISTORY_CONTRACT,
+)
 
 CONTRACT = "warp_bridged_supply_evidence/v1"
 SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
@@ -527,6 +530,248 @@ def build_warp_bridged_supply_evidence(
     return result
 
 
+
+def _verified_message_rows(message_state: Any, chain: str, side: str) -> list[Mapping[str, Any]]:
+    if not isinstance(message_state, Mapping):
+        raise WarpBridgedSupplyEvidenceError("message_state must be an object")
+    if message_state.get("contract") != WARP_TRANSFER_HISTORY_CONTRACT:
+        raise WarpBridgedSupplyEvidenceError(
+            "accepted Warp on-chain transfer-history contract is required"
+        )
+    chain_block = message_state.get(chain)
+    if not isinstance(chain_block, Mapping):
+        raise WarpBridgedSupplyEvidenceError(f"{chain} message snapshot is required")
+    side_block = chain_block.get(side)
+    if not isinstance(side_block, Mapping):
+        raise WarpBridgedSupplyEvidenceError(
+            f"{chain}.{side} message snapshot is required"
+        )
+    if side_block.get("account_type_identity_verified") is not True:
+        raise WarpBridgedSupplyEvidenceError(
+            f"{chain}.{side} account-type identity is unverified"
+        )
+    if side_block.get("all_pda_identities_verified") is not True:
+        raise WarpBridgedSupplyEvidenceError(
+            f"{chain}.{side} PDA identity is unverified"
+        )
+    rows = side_block.get("accounts")
+    if not isinstance(rows, list):
+        raise WarpBridgedSupplyEvidenceError(
+            f"{chain}.{side}.accounts must be a list"
+        )
+    return rows
+
+
+def build_warp_liability_adjusted_backing_evidence(
+    *,
+    route_observation: Any,
+    source_vault: Any,
+    destination_mint: Any,
+    message_state: Any,
+    evaluated_at: Any,
+    max_observation_skew_seconds: float = DEFAULT_MAX_OBSERVATION_SKEW_SECONDS,
+) -> dict[str, Any]:
+    """Reconcile current source-vault surplus against exact in-flight Warp claims.
+
+    Strict vault == wrapped-supply equality is sufficient when no transfer is in
+    flight, but it is not necessary. A Solana->X1 deposit can increase the source
+    vault before destination minting, while an X1->Solana BridgeOut can burn the
+    wrapped representation before the source vault unlocks.
+
+    This contract therefore accepts a non-zero source-vault surplus only when it
+    equals the sum of exact route-scoped outgoing messages whose matching
+    destination IncomingMsg is still absent or not yet processed/claimed.
+    """
+
+    strict = build_warp_bridged_supply_evidence(
+        route_observation=route_observation,
+        source_vault=source_vault,
+        destination_mint=destination_mint,
+        evaluated_at=evaluated_at,
+        max_observation_skew_seconds=max_observation_skew_seconds,
+    )
+
+    source = route_observation.get("source") if isinstance(route_observation, Mapping) else None
+    destination = (
+        route_observation.get("destination")
+        if isinstance(route_observation, Mapping)
+        else None
+    )
+    if not isinstance(source, Mapping) or not isinstance(destination, Mapping):
+        raise WarpBridgedSupplyEvidenceError("route endpoints are required")
+
+    canonical_source_mint = _text(source.get("asset_id"), "route.source.asset_id")
+    wrapped_destination_mint = _text(
+        destination.get("asset_id"),
+        "route.destination.asset_id",
+    )
+
+    sol_out = _verified_message_rows(message_state, "solana", "outgoing")
+    x1_out = _verified_message_rows(message_state, "x1", "outgoing")
+    sol_in = _verified_message_rows(message_state, "solana", "incoming")
+    x1_in = _verified_message_rows(message_state, "x1", "incoming")
+
+    incoming_by_chain_seq = {
+        "solana": {int(row["source_seq"]): row for row in sol_in},
+        "x1": {int(row["source_seq"]): row for row in x1_in},
+    }
+
+    directions = [
+        {
+            "actual_source_chain": "solana",
+            "actual_destination_chain": "x1",
+            "outgoing_rows": sol_out,
+            "source_mint": canonical_source_mint,
+            "destination_mint": wrapped_destination_mint,
+            "expected_out_operation": 1,
+            "expected_in_operation": 0,
+        },
+        {
+            "actual_source_chain": "x1",
+            "actual_destination_chain": "solana",
+            "outgoing_rows": x1_out,
+            "source_mint": wrapped_destination_mint,
+            "destination_mint": canonical_source_mint,
+            "expected_out_operation": 0,
+            "expected_in_operation": 1,
+        },
+    ]
+
+    outstanding = []
+    settled_match_count = 0
+    ambiguous = []
+
+    for spec in directions:
+        incoming_index = incoming_by_chain_seq[spec["actual_destination_chain"]]
+        for outgoing in spec["outgoing_rows"]:
+            if outgoing.get("token_mint") != spec["source_mint"]:
+                continue
+            seq = _nonnegative_int(outgoing.get("seq"), "outgoing.seq")
+            amount_raw = _nonnegative_int(
+                outgoing.get("amount_raw"),
+                "outgoing.amount_raw",
+            )
+            incoming = incoming_index.get(seq)
+
+            if incoming is None:
+                outstanding.append(
+                    {
+                        "actual_source_chain": spec["actual_source_chain"],
+                        "actual_destination_chain": spec["actual_destination_chain"],
+                        "seq": seq,
+                        "amount_raw": amount_raw,
+                        "reason": "missing_destination_incoming",
+                    }
+                )
+                continue
+
+            exact_pair = bool(
+                incoming.get("token_mint") == spec["destination_mint"]
+                and incoming.get("sender") == outgoing.get("sender")
+                and int(incoming.get("amount_raw", -1)) == amount_raw
+                and int(incoming.get("source_timestamp", -1))
+                == int(outgoing.get("timestamp", -2))
+                and int(outgoing.get("operation", -1))
+                == spec["expected_out_operation"]
+                and int(incoming.get("operation", -1))
+                == spec["expected_in_operation"]
+            )
+            if not exact_pair:
+                ambiguous.append(
+                    {
+                        "actual_source_chain": spec["actual_source_chain"],
+                        "seq": seq,
+                        "reason": "incoming_pair_semantics_mismatch",
+                    }
+                )
+                continue
+
+            processed = incoming.get("processed") is True
+            legacy = incoming.get("legacy_layout") is True
+            claimable_after = int(incoming.get("claimable_after") or 0)
+            claimed = incoming.get("claimed")
+
+            if legacy:
+                ambiguous.append(
+                    {
+                        "actual_source_chain": spec["actual_source_chain"],
+                        "seq": seq,
+                        "reason": "legacy_incoming_claim_semantics_unverified",
+                    }
+                )
+                continue
+
+            if not processed or (claimable_after > 0 and claimed is not True):
+                outstanding.append(
+                    {
+                        "actual_source_chain": spec["actual_source_chain"],
+                        "actual_destination_chain": spec["actual_destination_chain"],
+                        "seq": seq,
+                        "amount_raw": amount_raw,
+                        "reason": (
+                            "destination_not_processed"
+                            if not processed
+                            else "delayed_destination_not_claimed"
+                        ),
+                    }
+                )
+                continue
+
+            settled_match_count += 1
+
+    source_amount = _nonnegative_int(
+        strict["source"].get("amount_raw"),
+        "source.amount_raw",
+    )
+    destination_supply = _nonnegative_int(
+        strict["destination"].get("raw_supply"),
+        "destination.raw_supply",
+    )
+    reserve_surplus_raw = source_amount - destination_supply
+    outstanding_raw = sum(int(row["amount_raw"]) for row in outstanding)
+
+    liability_adjusted_closure_verified = bool(
+        strict["source"]["identity_verified"] is True
+        and strict["destination"]["identity_verified"] is True
+        and strict["decimals_verified"] is True
+        and strict["observation_time_compatible"] is True
+        and reserve_surplus_raw >= 0
+        and not ambiguous
+        and reserve_surplus_raw == outstanding_raw
+    )
+
+    return {
+        "contract": "warp_bridged_supply_liability_adjusted_evidence/v1",
+        "route_id": strict["route_id"],
+        "strict_backing_closure_verified": strict[
+            "current_backing_closure_verified"
+        ],
+        "source_vault_amount_raw": source_amount,
+        "destination_wrapped_supply_raw": destination_supply,
+        "reserve_surplus_raw": reserve_surplus_raw,
+        "outstanding_route_liability_raw": outstanding_raw,
+        "outstanding_route_liability_count": len(outstanding),
+        "outstanding_route_liabilities": outstanding,
+        "settled_exact_pair_count": settled_match_count,
+        "ambiguous_route_message_count": len(ambiguous),
+        "ambiguous_route_messages": ambiguous,
+        "liability_adjusted_backing_closure_verified": (
+            liability_adjusted_closure_verified
+        ),
+        "destination_representation_value_equivalence_verified": (
+            liability_adjusted_closure_verified
+        ),
+        "current_usdcx_usd_equivalence_verified": False,
+        "historical_backing_closure_verified": False,
+        "liquidity_freshness_verified": False,
+        "cmis_promotable": False,
+        "public_service_promoted": False,
+        "scout_reliance_promoted": False,
+        "read_only": True,
+        "execution_authorized": False,
+    }
+
+
 __all__ = [
     "CONTRACT",
     "DEFAULT_MAX_OBSERVATION_SKEW_SECONDS",
@@ -540,6 +785,7 @@ __all__ = [
     "WSOL_X_DESTINATION_MINT",
     "WarpBridgedSupplyEvidenceError",
     "build_warp_bridged_supply_evidence",
+    "build_warp_liability_adjusted_backing_evidence",
     "capture_destination_mint_observation",
     "capture_source_vault_observation",
     "derive_mint_authority_pda",
