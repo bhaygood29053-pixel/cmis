@@ -11,6 +11,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - **PR #466 is the active bridge-parity follow-up.** Exact Solana USDC Warp-vault identity, exact X1 USDC.X mint/Warp authority, equal six-decimal units, and reserve sufficiency have been observed. The first retained-message liability interpretation failed closed because historical Warp message accounts cannot be treated as current in-flight liabilities. The next bridge proof must use a current-state invariant that does not misclassify retained historical messages.
 - Existing promoted CMIS services and the capability contract remain unchanged by #461 evidence research.
 - Controlled Execution remains locked: `execution_authorized=false`.
+- **Issue #471 — CMIS Web Discovery v1:** active foundation-only implementation for bounded multi-source discovery across X1 Explorer, XDEX, X1.Ninja, X1Report, X1 Docs, and GitHub. Every web observation remains `DISCOVERED` candidate evidence with source-specific URL allowlists, bounded retrieval/crawling, exact provenance/body hashing, and fail-closed provider errors. This work is not accepted capability until its PR passes deterministic CI and three-axis review; public-service promotion, Scout reliance, source-independence claims, Evidence Receipt / Proof Score promotion, and execution authority remain false.
 
 ## Product naming invariant
 
