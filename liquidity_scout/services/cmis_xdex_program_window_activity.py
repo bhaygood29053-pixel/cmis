@@ -14,7 +14,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+import time
 from typing import Any, Callable
+
+import requests
 
 from liquidity_scout.providers.x1.history_range import scan_address_history_range
 from liquidity_scout.providers.x1.rpc import DEFAULT_X1_RPC_URL
@@ -56,6 +59,141 @@ def _default_fetcher(signature: str, *, rpc_url: str):
     return fetch_transaction(signature, rpc_url=rpc_url)
 
 
+def _batch_fetch_transactions(
+    signatures: Sequence[str],
+    *,
+    rpc_url: str,
+    batch_size: int = 50,
+    batch_workers: int = 4,
+    retries: int = 4,
+    timeout: int = 40,
+    post: Callable[..., Any] = requests.post,
+    sleep: Callable[[float], Any] = time.sleep,
+) -> dict[str, tuple[Any, str | None]]:
+    """Fetch getTransaction responses through bounded JSON-RPC batches.
+
+    The return mapping preserves one explicit availability/error state per
+    requested signature. A transport or malformed-response failure never
+    becomes an empty successful transaction.
+    """
+
+    if (
+        isinstance(batch_size, bool)
+        or not isinstance(batch_size, int)
+        or batch_size < 1
+        or batch_size > 100
+    ):
+        raise XDEXProgramWindowActivityError(
+            "batch_size must be an integer between 1 and 100"
+        )
+    if (
+        isinstance(batch_workers, bool)
+        or not isinstance(batch_workers, int)
+        or batch_workers < 1
+        or batch_workers > 8
+    ):
+        raise XDEXProgramWindowActivityError(
+            "batch_workers must be an integer between 1 and 8"
+        )
+
+    normalized = [_text(value, "signature") for value in signatures]
+    chunks = [
+        normalized[index : index + batch_size]
+        for index in range(0, len(normalized), batch_size)
+    ]
+
+    def fetch_chunk(chunk: list[str]) -> dict[str, tuple[Any, str | None]]:
+        payload = [
+            {
+                "jsonrpc": "2.0",
+                "id": index + 1,
+                "method": "getTransaction",
+                "params": [
+                    signature,
+                    {
+                        "encoding": "jsonParsed",
+                        "commitment": "confirmed",
+                        "maxSupportedTransactionVersion": 0,
+                    },
+                ],
+            }
+            for index, signature in enumerate(chunk)
+        ]
+        last_error = "unknown batch transport error"
+        for attempt in range(retries):
+            try:
+                response = post(rpc_url, json=payload, timeout=timeout)
+                status = getattr(response, "status_code", None)
+                if status == 429 or (
+                    isinstance(status, int) and status >= 500
+                ):
+                    raise RuntimeError(f"HTTP {status}")
+                response.raise_for_status()
+                body = response.json()
+                if not isinstance(body, list):
+                    raise RuntimeError("non-list JSON-RPC batch response")
+                indexed: dict[int, Mapping[str, Any]] = {}
+                for item in body:
+                    if not isinstance(item, Mapping):
+                        raise RuntimeError("malformed JSON-RPC batch item")
+                    item_id = item.get("id")
+                    if isinstance(item_id, bool) or not isinstance(item_id, int):
+                        raise RuntimeError("batch item missing integer id")
+                    if item_id in indexed:
+                        raise RuntimeError("duplicate JSON-RPC batch id")
+                    indexed[item_id] = item
+
+                result: dict[str, tuple[Any, str | None]] = {}
+                for index, signature in enumerate(chunk, start=1):
+                    item = indexed.get(index)
+                    if item is None:
+                        result[signature] = (None, "missing JSON-RPC batch item")
+                    elif item.get("error") is not None:
+                        result[signature] = (
+                            None,
+                            "getTransaction JSON-RPC error",
+                        )
+                    elif "result" not in item:
+                        result[signature] = (
+                            None,
+                            "getTransaction batch item missing result",
+                        )
+                    elif item.get("result") is None:
+                        result[signature] = (
+                            None,
+                            "getTransaction returned no transaction",
+                        )
+                    elif not isinstance(item.get("result"), Mapping):
+                        result[signature] = (
+                            None,
+                            "getTransaction returned malformed transaction",
+                        )
+                    else:
+                        result[signature] = (item.get("result"), None)
+                return result
+            except Exception as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+                if attempt < retries - 1:
+                    sleep(0.75 * (2 ** attempt))
+
+        return {
+            signature: (None, f"batch transport unavailable: {last_error}")
+            for signature in chunk
+        }
+
+    merged: dict[str, tuple[Any, str | None]] = {}
+    if not chunks:
+        return merged
+    if batch_workers == 1:
+        chunk_results = [fetch_chunk(chunk) for chunk in chunks]
+    else:
+        with ThreadPoolExecutor(max_workers=batch_workers) as executor:
+            chunk_results = list(executor.map(fetch_chunk, chunks))
+    for result in chunk_results:
+        merged.update(result)
+    return merged
+
+
 def _default_verifier(
     tx: Mapping[str, Any] | None,
     *,
@@ -83,6 +221,8 @@ def prove_xdex_program_asset_window_activity(
     page_size: int = 1000,
     max_signatures: int = 100000,
     fetch_workers: int = 12,
+    batch_fetch_size: int = 50,
+    batch_fetch_workers: int = 4,
     scanner: Callable[..., Mapping[str, Any]] = scan_address_history_range,
     fetcher: Callable[..., Any] = _default_fetcher,
     verifier: Callable[..., Mapping[str, Any]] = _default_verifier,
@@ -101,6 +241,24 @@ def prove_xdex_program_asset_window_activity(
     ):
         raise XDEXProgramWindowActivityError(
             "fetch_workers must be an integer between 1 and 32"
+        )
+    if (
+        isinstance(batch_fetch_size, bool)
+        or not isinstance(batch_fetch_size, int)
+        or batch_fetch_size < 1
+        or batch_fetch_size > 100
+    ):
+        raise XDEXProgramWindowActivityError(
+            "batch_fetch_size must be an integer between 1 and 100"
+        )
+    if (
+        isinstance(batch_fetch_workers, bool)
+        or not isinstance(batch_fetch_workers, int)
+        or batch_fetch_workers < 1
+        or batch_fetch_workers > 8
+    ):
+        raise XDEXProgramWindowActivityError(
+            "batch_fetch_workers must be an integer between 1 and 8"
         )
 
     raw_scan = scanner(
@@ -156,6 +314,12 @@ def prove_xdex_program_asset_window_activity(
             "failed_window_signature_count": len(failed_rows),
             "transaction_fetch_unavailable_count": 0,
             "transaction_fetch_worker_count": fetch_workers,
+        "transaction_batch_size": (
+            batch_fetch_size if fetcher is _default_fetcher else 1
+        ),
+        "transaction_batch_worker_count": (
+            batch_fetch_workers if fetcher is _default_fetcher else 0
+        ),
             "transaction_identity_conflict_count": 0,
             "transaction_verification_error_count": 0,
             "all_successful_transactions_verified": False,
@@ -195,7 +359,23 @@ def prove_xdex_program_asset_window_activity(
             return clean, None, "getTransaction returned no transaction"
         return clean, tx, None
 
-    if fetch_workers == 1:
+    if fetcher is _default_fetcher and batch_fetch_size > 1:
+        batch = _batch_fetch_transactions(
+            [_text(row.get("signature"), "signature") for row in successful_rows],
+            rpc_url=rpc_url,
+            batch_size=batch_fetch_size,
+            batch_workers=batch_fetch_workers,
+        )
+        fetched_rows = []
+        for row in successful_rows:
+            clean = dict(row)
+            signature = _text(clean.get("signature"), "signature")
+            tx, fetch_error = batch.get(
+                signature,
+                (None, "missing batch fetch result"),
+            )
+            fetched_rows.append((clean, tx, fetch_error))
+    elif fetch_workers == 1:
         fetched_rows = [fetch_one(row) for row in successful_rows]
     else:
         with ThreadPoolExecutor(max_workers=fetch_workers) as executor:
@@ -359,5 +539,6 @@ def prove_xdex_program_asset_window_activity(
 __all__ = [
     "CONTRACT",
     "XDEXProgramWindowActivityError",
+    "_batch_fetch_transactions",
     "prove_xdex_program_asset_window_activity",
 ]
