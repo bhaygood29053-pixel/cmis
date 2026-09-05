@@ -12,10 +12,12 @@ XDEX_WEB_SOURCE = WebDiscoverySource(
     base_urls=(
         "https://xdexdocs.gitbook.io/xdex/",
         "https://api.xdex.xyz/",
+        "https://oracle.xdex.xyz/",
     ),
     allowed_hosts=(
         "xdexdocs.gitbook.io",
         "api.xdex.xyz",
+        "oracle.xdex.xyz",
     ),
 )
 
