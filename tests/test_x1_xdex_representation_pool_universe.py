@@ -3,6 +3,7 @@ import unittest
 from liquidity_scout.providers.x1.xdex_representation_pool_universe import (
     XDEXRepresentationPoolUniverseError,
     build_xdex_representation_pool_universe,
+    build_xdex_representation_pool_universe_from_program_set,
     select_representation_pool_candidates,
 )
 from liquidity_scout.services.cmis_bridge_to_xdex_utilization import (
@@ -174,6 +175,92 @@ class XDEXRepresentationPoolUniverseTests(unittest.TestCase):
                 {"address": "PoolA"},
                 representation_mint=WSOL_X,
             )
+
+    def test_program_set_adapter_preserves_explicit_verified_zero_scope(self):
+        program_set = {
+            "service": "verified_program_asset_pool_set",
+            "status": "recognized_program_asset_pool_set_structurally_verified",
+            "asset_mint": WSOL_X,
+            "program_id": "Program111",
+            "pools": [],
+            "summary": {
+                "recognized_program_asset_pool_set_structurally_verified": True,
+                "targeted_program_family_mint_filter_observed": True,
+                "all_matching_accounts_structurally_verified": True,
+                "all_catalog_asset_pools_recovered": True,
+                "verified_zero_set": True,
+            },
+        }
+        result = build_xdex_representation_pool_universe_from_program_set(
+            program_pool_set=program_set,
+            observed_at=1_788_600_000,
+        )
+        self.assertTrue(result["enumeration_verified"])
+        self.assertTrue(result["all_pool_identities_verified"])
+        self.assertTrue(result["verified_zero_set"])
+        self.assertEqual(result["pool_addresses"], [])
+        self.assertTrue(result["current_liquidity_zero_verified"])
+        self.assertTrue(result["liquidity_semantics_verified"])
+        self.assertFalse(result["volume_24h_semantics_verified"])
+        self.assertFalse(result["volume_24h_window_coverage_verified"])
+        self.assertFalse(result["global_onchain_pool_discovery_proven"])
+        self.assertFalse(result["execution_authorized"])
+
+    def test_program_set_adapter_rejects_unverified_empty_set(self):
+        program_set = {
+            "service": "verified_program_asset_pool_set",
+            "status": "recognized_program_asset_pool_set_structurally_verified",
+            "asset_mint": WSOL_X,
+            "program_id": "Program111",
+            "pools": [],
+            "summary": {
+                "recognized_program_asset_pool_set_structurally_verified": True,
+                "targeted_program_family_mint_filter_observed": True,
+                "all_matching_accounts_structurally_verified": True,
+                "all_catalog_asset_pools_recovered": True,
+                "verified_zero_set": False,
+            },
+        }
+        with self.assertRaisesRegex(
+            XDEXRepresentationPoolUniverseError,
+            "lacks explicit verified-zero",
+        ):
+            build_xdex_representation_pool_universe_from_program_set(
+                program_pool_set=program_set,
+                observed_at=1_788_600_000,
+            )
+
+    def test_program_set_adapter_validates_nonzero_pool_contains_mint(self):
+        program_set = {
+            "service": "verified_program_asset_pool_set",
+            "status": "recognized_program_asset_pool_set_structurally_verified",
+            "asset_mint": WSOL_X,
+            "program_id": "Program111",
+            "pools": [
+                {
+                    "pool_address": "PoolA",
+                    "mint_0": WSOL_X,
+                    "mint_1": OTHER,
+                    "catalog_listed": False,
+                    "pool_state_structural_role_verified": True,
+                }
+            ],
+            "summary": {
+                "recognized_program_asset_pool_set_structurally_verified": True,
+                "targeted_program_family_mint_filter_observed": True,
+                "all_matching_accounts_structurally_verified": True,
+                "all_catalog_asset_pools_recovered": True,
+                "verified_zero_set": False,
+            },
+        }
+        result = build_xdex_representation_pool_universe_from_program_set(
+            program_pool_set=program_set,
+            observed_at=1_788_600_000,
+        )
+        self.assertFalse(result["verified_zero_set"])
+        self.assertEqual(result["pool_addresses"], ["PoolA"])
+        self.assertFalse(result["liquidity_semantics_verified"])
+        self.assertFalse(result["market_freshness_verified"])
 
 
 if __name__ == "__main__":
