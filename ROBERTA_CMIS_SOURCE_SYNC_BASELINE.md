@@ -43,7 +43,9 @@ Active:
 
 ### Web Discovery
 
-Internal v1-v5 complete through PR #481:
+Internal v1-v5 complete through PR #481. Active v6: Issue #483 XDEX network-gap registry.
+
+Accepted stack:
 
 - six-source bounded discovery;
 - X1 Explorer structured discovery;
