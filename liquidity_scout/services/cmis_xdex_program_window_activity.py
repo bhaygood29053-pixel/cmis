@@ -136,6 +136,47 @@ def prove_xdex_program_asset_window_activity(
     successful_rows = [row for row in in_window if row.get("err") is None]
     failed_rows = [row for row in in_window if row.get("err") is not None]
 
+    if not range_proven or not integrity_verified:
+        return {
+            "contract": CONTRACT,
+            "chain": "x1",
+            "program_id": program_id,
+            "asset_mint": asset_mint,
+            "requested_window": {
+                "start_epoch": start,
+                "end_epoch": end,
+                "duration_seconds": end - start,
+                "membership_basis": "X1_RPC_PROGRAM_ADDRESS_HISTORY_PLUS_TRANSACTION_TOKEN_DELTAS",
+            },
+            "program_signature_range_proven": range_proven,
+            "program_signature_integrity_verified": integrity_verified,
+            "program_signature_scan": scan,
+            "window_signature_count": len(in_window),
+            "successful_window_signature_count": len(successful_rows),
+            "failed_window_signature_count": len(failed_rows),
+            "transaction_fetch_unavailable_count": 0,
+            "transaction_fetch_worker_count": fetch_workers,
+            "transaction_identity_conflict_count": 0,
+            "transaction_verification_error_count": 0,
+            "all_successful_transactions_verified": False,
+            "target_mint_activity_transaction_count": 0,
+            "target_mint_delta_count": 0,
+            "window_trace_complete_verified": False,
+            "program_scoped_asset_activity_zero_verified": False,
+            "volume_24h_window_coverage_verified": False,
+            "volume_24h_semantics_verified": False,
+            "verified_volume_24h_value": None,
+            "verified_volume_24h_unit": None,
+            "zero_authorization_basis": None,
+            "global_onchain_pool_discovery_proven": False,
+            "recognized_program_registry_globally_exhaustive": False,
+            "causal_claim_authorized": False,
+            "adoption_claim_authorized": False,
+            "read_only": True,
+            "execution_authorized": False,
+            "transactions": [],
+        }
+
     records: list[dict[str, Any]] = []
     fetch_unavailable = 0
     identity_conflicts = 0
