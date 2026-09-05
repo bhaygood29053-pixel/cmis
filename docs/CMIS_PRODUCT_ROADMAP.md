@@ -6,13 +6,11 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 
 ## Live checkpoint — 2026-09-05
 
-- **#461 reopened for final USD-liquidity semantic acceptance.** PR #465 accepted five same-fact revaluation events across five pools with `liquidity_fact_time_verified=true`. PR #466 accepted current exact Warp USDC reserve backing for USDC.X. PR #468 accepted the live current `x1_current_usdcx_usd_equivalence/v1` gate; the dedicated USDC.X/USD equivalence workflow passed.
-- **PR #470 is the active #461 final semantic proof.** It must compose fresh current USDC.X/USD equivalence with all five distinct same-fact X1.Ninja revaluation samples before `x1_ninja_liquidity_usd_semantics_verified=true` may be accepted. `liquidity_freshness_verified=false` remains a separate later #459 gate.
-- **#410 reopened for final Bridge-to-XDEX acceptance.** PR #467 accepted the deterministic `bridge_to_xdex_utilization/v1` foundation and proved a current verified-zero wSOL.X pool set inside the verified XDEX program family, but explicitly left `issue_410_acceptance_verified=false`.
-- **PR #469 is the final #410 evidence slice.** Its current exact-head deterministic/regression CI, bounded 24h XDEX-program activity window, comparable wSOL.X USD value basis, and dedicated Bridge-to-XDEX Final workflow are green. The PR remains unmerged, so final #410 acceptance and any ROBERTA reliance are still pending merge/reconciliation plus separate public-service / Scout-reliance promotion.
-- Existing promoted CMIS services and capability contract `1.18.0` remain unchanged by these open evidence PRs.
-- **CMIS Web Discovery v1-v4: COMPLETE as internal DISCOVERED-only foundations.** PR #472 added bounded six-source discovery; PR #474 added X1 Explorer structured discovery; PR #476 added sanitized network observation; PR #478 added operator-controlled one-page passive browser capture with optional lazy Playwright and no clicks/forms/wallet interaction/replay/raw HAR retention. None of these layers is public-service or Scout-reliance promoted.
-- **Issue #479 — XDEX Structured Discovery v1: ACTIVE.** The next source-specific Web Discovery slice recognizes only the four already accepted read-only XDEX API paths plus XDEX GitBook documentation, validates exact query identity/bounds, and hands candidate endpoints back to the existing `XDEXReadOnlyProvider` and X1 RPC/semantic verification contracts rather than creating a second XDEX truth or quote path.
+- **#410 Bridge-to-XDEX Utilization Intelligence: COMPLETE.** PR #469 merged as `3681559b728d8493fbc0c5e39227df5c34c23c69`. Accepted evidence now includes the bounded 24h XDEX-program activity window, verified 24h wSOL.X XDEX volume semantics inside the verified XDEX program family, fresh comparable wSOL.X USD value basis, and final `bridge_to_xdex_utilization/v1` composition with `issue_410_acceptance_verified=true`.
+- **Issue #482 is the active cross-chain release gate.** The job is no longer to prove #410; it is to promote the already-accepted #410 contract through the public CMIS capability/service boundary and then authorize X1 Scout reliance without widening scope. ROBERTA #314 is blocked only on #482.
+- **#461 remains active for final X1.Ninja USD-liquidity semantics.** PR #470 is the remaining five-pool proof. Its current head has green deterministic tests while the repeated-revaluation live workflow is still in progress. `liquidity_freshness_verified=false` remains a separate later #459 gate.
+- **CMIS Web Discovery v1-v5: COMPLETE internally.** PRs #472/#474/#476/#478 established the X1 Explorer/multi-source discovery stack; PR #481 now adds structured XDEX endpoint discovery and deterministic handoff back into the existing XDEX provider/verification path. All Web Discovery results remain `DISCOVERED`, non-promoted, and non-authorizing.
+- Existing promoted CMIS services and capability contract `1.18.0` remain unchanged until a separately accepted promotion gate changes them.
 - Controlled Execution remains locked: `execution_authorized=false`.
 
 ## Product naming invariant
@@ -890,8 +888,9 @@ Controlled Execution remains unauthorized.
 
 - **Historical Coverage Proof, Burn, Discovery, WHAT CHANGED?, Field-Scoped Freshness, and pull-only Early Warning adoption: COMPLETE.**
 - **#409 Bridge Supply + Flow Intelligence: COMPLETE.**
-- **#410 Bridge-to-XDEX Utilization: final acceptance pending PR #469 merge/reconciliation.** PR #467 accepted the utilization foundation and verified wSOL.X XDEX program-family pool universe. PR #469's exact-head 24h activity and comparable-value gates are green, but open-PR evidence is not accepted capability. Public-service / Scout-reliance promotion remains separate, and ROBERTA #314 remains blocked until both gates complete.
-- **#461 X1.Ninja USD-liquidity semantics: final acceptance pending PR #470.** Current USDC.X reserve backing and current USDC.X/USD equivalence are accepted prerequisites; provider USD-liquidity semantics and liquidity freshness are not yet promoted.
-- **CMIS Web Discovery v1-v4: COMPLETE internally through PR #478.** Discovery remains `DISCOVERED`, non-promoted, and non-authorizing.
-- **CMIS #363:** parallel read-only delayed-vault/X1.Ninja research; not the flagship blocker.
+- **#410 Bridge-to-XDEX Utilization: COMPLETE through merged PR #469.**
+- **#482: ACTIVE promotion gate** for public CMIS service + X1 Scout reliance. ROBERTA #314 follows #482.
+- **#461: ACTIVE through PR #470** for final five-pool X1.Ninja USD-liquidity semantics; #459 remains the later freshness promotion.
+- **CMIS Web Discovery v1-v5: COMPLETE internally through PR #481.**
+- **CMIS #363:** parallel delayed-vault/X1.Ninja research; not the flagship blocker.
 - `execution_authorized=false`.
