@@ -13,6 +13,7 @@ closed and zero is not authorized.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from liquidity_scout.providers.x1.history_range import scan_address_history_range
@@ -81,6 +82,7 @@ def prove_xdex_program_asset_window_activity(
     rpc_url: str = DEFAULT_X1_RPC_URL,
     page_size: int = 1000,
     max_signatures: int = 100000,
+    fetch_workers: int = 12,
     scanner: Callable[..., Mapping[str, Any]] = scan_address_history_range,
     fetcher: Callable[..., Any] = _default_fetcher,
     verifier: Callable[..., Mapping[str, Any]] = _default_verifier,
@@ -91,6 +93,15 @@ def prove_xdex_program_asset_window_activity(
     end = _epoch(end_epoch, "end_epoch")
     if start >= end:
         raise XDEXProgramWindowActivityError("start_epoch must be < end_epoch")
+    if (
+        isinstance(fetch_workers, bool)
+        or not isinstance(fetch_workers, int)
+        or fetch_workers < 1
+        or fetch_workers > 32
+    ):
+        raise XDEXProgramWindowActivityError(
+            "fetch_workers must be an integer between 1 and 32"
+        )
 
     raw_scan = scanner(
         program_id,
@@ -132,26 +143,33 @@ def prove_xdex_program_asset_window_activity(
     target_mint_activity_count = 0
     target_mint_delta_count = 0
 
-    for row in successful_rows:
-        signature = _text(row.get("signature"), "signature")
-        slot = row.get("slot")
-        block_time = row.get("block_time")
+    def fetch_one(row: Mapping[str, Any]) -> tuple[dict[str, Any], Any, str | None]:
+        clean = dict(row)
+        signature = _text(clean.get("signature"), "signature")
         try:
             tx = fetcher(signature, rpc_url=rpc_url)
         except Exception as exc:
-            fetch_unavailable += 1
-            records.append({
-                "signature": signature,
-                "classification": "FETCH_UNAVAILABLE",
-                "error": f"{type(exc).__name__}: {exc}",
-            })
-            continue
+            return clean, None, f"{type(exc).__name__}: {exc}"
         if tx is None:
+            return clean, None, "getTransaction returned no transaction"
+        return clean, tx, None
+
+    if fetch_workers == 1:
+        fetched_rows = [fetch_one(row) for row in successful_rows]
+    else:
+        with ThreadPoolExecutor(max_workers=fetch_workers) as executor:
+            fetched_rows = list(executor.map(fetch_one, successful_rows))
+
+    for row, tx, fetch_error in fetched_rows:
+        signature = _text(row.get("signature"), "signature")
+        slot = row.get("slot")
+        block_time = row.get("block_time")
+        if fetch_error is not None:
             fetch_unavailable += 1
             records.append({
                 "signature": signature,
                 "classification": "FETCH_UNAVAILABLE",
-                "error": "getTransaction returned no transaction",
+                "error": fetch_error,
             })
             continue
 
@@ -270,6 +288,7 @@ def prove_xdex_program_asset_window_activity(
         "successful_window_signature_count": len(successful_rows),
         "failed_window_signature_count": len(failed_rows),
         "transaction_fetch_unavailable_count": fetch_unavailable,
+        "transaction_fetch_worker_count": fetch_workers,
         "transaction_identity_conflict_count": identity_conflicts,
         "transaction_verification_error_count": verification_errors,
         "all_successful_transactions_verified": all_successful_transactions_verified,
