@@ -20,6 +20,7 @@ from liquidity_scout.providers.web_discovery import (
     parse_x1_explorer_url,
     list_x1_explorer_network_observations,
     capture_x1_explorer_page_network,
+    parse_xdex_url,
 )
 
 
@@ -169,6 +170,21 @@ class CMISWebDiscoveryService:
             "read_only": True,
             "request_replay_authorized": False,
             "background_monitoring_authorized": False,
+            **_service_truth_state(),
+        }
+
+    def discover_xdex_structured(
+        self,
+        url: str,
+    ) -> dict[str, Any]:
+        route = parse_xdex_url(url)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "xdex",
+            "structured_endpoint": route,
+            "read_only": True,
             **_service_truth_state(),
         }
 
