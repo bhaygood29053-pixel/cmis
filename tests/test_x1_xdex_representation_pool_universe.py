@@ -2,6 +2,7 @@ import unittest
 
 from liquidity_scout.providers.x1.xdex_representation_pool_universe import (
     XDEXRepresentationPoolUniverseError,
+    apply_verified_program_window_to_zero_universe,
     build_xdex_representation_pool_universe,
     build_xdex_representation_pool_universe_from_program_set,
     select_representation_pool_candidates,
@@ -261,6 +262,107 @@ class XDEXRepresentationPoolUniverseTests(unittest.TestCase):
         self.assertEqual(result["pool_addresses"], ["PoolA"])
         self.assertFalse(result["liquidity_semantics_verified"])
         self.assertFalse(result["market_freshness_verified"])
+
+    def test_verified_program_window_promotes_only_24h_zero_on_zero_universe(self):
+        universe = build_xdex_representation_pool_universe_from_program_set(
+            program_pool_set={
+                "service": "verified_program_asset_pool_set",
+                "status": "recognized_program_asset_pool_set_structurally_verified",
+                "asset_mint": WSOL_X,
+                "program_id": "Program111",
+                "pools": [],
+                "summary": {
+                    "recognized_program_asset_pool_set_structurally_verified": True,
+                    "targeted_program_family_mint_filter_observed": True,
+                    "all_matching_accounts_structurally_verified": True,
+                    "all_catalog_asset_pools_recovered": True,
+                    "verified_zero_set": True,
+                },
+            },
+            observed_at=1_788_600_000,
+        )
+        activity = {
+            "contract": "xdex_program_asset_window_activity/v1",
+            "program_id": "Program111",
+            "asset_mint": WSOL_X,
+            "requested_window": {
+                "start_epoch": 1_788_513_600.0,
+                "end_epoch": 1_788_600_000.0,
+                "duration_seconds": 86400.0,
+            },
+            "program_signature_range_proven": True,
+            "program_signature_integrity_verified": True,
+            "all_successful_transactions_verified": True,
+            "window_trace_complete_verified": True,
+            "program_scoped_asset_activity_zero_verified": True,
+            "volume_24h_window_coverage_verified": True,
+            "volume_24h_semantics_verified": True,
+            "verified_volume_24h_value": "0",
+            "verified_volume_24h_unit": "USD",
+            "target_mint_activity_transaction_count": 0,
+            "target_mint_delta_count": 0,
+            "window_signature_count": 12,
+            "zero_authorization_basis": "complete_program_trace",
+            "execution_authorized": False,
+        }
+
+        enriched = apply_verified_program_window_to_zero_universe(
+            pool_universe=universe,
+            program_window_activity=activity,
+        )
+        self.assertTrue(enriched["verified_zero_set"])
+        self.assertTrue(enriched["current_liquidity_zero_verified"])
+        self.assertTrue(enriched["volume_24h_semantics_verified"])
+        self.assertTrue(enriched["volume_24h_window_coverage_verified"])
+        self.assertEqual(enriched["verified_volume_24h_value"], "0")
+        self.assertEqual(enriched["program_window_activity_signature_count"], 12)
+        self.assertFalse(enriched["cmis_promotable"])
+        self.assertFalse(enriched["execution_authorized"])
+
+    def test_program_window_cannot_bind_target_activity_as_zero(self):
+        universe = build_xdex_representation_pool_universe_from_program_set(
+            program_pool_set={
+                "service": "verified_program_asset_pool_set",
+                "status": "recognized_program_asset_pool_set_structurally_verified",
+                "asset_mint": WSOL_X,
+                "program_id": "Program111",
+                "pools": [],
+                "summary": {
+                    "recognized_program_asset_pool_set_structurally_verified": True,
+                    "targeted_program_family_mint_filter_observed": True,
+                    "all_matching_accounts_structurally_verified": True,
+                    "all_catalog_asset_pools_recovered": True,
+                    "verified_zero_set": True,
+                },
+            },
+            observed_at=1_788_600_000,
+        )
+        activity = {
+            "contract": "xdex_program_asset_window_activity/v1",
+            "program_id": "Program111",
+            "asset_mint": WSOL_X,
+            "requested_window": {"duration_seconds": 86400.0},
+            "program_signature_range_proven": True,
+            "program_signature_integrity_verified": True,
+            "all_successful_transactions_verified": True,
+            "window_trace_complete_verified": True,
+            "program_scoped_asset_activity_zero_verified": False,
+            "volume_24h_window_coverage_verified": False,
+            "volume_24h_semantics_verified": False,
+            "verified_volume_24h_value": None,
+            "verified_volume_24h_unit": None,
+            "target_mint_activity_transaction_count": 1,
+            "target_mint_delta_count": 2,
+            "execution_authorized": False,
+        }
+        with self.assertRaisesRegex(
+            XDEXRepresentationPoolUniverseError,
+            "program_scoped_asset_activity_zero_verified",
+        ):
+            apply_verified_program_window_to_zero_universe(
+                pool_universe=universe,
+                program_window_activity=activity,
+            )
 
 
 if __name__ == "__main__":
