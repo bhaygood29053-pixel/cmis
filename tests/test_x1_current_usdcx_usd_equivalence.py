@@ -1,6 +1,7 @@
 import unittest
 
 from liquidity_scout.providers.x1.current_usdcx_usd_equivalence import (
+    PYTH_USDC_USD_UNIT,
     SOLANA_USDC_MINT,
     X1_USDC_X_MINT,
     evaluate_current_usdcx_usd_equivalence,
@@ -20,7 +21,7 @@ def route():
     }
 
 
-def source_price(price="1.0002"):
+def source_price(price="1.0002", *, unit=PYTH_USDC_USD_UNIT):
     return {
         "chain": "solana",
         "source": "pyth_core_solana_push",
@@ -28,7 +29,7 @@ def source_price(price="1.0002"):
         "mapping_verified": True,
         "price_integrity_verified": True,
         "fact_time_verified": True,
-        "unit": "USD",
+        "unit": unit,
         "price_usd": price,
     }
 
@@ -60,15 +61,11 @@ class CurrentUsdcxUsdEquivalenceTests(unittest.TestCase):
             source_usdc_freshness=fresh(),
         )
         self.assertTrue(result["route_identity_verified"])
+        self.assertTrue(result["source_usdc_usd_price_unit_verified"])
         self.assertTrue(result["source_usdc_usd_price_fresh"])
-        self.assertFalse(
-            result["destination_representation_value_equivalence_verified"]
-        )
+        self.assertFalse(result["destination_representation_value_equivalence_verified"])
         self.assertFalse(result["current_usdcx_usd_equivalence_verified"])
-        self.assertIn(
-            "destination_representation_value_equivalence",
-            result["missing_gates"],
-        )
+        self.assertIn("destination_representation_value_equivalence", result["missing_gates"])
 
     def test_full_current_parity_contract_can_verify_equivalence(self):
         result = evaluate_current_usdcx_usd_equivalence(
@@ -81,6 +78,18 @@ class CurrentUsdcxUsdEquivalenceTests(unittest.TestCase):
         self.assertFalse(result["historical_usdcx_usd_equivalence_verified"])
         self.assertFalse(result["cmis_promotable"])
         self.assertFalse(result["execution_authorized"])
+
+    def test_provider_native_pyth_unit_is_required(self):
+        wrong_unit = source_price(unit="USD")
+        result = evaluate_current_usdcx_usd_equivalence(
+            warp_route_evidence=route(),
+            source_usdc_usd_evidence=wrong_unit,
+            source_usdc_freshness=fresh(),
+            destination_parity_evidence=parity(),
+        )
+        self.assertFalse(result["source_usdc_usd_price_unit_verified"])
+        self.assertFalse(result["current_usdcx_usd_equivalence_verified"])
+        self.assertIn("verified_solana_usdc_usd_price", result["missing_gates"])
 
     def test_stale_source_price_fails_closed(self):
         stale = fresh()

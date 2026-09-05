@@ -1,0 +1,56 @@
+name: X1 USDC.X USD Equivalence Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composed-usdcx-usd:
+    name: Compose current USDC.X reserve parity with fresh Pyth USDC/USD
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'evidence/x1-usdcx-usd-composed-live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_USDCX_USD_COMPOSED_LIVE: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run deterministic current USDC.X/USD policy tests
+        run: |
+          python -m unittest tests.test_x1_current_usdcx_usd_equivalence -v
+          python -m unittest tests.test_x1_usdcx_destination_parity -v
+          python -m unittest tests.test_solana_pyth_push_provider -v
+          python -m unittest tests.test_solana_pyth_freshness_policy -v
+
+      - name: Compose live current USDC.X/USD evidence
+        run: |
+          python -m unittest tests.test_x1_current_usdcx_usd_equivalence_live -v
+
+      - name: Safety and promotion boundary
+        if: always()
+        run: |
+          echo "Read-only Warp/Solana/X1/Pyth evidence only."
+          echo "A successful composed current USDC.X/USD proof does not establish historical equivalence."
+          echo "x1_ninja_liquidity_usd_semantics_verified=false"
+          echo "liquidity_freshness_verified=false"
+          echo "cmis_promotable=false"
+          echo "execution_authorized=false"
