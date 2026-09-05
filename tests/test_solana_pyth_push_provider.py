@@ -6,9 +6,12 @@ from liquidity_scout.providers.solana.pyth_push import (
     PYTH_CORE_RECEIVER_PROGRAM_ID,
     PythSolanaPushProvider,
     PythSolanaSourceError,
+    SOL_USD_CURRENT_ACCOUNT,
+    SOL_USD_FEED_ID,
     USDC_MINT,
     USDC_USD_CURRENT_ACCOUNT,
     USDC_USD_FEED_ID,
+    WSOL_MINT,
 )
 
 
@@ -130,10 +133,41 @@ class PythSolanaPushProviderTests(unittest.TestCase):
         self.assertFalse(result["source_independence_verified"])
         self.assertFalse(result["execution_authorized"])
 
+    def test_exact_wsol_fixture_decodes_verified_sol_usd_price(self):
+        data = price_account_bytes(
+            feed_id=SOL_USD_FEED_ID,
+            price=15_012_345_678,
+            conf=123_456,
+            exponent=-8,
+            publish_time=2_000_000_100,
+            prev_publish_time=2_000_000_099,
+            write_authority=base58_decode(SOL_USD_CURRENT_ACCOUNT),
+        )
+        rpc = FakeRPC(data=data)
+        ticks = iter([2_000_000_110.0, 2_000_000_111.0])
+        result = PythSolanaPushProvider(
+            rpc,
+            clock=lambda: next(ticks),
+        ).get_price(WSOL_MINT)
+
+        self.assertEqual(rpc.calls, [SOL_USD_CURRENT_ACCOUNT])
+        self.assertEqual(result["mint"], WSOL_MINT)
+        self.assertEqual(result["feed_alias"], "SOL/USD")
+        self.assertEqual(result["feed_id"], SOL_USD_FEED_ID)
+        self.assertEqual(result["price_subject"], "SOL")
+        self.assertEqual(result["unit"], "USD_per_SOL")
+        self.assertEqual(result["price_usd"], "150.12345678")
+        self.assertTrue(result["mapping_verified"])
+        self.assertTrue(result["feed_id_verified"])
+        self.assertTrue(result["full_verification"])
+        self.assertTrue(result["price_integrity_verified"])
+        self.assertFalse(result["current_price_promotable"])
+        self.assertFalse(result["execution_authorized"])
+
     def test_unsupported_mint_never_queries_rpc_or_symbol_matches(self):
         rpc = FakeRPC()
         result = PythSolanaPushProvider(rpc).get_price(
-            "So11111111111111111111111111111111111111112"
+            "UnsupportedMint111111111111111111111111111111"
         )
 
         self.assertEqual(rpc.calls, [])
