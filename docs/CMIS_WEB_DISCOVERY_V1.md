@@ -1,6 +1,6 @@
 # CMIS Web Discovery v1
 
-Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472. Follow-on X1 Explorer layers through PR #478 and XDEX source-specific layers through PR #486 are merged. Issue #488 is the active XDEX coverage-reconciliation gate. The entire stack remains discovery-only, non-promoted, and `execution_authorized=false`.
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472. Follow-on X1 Explorer layers through PR #478 and XDEX source-specific layers through PR #489 are merged. Issue #490 is the active X1.Ninja structured-discovery gate. The entire stack remains discovery-only, non-promoted, and `execution_authorized=false`.
 
 ## Purpose
 
@@ -153,7 +153,7 @@ The webpage itself never becomes the verification authority.
 
 ## Promotion state
 
-Issue #471 / PR #472 accepted this internal foundation. Later source-specific Web Discovery layers through PR #486 remain internal and do not change the promotion boundary.
+Issue #471 / PR #472 accepted this internal foundation. Later source-specific Web Discovery layers through PR #489 remain internal and do not change the promotion boundary.
 
 A later gate is required before any of the following:
 
