@@ -1,20 +1,20 @@
 # Architecture Sync Entrypoint
 
-Last reconciled: 2026-09-01 (America/New_York)
+Last reconciled: 2026-09-05 (America/New_York)
 
-Use these files together for the current Roberta ↔ CMIS boundary:
+Use these files together for the current ROBERTA ↔ CMIS boundary:
 
-1. `ROBERTA_INTEGRATION_CONTRACT.md` — primary authority-boundary contract.
+1. `ROBERTA_INTEGRATION_CONTRACT.md` — primary authority boundary.
 2. `ROBERTA_CMIS_ACCEPTED_BASELINE.md` — accepted CMIS trust-layer baseline.
-3. `ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md` — mirrored cross-project synchronization baseline.
-4. `docs/CMIS_PRODUCT_ROADMAP.md` — authoritative living CMIS roadmap.
-5. `docs/ROADMAP_RECONCILIATION_2026-09-01.md` — current roadmap reconciliation.
-6. `docs/PROJECT_STATUS_2026-09-01.md` — current dated CMIS status snapshot.
+3. `ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md` — mirrored four-repository status baseline.
+4. `docs/CURRENT_PROJECT_STATUS.md` — current CMIS status.
+5. `docs/CMIS_PRODUCT_ROADMAP.md` — authoritative living CMIS roadmap.
+6. `docs/CHECKPOINT_2026-09-05_FOUR_REPOS.md` — reconciliation checkpoint.
 
-Roberta Learning System and autonomous Learning Plane capabilities do not alter the authority hierarchy or become a second live-fact path.
+Earlier dated roadmap/status reconciliation files are historical snapshots only.
 
-CMIS remains authoritative for deterministic freshness-sensitive facts/evidence/risk and live capability eligibility. Roberta reaches CMIS through the relevant Chain Scout. Any new public intelligence/alert promotion requires a separately accepted CMIS promotion contract and separate Roberta/Scout adoption-readiness gate.
+Current active evidence gates are PR #469 for final #410 acceptance and PR #470 for final five-pool X1.Ninja USD-liquidity semantics. Web Discovery v1-v4 is complete internally through PR #478 and remains discovery-only.
 
-Dated status/sync files through 2026-08-30 are historical and must not override the living roadmap or September 1 reconciliation.
+Any new public service / Scout reliance requires a separately accepted promotion contract. Controlled Execution remains locked.
 
-Controlled Execution remains locked/not started.
+`execution_authorized=false`
