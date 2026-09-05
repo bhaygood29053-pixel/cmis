@@ -37,7 +37,8 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_x1_warp_bridged_supply_evidence.py \
-            tests/test_x1_warp_usdc_bridgein_v2_anchor.py
+            tests/test_x1_warp_usdc_bridgein_v2_anchor.py \
+            tests/test_x1_usdcx_destination_parity.py
 
   warp-bridged-supply-live:
     name: Verify live exact Warp vault/mint supply closure
@@ -74,7 +75,6 @@ jobs:
               WSOL_SOURCE_MINT,
               WSOL_X_DESTINATION_MINT,
               build_warp_bridged_supply_evidence,
-              build_warp_liability_adjusted_backing_evidence,
               capture_destination_mint_observation,
               capture_source_vault_observation,
           )
@@ -83,9 +83,6 @@ jobs:
           )
           from liquidity_scout.providers.x1.warp_message_retention_coverage import (
               fetch_official_warp_config,
-          )
-          from liquidity_scout.providers.x1.warp_onchain_transfer_history import (
-              capture_warp_message_state,
           )
 
           def endpoint(chain, mint):
@@ -157,18 +154,20 @@ jobs:
           assert result["execution_authorized"] is False
           PY
 
-      - name: Prove current exact USDC -> USDC.X Warp backing closure
+      - name: Prove current USDC -> USDC.X reserve parity
         run: |
           python - <<'PY'
           import json
           import time
 
+          from liquidity_scout.providers.x1.usdcx_destination_parity import (
+              SOLANA_USDC_MINT,
+              WARP_USDC_ROUTE_ID,
+              X1_USDC_X_MINT,
+              evaluate_usdcx_destination_parity,
+          )
           from liquidity_scout.providers.x1.warp_bridged_supply_evidence import (
-              USDC_ROUTE_ID,
-              USDC_SOURCE_MINT,
-              USDC_X_DESTINATION_MINT,
               build_warp_bridged_supply_evidence,
-              build_warp_liability_adjusted_backing_evidence,
               capture_destination_mint_observation,
               capture_source_vault_observation,
           )
@@ -178,9 +177,6 @@ jobs:
           from liquidity_scout.providers.x1.warp_message_retention_coverage import (
               fetch_official_warp_config,
           )
-          from liquidity_scout.providers.x1.warp_onchain_transfer_history import (
-              capture_warp_message_state,
-          )
 
           def endpoint(chain, mint):
               return {
@@ -189,65 +185,58 @@ jobs:
                   "asset_id_kind": "mint",
               }
 
-          official = fetch_official_warp_config()
           route = build_warp_config_route_observation(
-              config_response=official,
-              route_id=USDC_ROUTE_ID,
-              source=endpoint("solana", USDC_SOURCE_MINT),
-              destination=endpoint("x1", USDC_X_DESTINATION_MINT),
+              config_response=fetch_official_warp_config(),
+              route_id=WARP_USDC_ROUTE_ID,
+              source=endpoint("solana", SOLANA_USDC_MINT),
+              destination=endpoint("x1", X1_USDC_X_MINT),
           )
-          source = capture_source_vault_observation(
-              source_mint=USDC_SOURCE_MINT,
-          )
-          destination = capture_destination_mint_observation(
-              destination_mint=USDC_X_DESTINATION_MINT,
-          )
-          strict = build_warp_bridged_supply_evidence(
+          backing = build_warp_bridged_supply_evidence(
               route_observation=route,
-              source_vault=source,
-              destination_mint=destination,
+              source_vault=capture_source_vault_observation(
+                  source_mint=SOLANA_USDC_MINT,
+              ),
+              destination_mint=capture_destination_mint_observation(
+                  destination_mint=X1_USDC_X_MINT,
+              ),
               evaluated_at=time.time(),
           )
-          messages = capture_warp_message_state()
-          adjusted = build_warp_liability_adjusted_backing_evidence(
-              route_observation=route,
-              source_vault=source,
-              destination_mint=destination,
-              message_state=messages,
-              evaluated_at=time.time(),
-          )
+          parity = evaluate_usdcx_destination_parity(backing)
 
           evidence = {
-              "strict": {
-                  "source": strict["source"],
-                  "destination": strict["destination"],
-                  "source_vault_balance_equals_destination_supply": strict[
-                      "source_vault_balance_equals_destination_supply"
-                  ],
-                  "current_backing_closure_verified": strict[
-                      "current_backing_closure_verified"
-                  ],
-              },
-              "liability_adjusted": adjusted,
+              "schema": "x1_usdcx_destination_parity_live.v1",
+              "source": backing["source"],
+              "destination": backing["destination"],
+              "observation_skew_seconds": backing["observation_skew_seconds"],
+              "strict_supply_equality": backing[
+                  "source_vault_balance_equals_destination_supply"
+              ],
+              "exact_backing_closure_verified": backing[
+                  "current_backing_closure_verified"
+              ],
+              "parity": parity,
           }
-          print("WARP_USDC_USDCX_BACKING_EVIDENCE")
+          print("WARP_USDC_USDCX_PARITY_EVIDENCE")
           print(json.dumps(evidence, indent=2, sort_keys=True))
 
-          assert strict["source"]["identity_verified"] is True
-          assert strict["destination"]["identity_verified"] is True
-          assert strict["decimals_verified"] is True
-          assert strict["observation_time_compatible"] is True
-          assert adjusted["ambiguous_route_message_count"] == 0
-          assert adjusted["reserve_surplus_raw"] >= 0
-          assert adjusted["reserve_surplus_raw"] == adjusted[
-              "outstanding_route_liability_raw"
-          ]
-          assert adjusted["liability_adjusted_backing_closure_verified"] is True
-          assert adjusted[
+          assert backing["source"]["identity_verified"] is True
+          assert backing["destination"]["identity_verified"] is True
+          assert backing["decimals_verified"] is True
+          assert backing["observation_time_compatible"] is True
+          assert parity["exact_route_identity_verified"] is True
+          assert parity["source_destination_identity_verified"] is True
+          assert parity["decimals_verified"] is True
+          assert parity["source_reserve_gte_destination_supply"] is True
+          assert parity["reserve_surplus_raw"] >= 0
+          assert parity["current_reserve_backing_verified"] is True
+          assert parity["reserve_or_redemption_semantics_verified"] is True
+          assert parity[
               "destination_representation_value_equivalence_verified"
           ] is True
-          assert adjusted["current_usdcx_usd_equivalence_verified"] is False
-          assert adjusted["execution_authorized"] is False
+          assert parity["future_redemption_guaranteed"] is False
+          assert parity["historical_value_equivalence_verified"] is False
+          assert parity["cmis_promotable"] is False
+          assert parity["execution_authorized"] is False
           PY
 
       - name: Safety boundary
