@@ -153,6 +153,7 @@ def verify_recognized_program_asset_pool_set(
     rpc_url: str = DEFAULT_X1_RPC_URL,
     layout_sample_pools: int = DEFAULT_LAYOUT_SAMPLE_POOLS,
     min_layout_pools: int = DEFAULT_MIN_LAYOUT_POOLS,
+    allow_verified_zero_set: bool = False,
     inventory_provider: Callable[..., Mapping[str, Any]] = (
         inventory_recognized_amm_programs
     ),
@@ -164,7 +165,14 @@ def verify_recognized_program_asset_pool_set(
     ),
     role_verifier: Callable[..., Mapping[str, Any]] = verify_candidate_pool_role,
 ) -> dict[str, Any]:
-    """Resolve the structurally verified target-mint pool set for one XDEX family."""
+    """Resolve the structurally verified target-mint pool set for one XDEX family.
+
+    Empty mint-filtered results remain unverified by default. A caller may
+    explicitly opt into allow_verified_zero_set only when a verified empty
+    program-family set is itself the required fact. This never widens the
+    result beyond the one verified program/account family and never proves an
+    all-X1 DEX zero.
+    """
 
     asset_mint = _text(asset_mint)
     rpc_url = _text(rpc_url)
@@ -180,6 +188,8 @@ def verify_recognized_program_asset_pool_set(
         raise ValueError("min_layout_pools must be an integer >= 3")
     if min_layout_pools < 3 or min_layout_pools > layout_sample_pools:
         raise ValueError("min_layout_pools must be between 3 and layout_sample_pools")
+    if not isinstance(allow_verified_zero_set, bool):
+        raise ValueError("allow_verified_zero_set must be boolean")
 
     clean_catalog = [
         dict(pool) for pool in catalog_pools if isinstance(pool, Mapping)
@@ -356,8 +366,16 @@ def verify_recognized_program_asset_pool_set(
     filters_verified = (discovery or {}).get("summary", {}).get(
         "targeted_program_family_mint_filter_observed"
     ) is True
-    all_matching_verified = bool(discovered_addresses) and (
+    zero_matching_program_state = not discovered_addresses
+    verified_zero_set = bool(
+        allow_verified_zero_set
+        and zero_matching_program_state
+        and filters_verified
+        and not catalog_addresses
+    )
+    all_matching_verified = bool(
         verified_addresses == discovered_addresses
+        and (bool(discovered_addresses) or verified_zero_set)
     )
     catalog_recovered = catalog_addresses.issubset(discovered_addresses)
     pool_set_verified = bool(
@@ -415,6 +433,9 @@ def verify_recognized_program_asset_pool_set(
             "targeted_program_family_mint_filter_observed": filters_verified,
             "matching_program_state_account_count": len(discovered_addresses),
             "verified_program_pool_count": len(verified_addresses),
+            "allow_verified_zero_set": allow_verified_zero_set,
+            "zero_matching_program_state_observed": zero_matching_program_state,
+            "verified_zero_set": verified_zero_set,
             "all_matching_accounts_structurally_verified": all_matching_verified,
             "catalog_asset_pool_count": len(catalog_addresses),
             "all_catalog_asset_pools_recovered": catalog_recovered,
