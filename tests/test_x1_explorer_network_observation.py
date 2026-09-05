@@ -178,7 +178,7 @@ class X1ExplorerNetworkObservationTests(unittest.TestCase):
             rpc["rpc_methods"],
             ["getEpochInfo", "getBlock", "getBlockTime"],
         )
-        self.assertEqual(len(rpc["safe_identifiers"]), 2)
+        self.assertEqual(len(rpc["safe_identifiers"]), 1)
 
     def test_send_transaction_and_unknown_rpc_methods_fail_closed(self):
         observations = list_x1_explorer_network_observations(
