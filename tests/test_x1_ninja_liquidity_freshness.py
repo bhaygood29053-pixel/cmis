@@ -1,8 +1,10 @@
 import unittest
 
 from liquidity_scout.providers.x1.liquidity_freshness import (
+    POOL_SCOPE_VERSION,
     REFERENCE_POOL_ADDRESS,
     VERSION,
+    evaluate_x1_ninja_current_pool_scope,
     evaluate_x1_ninja_liquidity_freshness,
 )
 from liquidity_scout.providers.x1.current_usdcx_usd_equivalence import (
@@ -99,6 +101,21 @@ def snapshot(*rows, before_time=995, after_time=997):
     }
 
 
+def scope(addresses=(P1, P2)):
+    return {
+        "contract_version": POOL_SCOPE_VERSION,
+        "chain": "x1",
+        "asset_mint": ASSET,
+        "market_contributing_pool_addresses": list(addresses),
+        "current_catalog_exact_mint_pool_addresses": list(addresses),
+        "market_pool_count": len(addresses),
+        "current_catalog_exact_mint_pool_count": len(addresses),
+        "provider_scoped_pool_universe_verified": True,
+        "global_xdex_pool_universe_verified": False,
+        "execution_authorized": False,
+    }
+
+
 def equivalence():
     return {
         "schema": USDCX_SCHEMA,
@@ -127,6 +144,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
                 row(P2, xnt_reserve=25, asset_reserve=50, liquidity=100),
             ),
             current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=scope(),
             evaluated_at=1000,
         )
 
@@ -154,6 +172,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
                 after_time=801,
             ),
             current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=scope((P1,)),
             evaluated_at=1000,
         )
         self.assertFalse(result["liquidity_freshness_verified"])
@@ -168,6 +187,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
                 row(P1, xnt_reserve=100, asset_reserve=200, liquidity=400)
             ),
             current_usdcx_usd_equivalence=bad,
+            pool_scope_evidence=scope((P1,)),
             evaluated_at=1000,
         )
         self.assertFalse(result["liquidity_freshness_verified"])
@@ -189,6 +209,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
                 )
             ),
             current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=scope((P1,)),
             evaluated_at=1000,
         )
         self.assertFalse(result["liquidity_freshness_verified"])
@@ -204,6 +225,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
                 row(P1, xnt_reserve=100, asset_reserve=200, liquidity=400)
             ),
             current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=scope(),
             evaluated_at=1000,
         )
         self.assertFalse(result["liquidity_freshness_verified"])
@@ -219,6 +241,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
             market_envelope=market(addresses=(P1,), liquidity=400),
             snapshot=snapshot(bad),
             current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=scope((P1,)),
             evaluated_at=1000,
         )
         self.assertFalse(result["liquidity_freshness_verified"])
@@ -237,6 +260,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
             market_envelope=market(addresses=addresses, liquidity=12),
             snapshot=snapshot(*rows),
             current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=scope(),
             evaluated_at=1000,
             max_pools=2,
         )
@@ -246,6 +270,57 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
             result["failures"],
         )
 
+    def test_current_pool_scope_requires_exact_current_catalog_set(self):
+        catalog = [
+            {
+                "address": P1,
+                "baseToken": {"mint": ASSET, "address": ASSET},
+                "quoteToken": {"mint": WRAPPED_XNT_MINT, "address": WRAPPED_XNT_MINT},
+            },
+            {
+                "address": P2,
+                "baseToken": {"mint": ASSET, "address": ASSET},
+                "quoteToken": {"mint": WRAPPED_XNT_MINT, "address": WRAPPED_XNT_MINT},
+            },
+        ]
+        result = evaluate_x1_ninja_current_pool_scope(
+            market_envelope=market(),
+            catalog_pools=catalog,
+        )
+        self.assertEqual(result["contract_version"], POOL_SCOPE_VERSION)
+        self.assertTrue(result["provider_scoped_pool_universe_verified"])
+        self.assertFalse(result["global_xdex_pool_universe_verified"])
+        self.assertEqual(
+            set(result["current_catalog_exact_mint_pool_addresses"]),
+            {P1, P2},
+        )
+
+        subset = evaluate_x1_ninja_current_pool_scope(
+            market_envelope=market(addresses=(P1,), liquidity=400),
+            catalog_pools=catalog,
+        )
+        self.assertFalse(subset["provider_scoped_pool_universe_verified"])
+        self.assertIn(
+            "market_pool_set_does_not_match_current_catalog_exact_mint_set",
+            subset["failures"],
+        )
+
+    def test_unverified_pool_scope_blocks_liquidity_freshness(self):
+        bad_scope = scope()
+        bad_scope["provider_scoped_pool_universe_verified"] = False
+        result = evaluate_x1_ninja_liquidity_freshness(
+            market_envelope=market(),
+            snapshot=snapshot(
+                row(P1, xnt_reserve=100, asset_reserve=200, liquidity=400),
+                row(P2, xnt_reserve=25, asset_reserve=50, liquidity=100),
+            ),
+            current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=bad_scope,
+            evaluated_at=1000,
+        )
+        self.assertFalse(result["liquidity_freshness_verified"])
+        self.assertIn("provider_scoped_pool_universe_unverified", result["failures"])
+
     def test_incomplete_market_liquidity_fails_closed(self):
         result = evaluate_x1_ninja_liquidity_freshness(
             market_envelope=market(addresses=(P1,), liquidity=400, complete=False),
@@ -253,6 +328,7 @@ class X1NinjaLiquidityFreshnessTests(unittest.TestCase):
                 row(P1, xnt_reserve=100, asset_reserve=200, liquidity=400)
             ),
             current_usdcx_usd_equivalence=equivalence(),
+            pool_scope_evidence=scope((P1,)),
             evaluated_at=1000,
         )
         self.assertFalse(result["liquidity_freshness_verified"])
