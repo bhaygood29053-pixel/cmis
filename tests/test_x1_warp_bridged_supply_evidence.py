@@ -9,6 +9,7 @@ from liquidity_scout.providers.x1.warp_bridged_supply_evidence import (
     WSOL_X_DESTINATION_MINT,
     WarpBridgedSupplyEvidenceError,
     build_warp_bridged_supply_evidence,
+    build_warp_liability_adjusted_backing_evidence,
     derive_mint_authority_pda,
     derive_vault_pda,
 )
@@ -240,6 +241,209 @@ class WarpBridgedSupplyEvidenceTests(unittest.TestCase):
         self.assertEqual(result["amount_raw"], 24007049)
         self.assertEqual(result["amount"], "24.007049")
         self.assertFalse(result["execution_authorized"])
+
+
+    def test_inflight_route_liabilities_reconcile_nonzero_vault_surplus(self):
+        source_vault = derive_vault_pda(USDC_SOURCE_MINT)
+        mint_authority = derive_mint_authority_pda(USDC_X_DESTINATION_MINT)
+        route_observation = {
+            "contract": WARP_CONFIG_SEMANTICS_CONTRACT,
+            "semantic_contract_id": WARP_CONFIG_SEMANTIC_CONTRACT_ID,
+            "program_id": WARP_PROGRAM_ID,
+            "route_id": USDC_ROUTE_ID,
+            "source": {
+                "chain": "solana",
+                "asset_id": USDC_SOURCE_MINT,
+                "asset_id_kind": "mint",
+            },
+            "destination": {
+                "chain": "x1",
+                "asset_id": USDC_X_DESTINATION_MINT,
+                "asset_id_kind": "mint",
+            },
+            "source_is_native": True,
+            "destination_is_native": False,
+            "route_decimals": 6,
+        }
+        source = {
+            "chain": "solana",
+            "source_mint": USDC_SOURCE_MINT,
+            "vault_pda": source_vault["address"],
+            "vault_bump": source_vault["bump"],
+            "vault_token_account": "UsdcVaultToken111111111111111111111111111111",
+            "token_account_program_owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "token_account_mint": USDC_SOURCE_MINT,
+            "token_account_authority": source_vault["address"],
+            "amount_raw": 120,
+            "decimals": 6,
+            "observation_slot": 10,
+            "observed_at": 1000.0,
+            "identity_verified": True,
+        }
+        destination = {
+            "chain": "x1",
+            "destination_mint": USDC_X_DESTINATION_MINT,
+            "mint_program_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+            "mint_authority": mint_authority["address"],
+            "expected_warp_mint_authority": mint_authority["address"],
+            "mint_authority_bump": mint_authority["bump"],
+            "raw_supply": 100,
+            "decimals": 6,
+            "mint_observation_slot": 20,
+            "mint_observed_at": 1004.0,
+            "supply_observation_slot": 21,
+            "supply_observed_at": 1005.0,
+            "authority_verified": True,
+            "supply_crosscheck_verified": True,
+        }
+
+        def block(rows):
+            return {
+                "account_type_identity_verified": True,
+                "all_pda_identities_verified": True,
+                "accounts": rows,
+            }
+
+        message_state = {
+            "contract": "warp_onchain_transfer_history/v1",
+            "solana": {
+                "outgoing": block([
+                    {
+                        "seq": 11,
+                        "sender": "Sender111",
+                        "token_mint": USDC_SOURCE_MINT,
+                        "amount_raw": 8,
+                        "timestamp": 900,
+                        "operation": 1,
+                    }
+                ]),
+                "incoming": block([]),
+            },
+            "x1": {
+                "outgoing": block([
+                    {
+                        "seq": 12,
+                        "sender": "Sender222",
+                        "token_mint": USDC_X_DESTINATION_MINT,
+                        "amount_raw": 12,
+                        "timestamp": 901,
+                        "operation": 0,
+                    }
+                ]),
+                "incoming": block([]),
+            },
+        }
+
+        result = build_warp_liability_adjusted_backing_evidence(
+            route_observation=route_observation,
+            source_vault=source,
+            destination_mint=destination,
+            message_state=message_state,
+            evaluated_at=1010.0,
+        )
+        self.assertFalse(result["strict_backing_closure_verified"])
+        self.assertEqual(result["reserve_surplus_raw"], 20)
+        self.assertEqual(result["outstanding_route_liability_raw"], 20)
+        self.assertEqual(result["outstanding_route_liability_count"], 2)
+        self.assertTrue(result["liability_adjusted_backing_closure_verified"])
+        self.assertTrue(
+            result["destination_representation_value_equivalence_verified"]
+        )
+        self.assertFalse(result["current_usdcx_usd_equivalence_verified"])
+        self.assertFalse(result["execution_authorized"])
+
+    def test_unexplained_vault_surplus_fails_liability_adjusted_closure(self):
+        source_vault = derive_vault_pda(USDC_SOURCE_MINT)
+        mint_authority = derive_mint_authority_pda(USDC_X_DESTINATION_MINT)
+        route_observation = {
+            "contract": WARP_CONFIG_SEMANTICS_CONTRACT,
+            "semantic_contract_id": WARP_CONFIG_SEMANTIC_CONTRACT_ID,
+            "program_id": WARP_PROGRAM_ID,
+            "route_id": USDC_ROUTE_ID,
+            "source": {
+                "chain": "solana",
+                "asset_id": USDC_SOURCE_MINT,
+                "asset_id_kind": "mint",
+            },
+            "destination": {
+                "chain": "x1",
+                "asset_id": USDC_X_DESTINATION_MINT,
+                "asset_id_kind": "mint",
+            },
+            "source_is_native": True,
+            "destination_is_native": False,
+            "route_decimals": 6,
+        }
+        source = {
+            "chain": "solana",
+            "source_mint": USDC_SOURCE_MINT,
+            "vault_pda": source_vault["address"],
+            "vault_bump": source_vault["bump"],
+            "vault_token_account": "UsdcVaultToken111111111111111111111111111111",
+            "token_account_program_owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "token_account_mint": USDC_SOURCE_MINT,
+            "token_account_authority": source_vault["address"],
+            "amount_raw": 120,
+            "decimals": 6,
+            "observation_slot": 10,
+            "observed_at": 1000.0,
+            "identity_verified": True,
+        }
+        destination = {
+            "chain": "x1",
+            "destination_mint": USDC_X_DESTINATION_MINT,
+            "mint_program_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+            "mint_authority": mint_authority["address"],
+            "expected_warp_mint_authority": mint_authority["address"],
+            "mint_authority_bump": mint_authority["bump"],
+            "raw_supply": 100,
+            "decimals": 6,
+            "mint_observation_slot": 20,
+            "mint_observed_at": 1004.0,
+            "supply_observation_slot": 21,
+            "supply_observed_at": 1005.0,
+            "authority_verified": True,
+            "supply_crosscheck_verified": True,
+        }
+
+        def block(rows):
+            return {
+                "account_type_identity_verified": True,
+                "all_pda_identities_verified": True,
+                "accounts": rows,
+            }
+
+        message_state = {
+            "contract": "warp_onchain_transfer_history/v1",
+            "solana": {"outgoing": block([]), "incoming": block([])},
+            "x1": {
+                "outgoing": block([
+                    {
+                        "seq": 12,
+                        "sender": "Sender222",
+                        "token_mint": USDC_X_DESTINATION_MINT,
+                        "amount_raw": 12,
+                        "timestamp": 901,
+                        "operation": 0,
+                    }
+                ]),
+                "incoming": block([]),
+            },
+        }
+
+        result = build_warp_liability_adjusted_backing_evidence(
+            route_observation=route_observation,
+            source_vault=source,
+            destination_mint=destination,
+            message_state=message_state,
+            evaluated_at=1010.0,
+        )
+        self.assertEqual(result["reserve_surplus_raw"], 20)
+        self.assertEqual(result["outstanding_route_liability_raw"], 12)
+        self.assertFalse(result["liability_adjusted_backing_closure_verified"])
+        self.assertFalse(
+            result["destination_representation_value_equivalence_verified"]
+        )
 
     def test_pda_derivations_are_deterministic_and_distinct(self):
         vault_a = derive_vault_pda(WSOL_SOURCE_MINT)
