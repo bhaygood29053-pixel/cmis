@@ -45,6 +45,15 @@ from .x1_explorer_structured import (
     parse_x1_explorer_url,
 )
 from .x1_ninja import X1_NINJA_WEB_SOURCE, X1NinjaWebDiscoveryProvider
+from .x1_ninja_structured import (
+    OHLCV_PREFIX as X1_NINJA_OHLCV_PREFIX,
+    POOL_CATALOG_PATH as X1_NINJA_POOL_CATALOG_PATH,
+    POOL_DETAIL_PREFIX as X1_NINJA_POOL_DETAIL_PREFIX,
+    STRUCTURED_CONTRACT as X1_NINJA_STRUCTURED_CONTRACT,
+    TRADE_HISTORY_PREFIX as X1_NINJA_TRADE_HISTORY_PREFIX,
+    TRADE_STREAM_PATH as X1_NINJA_TRADE_STREAM_PATH,
+    parse_x1_ninja_url,
+)
 from .x1report import X1REPORT_SOURCE, X1ReportDiscoveryProvider
 from .xdex import XDEX_WEB_SOURCE, XDEXWebDiscoveryProvider
 from .xdex_coverage_reconciliation import (
@@ -110,6 +119,12 @@ __all__ = [
     "X1ExplorerStructuredDiscoveryError",
     "ADDRESS_SUBVIEWS",
     "X1_NINJA_WEB_SOURCE",
+    "X1_NINJA_STRUCTURED_CONTRACT",
+    "X1_NINJA_POOL_CATALOG_PATH",
+    "X1_NINJA_POOL_DETAIL_PREFIX",
+    "X1_NINJA_TRADE_HISTORY_PREFIX",
+    "X1_NINJA_OHLCV_PREFIX",
+    "X1_NINJA_TRADE_STREAM_PATH",
     "X1REPORT_SOURCE",
     "XDEX_WEB_SOURCE",
     "XDEX_STRUCTURED_CONTRACT",
@@ -140,6 +155,7 @@ __all__ = [
     "list_x1_explorer_network_observations",
     "capture_x1_explorer_page_network",
     "X1NinjaWebDiscoveryProvider",
+    "parse_x1_ninja_url",
     "X1ReportDiscoveryProvider",
     "XDEXWebDiscoveryProvider",
     "parse_xdex_url",
