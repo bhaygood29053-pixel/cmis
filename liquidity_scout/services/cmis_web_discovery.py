@@ -18,6 +18,7 @@ from liquidity_scout.providers.web_discovery import (
     provider_ids,
     extract_x1_explorer_related_from_web_discovery,
     parse_x1_explorer_url,
+    list_x1_explorer_network_observations,
 )
 
 
@@ -129,6 +130,23 @@ class CMISWebDiscoveryService:
             "page_discovery": page_discovery,
             "related_entities": related_entities,
             "read_only": True,
+            **_service_truth_state(),
+        }
+
+    def observe_x1_explorer_network(
+        self,
+        har_document: Any,
+    ) -> dict[str, Any]:
+        observations = list_x1_explorer_network_observations(har_document)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "x1_explorer",
+            "observation_count": len(observations),
+            "observations": observations,
+            "read_only": True,
+            "request_replay_authorized": False,
             **_service_truth_state(),
         }
 
