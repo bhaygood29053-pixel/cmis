@@ -48,6 +48,7 @@ jobs:
     env:
       PYTHONPATH: .
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
 
     steps:
       - name: Check out repository
@@ -222,6 +223,62 @@ jobs:
           assert evidence["public_service_promoted"] is False
           assert evidence["scout_reliance_promoted"] is False
           assert evidence["execution_authorized"] is False
+          PY
+
+      - name: Prove recognized-program wSOL.X pool set from X1 RPC
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.verified_program_pool_set import (
+              verify_recognized_program_asset_pool_set,
+          )
+          from liquidity_scout.providers.x1.warp_bridged_supply_evidence import (
+              WSOL_X_DESTINATION_MINT,
+          )
+
+          pools, _ = fetch_all_pools(sleep_seconds=0)
+          result = verify_recognized_program_asset_pool_set(
+              asset_mint=WSOL_X_DESTINATION_MINT,
+              catalog_pools=pools,
+              rpc_url=os.environ["X1_RPC_URL"],
+              layout_sample_pools=8,
+              min_layout_pools=3,
+          )
+
+          public = {
+              "service": result["service"],
+              "version": result["version"],
+              "asset_mint": result["asset_mint"],
+              "status": result["status"],
+              "program_id": result["program_id"],
+              "account_space": result["account_space"],
+              "mint_offsets": result["mint_offsets"],
+              "vault_offsets": result["vault_offsets"],
+              "pools": result["pools"],
+              "summary": result["summary"],
+              "errors": result["errors"],
+          }
+          print("BRIDGE_TO_XDEX_WSOLX_PROGRAM_POOL_SET_EVIDENCE")
+          print(json.dumps(public, indent=2, sort_keys=True))
+
+          assert result["summary"][
+              "recognized_program_asset_pool_set_structurally_verified"
+          ] is True
+          assert result["summary"]["vault_layout_verified"] is True
+          assert result["summary"][
+              "targeted_program_family_mint_filter_observed"
+          ] is True
+          assert result["summary"][
+              "all_matching_accounts_structurally_verified"
+          ] is True
+          assert result["summary"]["all_catalog_asset_pools_recovered"] is True
+          assert result["summary"][
+              "recognized_program_registry_globally_exhaustive"
+          ] is False
+          assert result["summary"]["global_onchain_pool_discovery_proven"] is False
           PY
 
       - name: Safety boundary
