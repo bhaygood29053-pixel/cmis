@@ -129,6 +129,8 @@ class BridgeToXdexUtilizationTests(unittest.TestCase):
         )
         self.assertTrue(result["comparable_value_basis_verified"])
         self.assertTrue(result["utilization_verified"])
+        self.assertTrue(result["market_activity_24h_verified"])
+        self.assertTrue(result["issue_410_acceptance_verified"])
         self.assertFalse(result["causal_bridge_to_xdex_claim_authorized"])
         self.assertFalse(result["adoption_claim_authorized"])
         self.assertFalse(result["risk_promotion_authorized"])
@@ -273,6 +275,62 @@ class BridgeToXdexUtilizationTests(unittest.TestCase):
                 bridge_integration=bad,
                 pool_universe=pool_universe(),
                 pool_metrics=metrics(),
+                value_basis=value_basis(),
+            )
+
+    def test_verified_zero_current_pool_set_does_not_invent_24h_volume(self):
+        zero_universe = {
+            "contract": POOL_UNIVERSE_CONTRACT,
+            "representation_mint": WSOL_X,
+            "enumeration_verified": True,
+            "all_pool_identities_verified": True,
+            "pool_addresses": [],
+            "unresolved_pools": [],
+            "verified_zero_set": True,
+            "current_liquidity_zero_verified": True,
+            "volume_24h_window_coverage_verified": False,
+            "scope": "verified_xdex_program_family",
+            "execution_authorized": False,
+        }
+        result = build_bridge_to_xdex_utilization(
+            bridge_integration=bridge_integration(),
+            pool_universe=zero_universe,
+            pool_metrics=[],
+            value_basis=value_basis(),
+        )
+        self.assertEqual(result["verified_xdex_liquidity_value"], "0")
+        self.assertIsNone(result["verified_xdex_volume_24h_value"])
+        self.assertEqual(result["bridge_to_xdex_liquidity_ratio"], "0")
+        self.assertTrue(result["verified_zero_pool_set"])
+        self.assertTrue(result["current_liquidity_zero_verified"])
+        self.assertFalse(result["volume_24h_window_coverage_verified"])
+        self.assertFalse(result["market_activity_24h_verified"])
+        self.assertEqual(
+            result["bridge_flow_to_xdex_volume_ratio_state"],
+            "unavailable_unverified_volume_window",
+        )
+        self.assertTrue(result["utilization_verified"])
+        self.assertFalse(result["issue_410_acceptance_verified"])
+        self.assertFalse(result["execution_authorized"])
+
+    def test_empty_pool_universe_without_verified_zero_proof_is_rejected(self):
+        bad_universe = {
+            "contract": POOL_UNIVERSE_CONTRACT,
+            "representation_mint": WSOL_X,
+            "enumeration_verified": True,
+            "all_pool_identities_verified": True,
+            "pool_addresses": [],
+            "unresolved_pools": [],
+            "execution_authorized": False,
+        }
+        with self.assertRaisesRegex(
+            BridgeToXdexUtilizationError,
+            "explicit verified_zero_set",
+        ):
+            build_bridge_to_xdex_utilization(
+                bridge_integration=bridge_integration(),
+                pool_universe=bad_universe,
+                pool_metrics=[],
                 value_basis=value_basis(),
             )
 
