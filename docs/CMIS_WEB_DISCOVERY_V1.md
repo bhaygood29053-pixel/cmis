@@ -1,6 +1,6 @@
 # CMIS Web Discovery v1
 
-Status: implementation candidate under Issue #471. Foundation-only until accepted through the normal CMIS merge gates.
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472. Follow-on X1 Explorer structured discovery (#473/#474), sanitized network observation (#475/#476), and operator-controlled passive browser capture (#477/#478) are also merged. The entire v1-v4 stack remains discovery-only, non-promoted, and `execution_authorized=false`.
 
 ## Purpose
 
@@ -153,7 +153,7 @@ The webpage itself never becomes the verification authority.
 
 ## Promotion state
 
-Issue #471 authorizes implementation of this internal foundation only.
+Issue #471 / PR #472 accepted this internal foundation. Later source-specific Web Discovery layers through PR #478 remain internal and do not change the promotion boundary.
 
 A later gate is required before any of the following:
 
