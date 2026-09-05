@@ -1,0 +1,335 @@
+name: Bridge-to-XDEX Utilization Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-xdex-unit:
+    name: Test #410 deterministic utilization contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run deterministic #410 tests
+        run: |
+          python -m pytest -q \
+            tests/test_cmis_bridge_to_xdex_utilization.py \
+            tests/test_x1_xdex_representation_pool_universe.py \
+            tests/test_x1_verified_program_pool_set.py
+
+  bridge-xdex-live-universe:
+    name: Prove live exact wSOL.X XDEX pool universe
+    needs: bridge-xdex-unit
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feature/issue410-bridge-xdex-utilization')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Enumerate and structurally verify current wSOL.X pools
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+
+          from liquidity_scout.providers.x1.candidate_pool_role import (
+              verify_candidate_pool_role,
+          )
+          from liquidity_scout.providers.x1.program_accounts import (
+              RECOGNIZED_AMM_PROGRAM_IDS,
+          )
+          from liquidity_scout.providers.x1.warp_bridged_supply_evidence import (
+              WSOL_X_DESTINATION_MINT,
+          )
+          from liquidity_scout.providers.x1.xdex import fetch_pool_list
+          from liquidity_scout.providers.x1.xdex_representation_pool_universe import (
+              build_xdex_representation_pool_universe,
+              select_representation_pool_candidates,
+          )
+
+          rpc_url = os.environ["X1_RPC_URL"]
+          observations = {}
+          selected_network = None
+          pools = []
+
+          for network in ("mainnet", "X1 Mainnet"):
+              try:
+                  rows = fetch_pool_list(network=network)
+                  selection = select_representation_pool_candidates(
+                      rows,
+                      representation_mint=WSOL_X_DESTINATION_MINT,
+                  )
+                  observations[network] = {
+                      "status": "ok",
+                      "pool_row_count": len(rows),
+                      "representation_candidate_count": len(
+                          selection["candidate_pool_addresses"]
+                      ),
+                  }
+              except Exception as exc:
+                  rows = []
+                  observations[network] = {
+                      "status": "error",
+                      "error": f"{type(exc).__name__}: {exc}",
+                  }
+
+              if rows and not pools:
+                  pools = rows
+                  selected_network = network
+
+          if not pools:
+              raise AssertionError(
+                  "XDEX public pool list returned no usable current pool rows"
+              )
+
+          selection = select_representation_pool_candidates(
+              pools,
+              representation_mint=WSOL_X_DESTINATION_MINT,
+          )
+          reports = {}
+          attempts = {}
+
+          for address in selection["candidate_pool_addresses"]:
+              attempts[address] = []
+              accepted = None
+              for program_id in RECOGNIZED_AMM_PROGRAM_IDS:
+                  try:
+                      report = verify_candidate_pool_role(
+                          account=address,
+                          target_mint=WSOL_X_DESTINATION_MINT,
+                          program_id=program_id,
+                          rpc_url=rpc_url,
+                          signature_limit=1,
+                      )
+                      attempts[address].append(
+                          {
+                              "program_id": program_id,
+                              "structural_role_verified": (
+                                  report.get("summary", {}).get(
+                                      "pool_state_structural_role_verified"
+                                  )
+                                  is True
+                              ),
+                          }
+                      )
+                  except Exception as exc:
+                      report = None
+                      attempts[address].append(
+                          {
+                              "program_id": program_id,
+                              "structural_role_verified": False,
+                              "error": f"{type(exc).__name__}: {exc}",
+                          }
+                      )
+
+                  if (
+                      isinstance(report, dict)
+                      and report.get("summary", {}).get(
+                          "pool_state_structural_role_verified"
+                      )
+                      is True
+                  ):
+                      accepted = report
+                      break
+
+              if accepted is not None:
+                  reports[address] = accepted
+
+          evidence = build_xdex_representation_pool_universe(
+              representation_mint=WSOL_X_DESTINATION_MINT,
+              xdex_pools=pools,
+              structural_reports_by_address=reports,
+              observed_at=time.time(),
+              network=selected_network,
+          )
+
+          public = {
+              "contract": evidence["contract"],
+              "source": evidence["source"],
+              "network": evidence["network"],
+              "representation_mint": evidence["representation_mint"],
+              "provider_pool_row_count": evidence["provider_pool_row_count"],
+              "representation_candidate_pool_count": evidence[
+                  "representation_candidate_pool_count"
+              ],
+              "verified_pool_count": evidence["verified_pool_count"],
+              "pool_addresses": evidence["pool_addresses"],
+              "unresolved_pools": evidence["unresolved_pools"],
+              "enumeration_verified": evidence["enumeration_verified"],
+              "all_pool_identities_verified": evidence[
+                  "all_pool_identities_verified"
+              ],
+              "recognized_program_registry_globally_exhaustive": evidence[
+                  "recognized_program_registry_globally_exhaustive"
+              ],
+              "global_onchain_pool_discovery_proven": evidence[
+                  "global_onchain_pool_discovery_proven"
+              ],
+              "execution_authorized": evidence["execution_authorized"],
+              "network_observations": observations,
+              "structural_attempts": attempts,
+          }
+          print("BRIDGE_TO_XDEX_WSOLX_POOL_UNIVERSE_EVIDENCE")
+          print(json.dumps(public, indent=2, sort_keys=True))
+
+          assert evidence["unresolved_pools"] == []
+          assert evidence["enumeration_verified"] is True
+          assert evidence["all_pool_identities_verified"] is True
+          assert evidence["provider_catalog_scope_complete"] is True
+          assert evidence["liquidity_semantics_verified"] is False
+          assert evidence["volume_24h_semantics_verified"] is False
+          assert evidence["market_freshness_verified"] is False
+          assert evidence["cmis_promotable"] is False
+          assert evidence["public_service_promoted"] is False
+          assert evidence["scout_reliance_promoted"] is False
+          assert evidence["execution_authorized"] is False
+          PY
+
+      - name: Prove recognized-program wSOL.X pool set from X1 RPC
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.verified_program_pool_set import (
+              verify_recognized_program_asset_pool_set,
+          )
+          from liquidity_scout.providers.x1.xdex_representation_pool_universe import (
+              build_xdex_representation_pool_universe_from_program_set,
+          )
+          from liquidity_scout.providers.x1.warp_bridged_supply_evidence import (
+              WSOL_X_DESTINATION_MINT,
+          )
+
+          pools, _ = fetch_all_pools(sleep_seconds=0)
+          result = verify_recognized_program_asset_pool_set(
+              asset_mint=WSOL_X_DESTINATION_MINT,
+              catalog_pools=pools,
+              rpc_url=os.environ["X1_RPC_URL"],
+              layout_sample_pools=8,
+              min_layout_pools=3,
+              allow_verified_zero_set=True,
+          )
+
+          universe = build_xdex_representation_pool_universe_from_program_set(
+              program_pool_set=result,
+              observed_at=result.get("evidence", {})
+              .get("discovery", {})
+              .get("observed_at")
+              or __import__("time").time(),
+          )
+
+          public = {
+              "service": result["service"],
+              "version": result["version"],
+              "asset_mint": result["asset_mint"],
+              "status": result["status"],
+              "program_id": result["program_id"],
+              "account_space": result["account_space"],
+              "mint_offsets": result["mint_offsets"],
+              "vault_offsets": result["vault_offsets"],
+              "pools": result["pools"],
+              "summary": result["summary"],
+              "errors": result["errors"],
+              "normalized_pool_universe": {
+                  "contract": universe["contract"],
+                  "scope": universe["scope"],
+                  "pool_addresses": universe["pool_addresses"],
+                  "verified_pool_count": universe["verified_pool_count"],
+                  "verified_zero_set": universe["verified_zero_set"],
+                  "current_liquidity_zero_verified": universe[
+                      "current_liquidity_zero_verified"
+                  ],
+                  "volume_24h_semantics_verified": universe[
+                      "volume_24h_semantics_verified"
+                  ],
+                  "volume_24h_window_coverage_verified": universe[
+                      "volume_24h_window_coverage_verified"
+                  ],
+                  "global_onchain_pool_discovery_proven": universe[
+                      "global_onchain_pool_discovery_proven"
+                  ],
+              },
+          }
+          print("BRIDGE_TO_XDEX_WSOLX_PROGRAM_POOL_SET_EVIDENCE")
+          print(json.dumps(public, indent=2, sort_keys=True))
+
+          assert result["summary"][
+              "recognized_program_asset_pool_set_structurally_verified"
+          ] is True
+          assert result["summary"]["vault_layout_verified"] is True
+          assert result["summary"][
+              "targeted_program_family_mint_filter_observed"
+          ] is True
+          assert result["summary"][
+              "all_matching_accounts_structurally_verified"
+          ] is True
+          assert result["summary"]["all_catalog_asset_pools_recovered"] is True
+          if result["summary"]["matching_program_state_account_count"] == 0:
+              assert result["summary"]["allow_verified_zero_set"] is True
+              assert result["summary"]["zero_matching_program_state_observed"] is True
+              assert result["summary"]["verified_zero_set"] is True
+          assert result["summary"][
+              "recognized_program_registry_globally_exhaustive"
+          ] is False
+          assert result["summary"]["global_onchain_pool_discovery_proven"] is False
+          assert universe["enumeration_verified"] is True
+          assert universe["all_pool_identities_verified"] is True
+          assert universe["scope"] == "verified_xdex_program_family"
+          assert universe["global_onchain_pool_discovery_proven"] is False
+          if universe["verified_zero_set"]:
+              assert universe["pool_addresses"] == []
+              assert universe["current_liquidity_zero_verified"] is True
+              assert universe["volume_24h_semantics_verified"] is False
+              assert universe["volume_24h_window_coverage_verified"] is False
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only XDEX pool-list + X1 RPC structural evidence only."
+          echo "No swap, bridge, transaction preparation, signing, broadcast, custody, or value movement."
+          echo "Liquidity/volume semantics and market freshness remain separate gates."
+          echo "EXECUTION_AUTHORIZED=FALSE"

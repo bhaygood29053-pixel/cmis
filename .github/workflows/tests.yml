@@ -267,3 +267,18 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_warp_bridge_flow_integration.py
+
+      - name: Test Bridge-to-XDEX utilization intelligence v1
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_cmis_bridge_to_xdex_utilization.py
+
+      - name: Test exact XDEX representation pool universe
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_xdex_representation_pool_universe.py
+
+      - name: Test verified XDEX program pool-set semantics
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_verified_program_pool_set.py
