@@ -16,6 +16,10 @@ from liquidity_scout.services.cmis_bridge_to_xdex_public import (
     CONTRACT_VERSION as BRIDGE_TO_XDEX_CONTRACT_VERSION,
     SERVICE as BRIDGE_TO_XDEX_SERVICE,
 )
+from liquidity_scout.services.cmis_cross_chain_provenance_public import (
+    CONTRACT_VERSION as CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION,
+    SERVICE as CROSS_CHAIN_PROVENANCE_SERVICE,
+)
 from liquidity_scout.services.cmis_burn_intelligence import (
     CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as BURN_INTELLIGENCE_SERVICE,
@@ -52,7 +56,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.19.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.20.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -624,3 +628,31 @@ def test_bridge_to_xdex_promotion_is_bounded_to_x1_program_family():
     assert solana["callable"] is False
     assert solana["public_service_promoted"] is False
     assert solana["scout_reliance_promoted"] is False
+
+
+def test_cross_chain_provenance_promotion_is_x1_only_and_structural():
+    manifest = build_capability_manifest(
+        runtime_services=SUPPORTED_SERVICES,
+        legacy_supported_chains=SUPPORTED_CHAINS,
+        known_chains=KNOWN_CHAINS,
+    )
+    x1 = manifest["chains"]["x1"]["services"][CROSS_CHAIN_PROVENANCE_SERVICE]
+    assert x1["state"] == "bounded"
+    assert x1["callable"] is True
+    assert x1["read_only"] is True
+    assert x1["public_service_promoted"] is True
+    assert x1["scout_reliance_promoted"] is True
+    assert x1["service_contract_version"] == CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION
+    assert "ordered_provenance_hop_continuity" in x1["requirements"]
+    assert "symbol_or_name_equality_is_not_identity_proof" in x1["limitations"]
+    assert "bridge_dependency_is_not_risk" in x1["limitations"]
+    assert "provenance_does_not_verify_backing" in x1["limitations"]
+    assert "provenance_does_not_establish_adoption_or_causality" in x1["limitations"]
+    assert x1["execution_authorized"] is False
+
+    solana = manifest["chains"]["solana"]["services"][CROSS_CHAIN_PROVENANCE_SERVICE]
+    assert solana["state"] == "unavailable"
+    assert solana["callable"] is False
+    assert solana["public_service_promoted"] is False
+    assert solana["scout_reliance_promoted"] is False
+    assert solana["execution_authorized"] is False

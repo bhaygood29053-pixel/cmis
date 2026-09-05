@@ -18,6 +18,10 @@ from liquidity_scout.services.cmis_bridge_to_xdex_public import (
     CONTRACT_VERSION as BRIDGE_TO_XDEX_CONTRACT_VERSION,
     SERVICE as BRIDGE_TO_XDEX_SERVICE,
 )
+from liquidity_scout.services.cmis_cross_chain_provenance_public import (
+    CONTRACT_VERSION as CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION,
+    SERVICE as CROSS_CHAIN_PROVENANCE_SERVICE,
+)
 from liquidity_scout.services.cmis_burn_intelligence import (
     CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as BURN_INTELLIGENCE_SERVICE,
@@ -43,7 +47,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.19.0"
+CMIS_CONTRACT_VERSION = "1.20.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -70,6 +74,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "concentration_change_intelligence",
     "concentration_warning_intelligence",
     "bridge_to_xdex_utilization",
+    "cross_chain_asset_provenance",
 )
 PUBLIC_SUPPORTED_CHAINS = ("x1",)
 PUBLIC_KNOWN_CHAINS = ("x1", "solana")
@@ -104,6 +109,55 @@ def _intelligence_capability(
         "scout_reliance_promoted": False,
         "requirements": list(requirements),
         "limitations": list(limitations),
+    }
+
+
+
+def _cross_chain_provenance_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": [
+                "cross_chain_asset_provenance_not_available_for_chain"
+            ],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION,
+        "requirements": [
+            "canonical_cmis_owned_cross_chain_provenance_record",
+            "content_addressed_provenance_evidence",
+            "exact_current_x1_chain_scoped_asset_id",
+            "exact_asset_id_kind",
+            "ordered_provenance_hop_continuity",
+            "exact_representation_depth",
+            "symbol_and_name_identity_shortcuts_rejected",
+        ],
+        "limitations": [
+            "symbol_or_name_equality_is_not_identity_proof",
+            "bridge_dependency_is_not_risk",
+            "custody_dependency_is_not_risk",
+            "provenance_does_not_verify_live_bridge_state",
+            "provenance_does_not_verify_backing",
+            "provenance_does_not_verify_solvency_or_safety",
+            "provenance_does_not_establish_adoption_or_causality",
+            "source_independence_unverified_unless_separately_proven",
+            "missing_provenance_is_unknown_not_fabricated",
+            "no_execution_authorization",
+            "x1_current_representation_scope_only",
+        ],
+        "execution_authorized": False,
     }
 
 
@@ -462,6 +516,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             available=True
         ),
         BRIDGE_TO_XDEX_SERVICE: _bridge_to_xdex_capability(available=True),
+        CROSS_CHAIN_PROVENANCE_SERVICE: _cross_chain_provenance_capability(
+            available=True
+        ),
     },
     "solana": {
         "asset_lookup": _capability(
@@ -562,6 +619,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             available=False
         ),
         BRIDGE_TO_XDEX_SERVICE: _bridge_to_xdex_capability(available=False),
+        CROSS_CHAIN_PROVENANCE_SERVICE: _cross_chain_provenance_capability(
+            available=False
+        ),
     },
 }
 
