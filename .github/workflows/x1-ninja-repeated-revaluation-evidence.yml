@@ -26,6 +26,7 @@ jobs:
       X1_NINJA_LIQUIDITY_REFERENCE_REL_TOL: "0.000001"
       X1_NINJA_LIQUIDITY_TRANSITION_LOOKBACK_SLOTS: "2500"
       X1_NINJA_LIQUIDITY_TRANSITION_RATE_LIMIT_BACKOFF_SECONDS: "65"
+      RUN_X1_USDCX_DESTINATION_PARITY_LIVE: "1"
 
     steps:
       - name: Check out repository
@@ -54,6 +55,14 @@ jobs:
         run: |
           python -m unittest tests.test_x1_ninja_liquidity_revaluation_series -v
 
+      - name: Run deterministic USDC.X destination parity tests
+        run: |
+          python -m unittest tests.test_x1_usdcx_destination_parity -v
+
+      - name: Prove current USDC.X destination reserve backing
+        run: |
+          python -m unittest tests.test_x1_usdcx_destination_parity_live -v
+
       - name: Capture repeated same-fact revaluation evidence
         run: |
           python -m unittest tests.test_x1_ninja_liquidity_revaluation_series_live -v
@@ -61,9 +70,10 @@ jobs:
       - name: Safety and promotion boundary
         if: always()
         run: |
-          echo "Read-only X1.Ninja/XDEX/X1 RPC evidence only."
+          echo "Read-only X1.Ninja/XDEX/X1 RPC/Solana RPC evidence only."
           echo "Repeated revaluation may establish fact-time only after the explicit series thresholds pass."
-          echo "USDC.X/USD destination reserve/redemption/value equivalence remains separately required."
+          echo "Destination reserve backing may be proven without claiming guaranteed future redemption."
+          echo "Broader USDC.X/USD and liquidity semantic composition remains separately accepted."
           echo "current_usdcx_usd_equivalence_verified=false"
           echo "x1_ninja_liquidity_usd_semantics_verified=false"
           echo "liquidity_freshness_verified=false"
