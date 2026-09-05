@@ -151,6 +151,23 @@ def _bridge_inputs(bridge_integration: Any) -> dict[str, Any]:
     _bool_true(bridge.get("integration_verified"), "bridge_integration.integration_verified")
     _bool_false(bridge.get("execution_authorized"), "bridge_integration.execution_authorized")
 
+    source_raw = bridge.get("source")
+    source_chain = None
+    source_mint = None
+    if isinstance(source_raw, Mapping):
+        source_chain = _text(
+            source_raw.get("chain"),
+            "bridge_integration.source.chain",
+        ).casefold()
+        if source_raw.get("asset_id_kind") != "mint":
+            raise BridgeToXdexUtilizationError(
+                "bridge_integration.source.asset_id_kind must be mint"
+            )
+        source_mint = _text(
+            source_raw.get("asset_id"),
+            "bridge_integration.source.asset_id",
+        )
+
     destination = _mapping(bridge.get("destination"), "bridge_integration.destination")
     if str(destination.get("chain") or "").strip().casefold() != "x1":
         raise BridgeToXdexUtilizationError(
@@ -224,7 +241,11 @@ def _bridge_inputs(bridge_integration: Any) -> dict[str, Any]:
 
     return {
         "route_id": _text(bridge.get("route_id"), "bridge_integration.route_id"),
+        "source_chain": source_chain,
+        "source_mint": source_mint,
+        "destination_chain": "x1",
         "representation_mint": representation_mint,
+        "source_independence_verified": bridge.get("source_independence_verified") is True,
         "as_of": as_of,
         "decimals": decimals,
         "supply_raw": supply_raw,
@@ -313,6 +334,12 @@ def _pool_universe(
             volume_24h_window_coverage_verified
         ),
         "scope": universe.get("scope"),
+        "recognized_program_registry_globally_exhaustive": (
+            universe.get("recognized_program_registry_globally_exhaustive") is True
+        ),
+        "global_onchain_pool_discovery_proven": (
+            universe.get("global_onchain_pool_discovery_proven") is True
+        ),
     }
 
 
@@ -568,6 +595,10 @@ def build_bridge_to_xdex_utilization(
         "service": SERVICE,
         "contract": CONTRACT_VERSION,
         "route_id": bridge["route_id"],
+        "source_chain": bridge["source_chain"],
+        "source_mint": bridge["source_mint"],
+        "destination_chain": bridge["destination_chain"],
+        "destination_mint": bridge["representation_mint"],
         "representation_mint": bridge["representation_mint"],
         "as_of": bridge["as_of"],
         "pool_universe_contract": POOL_UNIVERSE_CONTRACT,
@@ -579,6 +610,12 @@ def build_bridge_to_xdex_utilization(
         "xdex_pool_count": len(universe["addresses"]),
         "xdex_pool_addresses": universe["addresses"],
         "xdex_pool_universe_scope": universe["scope"],
+        "recognized_program_registry_globally_exhaustive": universe[
+            "recognized_program_registry_globally_exhaustive"
+        ],
+        "global_onchain_pool_discovery_proven": universe[
+            "global_onchain_pool_discovery_proven"
+        ],
         "verified_zero_pool_set": universe["verified_zero_set"],
         "current_liquidity_zero_verified": universe[
             "current_liquidity_zero_verified"
@@ -623,6 +660,7 @@ def build_bridge_to_xdex_utilization(
         "issue_410_acceptance_verified": bool(
             utilization_verified and volume_24h_value is not None
         ),
+        "source_independence_verified": bridge["source_independence_verified"],
         "causal_bridge_to_xdex_claim_authorized": False,
         "adoption_claim_authorized": False,
         "risk_promotion_authorized": False,

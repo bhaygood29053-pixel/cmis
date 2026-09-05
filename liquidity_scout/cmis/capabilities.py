@@ -14,6 +14,10 @@ from typing import Any, Iterable, Mapping
 from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.cmis_bridge_to_xdex_public import (
+    CONTRACT_VERSION as BRIDGE_TO_XDEX_CONTRACT_VERSION,
+    SERVICE as BRIDGE_TO_XDEX_SERVICE,
+)
 from liquidity_scout.services.cmis_burn_intelligence import (
     CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as BURN_INTELLIGENCE_SERVICE,
@@ -39,7 +43,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.18.0"
+CMIS_CONTRACT_VERSION = "1.19.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -65,6 +69,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "verification_evidence",
     "concentration_change_intelligence",
     "concentration_warning_intelligence",
+    "bridge_to_xdex_utilization",
 )
 PUBLIC_SUPPORTED_CHAINS = ("x1",)
 PUBLIC_KNOWN_CHAINS = ("x1", "solana")
@@ -99,6 +104,52 @@ def _intelligence_capability(
         "scout_reliance_promoted": False,
         "requirements": list(requirements),
         "limitations": list(limitations),
+    }
+
+
+def _bridge_to_xdex_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": BRIDGE_TO_XDEX_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": ["bridge_to_xdex_utilization_not_available_for_chain"],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": BRIDGE_TO_XDEX_CONTRACT_VERSION,
+        "requirements": [
+            "canonical_cmis_owned_issue_410_record",
+            "exact_route_identity",
+            "exact_source_and_destination_mints",
+            "verified_xdex_program_family_scope",
+            "verified_24h_window_coverage_and_volume_semantics",
+            "verified_comparable_usd_value_basis",
+            "explicit_fact_time_and_freshness_bound",
+        ],
+        "limitations": [
+            "verified_xdex_program_family_is_not_every_x1_dex",
+            "bounded_zero_activity_is_not_global_zero_activity",
+            "bridge_activity_is_not_adoption",
+            "liquidity_is_not_volume",
+            "no_causal_inference",
+            "no_automatic_risk_conclusion",
+            "source_independence_unverified_unless_separately_proven",
+            "global_onchain_pool_discovery_unproven",
+            "recognized_program_registry_not_globally_exhaustive",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "execution_authorized": False,
     }
 
 
@@ -410,6 +461,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         CONCENTRATION_WARNING_SERVICE: _concentration_warning_capability(
             available=True
         ),
+        BRIDGE_TO_XDEX_SERVICE: _bridge_to_xdex_capability(available=True),
     },
     "solana": {
         "asset_lookup": _capability(
@@ -509,6 +561,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         CONCENTRATION_WARNING_SERVICE: _concentration_warning_capability(
             available=False
         ),
+        BRIDGE_TO_XDEX_SERVICE: _bridge_to_xdex_capability(available=False),
     },
 }
 
