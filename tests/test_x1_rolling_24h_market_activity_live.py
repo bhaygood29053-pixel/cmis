@@ -96,6 +96,63 @@ def _pool_candidate(pool, pools):
     }
 
 
+def _active_pool_candidate(pool, pools):
+    if not isinstance(pool, dict):
+        return None
+    address = _text(pool_address(pool))
+    if not address:
+        return None
+
+    volume = _number(pool.get("volume24h"))
+    txs = _number(
+        pool.get("txns24h")
+        if pool.get("txns24h") is not None
+        else pool.get("transactions24h")
+    )
+    if (
+        volume is None
+        or volume <= 0
+        or txs is None
+        or txs <= 0
+        or txs > 30
+        or not float(txs).is_integer()
+    ):
+        return None
+
+    base = _token_mint(pool.get("baseToken"))
+    quote = _token_mint(pool.get("quoteToken"))
+    if base == WRAPPED_XNT_MINT and quote and quote != WRAPPED_XNT_MINT:
+        asset_mint = quote
+    elif quote == WRAPPED_XNT_MINT and base and base != WRAPPED_XNT_MINT:
+        asset_mint = base
+    else:
+        return None
+
+    matches = [
+        match
+        for match in find_matches_for_term(asset_mint, pools)
+        if len(match) >= 4 and match[3] >= 90
+    ]
+    addresses = []
+    seen = set()
+    for match in matches:
+        selected = _text(pool_address(match[0]))
+        if selected and selected not in seen:
+            seen.add(selected)
+            addresses.append(selected)
+    if addresses != [address]:
+        return None
+
+    return {
+        "asset_mint": asset_mint,
+        "pool_address": address,
+        "matches": matches,
+        "provider_volume24h": volume,
+        "provider_transactions24h": int(txs),
+        "liquidity": _number(pool.get("liquidity")) or 0.0,
+    }
+
+
 def _identity_from_current_rpc(pool_address_value, asset_mint):
     snapshot = collect_ninja_price_fact_time_snapshot(
         pool_addresses=[pool_address_value]
@@ -349,6 +406,162 @@ class X1Rolling24hMarketActivityLiveTests(unittest.TestCase):
         self.assertTrue(rolling["volume_24h_freshness_verified"])
         self.assertFalse(rolling["provider_fact_time_verified"])
         self.assertFalse(rolling["source_independence_verified"])
+        self.assertFalse(rolling["execution_authorized"])
+
+
+    def test_prove_one_active_market_transaction_count_from_x1_rpc(self):
+        pools, xnt_price_usd = fetch_all_pools(sleep_seconds=0)
+        self.assertTrue(pools, "X1.Ninja returned no current pool catalog")
+
+        candidates = []
+        seen = set()
+        for pool in pools:
+            candidate = _active_pool_candidate(pool, pools)
+            if not candidate:
+                continue
+            address = candidate["pool_address"]
+            if address in seen:
+                continue
+            seen.add(address)
+            candidates.append(candidate)
+
+        candidates.sort(
+            key=lambda row: (
+                row["provider_transactions24h"],
+                -row["liquidity"],
+                row["pool_address"],
+            )
+        )
+        candidates = candidates[:MAX_CANDIDATES]
+        self.assertTrue(
+            candidates,
+            "no exact single-pool wrapped-XNT active market with <=30 provider transactions is available",
+        )
+
+        attempts = []
+        verified = None
+
+        for candidate in candidates:
+            asset_mint = candidate["asset_mint"]
+            address = candidate["pool_address"]
+            report = {
+                "asset_mint": asset_mint,
+                "pool_address": address,
+                "provider_volume24h": candidate["provider_volume24h"],
+                "provider_transactions24h": candidate["provider_transactions24h"],
+                "liquidity": candidate["liquidity"],
+            }
+            try:
+                catalog = SimpleNamespace(
+                    xnt_price_usd=xnt_price_usd,
+                    last_refresh=time.time(),
+                )
+                market = build_market_report_response(
+                    asset_mint,
+                    candidate["matches"],
+                    catalog,
+                    chain="x1",
+                    observed_at=time.time(),
+                )
+                report["market_status"] = market.get("status")
+                if market.get("status") not in {"ok", "partial"}:
+                    report["result"] = "market_unavailable"
+                    attempts.append(report)
+                    continue
+
+                scope = evaluate_x1_ninja_current_pool_scope(
+                    market_envelope=market,
+                    catalog_pools=pools,
+                )
+                report["pool_scope_verified"] = scope.get(
+                    "provider_scoped_pool_universe_verified"
+                )
+                if scope.get("provider_scoped_pool_universe_verified") is not True:
+                    report["result"] = "pool_scope_unverified"
+                    attempts.append(report)
+                    continue
+
+                pool_identity = _identity_from_current_rpc(address, asset_mint)
+                end_epoch = int(time.time())
+                start_epoch = end_epoch - 86400
+                pool_window = reconstruct_x1_pool_24h_chain_activity(
+                    pool_identity=pool_identity,
+                    start_epoch=start_epoch,
+                    end_epoch=end_epoch,
+                    max_signatures=MAX_SIGNATURES,
+                )
+                rolling = evaluate_x1_rolling_24h_market_activity(
+                    market_envelope=market,
+                    pool_scope_evidence=scope,
+                    pool_windows=[pool_window],
+                    evaluated_at=end_epoch,
+                )
+                report["history_range_proven"] = pool_window.get(
+                    "history_range_proven"
+                )
+                report["window_signature_count"] = pool_window.get(
+                    "window_signature_count"
+                )
+                report["classification_ambiguity_count"] = pool_window.get(
+                    "classification_ambiguity_count"
+                )
+                report["chain_transactions_24h"] = pool_window.get(
+                    "verified_transactions_24h"
+                )
+                report["transactions_24h_freshness_verified"] = rolling.get(
+                    "transactions_24h_freshness_verified"
+                )
+                report["volume_24h_freshness_verified"] = rolling.get(
+                    "volume_24h_freshness_verified"
+                )
+                report["rolling_failures"] = rolling.get("failures")
+                attempts.append(report)
+
+                if (
+                    rolling.get("transactions_24h_freshness_verified") is True
+                    and (pool_window.get("verified_transactions_24h") or 0) > 0
+                ):
+                    verified = {
+                        "candidate": candidate,
+                        "pool_window": pool_window,
+                        "rolling_activity": rolling,
+                    }
+                    break
+            except Exception as exc:
+                report["result"] = "exception"
+                report["error"] = f"{type(exc).__name__}: {exc}"
+                attempts.append(report)
+
+        evidence = {
+            "schema": "x1_502_nonzero_transaction_count_live.v1",
+            "chain": "x1",
+            "candidate_count": len(candidates),
+            "attempts": attempts,
+            "verified_market": verified,
+            "nonzero_transaction_count_semantics_verified": verified is not None,
+            "nonzero_usd_volume_semantics_verified": False,
+            "provider_fact_time_verified": False,
+            "source_independence_verified": False,
+            "execution_authorized": False,
+        }
+        print("X1 #502 NONZERO TRANSACTION COUNT LIVE EVIDENCE")
+        print(json.dumps(evidence, sort_keys=True, default=str))
+
+        self.assertIsNotNone(
+            verified,
+            f"no active exact market reproduced the provider transaction count from a complete X1 RPC 24h chain window: {attempts}",
+        )
+        rolling = verified["rolling_activity"]
+        window = verified["pool_window"]
+        self.assertTrue(window["history_range_proven"])
+        self.assertTrue(window["all_successful_transactions_verified"])
+        self.assertTrue(window["all_pool_relevant_transactions_classified"])
+        self.assertGreater(window["verified_transactions_24h"], 0)
+        self.assertTrue(rolling["transactions_24h_window_coverage_verified"])
+        self.assertTrue(rolling["transactions_24h_semantics_verified"])
+        self.assertTrue(rolling["transactions_24h_freshness_verified"])
+        self.assertFalse(rolling["volume_24h_freshness_verified"])
+        self.assertFalse(rolling["provider_fact_time_verified"])
         self.assertFalse(rolling["execution_authorized"])
 
 
