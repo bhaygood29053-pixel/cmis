@@ -106,3 +106,47 @@ execution_authorized=false
 ```
 
 This first slice is an internal deterministic foundation. Live pool discovery, exact wSOL.X universe closure, verified/fresh XDEX metric capture, and verified representation valuation remain the next acceptance gate before #410 can close.
+
+
+## Live wSOL.X pool-universe checkpoint
+
+The live #410 evidence path now performs two separate observations:
+
+1. XDEX's public current pool catalogue; and
+2. mint-filtered X1 RPC enumeration inside the independently verified XDEX
+   program/account family.
+
+For wSOL.X
+`JDqX4vau2P5zJmLpuNitvR6vMURr9kYjex6oZQXz3Ja8`, both produced zero current
+matching pools. The authoritative chain-side result uses an explicit opt-in
+verified-zero contract:
+
+```text
+scope = verified_xdex_program_family
+matching_program_state_account_count = 0
+verified_program_pool_count = 0
+verified_zero_set = true
+current_liquidity_zero_verified = true
+recognized_program_registry_globally_exhaustive = false
+global_onchain_pool_discovery_proven = false
+```
+
+This proves current zero liquidity only inside the exact verified XDEX
+program-family scope. It is not an all-X1-DEX claim.
+
+Critically, a current verified-zero pool set does **not** prove a rolling 24-hour
+trading-volume zero. A pool could have existed earlier in the 24-hour window, or
+the rolling-volume source/window semantics could remain incomplete. Therefore:
+
+```text
+volume_24h_semantics_verified = false
+volume_24h_window_coverage_verified = false
+verified_xdex_volume_24h_value = null
+bridge_flow_to_xdex_volume_ratio_state =
+    unavailable_unverified_volume_window
+issue_410_acceptance_verified = false
+```
+
+The remaining #410 acceptance work is a bounded 24-hour XDEX activity/window
+proof plus a verified comparable value basis for the bridged-supply denominator.
+No zero substitution is authorized.
