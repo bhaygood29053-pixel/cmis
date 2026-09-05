@@ -2,82 +2,54 @@
 
 Last reconciled: 2026-09-05 (America/New_York)
 
-This file is the mirrored cross-project checkpoint for accepted public and protected repository state. Implementation contracts, capability manifests, issue acceptance criteria, and protected-core documents remain authoritative for their own scopes.
+This is the CMIS-side mirror of the four-repository roadmap/status checkpoint.
 
 ## Authority invariant
 
-- Public product: **ROBERTA — Verified On-Chain Intelligence**.
-- Canonical path: `User / transport -> ROBERTA -> Chain Scout -> CMIS -> Chain Provider / verified source`.
+`User / transport -> ROBERTA -> Chain Scout -> CMIS -> Chain Provider / verified source`
+
+- CMIS owns deterministic freshness-sensitive facts, evidence, Proof Score, risk, historical intelligence, bridge evidence, and provider semantic verification.
 - ROBERTA owns orchestration and final synthesis.
-- Chain Scouts consume and interpret accepted CMIS contracts; they do not manufacture chain facts.
-- CMIS owns deterministic facts, freshness, evidence, Evidence Receipts, Proof Scores, risk, historical intelligence, burn arithmetic, warning evidence, bridge qualification, bridge-flow evidence, and provider semantic verification.
+- Open PR evidence is not accepted runtime truth.
 - Missing evidence remains unknown/unavailable.
-- Proof Score, warning state, bridge qualification, liquidity fact-time, USD equivalence, and risk remain separate claims.
-- Controlled Execution remains locked. `execution_authorized=false`.
+- `execution_authorized=false`.
 
-## Accepted implementation heads checkpointed
-
-```text
-CMIS public implementation
-e3fcaa28c32143de03a88bebe1f3626e22a46573
-
-CMIS protected core implementation
-e84a352f12fa2b5291a98de61603f8dece577d44
-
-ROBERTA public implementation
-548bf70360ecb928002b8d9fce6cc8a673b1919e
-
-ROBERTA protected core implementation
-6627e756427f6270a7f32a243e40ad4db4df3c71
-```
-
-The documentation checkpoint commits intentionally advance the repositories beyond these implementation SHAs. The SHAs above identify the accepted runtime/evidence implementation state being synchronized.
-
-## CMIS #461 / liquidity evidence state
-
-CMIS PR #465 is merged and establishes the stable fact-time milestone:
+## Repository heads at reconciliation start
 
 ```text
-verified_revaluation_event_count=5
-verified_revaluation_pool_count=5
-same_fact_reference_event_count=5
-same_fact_reference_pool_count=5
-liquidity_fact_time_verified=true
+ROBERTA public      e1ab51fc5a004652274597de297cc96e85132f08
+ROBERTA protected   267aa3b1adb1c49ec11ab88ab53c8d2a83515251
+CMIS public         9eea8a13f4d19b3c18021c44b62367a3c1bf425b
+CMIS protected      e34353c4a4ce90d1f9da7ffb8f62bee4d03d1456
 ```
 
-That milestone does **not** yet establish final USD-liquidity semantics:
+CMIS advanced after that checkpoint through merged Web Discovery PR #478 and this documentation reconciliation; the SHAs above remain the reconciliation-start reference.
 
-```text
-current_usdcx_usd_equivalence_verified=false
-x1_ninja_liquidity_usd_semantics_verified=false
-liquidity_freshness_verified=false
-source_independence_verified=false
-cmis_promotable=false
-execution_authorized=false
-```
+## #461 current state
 
-CMIS PR #466 is the active bridge/value-equivalence follow-up. Exact Solana USDC Warp-vault identity, exact X1 USDC.X mint and Warp authority, equal six-decimal units, and current reserve sufficiency have been observed. Historical retained Warp message accounts are not accepted as current in-flight liabilities merely because they remain enumerable.
+Accepted: #465 fact-time, #466 current USDC.X reserve backing, #468 current USDC.X/USD live equivalence.
 
-The next accepted USDC.X proof must establish current value equivalence without using retained historical message state as a shortcut, then compose that result with a fresh exact-mint USDC/USD observation under the accepted policy.
+Active: PR #470 final five-pool USD-liquidity semantics. Liquidity freshness remains separate under #459.
 
-## ROBERTA synchronized state
+## #410 current state
 
-- ROBERTA Opinion v1 remains accepted.
-- ROBERTA Claim Integrity v1 is accepted for X1 asset intelligence and X1 Compare.
-- Compare Claim Integrity is accepted on public/protected main.
-- The next ROBERTA Truth Gate is standalone History, followed by Burn, Discovery, and remaining specialist products.
-- ROBERTA does not promote the #461 X1.Ninja USD-liquidity claim until CMIS completes the remaining USD-equivalence and freshness gates.
-- ROBERTA must preserve CMIS unavailable/unverified states rather than recompute or upgrade them.
+Accepted: #409 and PR #467 utilization foundation.
 
-## Protected-core state
+Active: PR #469 final 24h XDEX activity/value-basis evidence. Its exact-head final live workflow is green; merge/reconciliation and later public-service / Scout-reliance promotion are still required before ROBERTA #314 may consume the result.
 
-- `cmis-core` remains the protected deterministic runtime beneath the public CMIS shell. Its accepted implementation includes X1 RPC market corroboration across protected scan/risk freshness routes.
-- `roberta-core` remains the protected orchestration/synthesis runtime beneath the public ROBERTA shell. Its accepted implementation includes Claim Integrity and repaired Compare claim-boundary handling.
-- No protected source is moved back into the public repositories for convenience.
-- Public evidence-contract progress does not automatically imply a protected-runtime promotion.
+## Web Discovery current state
 
-## Core sync rule
+Merged internal foundations:
 
-**CMIS verifies the evidence. X1 Scout composes only accepted CMIS contracts. ROBERTA explains the same canonical evidence. No upper layer may silently recompute or upgrade facts, freshness, USD equivalence, warnings, bridge truth, risk, coverage, or execution authority.**
+- #472 six-source bounded discovery;
+- #474 X1 Explorer structured discovery;
+- #476 sanitized network observation;
+- #478 operator-controlled passive browser capture.
+
+All remain `DISCOVERED`, non-promoted, and non-authorizing.
+
+## ROBERTA
+
+Opinion v1 and Claim Integrity v1 for X1 asset intelligence/Compare remain accepted. Standalone History is the next ROBERTA Truth Gate. ROBERTA #314 remains blocked on accepted/promoted CMIS cross-chain output.
 
 `execution_authorized=false`
