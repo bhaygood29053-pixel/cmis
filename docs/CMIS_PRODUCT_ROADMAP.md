@@ -12,7 +12,8 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - Existing promoted CMIS services and the capability contract remain unchanged by #461 evidence research.
 - Controlled Execution remains locked: `execution_authorized=false`.
 - **CMIS Web Discovery v1 — Issue #471 / PR #472: COMPLETE as an internal foundation.** Bounded multi-source discovery across X1 Explorer, XDEX, X1.Ninja, X1Report, X1 Docs, and GitHub is merged with source allowlists, redirect containment, bounded retrieval/crawling, exact provenance/body hashing, visible provider failures, and `DISCOVERED`-only truth state. It is not public-service or Scout-reliance promoted.
-- **Issue #473 — X1 Explorer Structured Discovery v1: ACTIVE.** The next source-specific slice deterministically maps supported X1 Explorer transaction/address/block/epoch routes into candidate entity identities and explicit read-only X1 RPC verification handoffs. Address subviews remain route hints only; explorer routes do not prove wallet/program/token/mint/ownership semantics.
+- **X1 Explorer Structured Discovery v1 — Issue #473 / PR #474: COMPLETE as an internal source-specific layer.** Supported transaction/address/block/epoch routes now map deterministically to discovery-only entity candidates and explicit read-only X1 RPC verification handoffs. Address subviews remain route hints only and do not prove wallet/program/token/mint/ownership semantics.
+- **Issue #475 — X1 Explorer Network Observation v1: ACTIVE.** The next Web Discovery slice sanitizes browser-exported network observations from the official X1 Explorer, recognizes only allowlisted read-only X1 JSON-RPC methods, correlates bounded safe identifiers to structured discovery candidates, rejects credential-like material and execution-oriented RPC methods, and preserves `DISCOVERED` / non-promoted / `execution_authorized=false` state.
 
 ## Product naming invariant
 

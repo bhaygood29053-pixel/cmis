@@ -19,6 +19,13 @@ from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider
 from .registry import build_provider, provider_catalog, provider_ids
 from .x1_docs import X1_DOCS_SOURCE, X1DocsDiscoveryProvider
 from .x1_explorer import X1_EXPLORER_SOURCE, X1ExplorerDiscoveryProvider
+from .x1_explorer_network import (
+    ALLOWED_TARGET_HOSTS as X1_EXPLORER_NETWORK_ALLOWED_TARGET_HOSTS,
+    NETWORK_OBSERVATION_CONTRACT as X1_EXPLORER_NETWORK_OBSERVATION_CONTRACT,
+    OFFICIAL_EXPLORER_HOST as X1_EXPLORER_NETWORK_OFFICIAL_HOST,
+    READ_ONLY_RPC_METHODS as X1_EXPLORER_READ_ONLY_RPC_METHODS,
+    list_x1_explorer_network_observations,
+)
 from .x1_explorer_structured import (
     ADDRESS_SUBVIEWS,
     STRUCTURED_CONTRACT as X1_EXPLORER_STRUCTURED_CONTRACT,
@@ -49,6 +56,10 @@ __all__ = [
     "X1_DOCS_SOURCE",
     "X1_EXPLORER_SOURCE",
     "X1_EXPLORER_STRUCTURED_CONTRACT",
+    "X1_EXPLORER_NETWORK_ALLOWED_TARGET_HOSTS",
+    "X1_EXPLORER_NETWORK_OBSERVATION_CONTRACT",
+    "X1_EXPLORER_NETWORK_OFFICIAL_HOST",
+    "X1_EXPLORER_READ_ONLY_RPC_METHODS",
     "X1_EXPLORER_IMPLEMENTATION_COMMIT",
     "X1_EXPLORER_IMPLEMENTATION_REF",
     "X1_EXPLORER_IMPLEMENTATION_REPOSITORY",
@@ -62,6 +73,7 @@ __all__ = [
     "extract_x1_explorer_related_from_web_discovery",
     "extract_related_x1_explorer_entities",
     "parse_x1_explorer_url",
+    "list_x1_explorer_network_observations",
     "X1NinjaWebDiscoveryProvider",
     "X1ReportDiscoveryProvider",
     "XDEXWebDiscoveryProvider",
