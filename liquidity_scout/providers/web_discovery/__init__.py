@@ -47,6 +47,14 @@ from .x1_explorer_structured import (
 from .x1_ninja import X1_NINJA_WEB_SOURCE, X1NinjaWebDiscoveryProvider
 from .x1report import X1REPORT_SOURCE, X1ReportDiscoveryProvider
 from .xdex import XDEX_WEB_SOURCE, XDEXWebDiscoveryProvider
+from .xdex_structured import (
+    STRUCTURED_CONTRACT as XDEX_STRUCTURED_CONTRACT,
+    X1PAYS_CORROBORATION_COMMIT,
+    X1PAYS_CORROBORATION_REF,
+    X1PAYS_CORROBORATION_REPOSITORY,
+    XDEXStructuredDiscoveryError,
+    parse_xdex_url,
+)
 
 
 __all__ = [
@@ -79,6 +87,11 @@ __all__ = [
     "X1_NINJA_WEB_SOURCE",
     "X1REPORT_SOURCE",
     "XDEX_WEB_SOURCE",
+    "XDEX_STRUCTURED_CONTRACT",
+    "X1PAYS_CORROBORATION_COMMIT",
+    "X1PAYS_CORROBORATION_REF",
+    "X1PAYS_CORROBORATION_REPOSITORY",
+    "XDEXStructuredDiscoveryError",
     "X1DocsDiscoveryProvider",
     "X1ExplorerDiscoveryProvider",
     "extract_x1_explorer_related_from_web_discovery",
@@ -89,6 +102,7 @@ __all__ = [
     "X1NinjaWebDiscoveryProvider",
     "X1ReportDiscoveryProvider",
     "XDEXWebDiscoveryProvider",
+    "parse_xdex_url",
     "build_provider",
     "provider_catalog",
     "provider_ids",
