@@ -96,12 +96,15 @@ def validate_cross_chain_provenance_public_record(
             f"canonical provenance must use {CONTRACT_VERSION}"
         )
 
-    rebuilt = build_cross_chain_asset_provenance(
-        canonical_asset_id=safe.get("canonical_asset_id"),
-        origin=safe.get("origin"),
-        current=safe.get("current"),
-        hops=safe.get("lineage"),
-    )
+    try:
+        rebuilt = build_cross_chain_asset_provenance(
+            canonical_asset_id=safe.get("canonical_asset_id"),
+            origin=safe.get("origin"),
+            current=safe.get("current"),
+            hops=safe.get("lineage"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise CrossChainProvenancePublicContractError(str(exc)) from exc
     if rebuilt != safe:
         raise CrossChainProvenancePublicContractError(
             "canonical provenance does not exactly match accepted deterministic reconstruction"
