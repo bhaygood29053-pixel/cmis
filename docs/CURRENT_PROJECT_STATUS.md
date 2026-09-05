@@ -72,5 +72,6 @@ Every result remains `DISCOVERED`; no Web Discovery layer creates verified marke
 - #459 field-scoped freshness expansion.
 - #363 delayed-vault/X1.Ninja research.
 - #458 X1Scroll qualification/fallback research.
+- #498 verified trade attribution + pool price-impact intelligence: planned read-only X1 capability for wallet/transaction/timestamp, trade size, volume contribution, pre/execution/post pool prices, and next-trade price. Pool-local AMM state transition may be proven; broader market causality, wallet identity/intent/manipulation, risk, recommendation, and execution remain unauthorized.
 
 `execution_authorized=false`
