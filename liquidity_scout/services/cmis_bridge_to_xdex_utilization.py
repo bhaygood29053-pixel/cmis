@@ -238,7 +238,7 @@ def _pool_universe(
     pool_universe: Any,
     *,
     representation_mint: str,
-) -> list[str]:
+) -> dict[str, Any]:
     universe = _mapping(pool_universe, "pool_universe")
     if universe.get("contract") != POOL_UNIVERSE_CONTRACT:
         raise BridgeToXdexUtilizationError(
@@ -284,7 +284,36 @@ def _pool_universe(
         raise BridgeToXdexUtilizationError(
             "pool_universe.pool_addresses contains duplicates"
         )
-    return sorted(addresses)
+
+    verified_zero_set = universe.get("verified_zero_set") is True
+    current_liquidity_zero_verified = (
+        universe.get("current_liquidity_zero_verified") is True
+    )
+    volume_24h_window_coverage_verified = (
+        universe.get("volume_24h_window_coverage_verified") is True
+    )
+    if not addresses and not verified_zero_set:
+        raise BridgeToXdexUtilizationError(
+            "empty pool universe requires explicit verified_zero_set"
+        )
+    if verified_zero_set and addresses:
+        raise BridgeToXdexUtilizationError(
+            "verified_zero_set cannot contain pool addresses"
+        )
+    if verified_zero_set and not current_liquidity_zero_verified:
+        raise BridgeToXdexUtilizationError(
+            "verified zero pool set lacks current liquidity-zero proof"
+        )
+
+    return {
+        "addresses": sorted(addresses),
+        "verified_zero_set": verified_zero_set,
+        "current_liquidity_zero_verified": current_liquidity_zero_verified,
+        "volume_24h_window_coverage_verified": (
+            volume_24h_window_coverage_verified
+        ),
+        "scope": universe.get("scope"),
+    }
 
 
 def _value_basis(
@@ -341,6 +370,8 @@ def _pool_metrics(
     *,
     representation_mint: str,
     expected_pool_addresses: list[str],
+    verified_zero_set: bool = False,
+    volume_24h_window_coverage_verified: bool = False,
     as_of: float,
     max_age_seconds: float,
     max_future_skew_seconds: float,
@@ -354,7 +385,11 @@ def _pool_metrics(
     seen: set[str] = set()
     accepted: list[dict[str, Any]] = []
     total_liquidity = Decimal(0)
-    total_volume_24h = Decimal(0)
+    total_volume_24h: Decimal | None = (
+        Decimal(0)
+        if expected or volume_24h_window_coverage_verified
+        else None
+    )
 
     for index, raw in enumerate(pool_metrics):
         metric = _mapping(raw, f"pool_metrics[{index}]")
@@ -412,6 +447,10 @@ def _pool_metrics(
             f"pool metric {address}.volume_24h_value",
         )
         total_liquidity += liquidity
+        if total_volume_24h is None:
+            raise BridgeToXdexUtilizationError(
+                "pool volume observed without verified volume aggregation state"
+            )
         total_volume_24h += volume_24h
         accepted.append(
             {
@@ -427,6 +466,14 @@ def _pool_metrics(
     if missing:
         raise BridgeToXdexUtilizationError(
             "pool metrics do not cover exact pool universe: " + ", ".join(missing)
+        )
+    if not expected and accepted:
+        raise BridgeToXdexUtilizationError(
+            "verified zero pool universe cannot contain pool metrics"
+        )
+    if not expected and not verified_zero_set:
+        raise BridgeToXdexUtilizationError(
+            "empty pool metric set requires verified zero pool universe"
         )
 
     accepted.sort(key=lambda item: item["pool_address"])
@@ -478,7 +525,11 @@ def build_bridge_to_xdex_utilization(
     markets = _pool_metrics(
         pool_metrics,
         representation_mint=bridge["representation_mint"],
-        expected_pool_addresses=universe,
+        expected_pool_addresses=universe["addresses"],
+        verified_zero_set=universe["verified_zero_set"],
+        volume_24h_window_coverage_verified=universe[
+            "volume_24h_window_coverage_verified"
+        ],
         as_of=bridge["as_of"],
         max_age_seconds=max_age,
         max_future_skew_seconds=max_future,
@@ -501,8 +552,16 @@ def build_bridge_to_xdex_utilization(
     volume_24h_value = markets["total_volume_24h"]
 
     liquidity_ratio = _ratio(liquidity_value, supply_value)
-    gross_flow_to_volume = _ratio(gross_flow_value, volume_24h_value)
-    net_flow_to_volume = _ratio(net_value, volume_24h_value)
+    gross_flow_to_volume = (
+        _ratio(gross_flow_value, volume_24h_value)
+        if volume_24h_value is not None
+        else None
+    )
+    net_flow_to_volume = (
+        _ratio(net_value, volume_24h_value)
+        if volume_24h_value is not None
+        else None
+    )
 
     utilization_verified = liquidity_ratio is not None
     core = {
@@ -517,8 +576,16 @@ def build_bridge_to_xdex_utilization(
         "value_basis_evidence_id": basis["evidence_id"],
         "value_unit": VALUE_UNIT,
         "comparable_value_basis_verified": True,
-        "xdex_pool_count": len(universe),
-        "xdex_pool_addresses": universe,
+        "xdex_pool_count": len(universe["addresses"]),
+        "xdex_pool_addresses": universe["addresses"],
+        "xdex_pool_universe_scope": universe["scope"],
+        "verified_zero_pool_set": universe["verified_zero_set"],
+        "current_liquidity_zero_verified": universe[
+            "current_liquidity_zero_verified"
+        ],
+        "volume_24h_window_coverage_verified": universe[
+            "volume_24h_window_coverage_verified"
+        ],
         "pool_metrics": markets["pools"],
         "verified_xdex_liquidity_value": _decimal_text(liquidity_value),
         "verified_xdex_volume_24h_value": _decimal_text(volume_24h_value),
@@ -545,9 +612,17 @@ def build_bridge_to_xdex_utilization(
         "bridge_flow_to_xdex_volume_ratio_state": (
             "descriptive"
             if gross_flow_to_volume is not None
-            else "undefined_zero_xdex_volume"
+            else (
+                "unavailable_unverified_volume_window"
+                if volume_24h_value is None
+                else "undefined_zero_xdex_volume"
+            )
         ),
+        "market_activity_24h_verified": volume_24h_value is not None,
         "utilization_verified": utilization_verified,
+        "issue_410_acceptance_verified": bool(
+            utilization_verified and volume_24h_value is not None
+        ),
         "causal_bridge_to_xdex_claim_authorized": False,
         "adoption_claim_authorized": False,
         "risk_promotion_authorized": False,
