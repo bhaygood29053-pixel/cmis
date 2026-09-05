@@ -21,6 +21,8 @@ from liquidity_scout.providers.web_discovery import (
     list_x1_explorer_network_observations,
     capture_x1_explorer_page_network,
     parse_xdex_url,
+    classify_xdex_network_surface,
+    xdex_network_gap_report,
 )
 
 
@@ -184,6 +186,35 @@ class CMISWebDiscoveryService:
             "state": STATE,
             "source_id": "xdex",
             "structured_endpoint": route,
+            "read_only": True,
+            **_service_truth_state(),
+        }
+
+    def classify_xdex_network_gap(
+        self,
+        url: str,
+        *,
+        method: str = "GET",
+    ) -> dict[str, Any]:
+        classification = classify_xdex_network_surface(url, method=method)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "xdex",
+            "classification": classification,
+            "read_only": True,
+            **_service_truth_state(),
+        }
+
+    def xdex_network_gap_report(self) -> dict[str, Any]:
+        report = xdex_network_gap_report()
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "xdex",
+            "report": report,
             "read_only": True,
             **_service_truth_state(),
         }
