@@ -77,12 +77,12 @@ Default limits:
 - max response body: 256,000 bytes;
 - max extracted same-source links: 100 per page;
 - max pages per crawl: 5;
-- default crawl depth: 1;
+- default crawl depth at the service seam: 0 (explicit opt-in is required to follow links);
 - maximum accepted crawl depth: 2;
 - max query text: 500 characters;
 - max returned normalized text excerpt: 8,000 characters.
 
-The implementation follows redirects only through the HTTP client and then validates the final URL against the same source allowlist. A redirect outside the allowlist fails closed.
+The implementation disables automatic redirect following. Every redirect target is normalized and checked against the same source allowlist before the next GET is sent. A redirect outside the allowlist fails closed without requesting the foreign target.
 
 Only HTTP and HTTPS URLs are accepted. URLs with embedded credentials are rejected.
 
