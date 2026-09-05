@@ -25,6 +25,7 @@ from liquidity_scout.providers.web_discovery import (
     xdex_network_gap_report,
     parse_xdex_extended_readonly_url,
     xdex_coverage_reconciliation,
+    parse_x1_ninja_url,
 )
 
 
@@ -244,6 +245,21 @@ class CMISWebDiscoveryService:
             "state": STATE,
             "source_id": "xdex",
             "report": report,
+            "read_only": True,
+            **_service_truth_state(),
+        }
+
+    def discover_x1_ninja_structured(
+        self,
+        url: str,
+    ) -> dict[str, Any]:
+        route = parse_x1_ninja_url(url)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "x1_ninja",
+            "structured_endpoint": route,
             "read_only": True,
             **_service_truth_state(),
         }
