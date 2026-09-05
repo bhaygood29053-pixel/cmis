@@ -54,28 +54,26 @@ None of those internal foundations creates a capability-manifest service or Scou
 ## September 3 cross-chain checkpoint
 
 The accepted baseline now also includes the following bounded CMIS cross-chain
-foundations:
+evidence stack:
 
 - exact Warp config semantics under `warp_config/exact-mint-pair/v1`;
 - deterministic bridge-flow calculation under `bridge_flow_intelligence/v1`;
 - canonical settled Warp events through exact on-chain
   `warp_onchain_transfer_history/v1` OutgoingMsg/IncomingMsg pairing;
 - connected wallet-history endpoint/response semantics as corroboration only;
-- current Warp message-universe counter/account closure under
-  `warp_message_retention_coverage/v1`.
+- exact current message-universe counter/account closure;
+- bounded 60-day lifecycle-retention / requested-window coverage through #441;
+- verified current bridged-supply closure;
+- completed #409 current/prior 24h, 7d, and 30d bridge-flow integration.
 
-These foundations do **not** yet establish complete route-wide historical
-coverage or verified bridged supply.
+Those accepted foundations remain bounded to their exact route, evidence,
+coverage, and fact-time scopes. They do **not** by themselves create a public
+CMIS bridge service, Scout reliance, an adoption claim, a risk conclusion, or
+execution authority.
 
-Current boundary:
+Current promotion boundary:
 
 ```text
-retention_deletion_semantics_verified = false
-historical_retention_complete_verified = false
-requested_60d_window_coverage_verified = false
-coverage_complete_verified = false
-missing_history_zero_authorized = false
-verified_bridged_supply = false
 public_service_promoted = false
 scout_reliance_promoted = false
 execution_authorized = false
