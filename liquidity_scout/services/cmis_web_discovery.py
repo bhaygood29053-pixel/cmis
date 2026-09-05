@@ -16,6 +16,8 @@ from liquidity_scout.providers.web_discovery import (
     build_provider,
     provider_catalog,
     provider_ids,
+    extract_x1_explorer_related_from_web_discovery,
+    parse_x1_explorer_url,
 )
 
 
@@ -81,6 +83,51 @@ class CMISWebDiscoveryService:
             "state": STATE,
             "source_id": provider.source.source_id,
             "discovery": discovery,
+            "read_only": True,
+            **_service_truth_state(),
+        }
+
+    def discover_x1_explorer_structured(
+        self,
+        url: str,
+        *,
+        include_page: bool = False,
+        query: Optional[str] = None,
+        max_pages: int = 1,
+        max_depth: int = 0,
+        max_related_entities: int = 50,
+        provider_kwargs: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(include_page, bool):
+            raise ValueError("include_page must be a boolean")
+
+        route = parse_x1_explorer_url(url)
+        page_discovery = None
+        related_entities: list[dict[str, Any]] = []
+
+        if include_page:
+            page_result = self.discover(
+                "x1_explorer",
+                url=url,
+                query=query,
+                max_pages=max_pages,
+                max_depth=max_depth,
+                provider_kwargs=provider_kwargs,
+            )
+            page_discovery = page_result["discovery"]
+            related_entities = extract_x1_explorer_related_from_web_discovery(
+                page_discovery,
+                max_entities=max_related_entities,
+            )
+
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "x1_explorer",
+            "structured_route": route,
+            "page_discovery": page_discovery,
+            "related_entities": related_entities,
             "read_only": True,
             **_service_truth_state(),
         }
