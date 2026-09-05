@@ -3,7 +3,7 @@
 This policy deliberately separates three claims:
 
 1. the exact Warp route maps canonical Solana USDC to the exact X1 USDC.X mint;
-2. the source Solana USDC has a fresh, verified USD price observation;
+2. the source Solana USDC has a fresh, verified USD-per-USDC price observation;
 3. the destination representation is economically value-equivalent to the
    source token under a separately verified reserve/redemption/parity proof.
 
@@ -21,6 +21,7 @@ from typing import Any
 SCHEMA = "x1_current_usdcx_usd_equivalence.v1"
 SOLANA_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 X1_USDC_X_MINT = "B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq"
+PYTH_USDC_USD_UNIT = "USD_per_USDC"
 DEFAULT_ABSOLUTE_USD_DEVIATION = Decimal("0.01")
 
 
@@ -55,10 +56,7 @@ def evaluate_current_usdcx_usd_equivalence(
     freshness = _mapping(source_usdc_freshness)
     parity = _mapping(destination_parity_evidence)
 
-    tolerance = _decimal(
-        absolute_usd_deviation,
-        name="absolute_usd_deviation",
-    )
+    tolerance = _decimal(absolute_usd_deviation, name="absolute_usd_deviation")
     if tolerance <= 0:
         raise ValueError("absolute_usd_deviation must be positive")
 
@@ -73,6 +71,7 @@ def evaluate_current_usdcx_usd_equivalence(
         and route.get("destination_mint") == X1_USDC_X_MINT
     )
 
+    source_price_unit_verified = source_price.get("unit") == PYTH_USDC_USD_UNIT
     source_price_identity_verified = bool(
         source_price.get("chain") == "solana"
         and source_price.get("source") == "pyth_core_solana_push"
@@ -80,7 +79,7 @@ def evaluate_current_usdcx_usd_equivalence(
         and source_price.get("mapping_verified") is True
         and source_price.get("price_integrity_verified") is True
         and source_price.get("fact_time_verified") is True
-        and source_price.get("unit") == "USD"
+        and source_price_unit_verified
     )
 
     price = None
@@ -101,8 +100,7 @@ def evaluate_current_usdcx_usd_equivalence(
     )
 
     destination_parity_verified = bool(
-        parity.get("destination_representation_value_equivalence_verified")
-        is True
+        parity.get("destination_representation_value_equivalence_verified") is True
         and parity.get("source_mint") == SOLANA_USDC_MINT
         and parity.get("destination_mint") == X1_USDC_X_MINT
         and parity.get("proof_scope") == "current"
@@ -138,16 +136,13 @@ def evaluate_current_usdcx_usd_equivalence(
         "destination_chain": "x1",
         "destination_mint": X1_USDC_X_MINT,
         "route_identity_verified": route_identity_verified,
+        "source_usdc_usd_price_unit_verified": source_price_unit_verified,
         "source_usdc_usd_price_identity_verified": source_price_identity_verified,
         "source_usdc_usd_price_fresh": source_price_fresh,
-        "source_usdc_usd_price": (
-            format(price, "f") if price is not None else None
-        ),
+        "source_usdc_usd_price": format(price, "f") if price is not None else None,
         "absolute_usd_deviation_policy": format(tolerance, "f"),
         "source_usdc_within_usd_tolerance": price_close_to_one,
-        "destination_representation_value_equivalence_verified": (
-            destination_parity_verified
-        ),
+        "destination_representation_value_equivalence_verified": destination_parity_verified,
         "current_usdcx_usd_equivalence_verified": verified,
         "missing_gates": missing_gates,
         "historical_usdcx_usd_equivalence_verified": False,
@@ -161,6 +156,7 @@ def evaluate_current_usdcx_usd_equivalence(
 
 __all__ = [
     "DEFAULT_ABSOLUTE_USD_DEVIATION",
+    "PYTH_USDC_USD_UNIT",
     "SCHEMA",
     "SOLANA_USDC_MINT",
     "X1_USDC_X_MINT",
