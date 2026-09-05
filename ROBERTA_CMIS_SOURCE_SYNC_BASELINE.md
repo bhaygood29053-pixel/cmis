@@ -1,139 +1,82 @@
 # ROBERTA ↔ CMIS Source Sync Baseline
 
-Last reconciled: 2026-09-03 (America/New_York)
+Last reconciled: 2026-09-05 (America/New_York)
 
-This file is the cross-project checkpoint for accepted public repository state.
-Implementation contracts, capability manifests, issue acceptance criteria, and
-protected-core documents remain authoritative for their own scopes.
+This file is the cross-project checkpoint for accepted public and protected repository state. Implementation contracts, capability manifests, issue acceptance criteria, and protected-core documents remain authoritative for their own scopes.
 
 ## Authority invariant
 
 - Public product: **ROBERTA — Verified On-Chain Intelligence**.
-- Canonical path:
-  `User / transport -> ROBERTA -> Chain Scout -> CMIS -> Chain Provider / verified source`.
+- Canonical path: `User / transport -> ROBERTA -> Chain Scout -> CMIS -> Chain Provider / verified source`.
 - ROBERTA owns orchestration and final synthesis.
-- Chain Scouts consume and interpret accepted CMIS contracts; they do not
-  manufacture chain facts.
-- CMIS owns deterministic facts, freshness, evidence, Evidence Receipts, Proof
-  Scores, risk, historical intelligence, burn arithmetic, warning evidence,
-  bridge qualification, and bridge-flow evidence.
+- Chain Scouts consume and interpret accepted CMIS contracts; they do not manufacture chain facts.
+- CMIS owns deterministic facts, freshness, evidence, Evidence Receipts, Proof Scores, risk, historical intelligence, burn arithmetic, warning evidence, bridge qualification, bridge-flow evidence, and provider semantic verification.
 - Missing evidence remains unknown/unavailable.
-- Proof Score, warning state, bridge qualification, and risk remain separate.
+- Proof Score, warning state, bridge qualification, liquidity fact-time, USD-equivalence, and risk remain separate claims.
 - Controlled Execution remains locked. `execution_authorized=false`.
 
-## Public heads observed for this checkpoint
+## Exact four-repository checkpoint
 
 ```text
-CMIS checkpoint base main =
-fb628257a728347df5abc3d255f97da0cce2b058
+CMIS public main
+e3fcaa28c32143de03a88bebe1f3626e22a46573
 
-ROBERTA observed main =
-9f66906bbc756e4abdf1e903c22b61e45884938c
+CMIS protected core main
+e84a352f12fa2b5291a98de61603f8dece577d44
+
+ROBERTA public main
+548bf70360ecb928002b8d9fce6cc8a673b1919e
+
+ROBERTA protected core main
+6627e756427f6270a7f32a243e40ad4db4df3c71
 ```
 
-The CMIS checkpoint commit/PR that updates this document is expected to advance
-CMIS `main` beyond the recorded checkpoint base. The SHA above intentionally
-identifies the accepted state being checkpointed.
+The documentation checkpoint commit that contains this file advances the repository on which it is written beyond the recorded implementation head above. The SHAs intentionally identify the accepted implementation state being checkpointed.
 
-## Current synchronized capability state
+## CMIS #461 / liquidity evidence state
 
-- CMIS capability contract: `1.18.0`.
-- Instant X1 Scan: `instant_x1_scan/v3`.
-- Burn Intelligence: accepted under CMIS 1.15.
-- Discovery Intelligence: accepted under CMIS 1.16.
-- Field-scoped current-market freshness: accepted under CMIS 1.17.
-- Concentration Warning Intelligence: accepted under CMIS 1.18 and adopted
-  through X1 Scout / Canonical ROBERTA Decision Object.
-- Push warning delivery: not authorized.
-- Controlled Execution: not authorized.
-
-## Warp / cross-chain accepted state
-
-Accepted CMIS evidence now includes:
-
-- #402 / PR #403 — `cross_chain_asset_provenance/v1`;
-- #405 / PR #406 — bridge route/Warp qualification foundation;
-- #407 / PR #429 — exact official Warp config semantics accepted through
-  `warp_config/exact-mint-pair/v1`;
-- PR #432 — `bridge_flow_intelligence/v1` deterministic calculator;
-- #433 / PR #435 — exact connected History endpoint pattern preserved with
-  wallet redaction;
-- PR #436 — `warp_onchain_transfer_history/v1` canonical settled-event
-  authority using exact OutgoingMsg/IncomingMsg pairing;
-- PR #439 — wallet-history response body pinned as corroboration only;
-- #437 / PR #440 — `warp_message_retention_coverage/v1` current-universe
-  counter/account closure accepted.
-
-The previous state that treated #407 as open/blocked is superseded.
-
-## Current bridge truth boundary
+PR #465 is merged and establishes the stable fact-time milestone:
 
 ```text
-warp_exact_route_semantics = accepted
-real_settled_transfer_pairing = accepted
-wallet_history_response_semantics = accepted_corroboration
-current_message_universe_counter_closure = accepted
-
-retention_deletion_semantics_verified = false
-historical_retention_complete_verified = false
-requested_60d_window_coverage_verified = false
-coverage_complete_verified = false
-missing_history_zero_authorized = false
-
-bridge_flow_24h_7d_30d_primary_totals = coverage_gated
-verified_bridged_supply = not_accepted
-
-public_service_promoted = false
-scout_reliance_promoted = false
-execution_authorized = false
+verified_revaluation_event_count=5
+verified_revaluation_pool_count=5
+same_fact_reference_event_count=5
+same_fact_reference_pool_count=5
+liquidity_fact_time_verified=true
 ```
 
-The wallet-history API is wallet-scoped and cannot establish route-wide
-coverage. Provider status labels are corroboration, not the settlement trust
-root. Canonical settled-event truth remains the accepted on-chain paired
-message evidence.
-
-## Active synchronized gate
-
-**CMIS Issue #441 — prove 60-day Warp message-account lifecycle retention for
-#409.**
-
-The required lookback covers the current 30-day window plus the immediately
-preceding 30-day comparison window.
-
-#441 must prove that the exact relevant history has not been lost through
-message-account close/deletion/recycling and that the finalized read-only trace
-reaches the requested lookback start without archive/pagination gaps.
-
-Until that proof passes, missing bridge history cannot become zero.
-
-## Downstream sequence
+This does **not** yet establish final USD-liquidity semantics:
 
 ```text
-CMIS #441
-  -> finish CMIS #409 Bridge Supply + 24h/7d/30d Flow Intelligence
-    -> CMIS #410 Bridge-to-XDEX Utilization
-      -> ROBERTA #314 X1 Scout cross-chain adoption
+current_usdcx_usd_equivalence_verified=false
+x1_ninja_liquidity_usd_semantics_verified=false
+liquidity_freshness_verified=false
+source_independence_verified=false
+cmis_promotable=false
+execution_authorized=false
 ```
 
-ROBERTA #314 may prepare/adopt only after the required CMIS public-service /
-Scout-reliance contracts are accepted. ROBERTA must not independently infer
-Warp route, supply, flow, retention, or utilization truth.
+PR #466 is the active bridge-parity follow-up. Exact Solana USDC Warp-vault identity, exact X1 USDC.X mint and Warp authority, equal six-decimal units, and current reserve sufficiency have been observed. Historical retained Warp message accounts are not accepted as current in-flight liabilities merely because they remain enumerable.
 
-## Parallel items
+The next valid USDC.X proof must establish current value-equivalence without using a stale-retention shortcut, then compose that result with a fresh exact-mint USDC/USD observation under the accepted policy.
 
-- CMIS #363 remains parallel X1.Ninja delayed-vault evidence research and is not
-  the flagship cross-chain blocker.
-- FortiSwap remains an accepted bounded read-only provider foundation; provider
-  assertions do not override CMIS bridge truth.
-- Theo remains a bounded advisory-provider boundary; live factual authority is
-  fail-closed.
+## ROBERTA synchronized state
+
+- ROBERTA Opinion v1 remains accepted.
+- ROBERTA Claim Integrity v1 is accepted for X1 asset intelligence and X1 Compare.
+- Compare Claim Integrity is accepted on public/protected main.
+- The next ROBERTA Truth Gate expansion is standalone History, followed by Burn, Discovery, and remaining specialist products.
+- ROBERTA does not yet promote the #461 X1.Ninja USD-liquidity claim. Until CMIS completes its remaining USD-equivalence and freshness gates, ROBERTA must preserve the unavailable/unverified boundary.
+
+## Protected-core state
+
+- `cmis-core` remains the protected deterministic runtime beneath the public CMIS shell. Its current accepted main includes X1 RPC market corroboration across protected scan/risk freshness routes.
+- `roberta-core` remains the protected orchestration/synthesis runtime beneath the public ROBERTA shell. Its current accepted main includes Claim Integrity and repaired Compare claim-boundary handling.
+- No protected source is moved back into the public repositories for convenience.
+- Public evidence-contract work does not automatically imply a protected-runtime promotion.
 
 ## Core sync rule
 
-**CMIS verifies the evidence. X1 Scout composes only accepted CMIS contracts.
-ROBERTA explains the same canonical evidence. No upper layer may silently
-recompute or upgrade facts, freshness, warnings, bridge truth, risk, coverage,
-or execution authority.**
+**CMIS verifies the evidence. X1 Scout composes only accepted CMIS contracts. ROBERTA explains the same canonical evidence. No upper layer may silently recompute or upgrade facts, freshness, USD equivalence, warnings, bridge truth, risk, coverage, or execution authority.**
 
 `execution_authorized=false`

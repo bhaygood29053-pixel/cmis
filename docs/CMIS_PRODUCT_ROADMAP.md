@@ -1,8 +1,16 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-09-03 (America/New_York)
+Last reconciled: 2026-09-05 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
+
+## Live checkpoint — 2026-09-05
+
+- **#465 merged as the stable #461 fact-time checkpoint.** Five unique X1.Ninja price-only liquidity revaluation events were verified across five distinct X1 pools, each aligned to the exact X1 RPC XNT/USDC.X reserve-ratio reference with no intervening reference-pool transaction. `liquidity_fact_time_verified=true`.
+- The final USD-liquidity semantic promotion is **not complete**. `current_usdcx_usd_equivalence_verified=false`, `x1_ninja_liquidity_usd_semantics_verified=false`, and `liquidity_freshness_verified=false` remain authoritative.
+- **PR #466 is the active bridge-parity follow-up.** Exact Solana USDC Warp-vault identity, exact X1 USDC.X mint/Warp authority, equal six-decimal units, and reserve sufficiency have been observed. The first retained-message liability interpretation failed closed because historical Warp message accounts cannot be treated as current in-flight liabilities. The next bridge proof must use a current-state invariant that does not misclassify retained historical messages.
+- Existing promoted CMIS services and the capability contract remain unchanged by #461 evidence research.
+- Controlled Execution remains locked: `execution_authorized=false`.
 
 ## Product naming invariant
 
