@@ -19,6 +19,7 @@ from liquidity_scout.providers.web_discovery import (
     extract_x1_explorer_related_from_web_discovery,
     parse_x1_explorer_url,
     list_x1_explorer_network_observations,
+    capture_x1_explorer_page_network,
 )
 
 
@@ -147,6 +148,27 @@ class CMISWebDiscoveryService:
             "observations": observations,
             "read_only": True,
             "request_replay_authorized": False,
+            **_service_truth_state(),
+        }
+
+    def capture_x1_explorer_browser(
+        self,
+        page_url: str,
+        **capture_kwargs: Any,
+    ) -> dict[str, Any]:
+        result = capture_x1_explorer_page_network(
+            page_url,
+            **capture_kwargs,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "x1_explorer",
+            "capture": result,
+            "read_only": True,
+            "request_replay_authorized": False,
+            "background_monitoring_authorized": False,
             **_service_truth_state(),
         }
 
