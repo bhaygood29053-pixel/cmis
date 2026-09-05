@@ -1,6 +1,6 @@
 # Roberta ↔ CMIS Accepted Baseline
 
-Last reconciled: 2026-09-03 (America/New_York)
+Last reconciled: 2026-09-05 (America/New_York)
 
 ## Purpose
 
@@ -81,10 +81,7 @@ scout_reliance_promoted = false
 execution_authorized = false
 ```
 
-Issue #441 is the active lifecycle-retention proof required before #409 may
-treat the current/prior 30-day history window as complete. After #409, the
-sequence is #410 Bridge-to-XDEX Utilization and then ROBERTA #314 adoption
-through X1 Scout.
+The Warp evidence sequence has advanced: #441 bounded lifecycle retention and #409 Bridge Supply + Flow Intelligence are accepted. PR #467 accepted the deterministic #410 utilization foundation and verified wSOL.X XDEX program-family pool-universe state. PR #469 is the remaining final #410 evidence slice; its current exact-head 24h activity-window and comparable-value workflows are green, but it remains unmerged. ROBERTA #314 therefore remains blocked until #469 is merged/reconciled and CMIS separately accepts the required public-service / Scout-reliance promotion.
 
 ## First promoted Verified Intelligence service — bounded X1 only
 
@@ -127,7 +124,7 @@ Where exact contracts permit, accepted X1 building blocks include identity/suppl
 
 Scope remains explicit. Program-, pool-, route-, provider-, token-account-, or sample-scoped evidence is not silently widened to asset/global truth.
 
-Current provider-gap work remains non-promotional. Issue #30 is still open. PR #242 (Warp Bridge) and PR #227 (FortiBlox) are closed as not currently verifiable/candidate research. PR #229 is closed and X1Scroll is removed from CMIS integration scope because the required API key was unavailable and no credential-backed provider request could be executed. No X1Scroll provider module or live workflow is accepted on `main`.
+Current provider-gap work remains non-promotional. Issue #30 remains open. Warp route/config, retention, supply, and #409 flow evidence are now accepted under their bounded contracts; #410 final evidence remains gated by PR #469. A bounded X1Scroll archival transaction provider foundation is accepted from PR #457, while its broader qualification remains separately gated. Web Discovery v1-v4 is accepted internally through PR #478 but remains `DISCOVERED`, non-promoted, and non-authorizing.
 
 ## Solana boundary
 
