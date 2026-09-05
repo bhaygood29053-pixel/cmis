@@ -246,6 +246,7 @@ jobs:
               rpc_url=os.environ["X1_RPC_URL"],
               layout_sample_pools=8,
               min_layout_pools=3,
+              allow_verified_zero_set=True,
           )
 
           public = {
@@ -275,6 +276,10 @@ jobs:
               "all_matching_accounts_structurally_verified"
           ] is True
           assert result["summary"]["all_catalog_asset_pools_recovered"] is True
+          if result["summary"]["matching_program_state_account_count"] == 0:
+              assert result["summary"]["allow_verified_zero_set"] is True
+              assert result["summary"]["zero_matching_program_state_observed"] is True
+              assert result["summary"]["verified_zero_set"] is True
           assert result["summary"][
               "recognized_program_registry_globally_exhaustive"
           ] is False
