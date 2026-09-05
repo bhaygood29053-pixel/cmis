@@ -9,7 +9,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - **#410 Bridge-to-XDEX Utilization Intelligence: COMPLETE.** PR #469 merged as `3681559b728d8493fbc0c5e39227df5c34c23c69`. Accepted evidence now includes the bounded 24h XDEX-program activity window, verified 24h wSOL.X XDEX volume semantics inside the verified XDEX program family, fresh comparable wSOL.X USD value basis, and final `bridge_to_xdex_utilization/v1` composition with `issue_410_acceptance_verified=true`.
 - **Issue #482 is the active cross-chain release gate.** The job is no longer to prove #410; it is to promote the already-accepted #410 contract through the public CMIS capability/service boundary and then authorize X1 Scout reliance without widening scope. ROBERTA #314 is blocked only on #482.
 - **#461 remains active for final X1.Ninja USD-liquidity semantics.** PR #470 is the remaining five-pool proof. Its current head has green deterministic tests while the repeated-revaluation live workflow is still in progress. `liquidity_freshness_verified=false` remains a separate later #459 gate.
-- **CMIS Web Discovery v1-v7: COMPLETE internally through PR #486.** PRs #472/#474/#476/#478 established the X1 Explorer/multi-source stack; PR #481 added XDEX structured endpoint discovery; PR #484 accepted the XDEX network-gap registry; PR #486 structured all three known direct read-only XDEX gaps. **Issue #488 is the active v8 XDEX coverage-reconciliation slice**, requiring `known_direct_readonly_gap_count=0`, `browser_capture_required_now=false`, and `recommended_next_source=x1_ninja` for the known repository-owned XDEX inventory while preserving non-promotion and `execution_authorized=false`.
+- **CMIS Web Discovery v1-v8: COMPLETE internally through PR #489.** XDEX reconciliation now records `known_direct_readonly_gap_count=0`, `browser_capture_required_now=false`, and `recommended_next_source=x1_ninja` for the known repository-owned XDEX inventory. **Issue #490 is the active v9 X1.Ninja structured-discovery slice**, recognizing the existing pool catalog, pool detail, trade history, OHLCV, and trade-stream handshake surfaces while preserving all price/liquidity/history/freshness/source-independence/promotion/execution boundaries.
 - Existing promoted CMIS services and capability contract `1.18.0` remain unchanged until a separately accepted promotion gate changes them.
 - Controlled Execution remains locked: `execution_authorized=false`.
 
@@ -891,7 +891,7 @@ Controlled Execution remains unauthorized.
 - **#410 Bridge-to-XDEX Utilization: COMPLETE through merged PR #469.**
 - **#482: ACTIVE promotion gate** for public CMIS service + X1 Scout reliance. ROBERTA #314 follows #482.
 - **#461: ACTIVE through PR #470** for final five-pool X1.Ninja USD-liquidity semantics; #459 remains the later freshness promotion.
-- **CMIS Web Discovery v1-v7: COMPLETE internally through PR #486; #488 is the active XDEX coverage-reconciliation gate before moving source-specific Web Discovery to X1.Ninja.**
+- **CMIS Web Discovery v1-v8: COMPLETE internally through PR #489; #490 is the active X1.Ninja structured-discovery gate.**
 - **CMIS #363:** parallel delayed-vault/X1.Ninja research; not the flagship blocker.
 - `execution_authorized=false`.
 
