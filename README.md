@@ -46,7 +46,7 @@ Chain Provider -> CMIS -> Chain Scout -> Roberta
 
 CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, learning-workflow coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
 
-## Current roadmap position — reconciled 2026-09-02
+## Current roadmap position — reconciled 2026-09-05
 
 Accepted on `main`:
 
@@ -70,6 +70,10 @@ Accepted on `main`:
 - **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
 - **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main`; operator-local MB4E source mastery is complete at 14/14 required stages plus the final capstone, with authoritative read-only autonomous-training telemetry accepted.
 - **Six-phase public-shell/private-core migration:** complete. Protected CMIS implementation is removed from active public branch/tag history and public package boundaries fail closed without the required private core.
+- **Warp Bridge Supply + Flow Intelligence (#409):** complete under the accepted bounded route/retention/supply/current+prior-window evidence stack.
+- **Bridge-to-XDEX Utilization foundation (PR #467):** accepted internally; PR #469 remains the final unmerged #410 evidence slice even though its current exact-head 24h activity/value-basis final workflow is green.
+- **Current USDC.X/USD equivalence (PRs #466/#468):** accepted as a bounded current proof; PR #470 remains the final X1.Ninja five-pool USD-liquidity semantic gate.
+- **CMIS Web Discovery v1-v4 (PRs #472/#474/#476/#478):** complete as internal `DISCOVERED`-only foundations, including bounded six-source discovery, X1 Explorer structured extraction, sanitized network observation, and operator-controlled passive one-page browser capture.
 
 Not accepted/promoted:
 
@@ -84,11 +88,11 @@ Not accepted/promoted:
 
 CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing, but Solana product expansion and release work are deferred to a future phase. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
 
-Current live ordering is narrower: Historical Coverage Proof v1, Burn Intelligence v1, Discovery Ledger/Intelligence v1, WHAT CHANGED? v1 consumption, CMIS 1.17 field-scoped current-market freshness, and CMIS 1.18 pull-only Concentration Warning Intelligence are complete. X1 Scout/ROBERTA Early Warning adoption is next. Push delivery remains a separate future gate. PR #363 delayed-vault/X1.Ninja evidence research remains parallel and is not the flagship product blocker.
+Current live ordering is narrower: PR #469 finalizes #410 Bridge-to-XDEX evidence; PR #470 finalizes #461 X1.Ninja USD-liquidity semantics; #459 remains the later field-scoped freshness promotion gate; ROBERTA #314 remains downstream of accepted CMIS cross-chain public-service / Scout-reliance promotion. CMIS Web Discovery v1-v4 is complete internally through PR #478. PR #363 delayed-vault/X1.Ninja evidence research remains parallel and is not the flagship blocker.
 
 
 
-The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current dated status snapshot is [`docs/PROJECT_STATUS_2026-09-01.md`](./docs/PROJECT_STATUS_2026-09-01.md).
+The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current status snapshot is [`docs/CURRENT_PROJECT_STATUS.md`](./docs/CURRENT_PROJECT_STATUS.md), with the four-repository checkpoint in [`docs/CHECKPOINT_2026-09-05_FOUR_REPOS.md`](./docs/CHECKPOINT_2026-09-05_FOUR_REPOS.md).
 
 ## Active provider-gap work — not accepted capability
 
