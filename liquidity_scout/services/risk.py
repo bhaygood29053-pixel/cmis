@@ -18,6 +18,11 @@ WARN = "WARN"
 BLOCK = "BLOCK"
 _STATUS_ORDER = {PASS: 0, WARN: 1, BLOCK: 2}
 CURRENT_MARKET_FRESHNESS_CONTRACT = "x1_current_market_freshness/v1"
+CURRENT_MARKET_FRESHNESS_V2_CONTRACT = "x1_current_market_freshness/v2"
+ACCEPTED_CURRENT_MARKET_FRESHNESS_CONTRACTS = frozenset({
+    CURRENT_MARKET_FRESHNESS_CONTRACT,
+    CURRENT_MARKET_FRESHNESS_V2_CONTRACT,
+})
 _RISK_FRESHNESS_FIELDS = (
     ("price_usd", "price_freshness_unverified", "Current price freshness is not verified."),
     ("liquidity_usd", "liquidity_freshness_unverified", "Liquidity freshness is not verified."),
@@ -487,9 +492,11 @@ def _assess_freshness(
 ) -> Dict[str, Any]:
     """Assess accepted field-level current-market freshness without widening it."""
 
-    if freshness_report.get("contract_version") != CURRENT_MARKET_FRESHNESS_CONTRACT:
+    if freshness_report.get("contract_version") not in (
+        ACCEPTED_CURRENT_MARKET_FRESHNESS_CONTRACTS
+    ):
         raise ValueError(
-            "freshness_report must use x1_current_market_freshness/v1"
+            "freshness_report must use an accepted X1 current-market freshness contract"
         )
     fields = freshness_report.get("fields")
     if not isinstance(fields, Mapping):
@@ -687,7 +694,9 @@ def build_risk_check(
 
 __all__ = [
     "BLOCK",
+    "ACCEPTED_CURRENT_MARKET_FRESHNESS_CONTRACTS",
     "CURRENT_MARKET_FRESHNESS_CONTRACT",
+    "CURRENT_MARKET_FRESHNESS_V2_CONTRACT",
     "DEFAULT_RISK_POLICY",
     "PASS",
     "WARN",

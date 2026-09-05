@@ -91,6 +91,16 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_ninja_revaluation_watch.py
 
+      - name: Test X1.Ninja aggregate liquidity freshness v1
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_ninja_liquidity_freshness.py
+
+      - name: Test X1 current market freshness v2
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_current_market_freshness_v2.py tests/test_risk_freshness_v2.py
+
       - name: Validate Phase 6 public boundary
         shell: bash
         run: |

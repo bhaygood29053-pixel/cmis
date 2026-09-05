@@ -1,0 +1,72 @@
+name: X1.Ninja Liquidity Freshness Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  liquidity-freshness:
+    name: Prove current aggregate X1.Ninja liquidity freshness
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/x1-freshness-459-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_X1_NINJA_LIQUIDITY_FRESHNESS_LIVE: "1"
+      X1_NINJA_LIQUIDITY_FRESHNESS_MAX_LIVE_POOLS: "12"
+      X1_NINJA_LIQUIDITY_FRESHNESS_MAX_ATTEMPTS: "3"
+      X1_NINJA_LIQUIDITY_FRESHNESS_RETRY_SECONDS: "5"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Run deterministic #459 liquidity freshness tests
+        run: |
+          python -m pytest -q tests/test_x1_ninja_liquidity_freshness.py
+          python -m pytest -q tests/test_x1_current_market_freshness_v2.py
+          python -m pytest -q tests/test_risk_freshness_v2.py
+
+      - name: Prove one exact-mint aggregate current liquidity
+        run: |
+          python -m unittest tests.test_x1_ninja_liquidity_freshness_live -v
+
+      - name: Safety and remaining #459 boundary
+        if: always()
+        run: |
+          echo "Read-only X1.Ninja/X1 RPC/Warp/Pyth evidence only."
+          echo "Every current catalog pool for the exact candidate mint must be included; no sampling is promoted."
+          echo "Liquidity freshness may be verified only by reproducing the current aggregate value from fresh chain state."
+          echo "Provider collection time is not provider fact time."
+          echo "volume_24h_freshness_verified=false"
+          echo "transactions_24h_freshness_verified=false"
+          echo "source_independence_verified=false"
+          echo "public_service_promoted=false"
+          echo "scout_reliance_promoted=false"
+          echo "execution_authorized=false"
