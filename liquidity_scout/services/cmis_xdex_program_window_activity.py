@@ -178,6 +178,22 @@ def prove_xdex_program_asset_window_activity(
                 "error": "verifier returned malformed result",
             })
             continue
+        if verification.get("found") is not True:
+            verification_errors += 1
+            records.append({
+                "signature": signature,
+                "classification": "VERIFICATION_ERROR",
+                "error": "fetched transaction was not verified as found",
+            })
+            continue
+        if verification.get("succeeded") is not True:
+            verification_errors += 1
+            records.append({
+                "signature": signature,
+                "classification": "VERIFICATION_ERROR",
+                "error": "successful address-history row did not verify as succeeded",
+            })
+            continue
 
         verified_time = verification.get("block_time")
         if (
