@@ -47,6 +47,16 @@ from .x1_explorer_structured import (
 from .x1_ninja import X1_NINJA_WEB_SOURCE, X1NinjaWebDiscoveryProvider
 from .x1report import X1REPORT_SOURCE, X1ReportDiscoveryProvider
 from .xdex import XDEX_WEB_SOURCE, XDEXWebDiscoveryProvider
+from .xdex_network_gaps import (
+    COVERED_READ_ONLY as XDEX_COVERED_READ_ONLY,
+    EXECUTION_ADJACENT_EXCLUDED as XDEX_EXECUTION_ADJACENT_EXCLUDED,
+    GAP_REGISTRY_CONTRACT as XDEX_NETWORK_GAP_REGISTRY_CONTRACT,
+    READ_ONLY_GAP_CANDIDATE as XDEX_READ_ONLY_GAP_CANDIDATE,
+    UI_ONLY_CANDIDATE as XDEX_UI_ONLY_CANDIDATE,
+    UNKNOWN as XDEX_NETWORK_GAP_UNKNOWN,
+    classify_xdex_network_surface,
+    xdex_network_gap_report,
+)
 from .xdex_structured import (
     STRUCTURED_CONTRACT as XDEX_STRUCTURED_CONTRACT,
     X1PAYS_CORROBORATION_COMMIT,
@@ -88,6 +98,12 @@ __all__ = [
     "X1REPORT_SOURCE",
     "XDEX_WEB_SOURCE",
     "XDEX_STRUCTURED_CONTRACT",
+    "XDEX_NETWORK_GAP_REGISTRY_CONTRACT",
+    "XDEX_COVERED_READ_ONLY",
+    "XDEX_EXECUTION_ADJACENT_EXCLUDED",
+    "XDEX_READ_ONLY_GAP_CANDIDATE",
+    "XDEX_UI_ONLY_CANDIDATE",
+    "XDEX_NETWORK_GAP_UNKNOWN",
     "X1PAYS_CORROBORATION_COMMIT",
     "X1PAYS_CORROBORATION_REF",
     "X1PAYS_CORROBORATION_REPOSITORY",
@@ -103,6 +119,8 @@ __all__ = [
     "X1ReportDiscoveryProvider",
     "XDEXWebDiscoveryProvider",
     "parse_xdex_url",
+    "classify_xdex_network_surface",
+    "xdex_network_gap_report",
     "build_provider",
     "provider_catalog",
     "provider_ids",
