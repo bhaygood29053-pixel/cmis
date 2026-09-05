@@ -22,6 +22,7 @@ from liquidity_scout.providers.x1.xdex_representation_pool_universe import (
 )
 from liquidity_scout.services.cmis_xdex_program_window_activity import (
     XDEXProgramWindowActivityError,
+    _batch_fetch_transactions,
     prove_xdex_program_asset_window_activity,
 )
 
@@ -56,6 +57,55 @@ def verification(signature, slot, block_time, target=False):
             else [{"mint": "OtherMint", "delta_raw": "5"}]
         ),
     }
+
+
+class BatchTransactionFetchTests(unittest.TestCase):
+    def test_batch_fetch_maps_out_of_order_json_rpc_ids_to_signatures(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {"jsonrpc": "2.0", "id": 2, "result": {"slot": 2}},
+                    {"jsonrpc": "2.0", "id": 1, "result": {"slot": 1}},
+                ]
+
+        result = _batch_fetch_transactions(
+            ["sig-a", "sig-b"],
+            rpc_url="rpc",
+            batch_size=2,
+            batch_workers=1,
+            post=lambda *args, **kwargs: Response(),
+            sleep=lambda seconds: None,
+        )
+        self.assertEqual(result["sig-a"], ({"slot": 1}, None))
+        self.assertEqual(result["sig-b"], ({"slot": 2}, None))
+
+    def test_batch_fetch_keeps_rpc_item_error_unavailable(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {"jsonrpc": "2.0", "id": 1, "error": {"code": -1}},
+                ]
+
+        result = _batch_fetch_transactions(
+            ["sig-a"],
+            rpc_url="rpc",
+            batch_size=1,
+            batch_workers=1,
+            post=lambda *args, **kwargs: Response(),
+            sleep=lambda seconds: None,
+        )
+        self.assertIsNone(result["sig-a"][0])
+        self.assertEqual(result["sig-a"][1], "getTransaction JSON-RPC error")
 
 
 class ProgramWindowActivityTests(unittest.TestCase):
