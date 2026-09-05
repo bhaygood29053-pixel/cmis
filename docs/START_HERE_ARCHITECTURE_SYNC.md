@@ -1,18 +1,29 @@
-# Start Here — Roberta ↔ CMIS Architecture Sync
+# Start Here — ROBERTA ↔ CMIS Architecture Sync
 
-Last reconciled: 2026-09-01 (America/New_York)
+Last reconciled: 2026-09-05 (America/New_York)
 
 For current cross-project architecture and status, read in this order:
 
 1. `ROBERTA_INTEGRATION_CONTRACT.md`
 2. `ROBERTA_CMIS_ACCEPTED_BASELINE.md`
 3. `ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`
-4. `docs/CMIS_PRODUCT_ROADMAP.md`
-5. `docs/ROADMAP_RECONCILIATION_2026-09-01.md`
-6. `docs/PROJECT_STATUS_2026-09-01.md`
+4. `docs/CURRENT_PROJECT_STATUS.md`
+5. `docs/CMIS_PRODUCT_ROADMAP.md`
+6. `docs/CHECKPOINT_2026-09-05_FOUR_REPOS.md`
 
-The controlling authority model is `User -> Roberta -> Chain Scout -> CMIS -> Chain Provider`. CMIS remains the deterministic freshness-sensitive truth/evidence/risk layer beneath Chain Scouts. Roberta's accepted Learning Plane remains separate from that live-fact authority path and cannot promote learning state into CMIS/provider truth or execution authority.
+Authority model:
 
-Dated status/sync files through 2026-08-30 are historical snapshots. They must not override the living roadmap, the mirrored 2026-09-01 source-sync baseline, or the 2026-09-01 roadmap/status reconciliation.
+`User -> ROBERTA -> Chain Scout -> CMIS -> Chain Provider / verified source`
 
-Controlled Execution remains locked/not started and unauthorized.
+Current gates:
+
+- PR #469 — final #410 Bridge-to-XDEX evidence; exact-head final live workflow green, PR still open.
+- PR #470 — final five-pool X1.Ninja USD-liquidity semantic proof.
+- #459 — later field-scoped liquidity/rolling-24h freshness promotion.
+- ROBERTA #314 — downstream of accepted CMIS cross-chain promotion.
+
+Web Discovery v1-v4 is merged internally through PR #478 and remains discovery-only.
+
+Earlier dated status/reconciliation files are historical snapshots and do not override the living roadmap/current-status files.
+
+`execution_authorized=false`
