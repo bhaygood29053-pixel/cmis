@@ -47,6 +47,13 @@ from .x1_explorer_structured import (
 from .x1_ninja import X1_NINJA_WEB_SOURCE, X1NinjaWebDiscoveryProvider
 from .x1report import X1REPORT_SOURCE, X1ReportDiscoveryProvider
 from .xdex import XDEX_WEB_SOURCE, XDEXWebDiscoveryProvider
+from .xdex_extended_structured import (
+    EXTENDED_STRUCTURED_CONTRACT as XDEX_EXTENDED_READONLY_STRUCTURED_CONTRACT,
+    FRONTEND_QUOTE_ALIAS_PATH as XDEX_FRONTEND_QUOTE_ALIAS_PATH,
+    ORACLE_SELL_QUOTE_PATH as XDEX_ORACLE_SELL_QUOTE_PATH,
+    ORACLE_TOKEN_PRICE_PATH as XDEX_ORACLE_TOKEN_PRICE_PATH,
+    parse_xdex_extended_readonly_url,
+)
 from .xdex_network_gaps import (
     COVERED_READ_ONLY as XDEX_COVERED_READ_ONLY,
     EXECUTION_ADJACENT_EXCLUDED as XDEX_EXECUTION_ADJACENT_EXCLUDED,
@@ -99,6 +106,10 @@ __all__ = [
     "XDEX_WEB_SOURCE",
     "XDEX_STRUCTURED_CONTRACT",
     "XDEX_NETWORK_GAP_REGISTRY_CONTRACT",
+    "XDEX_EXTENDED_READONLY_STRUCTURED_CONTRACT",
+    "XDEX_FRONTEND_QUOTE_ALIAS_PATH",
+    "XDEX_ORACLE_TOKEN_PRICE_PATH",
+    "XDEX_ORACLE_SELL_QUOTE_PATH",
     "XDEX_COVERED_READ_ONLY",
     "XDEX_EXECUTION_ADJACENT_EXCLUDED",
     "XDEX_READ_ONLY_GAP_CANDIDATE",
@@ -121,6 +132,7 @@ __all__ = [
     "parse_xdex_url",
     "classify_xdex_network_surface",
     "xdex_network_gap_report",
+    "parse_xdex_extended_readonly_url",
     "build_provider",
     "provider_catalog",
     "provider_ids",
