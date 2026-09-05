@@ -19,6 +19,17 @@ from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider
 from .registry import build_provider, provider_catalog, provider_ids
 from .x1_docs import X1_DOCS_SOURCE, X1DocsDiscoveryProvider
 from .x1_explorer import X1_EXPLORER_SOURCE, X1ExplorerDiscoveryProvider
+from .x1_explorer_structured import (
+    ADDRESS_SUBVIEWS,
+    STRUCTURED_CONTRACT as X1_EXPLORER_STRUCTURED_CONTRACT,
+    X1_EXPLORER_IMPLEMENTATION_COMMIT,
+    X1_EXPLORER_IMPLEMENTATION_REF,
+    X1_EXPLORER_IMPLEMENTATION_REPOSITORY,
+    X1ExplorerStructuredDiscoveryError,
+    extract_related_from_web_discovery as extract_x1_explorer_related_from_web_discovery,
+    extract_related_x1_explorer_entities,
+    parse_x1_explorer_url,
+)
 from .x1_ninja import X1_NINJA_WEB_SOURCE, X1NinjaWebDiscoveryProvider
 from .x1report import X1REPORT_SOURCE, X1ReportDiscoveryProvider
 from .xdex import XDEX_WEB_SOURCE, XDEXWebDiscoveryProvider
@@ -37,11 +48,20 @@ __all__ = [
     "WebDiscoverySource",
     "X1_DOCS_SOURCE",
     "X1_EXPLORER_SOURCE",
+    "X1_EXPLORER_STRUCTURED_CONTRACT",
+    "X1_EXPLORER_IMPLEMENTATION_COMMIT",
+    "X1_EXPLORER_IMPLEMENTATION_REF",
+    "X1_EXPLORER_IMPLEMENTATION_REPOSITORY",
+    "X1ExplorerStructuredDiscoveryError",
+    "ADDRESS_SUBVIEWS",
     "X1_NINJA_WEB_SOURCE",
     "X1REPORT_SOURCE",
     "XDEX_WEB_SOURCE",
     "X1DocsDiscoveryProvider",
     "X1ExplorerDiscoveryProvider",
+    "extract_x1_explorer_related_from_web_discovery",
+    "extract_related_x1_explorer_entities",
+    "parse_x1_explorer_url",
     "X1NinjaWebDiscoveryProvider",
     "X1ReportDiscoveryProvider",
     "XDEXWebDiscoveryProvider",
