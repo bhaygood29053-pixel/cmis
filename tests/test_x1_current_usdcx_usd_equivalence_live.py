@@ -75,59 +75,71 @@ def _qualified_route_contract(route):
     }
 
 
+def capture_current_usdcx_usd_equivalence_live_evidence():
+    """Capture the full current USDC.X/USD composition for reuse by #461 gates."""
+    if USDC_MINT != SOLANA_USDC_MINT:
+        raise AssertionError("Pyth USDC mint identity mismatch")
+
+    route = build_warp_config_route_observation(
+        config_response=fetch_official_warp_config(),
+        route_id=WARP_USDC_ROUTE_ID,
+        source=endpoint("solana", SOLANA_USDC_MINT),
+        destination=endpoint("x1", X1_USDC_X_MINT),
+        collected_at=time.time(),
+    )
+    route_contract = _qualified_route_contract(route)
+
+    backing = build_warp_bridged_supply_evidence(
+        route_observation=route,
+        source_vault=capture_source_vault_observation(
+            source_mint=SOLANA_USDC_MINT
+        ),
+        destination_mint=capture_destination_mint_observation(
+            destination_mint=X1_USDC_X_MINT
+        ),
+        evaluated_at=time.time(),
+    )
+    parity = evaluate_usdcx_destination_parity(backing)
+
+    pyth = PythSolanaPushProvider(SolanaRPCProvider()).get_price(
+        SOLANA_USDC_MINT
+    )
+    freshness = classify_pyth_freshness(
+        pyth,
+        policy=accepted_pyth_freshness_policy(),
+    )
+
+    equivalence = evaluate_current_usdcx_usd_equivalence(
+        warp_route_evidence=route_contract,
+        source_usdc_usd_evidence=pyth,
+        source_usdc_freshness=freshness,
+        destination_parity_evidence=parity,
+    )
+
+    return {
+        "schema": "x1_current_usdcx_usd_equivalence_live.v1",
+        "route": route_contract,
+        "source_usdc_usd": pyth,
+        "source_usdc_freshness": freshness,
+        "destination_parity": parity,
+        "equivalence": equivalence,
+        "x1_ninja_liquidity_usd_semantics_verified": False,
+        "liquidity_freshness_verified": False,
+        "cmis_promotable": False,
+        "execution_authorized": False,
+    }
+
+
 @unittest.skipUnless(RUN_LIVE, "set RUN_X1_USDCX_USD_COMPOSED_LIVE=1")
 class X1CurrentUsdcxUsdEquivalenceLiveTests(unittest.TestCase):
     def test_compose_current_warp_parity_with_fresh_exact_mint_pyth_usdc_usd(self):
-        self.assertEqual(USDC_MINT, SOLANA_USDC_MINT)
+        evidence = capture_current_usdcx_usd_equivalence_live_evidence()
+        route_contract = evidence["route"]
+        parity = evidence["destination_parity"]
+        pyth = evidence["source_usdc_usd"]
+        freshness = evidence["source_usdc_freshness"]
+        equivalence = evidence["equivalence"]
 
-        route = build_warp_config_route_observation(
-            config_response=fetch_official_warp_config(),
-            route_id=WARP_USDC_ROUTE_ID,
-            source=endpoint("solana", SOLANA_USDC_MINT),
-            destination=endpoint("x1", X1_USDC_X_MINT),
-            collected_at=time.time(),
-        )
-        route_contract = _qualified_route_contract(route)
-
-        backing = build_warp_bridged_supply_evidence(
-            route_observation=route,
-            source_vault=capture_source_vault_observation(
-                source_mint=SOLANA_USDC_MINT
-            ),
-            destination_mint=capture_destination_mint_observation(
-                destination_mint=X1_USDC_X_MINT
-            ),
-            evaluated_at=time.time(),
-        )
-        parity = evaluate_usdcx_destination_parity(backing)
-
-        pyth = PythSolanaPushProvider(SolanaRPCProvider()).get_price(
-            SOLANA_USDC_MINT
-        )
-        freshness = classify_pyth_freshness(
-            pyth,
-            policy=accepted_pyth_freshness_policy(),
-        )
-
-        equivalence = evaluate_current_usdcx_usd_equivalence(
-            warp_route_evidence=route_contract,
-            source_usdc_usd_evidence=pyth,
-            source_usdc_freshness=freshness,
-            destination_parity_evidence=parity,
-        )
-
-        evidence = {
-            "schema": "x1_current_usdcx_usd_equivalence_live.v1",
-            "route": route_contract,
-            "source_usdc_usd": pyth,
-            "source_usdc_freshness": freshness,
-            "destination_parity": parity,
-            "equivalence": equivalence,
-            "x1_ninja_liquidity_usd_semantics_verified": False,
-            "liquidity_freshness_verified": False,
-            "cmis_promotable": False,
-            "execution_authorized": False,
-        }
         print("X1 #461 CURRENT USDC.X/USD COMPOSED LIVE EVIDENCE")
         print(json.dumps(evidence, sort_keys=True, default=str))
 
