@@ -19,6 +19,13 @@ from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider
 from .registry import build_provider, provider_catalog, provider_ids
 from .x1_docs import X1_DOCS_SOURCE, X1DocsDiscoveryProvider
 from .x1_explorer import X1_EXPLORER_SOURCE, X1ExplorerDiscoveryProvider
+from .x1_explorer_browser_capture import (
+    BROWSER_CAPTURE_CONTRACT as X1_EXPLORER_BROWSER_CAPTURE_CONTRACT,
+    DEFAULT_DWELL_SECONDS as X1_EXPLORER_BROWSER_DEFAULT_DWELL_SECONDS,
+    DEFAULT_MAX_NETWORK_EVENTS as X1_EXPLORER_BROWSER_DEFAULT_MAX_NETWORK_EVENTS,
+    DEFAULT_NAVIGATION_TIMEOUT_MS as X1_EXPLORER_BROWSER_DEFAULT_NAVIGATION_TIMEOUT_MS,
+    capture_x1_explorer_page_network,
+)
 from .x1_explorer_network import (
     ALLOWED_TARGET_HOSTS as X1_EXPLORER_NETWORK_ALLOWED_TARGET_HOSTS,
     NETWORK_OBSERVATION_CONTRACT as X1_EXPLORER_NETWORK_OBSERVATION_CONTRACT,
@@ -56,6 +63,10 @@ __all__ = [
     "X1_DOCS_SOURCE",
     "X1_EXPLORER_SOURCE",
     "X1_EXPLORER_STRUCTURED_CONTRACT",
+    "X1_EXPLORER_BROWSER_CAPTURE_CONTRACT",
+    "X1_EXPLORER_BROWSER_DEFAULT_DWELL_SECONDS",
+    "X1_EXPLORER_BROWSER_DEFAULT_MAX_NETWORK_EVENTS",
+    "X1_EXPLORER_BROWSER_DEFAULT_NAVIGATION_TIMEOUT_MS",
     "X1_EXPLORER_NETWORK_ALLOWED_TARGET_HOSTS",
     "X1_EXPLORER_NETWORK_OBSERVATION_CONTRACT",
     "X1_EXPLORER_NETWORK_OFFICIAL_HOST",
@@ -74,6 +85,7 @@ __all__ = [
     "extract_related_x1_explorer_entities",
     "parse_x1_explorer_url",
     "list_x1_explorer_network_observations",
+    "capture_x1_explorer_page_network",
     "X1NinjaWebDiscoveryProvider",
     "X1ReportDiscoveryProvider",
     "XDEXWebDiscoveryProvider",
