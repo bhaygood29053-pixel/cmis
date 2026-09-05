@@ -345,6 +345,160 @@ def build_xdex_representation_pool_universe(
     }
 
 
+def build_xdex_representation_pool_universe_from_program_set(
+    *,
+    program_pool_set: Any,
+    observed_at: Any,
+) -> dict[str, Any]:
+    """Normalize one verified XDEX program-family pool set for #410.
+
+    An empty set is accepted only when the upstream verifier explicitly records
+    verified_zero_set=true. This distinguishes proved absence inside the exact
+    verified XDEX program/account family from an unavailable or incomplete
+    discovery result.
+    """
+
+    if not isinstance(program_pool_set, Mapping):
+        raise XDEXRepresentationPoolUniverseError(
+            "program_pool_set must be a mapping"
+        )
+    if program_pool_set.get("service") != "verified_program_asset_pool_set":
+        raise XDEXRepresentationPoolUniverseError(
+            "program_pool_set service is not accepted"
+        )
+    if program_pool_set.get("status") != (
+        "recognized_program_asset_pool_set_structurally_verified"
+    ):
+        raise XDEXRepresentationPoolUniverseError(
+            "program_pool_set is not structurally verified"
+        )
+
+    summary = program_pool_set.get("summary")
+    if not isinstance(summary, Mapping):
+        raise XDEXRepresentationPoolUniverseError(
+            "program_pool_set summary is required"
+        )
+    if summary.get(
+        "recognized_program_asset_pool_set_structurally_verified"
+    ) is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "program_pool_set verification flag is false"
+        )
+    if summary.get("targeted_program_family_mint_filter_observed") is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "mint-filtered program-family enumeration is unverified"
+        )
+    if summary.get("all_matching_accounts_structurally_verified") is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "matching program accounts are not structurally closed"
+        )
+
+    representation = _text(program_pool_set.get("asset_mint"))
+    program_id = _text(program_pool_set.get("program_id"))
+    if not representation or not program_id:
+        raise XDEXRepresentationPoolUniverseError(
+            "program_pool_set identity is incomplete"
+        )
+    observed = _epoch(observed_at, "observed_at")
+
+    rows = program_pool_set.get("pools")
+    if not isinstance(rows, list):
+        raise XDEXRepresentationPoolUniverseError(
+            "program_pool_set pools must be a list"
+        )
+
+    addresses: list[str] = []
+    evidence: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise XDEXRepresentationPoolUniverseError(
+                f"program_pool_set.pools[{index}] must be a mapping"
+            )
+        address = _text(row.get("pool_address"))
+        if not address:
+            raise XDEXRepresentationPoolUniverseError(
+                f"program_pool_set.pools[{index}] address is missing"
+            )
+        if address in seen:
+            raise XDEXRepresentationPoolUniverseError(
+                f"duplicate verified program pool {address}"
+            )
+        seen.add(address)
+        if row.get("pool_state_structural_role_verified") is not True:
+            raise XDEXRepresentationPoolUniverseError(
+                f"program pool {address} structural role is unverified"
+            )
+        mint_0 = _text(row.get("mint_0"))
+        mint_1 = _text(row.get("mint_1"))
+        if representation not in {mint_0, mint_1}:
+            raise XDEXRepresentationPoolUniverseError(
+                f"program pool {address} does not contain representation mint"
+            )
+        addresses.append(address)
+        evidence.append(
+            {
+                "pool_address": address,
+                "program_id": program_id,
+                "mint_0": mint_0,
+                "mint_1": mint_1,
+                "catalog_listed": row.get("catalog_listed") is True,
+                "pool_state_structural_role_verified": True,
+            }
+        )
+
+    zero_set = not addresses
+    if zero_set and summary.get("verified_zero_set") is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "empty program pool set lacks explicit verified-zero evidence"
+        )
+
+    addresses.sort()
+    evidence.sort(key=lambda row: row["pool_address"])
+    core = {
+        "service": SERVICE,
+        "version": VERSION,
+        "contract": POOL_UNIVERSE_CONTRACT,
+        "source": "X1 RPC verified XDEX program-family pool set",
+        "network": "X1 Mainnet",
+        "chain": "x1",
+        "scope": "verified_xdex_program_family",
+        "program_id": program_id,
+        "representation_mint": representation,
+        "observed_at": observed,
+        "representation_candidate_pool_count": len(addresses),
+        "pool_addresses": addresses,
+        "verified_pool_count": len(addresses),
+        "structural_evidence": evidence,
+        "unresolved_pools": [],
+        "enumeration_verified": True,
+        "all_pool_identities_verified": True,
+        "verified_zero_set": zero_set,
+        "zero_set_scope": (
+            "verified_xdex_program_family" if zero_set else None
+        ),
+        "provider_catalog_scope_complete": (
+            summary.get("all_catalog_asset_pools_recovered") is True
+        ),
+        "recognized_program_registry_globally_exhaustive": False,
+        "global_onchain_pool_discovery_proven": False,
+        "liquidity_semantics_verified": zero_set,
+        "current_liquidity_zero_verified": zero_set,
+        "volume_24h_semantics_verified": False,
+        "volume_24h_window_coverage_verified": False,
+        "market_freshness_verified": zero_set,
+        "cmis_promotable": False,
+        "public_service_promoted": False,
+        "scout_reliance_promoted": False,
+        "read_only": True,
+        "execution_authorized": False,
+    }
+    return {
+        **core,
+        "evidence_sha256": _canonical_sha256(core),
+    }
+
+
 __all__ = [
     "DEFAULT_NETWORK",
     "SERVICE",
@@ -352,5 +506,6 @@ __all__ = [
     "VERSION",
     "XDEXRepresentationPoolUniverseError",
     "build_xdex_representation_pool_universe",
+    "build_xdex_representation_pool_universe_from_program_set",
     "select_representation_pool_candidates",
 ]
