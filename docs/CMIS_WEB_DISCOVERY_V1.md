@@ -1,6 +1,6 @@
 # CMIS Web Discovery v1
 
-Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472. Follow-on X1 Explorer layers through PR #478 and XDEX source-specific layers through PR #489 are merged. Issue #490 is the active X1.Ninja structured-discovery gate. The entire stack remains discovery-only, non-promoted, and `execution_authorized=false`.
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472. Follow-on X1 Explorer/XDEX layers through PR #489 and X1.Ninja structured discovery through PR #492 are merged. Issue #494 is the active X1.Ninja network/API gap-inventory gate. The entire stack remains discovery-only, non-promoted, and `execution_authorized=false`.
 
 ## Purpose
 
