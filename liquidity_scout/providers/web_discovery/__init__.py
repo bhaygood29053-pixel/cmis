@@ -47,6 +47,14 @@ from .x1_explorer_structured import (
 from .x1_ninja import X1_NINJA_WEB_SOURCE, X1NinjaWebDiscoveryProvider
 from .x1report import X1REPORT_SOURCE, X1ReportDiscoveryProvider
 from .xdex import XDEX_WEB_SOURCE, XDEXWebDiscoveryProvider
+from .xdex_coverage_reconciliation import (
+    COVERAGE_RECONCILIATION_CONTRACT as XDEX_COVERAGE_RECONCILIATION_CONTRACT,
+    KNOWN_DIRECT_READONLY_SURFACES as XDEX_KNOWN_DIRECT_READONLY_SURFACES,
+    KNOWN_DOCUMENTATION_SURFACE as XDEX_KNOWN_DOCUMENTATION_SURFACE,
+    KNOWN_EXECUTION_EXCLUSIONS as XDEX_KNOWN_EXECUTION_EXCLUSIONS,
+    KNOWN_UI_ONLY_SURFACES as XDEX_KNOWN_UI_ONLY_SURFACES,
+    xdex_coverage_reconciliation,
+)
 from .xdex_extended_structured import (
     EXTENDED_STRUCTURED_CONTRACT as XDEX_EXTENDED_READONLY_STRUCTURED_CONTRACT,
     FRONTEND_QUOTE_ALIAS_PATH as XDEX_FRONTEND_QUOTE_ALIAS_PATH,
@@ -107,6 +115,11 @@ __all__ = [
     "XDEX_STRUCTURED_CONTRACT",
     "XDEX_NETWORK_GAP_REGISTRY_CONTRACT",
     "XDEX_EXTENDED_READONLY_STRUCTURED_CONTRACT",
+    "XDEX_COVERAGE_RECONCILIATION_CONTRACT",
+    "XDEX_KNOWN_DIRECT_READONLY_SURFACES",
+    "XDEX_KNOWN_DOCUMENTATION_SURFACE",
+    "XDEX_KNOWN_EXECUTION_EXCLUSIONS",
+    "XDEX_KNOWN_UI_ONLY_SURFACES",
     "XDEX_FRONTEND_QUOTE_ALIAS_PATH",
     "XDEX_ORACLE_TOKEN_PRICE_PATH",
     "XDEX_ORACLE_SELL_QUOTE_PATH",
@@ -133,6 +146,7 @@ __all__ = [
     "classify_xdex_network_surface",
     "xdex_network_gap_report",
     "parse_xdex_extended_readonly_url",
+    "xdex_coverage_reconciliation",
     "build_provider",
     "provider_catalog",
     "provider_ids",
