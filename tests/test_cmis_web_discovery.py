@@ -23,11 +23,13 @@ class FakeResponse:
         url,
         status_code=200,
         content_type="text/html; charset=utf-8",
+        headers=None,
     ):
         self.content = body if isinstance(body, bytes) else str(body).encode("utf-8")
         self.url = url
         self.status_code = status_code
         self.headers = {"Content-Type": content_type}
+        self.headers.update(dict(headers or {}))
         self.encoding = "utf-8"
 
 
@@ -84,16 +86,22 @@ class CMISWebDiscoveryTests(unittest.TestCase):
             provider.discover_url("https://example.com/tx/abc")
 
     def test_redirect_cannot_escape_source_allowlist(self):
-        provider = X1ExplorerDiscoveryProvider(
-            session=FakeSession(
-                FakeResponse(
-                    "<html>redirected</html>",
-                    url="https://example.com/stolen",
-                )
+        requested = "https://explorer.mainnet.x1.xyz/tx/abc"
+        session = FakeSession(
+            FakeResponse(
+                "",
+                url=requested,
+                status_code=302,
+                headers={"Location": "https://example.com/stolen"},
             )
         )
+        provider = X1ExplorerDiscoveryProvider(session=session)
+
         with self.assertRaises(SourceBoundaryError):
-            provider.discover_url("https://explorer.mainnet.x1.xyz/tx/abc")
+            provider.discover_url(requested)
+
+        self.assertEqual(len(session.calls), 1)
+        self.assertFalse(session.calls[0][1]["allow_redirects"])
 
     def test_html_discovery_is_bounded_and_never_promoted(self):
         body = b"""
