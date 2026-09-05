@@ -1,30 +1,40 @@
 # Four-Repository GitHub Checkpoint — 2026-09-05
 
-## Accepted implementation heads at checkpoint start
+## Reconciliation-start heads
 
-| Repository | Visibility | Accepted implementation head |
+| Repository | Visibility | Head |
 | --- | --- | --- |
-| `cmis` | public | `e3fcaa28c32143de03a88bebe1f3626e22a46573` |
-| `cmis-core` | private | `e84a352f12fa2b5291a98de61603f8dece577d44` |
-| `roberta-langgraph` | public | `548bf70360ecb928002b8d9fce6cc8a673b1919e` |
-| `roberta-core` | private | `6627e756427f6270a7f32a243e40ad4db4df3c71` |
+| `roberta-langgraph` | public | `e1ab51fc5a004652274597de297cc96e85132f08` |
+| `roberta-core` | private | `267aa3b1adb1c49ec11ab88ab53c8d2a83515251` |
+| `cmis` | public | `9eea8a13f4d19b3c18021c44b62367a3c1bf425b` |
+| `cmis-core` | private | `e34353c4a4ce90d1f9da7ffb8f62bee4d03d1456` |
 
-## What is stable now
+Later accepted/documentation commits intentionally advance these repository heads.
 
-CMIS PR #465 is merged. The X1.Ninja liquidity revaluation/fact-time side of #461 has five verified same-fact events across five distinct pools and `liquidity_fact_time_verified=true`.
+## ROBERTA checkpoint
 
-ROBERTA Opinion v1 and Claim Integrity remain accepted, including Compare Claim Integrity. Protected/public boundaries remain intact in both projects.
+Opinion v1, X1 Asset Intelligence Claim Integrity, and Compare Claim Integrity are accepted. Standalone History is the next ROBERTA Truth Gate.
 
-## What remains open
+## CMIS liquidity checkpoint
 
-CMIS PR #466 remains research/verification work for current USDC.X value equivalence. Its retained-message liability interpretation is not accepted. Final X1.Ninja USD-liquidity semantics and liquidity freshness remain unpromoted.
+Accepted: PRs #465, #466, and #468.
 
-ROBERTA must not upgrade the #461 liquidity claim until CMIS completes the remaining exact evidence gates.
+Active: PR #470 final five-pool X1.Ninja USD-liquidity semantic proof; #459 remains the later freshness gate.
 
-## Safety boundary
+## CMIS cross-chain checkpoint
 
-```text
-execution_authorized=false
-```
+Accepted: #409 and PR #467 utilization foundation.
 
-No transaction construction, signing, broadcasting, custody, trading, bridge execution, or autonomous value movement is authorized by this checkpoint.
+Active: PR #469 final #410 evidence. Current exact-head final live workflow is green, but the PR remains unmerged. ROBERTA #314 remains behind merge/reconciliation and separate CMIS public-service / Scout-reliance promotion.
+
+## CMIS Web Discovery checkpoint
+
+Internal Web Discovery v1-v4 is merged through PR #478. It remains discovery-only and non-promoted.
+
+## Protected cores
+
+The protected cores remain mandatory fail-closed implementation boundaries. Public evidence/roadmap changes do not silently promote protected behavior.
+
+## Safety
+
+`execution_authorized=false`
