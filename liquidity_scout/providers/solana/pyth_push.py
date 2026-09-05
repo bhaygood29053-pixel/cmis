@@ -59,6 +59,12 @@ USDC_USD_FEED_ID = (
 )
 USDC_USD_CURRENT_ACCOUNT = "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX"
 
+WSOL_MINT = "So11111111111111111111111111111111111111112"
+SOL_USD_FEED_ID = (
+    "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d"
+)
+SOL_USD_CURRENT_ACCOUNT = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"
+
 PYTH_SOLANA_FEED_FIXTURES: dict[str, dict[str, Any]] = {
     USDC_MINT: {
         "mint": USDC_MINT,
@@ -77,6 +83,30 @@ PYTH_SOLANA_FEED_FIXTURES: dict[str, dict[str, Any]] = {
             "CMIS exact fixture: canonical Solana USDC mint mapped to the "
             "provider-listed Pyth USDC/USD sponsored shard-0 push feed. "
             "No symbol/name discovery is permitted."
+        ),
+        "provider_feed_provenance": PYTH_SOLANA_PUSH_FEED_PROVENANCE,
+        "contract_provenance": PYTH_CORE_CONTRACT_PROVENANCE,
+        "provider_source_commit": "ea35ae4718ccfe7abb31a1817f92a9dd548af1f2",
+    },
+    WSOL_MINT: {
+        "mint": WSOL_MINT,
+        "asset_symbol": "SOL",
+        "quote_symbol": "USD",
+        "price_subject": "SOL",
+        "unit": "USD_per_SOL",
+        "feed_alias": "SOL/USD",
+        "feed_id": SOL_USD_FEED_ID,
+        "account_address": SOL_USD_CURRENT_ACCOUNT,
+        "shard_id": 0,
+        "receiver_program_id": PYTH_CORE_RECEIVER_PROGRAM_ID,
+        "push_oracle_program_id": PYTH_CORE_PUSH_ORACLE_PROGRAM_ID,
+        "contract_generation": "pyth_core_current_in_place_upgraded_2026_08_26",
+        "mapping_provenance": (
+            "CMIS exact fixture: canonical wrapped-SOL mint mapped to the "
+            "provider-listed Pyth SOL/USD shard-0 push feed. The feed account "
+            "is deterministically derived from shard 0 plus the exact SOL/USD "
+            "feed id under the Pyth push-oracle program. No symbol discovery "
+            "is permitted."
         ),
         "provider_feed_provenance": PYTH_SOLANA_PUSH_FEED_PROVENANCE,
         "contract_provenance": PYTH_CORE_CONTRACT_PROVENANCE,
@@ -358,8 +388,11 @@ __all__ = [
     "PythSolanaPushProvider",
     "PythSolanaSourceError",
     "SOURCE",
+    "SOL_USD_CURRENT_ACCOUNT",
+    "SOL_USD_FEED_ID",
     "USDC_MINT",
     "USDC_USD_CURRENT_ACCOUNT",
     "USDC_USD_FEED_ID",
+    "WSOL_MINT",
     "VERSION",
 ]

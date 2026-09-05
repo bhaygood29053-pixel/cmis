@@ -499,6 +499,165 @@ def build_xdex_representation_pool_universe_from_program_set(
     }
 
 
+def apply_verified_program_window_to_zero_universe(
+    *,
+    pool_universe: Any,
+    program_window_activity: Any,
+) -> dict[str, Any]:
+    """Bind a complete zero-activity window to an already verified zero pool set.
+
+    This helper is deliberately zero-set-only. Non-empty pool universes still
+    require verified per-pool market metrics and are never collapsed through a
+    program-wide absence shortcut.
+    """
+
+    if not isinstance(pool_universe, Mapping):
+        raise XDEXRepresentationPoolUniverseError(
+            "pool_universe must be a mapping"
+        )
+    if pool_universe.get("contract") != POOL_UNIVERSE_CONTRACT:
+        raise XDEXRepresentationPoolUniverseError(
+            "pool_universe contract is not accepted"
+        )
+    if pool_universe.get("scope") != "verified_xdex_program_family":
+        raise XDEXRepresentationPoolUniverseError(
+            "pool_universe must use verified XDEX program-family scope"
+        )
+    if pool_universe.get("enumeration_verified") is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "pool_universe enumeration is unverified"
+        )
+    if pool_universe.get("all_pool_identities_verified") is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "pool_universe identities are unverified"
+        )
+    if pool_universe.get("verified_zero_set") is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window zero binding requires verified_zero_set"
+        )
+    if pool_universe.get("current_liquidity_zero_verified") is not True:
+        raise XDEXRepresentationPoolUniverseError(
+            "current zero liquidity is unverified"
+        )
+    if pool_universe.get("pool_addresses") != []:
+        raise XDEXRepresentationPoolUniverseError(
+            "verified zero universe must have no pool addresses"
+        )
+    if pool_universe.get("unresolved_pools") != []:
+        raise XDEXRepresentationPoolUniverseError(
+            "verified zero universe cannot contain unresolved pools"
+        )
+    if pool_universe.get("execution_authorized") is not False:
+        raise XDEXRepresentationPoolUniverseError(
+            "pool_universe must remain read-only"
+        )
+
+    if not isinstance(program_window_activity, Mapping):
+        raise XDEXRepresentationPoolUniverseError(
+            "program_window_activity must be a mapping"
+        )
+    if program_window_activity.get("contract") != (
+        "xdex_program_asset_window_activity/v1"
+    ):
+        raise XDEXRepresentationPoolUniverseError(
+            "program_window_activity contract is not accepted"
+        )
+    if program_window_activity.get("program_id") != pool_universe.get("program_id"):
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window program id does not match pool universe"
+        )
+    if program_window_activity.get("asset_mint") != (
+        pool_universe.get("representation_mint")
+    ):
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window asset mint does not match representation mint"
+        )
+    requested = program_window_activity.get("requested_window")
+    if not isinstance(requested, Mapping):
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window requested_window is required"
+        )
+    duration = requested.get("duration_seconds")
+    if isinstance(duration, bool):
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window duration must be 24 hours"
+        )
+    try:
+        duration_value = float(duration)
+    except (TypeError, ValueError) as exc:
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window duration must be 24 hours"
+        ) from exc
+    if abs(duration_value - 86400.0) > 1e-6:
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window duration must be exactly 24 hours"
+        )
+
+    for field in (
+        "program_signature_range_proven",
+        "program_signature_integrity_verified",
+        "all_successful_transactions_verified",
+        "window_trace_complete_verified",
+        "program_scoped_asset_activity_zero_verified",
+        "volume_24h_window_coverage_verified",
+        "volume_24h_semantics_verified",
+    ):
+        if program_window_activity.get(field) is not True:
+            raise XDEXRepresentationPoolUniverseError(
+                f"program_window_activity.{field} must be true"
+            )
+    if program_window_activity.get("verified_volume_24h_value") != "0":
+        raise XDEXRepresentationPoolUniverseError(
+            "verified program-window volume must be exact zero"
+        )
+    if program_window_activity.get("verified_volume_24h_unit") != "USD":
+        raise XDEXRepresentationPoolUniverseError(
+            "verified program-window volume unit must be USD"
+        )
+    if program_window_activity.get("target_mint_activity_transaction_count") != 0:
+        raise XDEXRepresentationPoolUniverseError(
+            "target-mint activity prevents zero-volume binding"
+        )
+    if program_window_activity.get("target_mint_delta_count") != 0:
+        raise XDEXRepresentationPoolUniverseError(
+            "target-mint deltas prevent zero-volume binding"
+        )
+    if program_window_activity.get("execution_authorized") is not False:
+        raise XDEXRepresentationPoolUniverseError(
+            "program-window evidence must remain read-only"
+        )
+
+    core = dict(pool_universe)
+    core.pop("evidence_sha256", None)
+    core.update(
+        {
+            "volume_24h_semantics_verified": True,
+            "volume_24h_window_coverage_verified": True,
+            "verified_volume_24h_value": "0",
+            "verified_volume_24h_unit": "USD",
+            "volume_24h_zero_authorization_basis": (
+                program_window_activity.get("zero_authorization_basis")
+            ),
+            "volume_24h_window": dict(requested),
+            "program_window_activity_contract": program_window_activity.get(
+                "contract"
+            ),
+            "program_window_activity_signature_count": (
+                program_window_activity.get("window_signature_count")
+            ),
+            "market_freshness_verified": True,
+            "cmis_promotable": False,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "execution_authorized": False,
+        }
+    )
+    return {
+        **core,
+        "evidence_sha256": _canonical_sha256(core),
+    }
+
+
 __all__ = [
     "DEFAULT_NETWORK",
     "SERVICE",
@@ -506,6 +665,7 @@ __all__ = [
     "VERSION",
     "XDEXRepresentationPoolUniverseError",
     "build_xdex_representation_pool_universe",
+    "apply_verified_program_window_to_zero_universe",
     "build_xdex_representation_pool_universe_from_program_set",
     "select_representation_pool_candidates",
 ]
