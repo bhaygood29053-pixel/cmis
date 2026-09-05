@@ -71,9 +71,9 @@ Accepted on `main`:
 - **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main`; operator-local MB4E source mastery is complete at 14/14 required stages plus the final capstone, with authoritative read-only autonomous-training telemetry accepted.
 - **Six-phase public-shell/private-core migration:** complete. Protected CMIS implementation is removed from active public branch/tag history and public package boundaries fail closed without the required private core.
 - **Warp Bridge Supply + Flow Intelligence (#409):** complete under the accepted bounded route/retention/supply/current+prior-window evidence stack.
-- **Bridge-to-XDEX Utilization foundation (PR #467):** accepted internally; PR #469 remains the final unmerged #410 evidence slice even though its current exact-head 24h activity/value-basis final workflow is green.
+- **Bridge-to-XDEX Utilization Intelligence (#410): COMPLETE.** PR #469 merged the final bounded 24h XDEX activity proof, comparable wSOL.X USD value basis, and final utilization composition. Issue #482 is now the separate public-service / Scout-reliance promotion gate.
 - **Current USDC.X/USD equivalence (PRs #466/#468):** accepted as a bounded current proof; PR #470 remains the final X1.Ninja five-pool USD-liquidity semantic gate.
-- **CMIS Web Discovery v1-v4 (PRs #472/#474/#476/#478):** complete as internal `DISCOVERED`-only foundations, including bounded six-source discovery, X1 Explorer structured extraction, sanitized network observation, and operator-controlled passive one-page browser capture.
+- **CMIS Web Discovery v1-v5:** complete internally through PR #481, adding structured XDEX endpoint discovery to the bounded six-source/X1 Explorer discovery stack. All results remain `DISCOVERED` and non-promoted.
 
 Not accepted/promoted:
 
@@ -88,7 +88,7 @@ Not accepted/promoted:
 
 CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing, but Solana product expansion and release work are deferred to a future phase. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
 
-Current live ordering is narrower: PR #469 finalizes #410 Bridge-to-XDEX evidence; PR #470 finalizes #461 X1.Ninja USD-liquidity semantics; #459 remains the later field-scoped freshness promotion gate; ROBERTA #314 remains downstream of accepted CMIS cross-chain public-service / Scout-reliance promotion. CMIS Web Discovery v1-v4 is complete internally through PR #478. PR #363 delayed-vault/X1.Ninja evidence research remains parallel and is not the flagship blocker.
+Current live ordering is narrower: #482 promotes the already-accepted #410 Bridge-to-XDEX contract for public CMIS service/X1 Scout reliance; PR #470 finalizes #461 X1.Ninja USD-liquidity semantics; #459 remains the later field-scoped freshness promotion gate. ROBERTA #314 follows #482. CMIS Web Discovery v1-v5 is complete internally through PR #481. PR #363 delayed-vault/X1.Ninja evidence research remains parallel and is not the flagship blocker.
 
 
 
