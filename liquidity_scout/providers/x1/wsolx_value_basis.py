@@ -19,7 +19,6 @@ from typing import Any
 
 from liquidity_scout.providers.solana.pyth_freshness_policy import (
     FRESH,
-    accepted_pyth_freshness_policy,
     classify_pyth_freshness,
 )
 from liquidity_scout.providers.solana.pyth_push import (
@@ -36,6 +35,22 @@ from liquidity_scout.services.cmis_bridge_to_xdex_utilization import (
 )
 
 CONTRACT = VALUE_BASIS_CONTRACT
+
+WSOLX_PYTH_FRESHNESS_POLICY = {
+    "policy_id": "cmis.issue410.pyth_sol_usd.current_value_basis_freshness.v1",
+    "max_age_seconds": 60,
+    "max_age_provenance": (
+        "CMIS #410 requires the SOL/USD source fact used to value current "
+        "bridged wSOL.X supply to be no older than 60 seconds at collection "
+        "completion. This is an operator-owned current-value bound, not a "
+        "Pyth SLA and not inferred from observed passing samples."
+    ),
+    "max_future_skew_seconds": 5,
+    "future_skew_provenance": (
+        "CMIS #410 allows at most five seconds of positive publish-time skew "
+        "against the collection clock. This is an operator-owned clock bound."
+    ),
+}
 
 
 class WSOLXValueBasisError(RuntimeError):
@@ -130,7 +145,7 @@ def build_wsolx_value_basis(
 
     freshness = classify_pyth_freshness(
         pyth,
-        policy=accepted_pyth_freshness_policy(),
+        policy=WSOLX_PYTH_FRESHNESS_POLICY,
     )
     if freshness.get("classification") != FRESH:
         raise WSOLXValueBasisError("Pyth SOL/USD observation is not fresh")
@@ -181,5 +196,6 @@ def build_wsolx_value_basis(
 __all__ = [
     "CONTRACT",
     "WSOLXValueBasisError",
+    "WSOLX_PYTH_FRESHNESS_POLICY",
     "build_wsolx_value_basis",
 ]
