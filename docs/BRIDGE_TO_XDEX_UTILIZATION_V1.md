@@ -150,3 +150,19 @@ issue_410_acceptance_verified = false
 The remaining #410 acceptance work is a bounded 24-hour XDEX activity/window
 proof plus a verified comparable value basis for the bridged-supply denominator.
 No zero substitution is authorized.
+
+
+## #410 acceptance and #482 promotion
+
+The final #410 evidence gate is accepted through PR #469. The accepted wSOL.X
+composition proves current zero XDEX liquidity and verified 24h zero XDEX
+volume only inside the verified XDEX program family, together with a comparable
+fresh USD value basis.
+
+Issue #482 keeps the canonical #410 object immutable with
+`public_service_promoted=false` and `scout_reliance_promoted=false`, then
+adds a separate public projection that validates exact route/source/destination
+identity, content hash, freshness, units, scope, and guardrails. Only that
+validated service projection reports public-service and Scout-reliance
+promotion. This prevents X1 Scout from becoming a second utilization
+calculator.

@@ -27,7 +27,7 @@ The `liquidity_scout` namespace is a migration compatibility identifier, not a s
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.14.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v2` requires `>=1.14.0`.
+Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.19.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v2` requires `>=1.14.0`.
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
@@ -47,6 +47,8 @@ risk_check
 pre_trade_check
 verification_evidence
 concentration_change_intelligence
+concentration_warning_intelligence
+bridge_to_xdex_utilization
 instant_x1_scan
 ```
 
@@ -123,3 +125,23 @@ The CMIS six-phase public-shell/private-core migration is complete. The public p
 No current Scout or CMIS contract authorizes transaction preparation for execution, signing, broadcasting, custody, live trading, bridge transfer, autonomous execution, or value movement.
 
 **CMIS verifies. Scouts preserve and interpret chain-specific results. Roberta coordinates and explains.**
+
+
+## Bridge-to-XDEX utilization reliance
+
+For CMIS `>=1.19.0`, X1 Scout may rely on
+`bridge_to_xdex_utilization/v1` only when the capability record is bounded,
+callable, read-only, public-service promoted, Scout-reliance promoted, and
+`execution_authorized=false`.
+
+Scout supplies only exact selector/identity/freshness parameters. It does not
+submit bridge evidence, XDEX pool/volume evidence, Pyth/value-basis evidence,
+or a utilization result. The protected CMIS runtime resolves the canonical
+#410 record and the public contract validates it.
+
+Scout must preserve these boundaries: verified XDEX program-family scope is not
+every X1 DEX; bounded zero wSOL.X activity is not global zero activity; bridge
+activity is not adoption; liquidity is not volume; no causal inference is
+authorized; and no automatic risk conclusion is authorized. Scout must not
+call Warp, XDEX, Pyth, or other providers to reconstruct this service or
+recompute its ratios.

@@ -12,6 +12,10 @@ from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
     validate_x1_evidence_capability_manifest,
 )
+from liquidity_scout.services.cmis_bridge_to_xdex_public import (
+    CONTRACT_VERSION as BRIDGE_TO_XDEX_CONTRACT_VERSION,
+    SERVICE as BRIDGE_TO_XDEX_SERVICE,
+)
 from liquidity_scout.services.cmis_burn_intelligence import (
     CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as BURN_INTELLIGENCE_SERVICE,
@@ -48,7 +52,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.18.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.19.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -594,3 +598,29 @@ class CMISCapabilityContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_bridge_to_xdex_promotion_is_bounded_to_x1_program_family():
+    manifest = build_capability_manifest(
+        runtime_services=SUPPORTED_SERVICES,
+        legacy_supported_chains=SUPPORTED_CHAINS,
+        known_chains=KNOWN_CHAINS,
+    )
+    x1 = manifest["chains"]["x1"]["services"][BRIDGE_TO_XDEX_SERVICE]
+    assert x1["state"] == "bounded"
+    assert x1["callable"] is True
+    assert x1["public_service_promoted"] is True
+    assert x1["scout_reliance_promoted"] is True
+    assert x1["service_contract_version"] == BRIDGE_TO_XDEX_CONTRACT_VERSION
+    assert "verified_xdex_program_family_is_not_every_x1_dex" in x1["limitations"]
+    assert "bridge_activity_is_not_adoption" in x1["limitations"]
+    assert "liquidity_is_not_volume" in x1["limitations"]
+    assert "no_causal_inference" in x1["limitations"]
+    assert "no_automatic_risk_conclusion" in x1["limitations"]
+    assert x1["execution_authorized"] is False
+
+    solana = manifest["chains"]["solana"]["services"][BRIDGE_TO_XDEX_SERVICE]
+    assert solana["state"] == "unavailable"
+    assert solana["callable"] is False
+    assert solana["public_service_promoted"] is False
+    assert solana["scout_reliance_promoted"] is False

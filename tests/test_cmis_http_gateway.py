@@ -98,11 +98,12 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.18.0")
+        self.assertEqual(response["contract_version"], "1.19.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
-        self.assertEqual(len(response["supported_services"]), 15)
+        self.assertEqual(len(response["supported_services"]), 16)
         self.assertIn("burn_intelligence", response["supported_services"])
         self.assertIn("concentration_warning_intelligence", response["supported_services"])
+        self.assertIn("bridge_to_xdex_utilization", response["supported_services"])
         self.assertIn("discovery_intelligence", response["supported_services"])
         self.assertIn("verification_evidence", response["supported_services"])
         self.assertIn("instant_x1_scan", response["supported_services"])
@@ -250,7 +251,7 @@ class CMISHTTPGatewayTests(unittest.TestCase):
                 response = json.loads(raw.read().decode("utf-8"))
 
         self.assertEqual(response["service"], "cmis_gateway")
-        self.assertEqual(response["contract_version"], "1.18.0")
+        self.assertEqual(response["contract_version"], "1.19.0")
 
     def test_bearer_auth_is_enforced_when_configured(self):
         with RunningServer(api_key="test-secret") as running:
