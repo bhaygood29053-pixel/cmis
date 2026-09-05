@@ -168,6 +168,7 @@ jobs:
               USDC_SOURCE_MINT,
               USDC_X_DESTINATION_MINT,
               build_warp_bridged_supply_evidence,
+              build_warp_liability_adjusted_backing_evidence,
               capture_destination_mint_observation,
               capture_source_vault_observation,
           )
@@ -176,6 +177,9 @@ jobs:
           )
           from liquidity_scout.providers.x1.warp_message_retention_coverage import (
               fetch_official_warp_config,
+          )
+          from liquidity_scout.providers.x1.warp_onchain_transfer_history import (
+              capture_warp_message_state,
           )
 
           def endpoint(chain, mint):
