@@ -14,6 +14,12 @@ from liquidity_scout.providers.x1.wsolx_value_basis import (
     WSOLXValueBasisError,
     build_wsolx_value_basis,
 )
+from liquidity_scout.services.cmis_bridge_to_xdex_final import (
+    build_zero_pool_bridge_to_xdex_utilization,
+)
+from liquidity_scout.providers.x1.xdex_representation_pool_universe import (
+    build_xdex_representation_pool_universe_from_program_set,
+)
 from liquidity_scout.services.cmis_xdex_program_window_activity import (
     XDEXProgramWindowActivityError,
     prove_xdex_program_asset_window_activity,
@@ -231,6 +237,112 @@ class WSOLXValueBasisTests(unittest.TestCase):
                 bridged_supply=bridged_supply(),
                 pyth_sol_usd=bad,
             )
+
+
+class FinalIssue410CompositionTests(unittest.TestCase):
+    def test_final_zero_pool_composition_verifies_issue410(self):
+        as_of = 1_788_600_000.0
+        universe = build_xdex_representation_pool_universe_from_program_set(
+            program_pool_set={
+                "service": "verified_program_asset_pool_set",
+                "status": "recognized_program_asset_pool_set_structurally_verified",
+                "asset_mint": WSOL_X_DESTINATION_MINT,
+                "program_id": PROGRAM,
+                "pools": [],
+                "summary": {
+                    "recognized_program_asset_pool_set_structurally_verified": True,
+                    "targeted_program_family_mint_filter_observed": True,
+                    "all_matching_accounts_structurally_verified": True,
+                    "all_catalog_asset_pools_recovered": True,
+                    "verified_zero_set": True,
+                },
+            },
+            observed_at=as_of,
+        )
+        activity = {
+            "contract": "xdex_program_asset_window_activity/v1",
+            "program_id": PROGRAM,
+            "asset_mint": WSOL_X_DESTINATION_MINT,
+            "requested_window": {
+                "start_epoch": as_of - 86400,
+                "end_epoch": as_of,
+                "duration_seconds": 86400.0,
+            },
+            "program_signature_range_proven": True,
+            "program_signature_integrity_verified": True,
+            "all_successful_transactions_verified": True,
+            "window_trace_complete_verified": True,
+            "program_scoped_asset_activity_zero_verified": True,
+            "volume_24h_window_coverage_verified": True,
+            "volume_24h_semantics_verified": True,
+            "verified_volume_24h_value": "0",
+            "verified_volume_24h_unit": "USD",
+            "target_mint_activity_transaction_count": 0,
+            "target_mint_delta_count": 0,
+            "window_signature_count": 25,
+            "zero_authorization_basis": "complete_program_trace",
+            "execution_authorized": False,
+        }
+        basis = build_wsolx_value_basis(
+            bridged_supply=bridged_supply(),
+            pyth_sol_usd=pyth_record(
+                price="100",
+                publish=as_of - 20,
+                completed=as_of - 10,
+            ),
+        )
+        bridge = {
+            "contract": "warp_bridge_flow_integration/v1",
+            "route_id": WSOL_ROUTE_ID,
+            "destination": {
+                "chain": "x1",
+                "asset_id": WSOL_X_DESTINATION_MINT,
+                "asset_id_kind": "mint",
+            },
+            "integration_verified": True,
+            "execution_authorized": False,
+            "flow": {
+                "as_of": as_of,
+                "decimals": 9,
+                "bridged_supply": {
+                    "verified": True,
+                    "amount_raw": 10_000_000_000,
+                    "decimals": 9,
+                },
+                "windows": {
+                    "24h": {
+                        "current": {
+                            "coverage_complete": True,
+                            "inflow_raw": 2_000_000_000,
+                            "outflow_raw": 1_000_000_000,
+                            "net_flow_raw": 1_000_000_000,
+                        }
+                    }
+                },
+            },
+        }
+
+        result = build_zero_pool_bridge_to_xdex_utilization(
+            bridge_integration=bridge,
+            pool_universe=universe,
+            program_window_activity=activity,
+            value_basis=basis,
+        )
+        self.assertTrue(result["final_zero_pool_composition_verified"])
+        self.assertTrue(result["issue_410_acceptance_verified"])
+        self.assertEqual(result["verified_xdex_liquidity_value"], "0")
+        self.assertEqual(result["verified_xdex_volume_24h_value"], "0")
+        self.assertEqual(result["bridge_to_xdex_liquidity_ratio"], "0")
+        self.assertEqual(
+            result["bridge_flow_to_xdex_volume_ratio_state"],
+            "undefined_zero_xdex_volume",
+        )
+        self.assertIsNone(
+            result["bridge_gross_flow_24h_to_xdex_volume_24h_ratio"]
+        )
+        self.assertFalse(result["public_service_promoted"])
+        self.assertFalse(result["scout_reliance_promoted"])
+        self.assertFalse(result["execution_authorized"])
 
 
 if __name__ == "__main__":
