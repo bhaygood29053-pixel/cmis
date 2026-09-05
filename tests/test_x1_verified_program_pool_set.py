@@ -204,6 +204,100 @@ class VerifiedProgramPoolSetTests(unittest.TestCase):
             ]
         )
 
+    def test_verified_zero_set_requires_explicit_opt_in(self):
+        def empty_discovery(**kwargs):
+            return {
+                "accounts": [],
+                "summary": {
+                    "targeted_program_family_mint_filter_observed": True,
+                },
+                "errors": [],
+            }
+
+        default_report = verify_recognized_program_asset_pool_set(
+            asset_mint="zero-target-mint",
+            catalog_pools=CATALOG,
+            rpc_url="rpc",
+            layout_sample_pools=4,
+            min_layout_pools=3,
+            inventory_provider=inventory_provider,
+            layout_verifier=layout_verifier,
+            discovery_provider=empty_discovery,
+            role_verifier=successful_role_verifier,
+        )
+        self.assertEqual(default_report["status"], "partial")
+        self.assertFalse(
+            default_report["summary"][
+                "recognized_program_asset_pool_set_structurally_verified"
+            ]
+        )
+
+        zero_report = verify_recognized_program_asset_pool_set(
+            asset_mint="zero-target-mint",
+            catalog_pools=CATALOG,
+            rpc_url="rpc",
+            layout_sample_pools=4,
+            min_layout_pools=3,
+            allow_verified_zero_set=True,
+            inventory_provider=inventory_provider,
+            layout_verifier=layout_verifier,
+            discovery_provider=empty_discovery,
+            role_verifier=successful_role_verifier,
+        )
+        self.assertEqual(
+            zero_report["status"],
+            "recognized_program_asset_pool_set_structurally_verified",
+        )
+        self.assertEqual(zero_report["pools"], [])
+        self.assertEqual(
+            zero_report["summary"]["matching_program_state_account_count"],
+            0,
+        )
+        self.assertTrue(zero_report["summary"]["allow_verified_zero_set"])
+        self.assertTrue(
+            zero_report["summary"]["zero_matching_program_state_observed"]
+        )
+        self.assertTrue(zero_report["summary"]["verified_zero_set"])
+        self.assertTrue(
+            zero_report["summary"]["all_matching_accounts_structurally_verified"]
+        )
+        self.assertFalse(
+            zero_report["summary"]["recognized_program_registry_globally_exhaustive"]
+        )
+        self.assertFalse(
+            zero_report["summary"]["global_onchain_pool_discovery_proven"]
+        )
+
+    def test_verified_zero_set_rejects_provider_catalog_conflict(self):
+        def empty_discovery(**kwargs):
+            return {
+                "accounts": [],
+                "summary": {
+                    "targeted_program_family_mint_filter_observed": True,
+                },
+                "errors": [],
+            }
+
+        report = verify_recognized_program_asset_pool_set(
+            asset_mint=TARGET,
+            catalog_pools=CATALOG,
+            rpc_url="rpc",
+            layout_sample_pools=4,
+            min_layout_pools=3,
+            allow_verified_zero_set=True,
+            inventory_provider=inventory_provider,
+            layout_verifier=layout_verifier,
+            discovery_provider=empty_discovery,
+            role_verifier=successful_role_verifier,
+        )
+        self.assertEqual(report["status"], "partial")
+        self.assertFalse(report["summary"]["verified_zero_set"])
+        self.assertFalse(
+            report["summary"][
+                "recognized_program_asset_pool_set_structurally_verified"
+            ]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
