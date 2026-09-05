@@ -98,6 +98,25 @@ class MarketReportServiceTests(unittest.TestCase):
         report = build_market_report("AGI", matches, catalog)
 
         self.assertEqual(report["lp_count"], 2)
+        self.assertEqual(
+            report["contributing_pools"],
+            [
+                {
+                    "address": "P2",
+                    "pair": "AGI/USDC",
+                    "liquidity_usd": 5000,
+                    "volume_24h_usd": 100,
+                    "transactions_24h": 10,
+                },
+                {
+                    "address": "P1",
+                    "pair": "AGI/XNT",
+                    "liquidity_usd": 1000,
+                    "volume_24h_usd": 500,
+                    "transactions_24h": 20,
+                },
+            ],
+        )
         self.assertEqual(report["liquidity_usd"], 6000)
         self.assertEqual(report["volume_24h_usd"], 600)
         self.assertEqual(report["transactions_24h"], 30)
