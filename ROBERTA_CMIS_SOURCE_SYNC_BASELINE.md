@@ -8,48 +8,59 @@ This is the CMIS-side mirror of the four-repository roadmap/status checkpoint.
 
 `User / transport -> ROBERTA -> Chain Scout -> CMIS -> Chain Provider / verified source`
 
-- CMIS owns deterministic freshness-sensitive facts, evidence, Proof Score, risk, historical intelligence, bridge evidence, and provider semantic verification.
+- CMIS owns deterministic facts, freshness, evidence, Proof Score, risk, history, bridge evidence, and provider semantic verification.
 - ROBERTA owns orchestration and final synthesis.
-- Open PR evidence is not accepted runtime truth.
+- Open PR evidence is not accepted truth.
 - Missing evidence remains unknown/unavailable.
 - `execution_authorized=false`.
 
-## Repository heads at reconciliation start
+## Current synchronized state
 
-```text
-ROBERTA public      e1ab51fc5a004652274597de297cc96e85132f08
-ROBERTA protected   267aa3b1adb1c49ec11ab88ab53c8d2a83515251
-CMIS public         9eea8a13f4d19b3c18021c44b62367a3c1bf425b
-CMIS protected      e34353c4a4ce90d1f9da7ffb8f62bee4d03d1456
-```
+### Cross-chain
 
-CMIS advanced after that checkpoint through merged Web Discovery PR #478 and this documentation reconciliation; the SHAs above remain the reconciliation-start reference.
+Accepted:
 
-## #461 current state
+- #409 Bridge Supply + Flow Intelligence;
+- #410 Bridge-to-XDEX Utilization Intelligence through merged PR #469;
+- bounded 24h XDEX activity semantics;
+- comparable wSOL.X USD value basis;
+- final `bridge_to_xdex_utilization/v1` acceptance within the verified XDEX program-family scope.
 
-Accepted: #465 fact-time, #466 current USDC.X reserve backing, #468 current USDC.X/USD live equivalence.
+Active:
 
-Active: PR #470 final five-pool USD-liquidity semantics. Liquidity freshness remains separate under #459.
+- #482 public-service / Scout-reliance promotion.
+- ROBERTA #314 follows #482.
 
-## #410 current state
+### X1.Ninja liquidity
 
-Accepted: #409 and PR #467 utilization foundation.
+Accepted prerequisites: PRs #465, #466, and #468.
 
-Active: PR #469 final 24h XDEX activity/value-basis evidence. Its exact-head final live workflow is green; merge/reconciliation and later public-service / Scout-reliance promotion are still required before ROBERTA #314 may consume the result.
+Active:
 
-## Web Discovery current state
+- PR #470 final five-pool USD-liquidity semantic proof;
+- repeated-revaluation live workflow currently in progress;
+- #459 remains the later freshness promotion.
 
-Merged internal foundations:
+### Web Discovery
 
-- #472 six-source bounded discovery;
-- #474 X1 Explorer structured discovery;
-- #476 sanitized network observation;
-- #478 operator-controlled passive browser capture.
+Internal v1-v5 complete through PR #481:
+
+- six-source bounded discovery;
+- X1 Explorer structured discovery;
+- sanitized network observation;
+- passive browser capture;
+- XDEX structured endpoint discovery.
 
 All remain `DISCOVERED`, non-promoted, and non-authorizing.
 
 ## ROBERTA
 
-Opinion v1 and Claim Integrity v1 for X1 asset intelligence/Compare remain accepted. Standalone History is the next ROBERTA Truth Gate. ROBERTA #314 remains blocked on accepted/promoted CMIS cross-chain output.
+- Opinion v1 and Claim Integrity v1 remain accepted.
+- Standalone History is the next ROBERTA Truth Gate.
+- ROBERTA #314 is blocked only on CMIS #482.
+
+## Protected cores
+
+Public roadmap/evidence changes do not silently mutate protected runtime behavior. Protected implementation changes remain separately reviewed.
 
 `execution_authorized=false`
