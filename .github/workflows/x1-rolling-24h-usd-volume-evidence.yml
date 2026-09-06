@@ -324,6 +324,167 @@ jobs:
           assert all(row["pool_txns24h"] == 1 for row in snapshots)
           PY
 
+      - name: Discover reconciled nonzero XNT-volume candidate
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          from datetime import datetime, timezone
+
+          from liquidity_scout.market.resolver import find_matches_for_term, pool_address
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
+          from liquidity_scout.providers.x1.xdex_price_history_import import WRAPPED_XNT_MINT
+
+          now = time.time()
+          start = now - 86400
+          pools, xnt_price_usd = fetch_all_pools(sleep_seconds=0)
+
+          def text(value):
+              value = str(value or "").strip()
+              return value or None
+
+          def mint(token):
+              if not isinstance(token, dict):
+                  return None
+              return text(token.get("mint") or token.get("address"))
+
+          def epoch(value):
+              if not isinstance(value, str):
+                  return None
+              try:
+                  return datetime.fromisoformat(
+                      value.replace("Z", "+00:00")
+                  ).astimezone(timezone.utc).timestamp()
+              except ValueError:
+                  return None
+
+          candidates = []
+          for pool in pools:
+              if not isinstance(pool, dict):
+                  continue
+              address = text(pool_address(pool))
+              if not address:
+                  continue
+              raw_txs = pool.get("txns24h")
+              try:
+                  txs = int(raw_txs)
+              except (TypeError, ValueError):
+                  continue
+              if txs < 1 or txs > 8 or float(raw_txs) != txs:
+                  continue
+
+              base = mint(pool.get("baseToken"))
+              quote = mint(pool.get("quoteToken"))
+              if base == WRAPPED_XNT_MINT and quote and quote != WRAPPED_XNT_MINT:
+                  asset = quote
+              elif quote == WRAPPED_XNT_MINT and base and base != WRAPPED_XNT_MINT:
+                  asset = base
+              else:
+                  continue
+
+              matches = [
+                  match
+                  for match in find_matches_for_term(asset, pools)
+                  if len(match) >= 4 and match[3] >= 90
+              ]
+              matched_addresses = []
+              seen = set()
+              for match in matches:
+                  a = text(pool_address(match[0]))
+                  if a and a not in seen:
+                      seen.add(a)
+                      matched_addresses.append(a)
+              if matched_addresses != [address]:
+                  continue
+
+              try:
+                  trade_observation = fetch_pool_trades_raw(address)
+              except Exception:
+                  continue
+              rows = []
+              for row in (trade_observation.get("raw_response") or {}).get("trades", []):
+                  if not isinstance(row, dict):
+                      continue
+                  ts = epoch(row.get("timestamp"))
+                  if ts is None or ts < start or ts > now:
+                      continue
+                  if str(row.get("type") or "").lower() not in {"buy", "sell"}:
+                      continue
+                  try:
+                      native = abs(float(row["amountNative"]))
+                      usd = abs(float(row["amountUsd"]))
+                  except (TypeError, ValueError, KeyError):
+                      continue
+                  rows.append({
+                      "txHash": row.get("txHash"),
+                      "timestamp": row.get("timestamp"),
+                      "type": row.get("type"),
+                      "amountNative": native,
+                      "amountUsd": usd,
+                  })
+
+              if len({row["txHash"] for row in rows if row["txHash"]}) != txs:
+                  continue
+              native_sum = sum(row["amountNative"] for row in rows)
+              usd_sum = sum(row["amountUsd"] for row in rows)
+              current_mark = native_sum * float(xnt_price_usd)
+              provider_volume = float(pool.get("volume24h") or 0)
+              tolerance = max(0.01, abs(provider_volume) * 0.01)
+              trade_rows_match_pool = abs(provider_volume - usd_sum) <= tolerance
+              current_mark_matches_pool = abs(provider_volume - current_mark) <= tolerance
+              trade_rows_use_current_mark = abs(usd_sum - current_mark) <= tolerance
+
+              candidates.append({
+                  "pool_address": address,
+                  "asset_mint": asset,
+                  "provider_transactions_24h": txs,
+                  "provider_volume24h": provider_volume,
+                  "trade_row_count_24h": len(rows),
+                  "trade_row_native_sum": native_sum,
+                  "trade_row_usd_sum": usd_sum,
+                  "current_xnt_price_usd": xnt_price_usd,
+                  "native_sum_x_current_xnt_usd": current_mark,
+                  "trade_rows_match_pool_volume": trade_rows_match_pool,
+                  "current_mark_matches_pool_volume": current_mark_matches_pool,
+                  "trade_rows_use_current_mark": trade_rows_use_current_mark,
+                  "lastSyncedAt": pool.get("lastSyncedAt"),
+                  "rows": rows,
+              })
+
+          reconciled = [
+              row
+              for row in candidates
+              if row["trade_rows_match_pool_volume"]
+              and row["current_mark_matches_pool_volume"]
+              and row["trade_rows_use_current_mark"]
+          ]
+          reconciled.sort(
+              key=lambda row: (
+                  row["provider_transactions_24h"],
+                  -row["provider_volume24h"],
+                  row["pool_address"],
+              )
+          )
+
+          result = {
+              "schema": "x1_504_reconciled_candidate_discovery.v1",
+              "candidate_count": len(candidates),
+              "reconciled_candidate_count": len(reconciled),
+              "reconciled_candidates": reconciled[:10],
+              "all_candidates": candidates[:30],
+              "provider_trade_range_completeness_verified": False,
+              "chain_reconstruction_verified": False,
+              "current_usd_basis_independently_verified": False,
+              "execution_authorized": False,
+          }
+          print("X1 #504 RECONCILED NONZERO CANDIDATE DISCOVERY")
+          print(json.dumps(result, sort_keys=True, default=str))
+          assert candidates, "no bounded low-activity XNT markets available"
+          PY
+
       - name: Safety boundary
         if: always()
         run: |
