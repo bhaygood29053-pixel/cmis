@@ -98,9 +98,9 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.23.0")
+        self.assertEqual(response["contract_version"], "1.24.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
-        self.assertEqual(len(response["supported_services"]), 17)
+        self.assertEqual(len(response["supported_services"]), 18)
         self.assertIn("burn_intelligence", response["supported_services"])
         self.assertIn("concentration_warning_intelligence", response["supported_services"])
         self.assertIn("bridge_to_xdex_utilization", response["supported_services"])
@@ -110,6 +110,10 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         self.assertIn("instant_x1_scan", response["supported_services"])
         self.assertIn("trade_verification", response["supported_services"])
         self.assertIn("verified_asset_activity", response["supported_services"])
+        self.assertIn(
+            "trade_price_impact_intelligence",
+            response["supported_services"],
+        )
         self.assertIn(
             CONCENTRATION_INTELLIGENCE_SERVICE,
             response["supported_services"],
