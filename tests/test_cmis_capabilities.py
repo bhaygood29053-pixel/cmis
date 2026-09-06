@@ -713,7 +713,7 @@ def test_trade_price_impact_promotion_is_x1_only_and_pool_local():
     assert solana["execution_authorized"] is False
 
 
-def test_large_trade_discovery_is_x1_only_bounded_and_not_yet_scout_promoted():
+def test_large_trade_discovery_is_x1_only_bounded_and_scout_promoted():
     manifest = build_capability_manifest(
         runtime_services=SUPPORTED_SERVICES,
         legacy_supported_chains=SUPPORTED_CHAINS,
@@ -724,7 +724,7 @@ def test_large_trade_discovery_is_x1_only_bounded_and_not_yet_scout_promoted():
     assert x1["callable"] is True
     assert x1["read_only"] is True
     assert x1["public_service_promoted"] is True
-    assert x1["scout_reliance_promoted"] is False
+    assert x1["scout_reliance_promoted"] is True
     assert x1["service_contract_version"] == LARGE_TRADE_DISCOVERY_CONTRACT_VERSION
     assert "verified_provider_scoped_current_market_pool_set" in x1["requirements"]
     assert "aligned_complete_exact_pool_24h_windows" in x1["requirements"]

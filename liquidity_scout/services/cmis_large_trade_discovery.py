@@ -576,7 +576,7 @@ def build_large_trade_discovery_response(
         data={
             "contract_version": CONTRACT_VERSION,
             "public_service_promoted": True,
-            "scout_reliance_promoted": False,
+            "scout_reliance_promoted": True,
             "read_only": True,
             "ranking_metric": "verified_historical_usd_notional",
             "ranking_order": (
