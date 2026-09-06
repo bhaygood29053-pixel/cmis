@@ -187,6 +187,11 @@ def test_v6_verifies_native_xnt_scan_history_without_stronger_overclaims():
     assert completion["non_price_metric_lifetimes_required_for_scan_completion"] is False
     assert completion["execution_authorized"] is False
     assert "provider_source_independence_not_verified" in result["data"]["limitations"]
+    assert result["freshness"]["contract_version"] == "cmis_response_freshness/v1"
+    assert result["freshness"]["scope"] == "instant_x1_scan.response"
+    assert result["freshness"]["state"] == "PARTIAL"
+    assert result["freshness"]["freshness_verified"] is False
+    assert result["freshness"]["details"] == result["data"]["sections"]["market"]["freshness"]
 
 
 def test_v6_preserves_v5_sections_except_added_history_completion():
