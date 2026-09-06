@@ -2,6 +2,7 @@ import json
 import os
 import time
 import unittest
+from decimal import Decimal
 from types import SimpleNamespace
 
 from liquidity_scout.market.resolver import find_matches_for_term, pool_address
@@ -375,6 +376,63 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             if isinstance(row, dict) and row.get("txHash") in exact_swap_signatures
         ]
 
+        # Diagnostic arithmetic only: test whether the provider's trade-row USD
+        # fields are currently related to the catalog-level XNT/USD value. This
+        # does not promote trade-row financial semantics and is not used as an
+        # input to CMIS valuation.
+        catalog_xnt_price = Decimal(str(xnt_price_usd))
+        provider_trade_usd_conversion_diagnostics = []
+        for row in provider_trade_rows:
+            amount_native = Decimal(str(row.get("amountNative")))
+            amount_usd = Decimal(str(row.get("amountUsd")))
+            price_native = Decimal(str(row.get("priceNative")))
+            price_usd = Decimal(str(row.get("priceUsd")))
+            amount_implied_xnt_usd = amount_usd / amount_native
+            price_implied_xnt_usd = price_usd / price_native
+            amount_rel_error = abs(
+                amount_implied_xnt_usd - catalog_xnt_price
+            ) / catalog_xnt_price
+            price_rel_error = abs(
+                price_implied_xnt_usd - catalog_xnt_price
+            ) / catalog_xnt_price
+            provider_trade_usd_conversion_diagnostics.append(
+                {
+                    "txHash": row.get("txHash"),
+                    "slot": row.get("slot"),
+                    "timestamp": row.get("timestamp"),
+                    "amount_usd_div_amount_native": format(
+                        amount_implied_xnt_usd, "f"
+                    ),
+                    "price_usd_div_price_native": format(
+                        price_implied_xnt_usd, "f"
+                    ),
+                    "catalog_xnt_price_usd": format(catalog_xnt_price, "f"),
+                    "amount_relation_relative_error": format(
+                        amount_rel_error, "e"
+                    ),
+                    "price_relation_relative_error": format(
+                        price_rel_error, "e"
+                    ),
+                    "matches_current_catalog_xnt_price_at_1e_12": bool(
+                        amount_rel_error <= Decimal("1e-12")
+                        and price_rel_error <= Decimal("1e-12")
+                    ),
+                }
+            )
+        distinct_trade_slots = {
+            row.get("slot")
+            for row in provider_trade_usd_conversion_diagnostics
+            if row.get("slot") is not None
+        }
+        provider_trade_current_xnt_relationship_verified = bool(
+            len(provider_trade_usd_conversion_diagnostics) >= 2
+            and len(distinct_trade_slots) >= 2
+            and all(
+                row["matches_current_catalog_xnt_price_at_1e_12"]
+                for row in provider_trade_usd_conversion_diagnostics
+            )
+        )
+
         evidence = {
             "schema": "x1_504_nonzero_trade_time_usd_volume_live.v1",
             "target_pool": TARGET_POOL,
@@ -457,12 +515,23 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
                 for key in sorted(historical_parity_cache, key=str)
             ],
             "provider_trade_rows_for_exact_swaps": provider_trade_rows,
+            "provider_trade_usd_conversion_diagnostics": (
+                provider_trade_usd_conversion_diagnostics
+            ),
+            "provider_trade_current_xnt_relationship_verified": (
+                provider_trade_current_xnt_relationship_verified
+            ),
             "provider_trade_row_financial_semantics_promoted": False,
+            "provider_trade_usd_revaluation_semantics_promoted": False,
             "transactions": pool_window["transactions"],
         }
         print("X1 #504 NONZERO TRADE-TIME USD VOLUME LIVE EVIDENCE")
         print(json.dumps(evidence, sort_keys=True, default=str))
 
+        self.assertTrue(
+            provider_trade_current_xnt_relationship_verified,
+            "current provider trade-row USD fields do not share the current catalog XNT/USD relationship",
+        )
         self.assertGreater(pool_window["verified_transactions_24h"], 0)
         self.assertTrue(pool_window["history_range_proven"])
         self.assertTrue(pool_window["history_integrity_verified"])
