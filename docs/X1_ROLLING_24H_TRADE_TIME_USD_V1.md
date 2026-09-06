@@ -22,9 +22,11 @@ For each exact-pool swap classified by the #502/#503 chain reconstruction:
    transaction's exact post-token balance is used. A complete bounded X1 RPC
    address-history scan is required.
 4. Historical USDC.X equivalence is reconstructed from exact current Warp USDC
-   source reserve and X1 USDC.X supply observations. Every retained, paired,
-   settled USDC-route bridge action between the swap fact time and those
-   observations is reversed on the chain where that action actually occurred.
+   source reserve and X1 USDC.X supply observations. A separate
+   `warp_message_interval_retention/v1` proof covers only the interval from the
+   oldest exact swap fact in this market window through the current backing
+   observation. Every retained, paired, settled USDC-route bridge action inside
+   that interval is reversed on the chain where that action actually occurred.
 5. The reconstructed historical Solana USDC reserve must cover the reconstructed
    historical X1 USDC.X supply at equal six-decimal units.
 6. Canonical USDC/USD is observed from Kraken's public `USDC/USD` PostTrade
@@ -44,7 +46,7 @@ including:
 - a missing or ambiguous vault anchor;
 - exact-mint or unit/direction mismatch;
 - unresolved Warp USDC route events;
-- incomplete accepted Warp retention coverage;
+- incomplete bounded Warp interval-retention coverage;
 - reconstructed USDC reserve below reconstructed USDC.X supply;
 - no Kraken USDC/USD trade within the 120-second last-observation policy;
 - current-price substitution;
@@ -57,6 +59,8 @@ chain proof succeeds.
 ## Explicit boundaries
 
 - Provider collection time is not provider fact time.
+- `warp_message_interval_retention/v1` cannot satisfy or replace #441's
+  accepted 60-day Bridge Flow retention gate; that minimum remains unchanged.
 - Source independence remains separately unverified.
 - This work does not promote the public CMIS service or authorize Scout reliance.
 - Read-only evidence only.
