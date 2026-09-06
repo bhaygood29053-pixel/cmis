@@ -101,6 +101,14 @@ jobs:
               and (row.get("address") or row.get("poolAddress") or row.get("id"))
               == REFERENCE_POOL
           ]
+          target_pool_rows = [
+              row
+              for row in catalog
+              if isinstance(row, dict)
+              and (row.get("address") or row.get("poolAddress") or row.get("id"))
+              == TARGET_POOL
+          ]
+          current_mark_expected = 6.404425898 * float(xnt_price_usd)
 
           result = {
               "schema": "x1_504_probe.v1",
@@ -109,7 +117,9 @@ jobs:
               "xdex_xnt_usdcx_history": xdex_history,
               "ninja_xnt_usdcx_ohlcv": ninja_reference,
               "current_reference_pool_rows": ref_rows,
+              "current_target_pool_rows": target_pool_rows,
               "current_ninja_xnt_price_usd": xnt_price_usd,
+              "diagnostic_exact_quote_volume_x_current_ninja_xnt_usd": current_mark_expected,
               "target_time": TARGET_TIME,
               "historical_usdcx_usd_equivalence_verified": False,
               "execution_authorized": False,
@@ -120,6 +130,7 @@ jobs:
           assert tx["succeeded"] is True
           assert tx["block_time"] == TARGET_TIME
           assert target_rows, "target Ninja trade row unavailable"
+          assert target_pool_rows, "target current pool row unavailable"
           assert xdex_history, "XDEX XNT/USDC.X historical window unavailable"
           PY
 
