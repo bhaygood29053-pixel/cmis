@@ -964,3 +964,23 @@ Accepted promotion state:
 - `execution_authorized=false`.
 
 `COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain unauthorized. The next downstream gate is ROBERTA/X1 Scout adoption of the accepted CMIS 1.26 service without recomputation.
+
+## Live Regulatory Evidence Producer — Issue #543
+
+**ACTIVE.** Issue #543 replaces fixture-only/manual current-record injection with a deterministic live primary-source producer for the promoted CMIS 1.26 `regulatory_evidence/v1` service.
+
+Initial producer scope:
+
+- U.S. GENIUS Act;
+- exact X1 USDC.X mint `B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq`;
+- GovInfo Public Law 119-27 as primary-law source;
+- U.S. Treasury GENIUS Act implementation releases as primary-regulator sources;
+- deterministic newest-verified regulator-state selection;
+- injectable fetcher/clock/source registry for deterministic tests;
+- future `final_rule` / `effective` transition support without weakening the current proposed-rule boundary.
+
+The public producer validates source identity markers and then validates its emitted record against the existing canonical regulatory contract. It fails closed on missing/malformed authoritative evidence.
+
+Paired protected `cmis-core` Issue #45 owns the persistent canonical registry and automatic runtime refresh path.
+
+`COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain unauthorized.
