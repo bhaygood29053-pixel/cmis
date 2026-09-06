@@ -586,6 +586,8 @@ def build_trade_price_impact_intelligence_response(
 
     data = {
         "contract_version": CONTRACT_VERSION,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
         "read_only": True,
         "wallet_trade": {
             "wallet_address": wallet["wallet"],
