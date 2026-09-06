@@ -1,0 +1,155 @@
+name: X1 Provider Snapshot for Instant X1 Scan v5 #513
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture-provider-snapshot:
+    name: Capture fresh fixed non-secret X1.Ninja snapshot
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'evidence/513-v5-provider-snapshot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Capture fixed exact provider snapshot
+        run: |
+          mkdir -p artifacts
+          python - <<'PY'
+          import json
+          import time
+
+          from liquidity_scout.market.resolver import find_matches_for_term, pool_address
+          from liquidity_scout.providers.x1.liquidity_freshness import REFERENCE_POOL_ADDRESS
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+
+          def text(value):
+              value = str(value or "").strip()
+              return value or None
+
+          def number(value):
+              if value is None or isinstance(value, bool):
+                  return None
+              try:
+                  return float(value)
+              except (TypeError, ValueError):
+                  return None
+
+          target_pool = "8ztGiYGDvQA8bMoyaFgBNvNWgDraYpMeU3E63kaEHBWG"
+          target_asset = "7k79DrpoyY1GkD2m14WCwwew1yQsixkZzJhbCzLHdUKu"
+
+          pools, xnt_price = fetch_all_pools(sleep_seconds=0)
+          target_rows = [
+              row
+              for row in pools
+              if isinstance(row, dict) and text(pool_address(row)) == target_pool
+          ]
+          if len(target_rows) != 1:
+              raise SystemExit("fixed #513 target pool unavailable")
+          target_row = target_rows[0]
+
+          matches = [
+              match
+              for match in find_matches_for_term(target_asset, pools)
+              if len(match) >= 4 and match[3] >= 90
+          ]
+          addresses = []
+          seen = set()
+          for match in matches:
+              address = text(pool_address(match[0]))
+              if address and address not in seen:
+                  seen.add(address)
+                  addresses.append(address)
+          if addresses != [target_pool]:
+              raise SystemExit(
+                  f"fixed #513 target exact market scope changed: {addresses}"
+              )
+
+          volume = number(target_row.get("volume24h"))
+          txs = number(
+              target_row.get("txns24h")
+              if target_row.get("txns24h") is not None
+              else target_row.get("transactions24h")
+          )
+          if volume != 0.0 or txs != 0.0:
+              raise SystemExit(
+                  f"fixed #513 target no longer zero activity: volume={volume} txs={txs}"
+              )
+
+          required = {target_pool, REFERENCE_POOL_ADDRESS}
+          retained = [
+              dict(row)
+              for row in pools
+              if text(pool_address(row)) in required
+          ]
+          retained_addresses = {text(pool_address(row)) for row in retained}
+          if retained_addresses != required:
+              raise SystemExit(
+                  f"required provider rows unavailable: {sorted(retained_addresses)}"
+              )
+
+          evidence = {
+              "schema": "instant_x1_scan_v4_provider_snapshot_513/v1",
+              "captured_at": time.time(),
+              "selection_policy": (
+                  "fixed_target_from_first_non_cherry_picked_capture;"
+                  "no_pool_switching;no_usdc_parity_prescreen"
+              ),
+              "selected": {
+                  "asset_mint": target_asset,
+                  "pool_address": target_pool,
+                  "liquidity": number(target_row.get("liquidity")) or 0.0,
+                  "provider_volume24h": volume,
+                  "provider_transactions24h": int(txs),
+              },
+              "reference_pool_address": REFERENCE_POOL_ADDRESS,
+              "xnt_price_usd": xnt_price,
+              "provider_xnt_basis_eligible_for_strict_liquidity_match": False,
+              "pools": retained,
+              "provider_secret_included": False,
+              "execution_authorized": False,
+          }
+          rendered = json.dumps(evidence, sort_keys=True, default=str)
+          with open(
+              "artifacts/x1-provider-snapshot-513.json",
+              "w",
+              encoding="utf-8",
+          ) as handle:
+              handle.write(rendered + "\n")
+          print("X1 #513 V5 NON-SECRET PROVIDER SNAPSHOT")
+          print(rendered)
+          PY
+
+      - name: Upload provider snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1-provider-snapshot-513-v5
+          path: artifacts/x1-provider-snapshot-513.json
+          if-no-files-found: error
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Snapshot contains provider market data only; no API key or private core source."
+          echo "USDC/USD is not used as a provider-snapshot eligibility filter."
+          echo "EXECUTION_AUTHORIZED=FALSE"
