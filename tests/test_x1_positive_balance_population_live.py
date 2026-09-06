@@ -1,4 +1,4 @@
-"""Opt-in read-only XNT positive-balance population evidence."""
+"""Opt-in read-only XENCAT positive-balance population evidence."""
 
 import json
 import os
@@ -16,7 +16,7 @@ from liquidity_scout.providers.x1.rpc_token_supply import fetch_token_supply_raw
 
 
 RUN_LIVE = os.getenv("RUN_X1_POSITIVE_BALANCE_POPULATION_LIVE") == "1"
-XNT_MINT = "So11111111111111111111111111111111111111112"
+XENCAT_MINT = "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb"
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 
@@ -25,16 +25,16 @@ TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
     "set RUN_X1_POSITIVE_BALANCE_POPULATION_LIVE=1 to run read-only evidence",
 )
 class X1PositiveBalancePopulationLiveTests(unittest.TestCase):
-    def test_repeated_xnt_supply_conservation_population_evidence(self):
+    def test_repeated_xencat_supply_conservation_population_evidence(self):
         observations = []
 
         for index in range(3):
-            supply_before = fetch_token_supply_raw(XNT_MINT)
+            supply_before = fetch_token_supply_raw(XENCAT_MINT)
             enumeration = fetch_token_accounts_by_mint_raw(
-                XNT_MINT,
+                XENCAT_MINT,
                 token_program_id=TOKEN_PROGRAM,
             )
-            supply_after = fetch_token_supply_raw(XNT_MINT)
+            supply_after = fetch_token_supply_raw(XENCAT_MINT)
             observation = evaluate_x1_positive_balance_population_bracket(
                 enumeration,
                 supply_before,
@@ -80,7 +80,7 @@ class X1PositiveBalancePopulationLiveTests(unittest.TestCase):
                 "errors": observation["errors"],
             }
             print(
-                "[XNT positive-balance population observation] "
+                "[XENCAT positive-balance population observation] "
                 + json.dumps(summary, sort_keys=True)
             )
             if index < 2:
@@ -88,7 +88,7 @@ class X1PositiveBalancePopulationLiveTests(unittest.TestCase):
 
         series = verify_x1_positive_balance_population_series(observations)
         print(
-            "[XNT positive-balance population series] "
+            "[XENCAT positive-balance population series] "
             + json.dumps(series, sort_keys=True)
         )
 
