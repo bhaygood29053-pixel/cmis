@@ -379,6 +379,25 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             "schema": "x1_504_nonzero_trade_time_usd_volume_live.v1",
             "target_pool": TARGET_POOL,
             "target_asset": TARGET_ASSET,
+            "provider_catalog_xnt_price_usd_raw": xnt_price_usd,
+            "provider_catalog_target_pool_raw": {
+                key: row.get(key)
+                for row in pools
+                if _text(pool_address(row)) == TARGET_POOL
+                for key in (
+                    "address",
+                    "poolAddress",
+                    "volume24h",
+                    "txns24h",
+                    "transactions24h",
+                    "priceNative",
+                    "priceUsd",
+                    "pooledBase",
+                    "pooledQuote",
+                    "lastSyncedAt",
+                )
+                if key in row
+            },
             "route_qualification_verified": qualification["warp_qualified"],
             "current_usdcx_reserve_backing_verified": current_parity[
                 "current_reserve_backing_verified"
