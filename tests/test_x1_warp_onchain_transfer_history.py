@@ -312,6 +312,18 @@ class WarpOnchainTransferHistoryTests(unittest.TestCase):
         )
         self.assertEqual(result["accepted_settled_event_count"], 0)
         self.assertEqual(result["unresolved_counts"]["amount_mismatch"], 1)
+        self.assertEqual(len(result["unresolved_records"]), 1)
+        unresolved = result["unresolved_records"][0]
+        self.assertEqual(unresolved["reason"], "amount_mismatch")
+        self.assertEqual(unresolved["seq"], seq)
+        self.assertEqual(unresolved["source_timestamp"], 1_788_430_000)
+        self.assertEqual(unresolved["incoming_executed_timestamp"], 1_788_430_010)
+        self.assertTrue(unresolved["incoming_present"])
+        self.assertEqual(unresolved["source_mint"], route()["source"]["asset_id"])
+        self.assertEqual(
+            unresolved["expected_destination_mint"],
+            route()["destination"]["asset_id"],
+        )
 
     def test_delayed_claim_is_not_given_unproved_settlement_time(self):
         seq = 9004
