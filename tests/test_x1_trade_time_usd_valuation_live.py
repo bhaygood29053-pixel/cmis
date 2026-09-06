@@ -10,6 +10,7 @@ from liquidity_scout.providers.x1.bridge_source_provenance import (
     BridgeSourceProof,
     evaluate_bridge_source_provenance,
 )
+from liquidity_scout.providers.x1.history_range import scan_address_history_range
 from liquidity_scout.providers.x1.liquidity_freshness import (
     evaluate_x1_ninja_current_pool_scope,
 )
@@ -20,6 +21,7 @@ from liquidity_scout.providers.x1.rolling_24h_market_activity import (
     reconstruct_x1_pool_24h_chain_activity,
 )
 from liquidity_scout.providers.x1.trade_time_usd_valuation import (
+    REFERENCE_POOL,
     capture_historical_xnt_usdcx_reference_rate,
     capture_kraken_usdc_usd_fact_price,
     evaluate_historical_usdcx_parity,
@@ -457,6 +459,72 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             )
         )
 
+        # Retrospective #504 transition fixture. PR #503 captured one exact
+        # trade with provider volume 2.3859003395922413. Run #17 captured the
+        # same trade plus one new exact swap and provider volume
+        # 4.7430519845924595 at pool lastSyncedAt 2026-09-06T01:23:33.262Z.
+        # The aggregate delta equals 6.78 token units times the post-update
+        # pool priceUsd.  Reconstruct the independent XNT/USD reference at
+        # that provider update window without using the provider price.
+        retained_before_volume = Decimal("2.3859003395922413")
+        retained_after_volume = Decimal("4.7430519845924595")
+        retained_new_asset_amount = Decimal("6.7800000000002")
+        retained_new_price_native = Decimal("0.971236080088447")
+        retained_sync_epoch = Decimal("1788657813.262")
+        retained_volume_delta = retained_after_volume - retained_before_volume
+        retained_implied_stored_xnt_usd = retained_volume_delta / (
+            retained_new_asset_amount * retained_new_price_native
+        )
+
+        reference_scan = scan_address_history_range(
+            REFERENCE_POOL,
+            start_epoch=float(retained_sync_epoch - Decimal("300")),
+            end_epoch=float(retained_sync_epoch),
+            max_signatures=5000,
+        )
+        reference_entries = [
+            row
+            for row in reference_scan.get("entries", [])
+            if isinstance(row, dict)
+            and row.get("err") is None
+            and isinstance(row.get("block_time"), (int, float))
+            and Decimal(str(row["block_time"])) <= retained_sync_epoch
+        ]
+        latest_reference_entry = (
+            max(
+                reference_entries,
+                key=lambda row: (row["block_time"], row["slot"]),
+            )
+            if reference_entries
+            else None
+        )
+        retained_sync_reference = None
+        retained_sync_canonical = None
+        retained_sync_independent_xnt_usd = None
+        retained_sync_relative_error = None
+        retained_sync_reference_matches_stored_basis = False
+        if latest_reference_entry is not None:
+            retained_sync_reference = capture_historical_xnt_usdcx_reference_rate(
+                fact_time=int(retained_sync_epoch),
+                fact_slot=latest_reference_entry["slot"],
+            )
+            retained_sync_canonical = capture_kraken_usdc_usd_fact_price(
+                fact_time=int(retained_sync_epoch),
+            )
+            retained_sync_independent_xnt_usd = (
+                Decimal(str(retained_sync_reference["usdcx_per_xnt"]))
+                * Decimal(
+                    str(retained_sync_canonical["price_usd_per_usdc"])
+                )
+            )
+            retained_sync_relative_error = abs(
+                retained_sync_independent_xnt_usd
+                - retained_implied_stored_xnt_usd
+            ) / retained_implied_stored_xnt_usd
+            retained_sync_reference_matches_stored_basis = bool(
+                retained_sync_relative_error <= Decimal("0.01")
+            )
+
         evidence = {
             "schema": "x1_504_nonzero_trade_time_usd_volume_live.v1",
             "target_pool": TARGET_POOL,
@@ -556,6 +624,43 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             "provider_volume_equals_current_trade_row_sum": (
                 provider_volume_equals_current_trade_row_sum
             ),
+            "retained_volume_transition": {
+                "source_before": "PR #503 workflow 33999943283",
+                "source_after": "PR #506 workflow 34004319450",
+                "before_volume24h": format(retained_before_volume, "f"),
+                "after_volume24h": format(retained_after_volume, "f"),
+                "volume_delta_usd": format(retained_volume_delta, "f"),
+                "new_asset_amount": format(retained_new_asset_amount, "f"),
+                "new_price_native": format(retained_new_price_native, "f"),
+                "provider_sync_epoch": format(retained_sync_epoch, "f"),
+                "implied_stored_xnt_usd": format(
+                    retained_implied_stored_xnt_usd, "f"
+                ),
+                "reference_history_range_proven": reference_scan.get(
+                    "range_proven"
+                ),
+                "reference_history_integrity_verified": reference_scan.get(
+                    "integrity_verified"
+                ),
+                "latest_reference_entry": latest_reference_entry,
+                "independent_reference_rate": retained_sync_reference,
+                "independent_canonical_usdc_usd": retained_sync_canonical,
+                "independent_xnt_usd": (
+                    format(retained_sync_independent_xnt_usd, "f")
+                    if retained_sync_independent_xnt_usd is not None
+                    else None
+                ),
+                "relative_error": (
+                    format(retained_sync_relative_error, "e")
+                    if retained_sync_relative_error is not None
+                    else None
+                ),
+                "reference_matches_stored_basis_within_1pct": (
+                    retained_sync_reference_matches_stored_basis
+                ),
+                "provider_price_used_as_independent_input": False,
+                "execution_authorized": False,
+            },
             "provider_trade_row_financial_semantics_promoted": False,
             "provider_trade_usd_revaluation_semantics_promoted": False,
             "transactions": pool_window["transactions"],
@@ -563,6 +668,17 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         print("X1 #504 NONZERO TRADE-TIME USD VOLUME LIVE EVIDENCE")
         print(json.dumps(evidence, sort_keys=True, default=str))
 
+        self.assertTrue(reference_scan["range_proven"])
+        self.assertTrue(reference_scan["integrity_verified"])
+        self.assertIsNotNone(
+            latest_reference_entry,
+            "no successful XNT/USDC.X reference-pool anchor found before the retained provider sync",
+        )
+        self.assertIsNotNone(retained_sync_independent_xnt_usd)
+        self.assertTrue(
+            retained_sync_reference_matches_stored_basis,
+            "independent XNT/USD at the retained provider sync does not reproduce the stored rolling-volume contribution basis",
+        )
         self.assertTrue(
             provider_trade_shared_xnt_basis_verified,
             "provider trade rows at distinct slots do not share one common XNT/USD conversion basis",
