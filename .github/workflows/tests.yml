@@ -111,10 +111,10 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_x1_rolling_24h_market_activity.py
 
-      - name: Test X1 current market freshness v2 and Instant X1 Scan v4
+      - name: Test X1 current market freshness v2/v3 and Instant X1 Scan v4/v5
         env:
           PYTHONPATH: .
-        run: python -m pytest -q tests/test_x1_current_market_freshness_v2.py tests/test_x1_current_market_freshness_producer.py tests/test_risk_freshness_v2.py tests/test_cmis_instant_x1_scan_v4_contract.py
+        run: python -m pytest -q tests/test_x1_current_market_freshness_v2.py tests/test_x1_current_market_freshness_v3.py tests/test_x1_current_market_freshness_producer.py tests/test_risk_freshness_v2.py tests/test_cmis_instant_x1_scan_v4_contract.py tests/test_cmis_instant_x1_scan_v5_contract.py
 
       - name: Validate Phase 6 public boundary
         shell: bash
@@ -196,6 +196,7 @@ jobs:
           scan_v2 = Path("liquidity_scout/services/cmis_instant_x1_scan.py").read_text()
           scan_v3 = Path("liquidity_scout/services/cmis_instant_x1_scan_v3.py").read_text()
           scan_v4 = Path("liquidity_scout/services/cmis_instant_x1_scan_v4.py").read_text()
+          scan_v5 = Path("liquidity_scout/services/cmis_instant_x1_scan_v5.py").read_text()
           freshness = Path("liquidity_scout/providers/x1/current_market_freshness.py").read_text()
           policy = Path("liquidity_scout/providers/x1/instant_scan_freshness_policy.json").read_text()
           historical = Path("liquidity_scout/services/cmis_historical.py").read_text()
@@ -213,8 +214,12 @@ jobs:
           assert 'CONTRACT_VERSION = "instant_x1_scan/v4"' in scan_v4
           assert "build_instant_x1_scan_v3_response" in scan_v4
           assert "x1_current_market_freshness/v2" in scan_v4
+          assert 'CONTRACT_VERSION = "instant_x1_scan/v5"' in scan_v5
+          assert "build_instant_x1_scan_v4_response" in scan_v5
+          assert "x1_current_market_freshness/v3" in scan_v5
           assert "x1_current_market_freshness/v1" in freshness
           assert "x1_current_market_freshness/v2" in freshness
+          assert "x1_current_market_freshness/v3" in freshness
           assert '"max_collection_age_seconds": 60' in policy
           assert '"max_price_fact_age_seconds": 60' in policy
           assert '"max_future_skew_seconds": 5' in policy
