@@ -13,6 +13,7 @@ from liquidity_scout.providers.x1.liquidity_freshness import (
     evaluate_x1_ninja_current_pool_scope,
 )
 from liquidity_scout.providers.x1.market import fetch_all_pools
+from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
 from liquidity_scout.providers.x1.rolling_24h_market_activity import (
     evaluate_x1_rolling_24h_market_activity,
     reconstruct_x1_pool_24h_chain_activity,
@@ -352,6 +353,28 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             evaluated_at=end_epoch,
         )
 
+        # Diagnostic-only provider trade rows.  The raw X1.Ninja trade-history
+        # structure is an already-observed transport contract, but amount/price
+        # financial semantics remain unpromoted.  Match only the exact
+        # RPC-verified swap signatures so #504 can test the provider's stored
+        # USD valuation hypothesis without using those values as valuation
+        # inputs.
+        provider_history = fetch_pool_trades_raw(TARGET_POOL)
+        raw_provider_trades = (
+            provider_history.get("raw_response", {}).get("trades", [])
+        )
+        exact_swap_signatures = {
+            row["signature"]
+            for row in pool_window["transactions"]
+            if row.get("classification") == "EXACT_POOL_SWAP"
+            and row.get("signature")
+        }
+        provider_trade_rows = [
+            dict(row)
+            for row in raw_provider_trades
+            if isinstance(row, dict) and row.get("txHash") in exact_swap_signatures
+        ]
+
         evidence = {
             "schema": "x1_504_nonzero_trade_time_usd_volume_live.v1",
             "target_pool": TARGET_POOL,
@@ -414,6 +437,8 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
                 historical_parity_cache[key]
                 for key in sorted(historical_parity_cache, key=str)
             ],
+            "provider_trade_rows_for_exact_swaps": provider_trade_rows,
+            "provider_trade_row_financial_semantics_promoted": False,
             "transactions": pool_window["transactions"],
         }
         print("X1 #504 NONZERO TRADE-TIME USD VOLUME LIVE EVIDENCE")
