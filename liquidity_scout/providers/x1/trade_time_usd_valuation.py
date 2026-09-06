@@ -31,6 +31,7 @@ from liquidity_scout.providers.x1.pool_state_fingerprint import fetch_account_st
 from liquidity_scout.providers.x1.transaction_semantics import (
     USDC_X_MINT,
     WXNT_MINT,
+    XDEX_MAINNET_OBSERVED_PROGRAM_ID,
     account_key_info,
     fetch_transaction,
 )
@@ -38,6 +39,9 @@ from liquidity_scout.providers.x1.usdcx_destination_parity import (
     SOLANA_USDC_MINT,
     WARP_USDC_ROUTE_ID,
     X1_USDC_X_MINT,
+)
+from liquidity_scout.providers.x1.warp_message_interval_retention import (
+    CONTRACT as INTERVAL_RETENTION_CONTRACT,
 )
 from liquidity_scout.providers.x1.warp_message_lifecycle_retention import (
     CONTRACT as LIFECYCLE_CONTRACT,
@@ -152,6 +156,10 @@ def _pool_layout(
         "mint_0": extract_pubkey_at(data, MINT_0_OFFSET),
         "mint_1": extract_pubkey_at(data, MINT_1_OFFSET),
     }
+    if layout["program_id"] != XDEX_MAINNET_OBSERVED_PROGRAM_ID:
+        raise TradeTimeUsdValuationError(
+            "reference pool owner is not the accepted mainnet-observed XDEX program"
+        )
     if set((layout["mint_0"], layout["mint_1"])) != {WXNT_MINT, USDC_X_MINT}:
         raise TradeTimeUsdValuationError(
             "reference pool exact mint pair is not wrapped-XNT / USDC.X"
@@ -437,12 +445,21 @@ def evaluate_historical_usdcx_parity(
             "unresolved USDC route events prevent historical parity reconstruction"
         )
 
-    if lifecycle_retention.get("contract") != LIFECYCLE_CONTRACT:
+    lifecycle_contract = lifecycle_retention.get("contract")
+    if lifecycle_contract == LIFECYCLE_CONTRACT:
+        required_retention_field = "historical_retention_complete_verified"
+    elif lifecycle_contract == INTERVAL_RETENTION_CONTRACT:
+        required_retention_field = "interval_retention_complete_verified"
+        if lifecycle_retention.get("sixty_day_bridge_flow_retention_promoted") is not False:
+            raise TradeTimeUsdValuationError(
+                "short interval retention must not be promoted as the 60-day gate"
+            )
+    else:
         raise TradeTimeUsdValuationError(
-            "accepted Warp lifecycle-retention contract is required"
+            "accepted Warp lifecycle or interval-retention contract is required"
         )
     for field in (
-        "historical_retention_complete_verified",
+        required_retention_field,
         "requested_window_coverage_verified",
         "coverage_complete_verified",
         "missing_history_zero_authorized",
