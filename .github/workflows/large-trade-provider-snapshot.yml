@@ -1,0 +1,127 @@
+name: Large-Trade Provider Snapshot #534
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture-large-trade-provider-snapshot:
+    name: Capture fresh non-secret Large-Trade provider snapshot
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/534-large-trade-provider-snapshot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      RUN_LARGE_TRADE_PROVIDER_SNAPSHOT_534: "1"
+      LARGE_TRADE_PROVIDER_SNAPSHOT_534_OUTPUT: ${{ github.workspace }}/tests/fixtures/live_534_large_trade_provider_snapshot.json
+      SNAPSHOT_PATH: tests/fixtures/live_534_large_trade_provider_snapshot.json
+
+    steps:
+      - name: Check out public CMIS
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Run deterministic snapshot tests
+        run: |
+          python -m pytest -q tests/test_large_trade_provider_snapshot.py
+
+      # The committed sanitized fixture makes follow-up exact-head runs non-mutating.
+      - name: Capture live provider snapshot once
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "${SNAPSHOT_PATH}" ]; then
+            echo "Sanitized #534 snapshot already exists on this branch; not recapturing."
+          else
+            python -m pytest -q -s tests/test_large_trade_provider_snapshot_live.py
+          fi
+
+      - name: Validate sanitized fixture
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+          path = Path(os.environ["SNAPSHOT_PATH"])
+          if not path.exists():
+              raise SystemExit("sanitized #534 snapshot was not created")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          assert payload["schema"] == "cmis_large_trade_provider_snapshot_534/v1"
+          assert payload["provider_secret_included"] is False
+          assert payload["provider_scoped_candidate_search_only"] is True
+          assert payload["global_x1_dex_search_claimed"] is False
+          assert payload["source_independence_verified"] is False
+          assert payload["execution_authorized"] is False
+          assert 1 <= len(payload["candidates"]) <= 6
+          rendered = json.dumps(payload, sort_keys=True, default=str)
+          assert "Authorization" not in rendered
+          assert "Bearer " not in rendered
+          age = time.time() - float(payload["captured_at"])
+          print(f"#534 provider snapshot age seconds: {age:.3f}")
+          assert age >= -60
+          assert age <= 7200
+          PY
+
+      - name: Upload #534 snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: large-trade-provider-snapshot-534
+          path: ${{ env.SNAPSHOT_PATH }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit sanitized fixture to proof branch
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- "${SNAPSHOT_PATH}")" ]; then
+            echo "No new sanitized snapshot commit required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${SNAPSHOT_PATH}"
+          git commit -m "evidence: capture fresh #534 Large-Trade provider snapshot"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Public CMIS owns the X1.Ninja credential and provider transport."
+          echo "Committed/uploaded snapshot contains only sanitized public provider facts."
+          echo "No Authorization header, API key, cookies, or session data are retained."
+          echo "Candidate scope is provider-scoped, not every X1 DEX."
+          echo "Source independence remains unverified."
+          echo "No transaction construction, signing, broadcast, custody, mint, burn, swap, or value movement."
+          echo "EXECUTION_AUTHORIZED=FALSE"
