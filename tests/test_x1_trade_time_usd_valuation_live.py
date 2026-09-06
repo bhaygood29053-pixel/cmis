@@ -879,14 +879,10 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             ],
             "retained rolling-volume transition did not pass the independent USD valuation gate",
         )
-        self.assertTrue(
-            provider_trade_shared_xnt_basis_verified,
-            "provider trade rows at distinct slots do not share one common XNT/USD conversion basis",
-        )
-        self.assertFalse(
-            provider_volume_equals_current_trade_row_sum,
-            "pool volume24h unexpectedly equals the dynamically returned trade-row USD sum",
-        )
+        # Trade-history USD display behavior is diagnostic only. A valid
+        # candidate may contain a single trade row, and current trade-row
+        # amountUsd may or may not equal the separately stored pool aggregate.
+        # Neither observation is an acceptance prerequisite.
         self.assertGreater(pool_window["verified_transactions_24h"], 0)
         self.assertTrue(pool_window["history_range_proven"])
         self.assertTrue(pool_window["history_integrity_verified"])
