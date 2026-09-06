@@ -916,11 +916,11 @@ remains blocked until the paired public/protected #482 gate is accepted.
 
 ## Regulatory Evidence — Issue #536
 
-**ACTIVE FOUNDATION / NON-PROMOTED.** Issue #536 introduces `regulatory_evidence/v1` as a deterministic, read-only regulatory evidence contract beginning with the U.S. GENIUS Act and USDC / USDC.X identity fixtures.
+**COMPLETE FOUNDATION / NON-PROMOTED.** Issue #536 / PR #537 merged `regulatory_evidence/v1` as a deterministic, read-only regulatory evidence contract beginning with the U.S. GENIUS Act and USDC / USDC.X identity fixtures.
 
 The foundation separates statutory identity/status, authoritative-source provenance, effective-date semantics, current asset/issuer evidence, and native-versus-bridged dependencies. It intentionally does **not** emit COMPLIANT/NON_COMPLIANT conclusions.
 
-Current branch state:
+Accepted foundation state:
 
 - deterministic v1 validator added;
 - GovInfo-backed GENIUS Act source identity recorded;
