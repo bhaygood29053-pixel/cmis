@@ -16,8 +16,8 @@ from liquidity_scout.providers.x1.ninja_price_fact_time import (
 )
 from liquidity_scout.providers.x1.xdex_price_history_import import WRAPPED_XNT_MINT
 from liquidity_scout.services.cmis_market import build_market_report_response
-from tests.test_x1_current_usdcx_usd_equivalence_live import (
-    capture_current_usdcx_usd_equivalence_live_evidence,
+from liquidity_scout.providers.x1.current_usdcx_usd_capture import (
+    capture_current_usdcx_usd_equivalence_evidence,
 )
 
 
@@ -192,7 +192,7 @@ class X1NinjaLiquidityFreshnessLiveTests(unittest.TestCase):
                     pool_addresses=requested
                 )
 
-                usdcx = capture_current_usdcx_usd_equivalence_live_evidence()
+                usdcx = capture_current_usdcx_usd_equivalence_evidence()
                 equivalence = usdcx.get("equivalence") or {}
                 result = evaluate_x1_ninja_liquidity_freshness(
                     market_envelope=market,
