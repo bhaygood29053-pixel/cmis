@@ -916,7 +916,7 @@ remains blocked until the paired public/protected #482 gate is accepted.
 
 ## Regulatory Evidence — Issue #536
 
-**COMPLETE FOUNDATION / NON-PROMOTED.** Issue #536 / PR #537 merged `regulatory_evidence/v1` as a deterministic, read-only regulatory evidence contract beginning with the U.S. GENIUS Act and USDC / USDC.X identity fixtures.
+**COMPLETE FOUNDATION; PROMOTED THROUGH #539.** Issue #536 / PR #537 merged `regulatory_evidence/v1` as a deterministic, read-only regulatory evidence contract beginning with the U.S. GENIUS Act and USDC / USDC.X identity fixtures.
 
 The foundation separates statutory identity/status, authoritative-source provenance, effective-date semantics, current asset/issuer evidence, and native-versus-bridged dependencies. It intentionally does **not** emit COMPLIANT/NON_COMPLIANT conclusions.
 
@@ -929,17 +929,16 @@ Accepted foundation state:
 - bridged USDC.X preserves bridge/custody dependency;
 - fail-closed tests added for compliance overreach, source-authority drift, legal-status drift, and erased bridge dependency;
 - `read_only=true`;
-- `public_service_promoted=false`;
-- `scout_reliance_promoted=false`;
+- foundation-at-#537 `public_service_promoted=false`;
+- foundation-at-#537 `scout_reliance_promoted=false`;
 - `compliance_conclusion_authorized=false`;
 - `execution_authorized=false`.
 
-A later gate must add accepted runtime source ingestion, freshness policy, capability-manifest promotion, and Scout reliance before ROBERTA can treat this as current callable regulatory evidence.
+That later gate is now complete through Issue #539 / public PR #540 and protected `cmis-core` Issue #42 / PR #43. CMIS 1.26 advertises the bounded X1 service with exact-mint binding, current-regulator provenance, and freshness enforcement. ROBERTA adoption remains a separate downstream gate.
 
 ## Regulatory Evidence Runtime Promotion — Issue #539
 
-**ACTIVE.** The accepted #536 / PR #537 foundation is being promoted through a
-freshness-aware X1 runtime boundary under CMIS 1.26.
+**COMPLETE.** Issue #539 / public PR #540 and protected `cmis-core` Issue #42 / PR #43 promote the accepted #536 foundation through a freshness-aware X1 runtime boundary under CMIS 1.26.
 
 Initial proof scope:
 
@@ -950,6 +949,14 @@ Initial proof scope:
 - 24-hour default current-state freshness bound;
 - bridged representation and custody dependencies preserved.
 
-Public promotion work is paired with protected `cmis-core` Issue #42.
-`COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain
-unauthorized.
+Accepted promotion state:
+
+- `state=bounded`;
+- `callable=true`;
+- `read_only=true`;
+- `public_service_promoted=true`;
+- `scout_reliance_promoted=true`;
+- `compliance_conclusion_authorized=false`;
+- `execution_authorized=false`.
+
+`COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain unauthorized. The next downstream gate is ROBERTA/X1 Scout adoption of the accepted CMIS 1.26 service without recomputation.
