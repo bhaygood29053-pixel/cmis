@@ -295,6 +295,7 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         )
 
         cache = {}
+        historical_parity_cache = {}
 
         def usd_quote_resolver(
             *,
@@ -322,6 +323,7 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
                 normalized_events=normalized,
                 lifecycle_retention=interval_retention,
             )
+            historical_parity_cache[key] = historical_parity
             canonical = capture_kraken_usdc_usd_fact_price(
                 fact_time=fact_time,
             )
@@ -358,6 +360,9 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             "current_usdcx_reserve_backing_verified": current_parity[
                 "current_reserve_backing_verified"
             ],
+            "current_usdc_reserve_raw": current_parity["source_amount_raw"],
+            "current_usdcx_supply_raw": current_parity["destination_supply_raw"],
+            "current_reserve_surplus_raw": current_parity["reserve_surplus_raw"],
             "interval_retention_complete_verified": interval_retention[
                 "interval_retention_complete_verified"
             ],
@@ -405,6 +410,10 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             "public_service_promoted": rolling["public_service_promoted"],
             "scout_reliance_promoted": rolling["scout_reliance_promoted"],
             "execution_authorized": rolling["execution_authorized"],
+            "historical_parity_evidence": [
+                historical_parity_cache[key]
+                for key in sorted(historical_parity_cache, key=str)
+            ],
             "transactions": pool_window["transactions"],
         }
         print("X1 #504 NONZERO TRADE-TIME USD VOLUME LIVE EVIDENCE")
