@@ -69,8 +69,15 @@ class X1PositiveBalancePopulationEvidenceTests(unittest.TestCase):
         self.assertTrue(result["slot_scope_bounded"])
         self.assertTrue(result["supply_conservation_observed"])
         self.assertTrue(result["positive_balance_population_candidate_complete"])
+        self.assertTrue(result["positive_balance_token_account_population_candidate_complete"])
+        self.assertTrue(result["positive_balance_authority_address_population_candidate_complete"])
         self.assertFalse(result["positive_balance_population_coverage_verified"])
+        self.assertFalse(result["positive_balance_token_account_population_complete_verified"])
+        self.assertFalse(result["positive_balance_authority_address_population_complete_verified"])
+        self.assertFalse(result["zero_balance_token_account_population_complete_verified"])
+        self.assertEqual(result["returned_token_account_count"], 3)
         self.assertEqual(result["positive_balance_token_account_count"], 3)
+        self.assertEqual(result["zero_balance_returned_token_account_count"], 0)
         self.assertEqual(
             result["unique_positive_balance_authority_address_count"],
             2,
@@ -85,8 +92,10 @@ class X1PositiveBalancePopulationEvidenceTests(unittest.TestCase):
             ],
             65.0,
         )
+        self.assertFalse(result["wallet_identity_verified"])
         self.assertFalse(result["holder_semantics_verified"])
         self.assertFalse(result["beneficial_owner_identity_verified"])
+        self.assertFalse(result["source_independence_verified"])
         self.assertFalse(result["cmis_promotable"])
 
     def test_missing_positive_balance_or_wide_slot_span_fails_closed(self):
@@ -103,6 +112,24 @@ class X1PositiveBalancePopulationEvidenceTests(unittest.TestCase):
         )
         self.assertFalse(wide["slot_scope_bounded"])
         self.assertFalse(wide["positive_balance_population_candidate_complete"])
+
+    def test_missing_authority_does_not_destroy_token_account_population_proof(self):
+        result = evaluate_x1_positive_balance_population_observation(
+            enumeration(owners=("A", None, "A")),
+            supply(),
+        )
+
+        self.assertTrue(result["supply_conservation_observed"])
+        self.assertTrue(result["positive_balance_token_account_population_candidate_complete"])
+        self.assertFalse(result["positive_balance_authority_fields_complete"])
+        self.assertIsNone(result["unique_positive_balance_authority_address_count"])
+        self.assertFalse(
+            result["positive_balance_authority_address_population_candidate_complete"]
+        )
+        self.assertIn(
+            "one_or_more_positive_balance_authority_fields_missing",
+            result["warnings"],
+        )
 
     def test_stable_supply_bracket_accepts_enumeration_inside_bracket(self):
         result = evaluate_x1_positive_balance_population_bracket(
@@ -157,6 +184,9 @@ class X1PositiveBalancePopulationEvidenceTests(unittest.TestCase):
         self.assertTrue(result["all_supply_conservation_observations_passed"])
         self.assertTrue(result["identity_stable"])
         self.assertTrue(result["positive_balance_population_coverage_verified"])
+        self.assertTrue(result["positive_balance_token_account_population_complete_verified"])
+        self.assertTrue(result["positive_balance_authority_address_population_complete_verified"])
+        self.assertFalse(result["zero_balance_token_account_population_complete_verified"])
         self.assertEqual(result["counted_entity"], "positive_balance_token_account")
         self.assertEqual(
             result["authority_distribution_counted_entity"],
