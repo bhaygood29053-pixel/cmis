@@ -1,0 +1,98 @@
+name: Instant X1 Scan v4 Live Auto-Refresh #513
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-runtime-refresh:
+    name: Prove live Instant X1 Scan v4 miss -> refresh -> cache hit
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feature/513-live-runtime-freshness-proof'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      RUN_INSTANT_X1_SCAN_V4_LIVE_REFRESH: "1"
+      INSTANT_X1_SCAN_V4_LIVE_MAX_CANDIDATES: "20"
+      INSTANT_X1_SCAN_V4_LIVE_REFRESH_TIMEOUT_SECONDS: "1200"
+      INSTANT_X1_SCAN_V4_LIVE_EVIDENCE_PATH: ${{ github.workspace }}/artifacts/instant-x1-scan-v4-live-refresh.json
+
+    steps:
+      - name: Check out public CMIS shell
+        uses: actions/checkout@v4
+
+      - name: Check out protected #513 core branch
+        uses: actions/checkout@v4
+        with:
+          repository: bhaygood29053-pixel/cmis-core
+          ref: feature/513-live-runtime-freshness-proof
+          path: private-core
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install live runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Build protected/public runtime overlay
+        run: |
+          python -m pip install --no-deps --target runtime ./private-core
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          runtime = Path("runtime")
+          public_root = Path(".")
+          for source in sorted(public_root.glob("*.py")):
+              target = runtime / source.name
+              if not target.exists():
+                  shutil.copy2(source, target)
+
+          source = Path("liquidity_scout")
+          for item in source.rglob("*"):
+              if item.is_dir():
+                  continue
+              rel = item
+              target = runtime / rel
+              target.parent.mkdir(parents=True, exist_ok=True)
+              if not target.exists():
+                  shutil.copy2(item, target)
+          PY
+
+      - name: Prove live runtime auto-refresh path
+        env:
+          PYTHONPATH: ${{ github.workspace }}/runtime
+        run: |
+          cd /tmp
+          python -m pytest -q -s             "${GITHUB_WORKSPACE}/private-core/tests/test_instant_x1_scan_v4_live_refresh.py"
+
+      - name: Upload #513 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instant-x1-scan-v4-live-refresh-513
+          path: artifacts/instant-x1-scan-v4-live-refresh.json
+          if-no-files-found: warn
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only Instant X1 Scan / X1 RPC / X1.Ninja / Solana-Pyth / Warp evidence only."
+          echo "The first scan must remain fail-closed while the background producer is paused."
+          echo "No caller-supplied freshness proof is accepted."
+          echo "Provider fact-time remains unpromoted."
+          echo "Source independence remains separately unpromoted."
+          echo "No transaction construction, signing, broadcast, custody, mint, burn, swap, or value movement."
+          echo "EXECUTION_AUTHORIZED=FALSE"
