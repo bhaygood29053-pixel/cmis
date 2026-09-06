@@ -1,4 +1,4 @@
-name: Instant X1 Scan v4 Live Auto-Refresh #513
+name: X1 Provider Snapshot for Runtime Auto-Refresh #513
 
 on:
   pull_request:
@@ -10,29 +10,18 @@ permissions:
   contents: read
 
 jobs:
-  live-runtime-refresh:
-    name: Prove live Instant X1 Scan v4 miss -> refresh -> cache hit
+  capture-provider-snapshot:
+    name: Capture non-secret X1.Ninja snapshot for protected #513 gate
     if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feature/513-live-runtime-freshness-proof'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
     env:
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
       X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
-      RUN_INSTANT_X1_SCAN_V4_LIVE_REFRESH: "1"
-      INSTANT_X1_SCAN_V4_LIVE_MAX_CANDIDATES: "20"
-      INSTANT_X1_SCAN_V4_LIVE_REFRESH_TIMEOUT_SECONDS: "1200"
-      INSTANT_X1_SCAN_V4_LIVE_EVIDENCE_PATH: ${{ github.workspace }}/artifacts/instant-x1-scan-v4-live-refresh.json
 
     steps:
       - name: Check out public CMIS shell
         uses: actions/checkout@v4
-
-      - name: Check out protected #513 core branch
-        uses: actions/checkout@v4
-        with:
-          repository: bhaygood29053-pixel/cmis-core
-          ref: feature/513-live-runtime-freshness-proof
-          path: private-core
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,59 +29,145 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install live runtime dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install pytest
 
-      - name: Build protected/public runtime overlay
+      - name: Capture bounded provider snapshot
         run: |
-          python -m pip install --no-deps --target runtime ./private-core
+          mkdir -p artifacts
           python - <<'PY'
-          from pathlib import Path
-          import shutil
+          import json
+          import time
 
-          runtime = Path("runtime")
-          public_root = Path(".")
-          for source in sorted(public_root.glob("*.py")):
-              target = runtime / source.name
-              if not target.exists():
-                  shutil.copy2(source, target)
+          from liquidity_scout.market.resolver import find_matches_for_term, pool_address
+          from liquidity_scout.providers.x1.liquidity_freshness import REFERENCE_POOL_ADDRESS
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.xdex_price_history_import import WRAPPED_XNT_MINT
 
-          source = Path("liquidity_scout")
-          for item in source.rglob("*"):
-              if item.is_dir():
+          def text(value):
+              value = str(value or "").strip()
+              return value or None
+
+          def number(value):
+              if value is None or isinstance(value, bool):
+                  return None
+              try:
+                  return float(value)
+              except (TypeError, ValueError):
+                  return None
+
+          def token_mint(token):
+              if not isinstance(token, dict):
+                  return None
+              return text(token.get("mint") or token.get("address"))
+
+          pools, xnt_price = fetch_all_pools(sleep_seconds=0)
+          candidates = []
+          seen = set()
+          for pool in pools:
+              if not isinstance(pool, dict):
                   continue
-              rel = item
-              target = runtime / rel
-              target.parent.mkdir(parents=True, exist_ok=True)
-              if not target.exists():
-                  shutil.copy2(item, target)
+              address = text(pool_address(pool))
+              if not address or address in seen:
+                  continue
+              volume = number(pool.get("volume24h"))
+              txs = number(
+                  pool.get("txns24h")
+                  if pool.get("txns24h") is not None
+                  else pool.get("transactions24h")
+              )
+              if volume != 0.0 or txs != 0.0:
+                  continue
+              base = token_mint(pool.get("baseToken"))
+              quote = token_mint(pool.get("quoteToken"))
+              if base == WRAPPED_XNT_MINT and quote and quote != WRAPPED_XNT_MINT:
+                  asset_mint = quote
+              elif quote == WRAPPED_XNT_MINT and base and base != WRAPPED_XNT_MINT:
+                  asset_mint = base
+              else:
+                  continue
+              matches = [
+                  match
+                  for match in find_matches_for_term(asset_mint, pools)
+                  if len(match) >= 4 and match[3] >= 90
+              ]
+              addresses = []
+              match_seen = set()
+              for match in matches:
+                  selected = text(pool_address(match[0]))
+                  if selected and selected not in match_seen:
+                      match_seen.add(selected)
+                      addresses.append(selected)
+              if addresses != [address]:
+                  continue
+              seen.add(address)
+              candidates.append(
+                  {
+                      "asset_mint": asset_mint,
+                      "pool_address": address,
+                      "liquidity": number(pool.get("liquidity")) or 0.0,
+                      "provider_volume24h": volume,
+                      "provider_transactions24h": int(txs),
+                  }
+              )
+
+          candidates.sort(
+              key=lambda row: (
+                  -row["liquidity"],
+                  row["pool_address"],
+                  row["asset_mint"],
+              )
+          )
+          if not candidates:
+              raise SystemExit("no exact zero-activity single-pool wrapped-XNT candidate")
+
+          selected = candidates[0]
+          required = {selected["pool_address"], REFERENCE_POOL_ADDRESS}
+          retained = [
+              dict(row)
+              for row in pools
+              if text(pool_address(row)) in required
+          ]
+          retained_addresses = {text(pool_address(row)) for row in retained}
+          if retained_addresses != required:
+              raise SystemExit(
+                  f"required provider rows unavailable: expected={sorted(required)} "
+                  f"actual={sorted(retained_addresses)}"
+              )
+
+          evidence = {
+              "schema": "instant_x1_scan_v4_provider_snapshot_513/v1",
+              "captured_at": time.time(),
+              "selection_policy": (
+                  "exact_single_pool_wrapped_xnt_zero_activity;"
+                  "liquidity_desc_then_pool_address_then_asset_mint"
+              ),
+              "selected": selected,
+              "reference_pool_address": REFERENCE_POOL_ADDRESS,
+              "xnt_price_usd": xnt_price,
+              "pools": retained,
+              "provider_secret_included": False,
+              "execution_authorized": False,
+          }
+          rendered = json.dumps(evidence, sort_keys=True, default=str)
+          with open("artifacts/x1-provider-snapshot-513.json", "w", encoding="utf-8") as handle:
+              handle.write(rendered + "\n")
+          print("X1 #513 NON-SECRET PROVIDER SNAPSHOT")
+          print(rendered)
           PY
 
-      - name: Prove live runtime auto-refresh path
-        env:
-          PYTHONPATH: ${{ github.workspace }}/runtime
-        run: |
-          cd /tmp
-          python -m pytest -q -s             "${GITHUB_WORKSPACE}/private-core/tests/test_instant_x1_scan_v4_live_refresh.py"
-
-      - name: Upload #513 evidence
-        if: always()
+      - name: Upload provider snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: instant-x1-scan-v4-live-refresh-513
-          path: artifacts/instant-x1-scan-v4-live-refresh.json
-          if-no-files-found: warn
+          name: x1-provider-snapshot-513
+          path: artifacts/x1-provider-snapshot-513.json
+          if-no-files-found: error
 
       - name: Safety boundary
         if: always()
         run: |
-          echo "Read-only Instant X1 Scan / X1 RPC / X1.Ninja / Solana-Pyth / Warp evidence only."
-          echo "The first scan must remain fail-closed while the background producer is paused."
-          echo "No caller-supplied freshness proof is accepted."
-          echo "Provider fact-time remains unpromoted."
-          echo "Source independence remains separately unpromoted."
+          echo "Snapshot contains provider market data only; no API key or private core source."
           echo "No transaction construction, signing, broadcast, custody, mint, burn, swap, or value movement."
           echo "EXECUTION_AUTHORIZED=FALSE"
