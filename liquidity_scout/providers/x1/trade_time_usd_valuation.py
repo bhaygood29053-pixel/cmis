@@ -440,9 +440,14 @@ def evaluate_historical_usdcx_parity(
     unresolved_total = sum(
         _nonnegative_int(v, "unresolved count") for v in unresolved.values()
     )
-    if unresolved_total != 0:
+    unresolved_records = normalized_events.get("unresolved_records", [])
+    if not isinstance(unresolved_records, Sequence) or isinstance(
+        unresolved_records, (str, bytes, bytearray)
+    ):
+        raise TradeTimeUsdValuationError("normalized unresolved records are invalid")
+    if unresolved_total != len(unresolved_records):
         raise TradeTimeUsdValuationError(
-            "unresolved USDC route events prevent historical parity reconstruction"
+            "normalized unresolved counts/records do not reconcile"
         )
 
     lifecycle_contract = lifecycle_retention.get("contract")
@@ -547,6 +552,165 @@ def evaluate_historical_usdcx_parity(
             destination_at_fact -= destination_delta
             destination_reversed += 1
 
+    # Unresolved route records are not globally ignored.  We accept only the
+    # exact source-side action that is independently fixed by the retained
+    # OutgoingMsg plus the accepted native/non-native operation topology.
+    #
+    # This deliberately leaves the missing destination-side action unassumed:
+    # - Solana -> X1 inflow: a verified post-fact source lock is reversed from
+    #   the current Solana reserve, while any unresolved X1 mint is NOT reversed.
+    #   That keeps the historical reserve lower and supply higher.
+    # - X1 -> Solana outflow: a verified post-fact USDC.X burn is added back to
+    #   the current X1 supply, while any unresolved Solana release is NOT
+    #   reversed.  That keeps the historical reserve lower and supply higher.
+    #
+    # The resulting comparison is therefore a conservative lower-bound reserve
+    # versus upper-bound wrapped supply.  If that still covers, parity is proven
+    # without guessing whether the missing destination settlement occurred.
+    conservative_source_actions: list[dict[str, Any]] = []
+    unresolved_effects_bounded = True
+    source_action_creation_coverage_verified = (
+        lifecycle_retention.get("expected_outgoing_creations_verified") is True
+    )
+    safe_unresolved_reasons = {
+        "missing_destination_incoming",
+        "destination_mint_mismatch",
+    }
+
+    for record in unresolved_records:
+        if not isinstance(record, Mapping):
+            raise TradeTimeUsdValuationError("unresolved route record is invalid")
+        reason = _text(record.get("reason"))
+        direction = _text(record.get("direction"))
+        actual_source_chain = _text(record.get("actual_source_chain"))
+        actual_destination_chain = _text(record.get("actual_destination_chain"))
+        source_mint = _text(record.get("source_mint"))
+        expected_source_mint = _text(record.get("expected_source_mint"))
+        expected_destination_mint = _text(record.get("expected_destination_mint"))
+        source_timestamp = _epoch(
+            record.get("source_timestamp"), "unresolved source_timestamp"
+        )
+        amount = _nonnegative_int(
+            record.get("amount_raw"), "unresolved amount_raw"
+        )
+        outgoing_operation = _nonnegative_int(
+            record.get("outgoing_operation"), "unresolved outgoing_operation"
+        )
+        expected_outgoing_operation = _nonnegative_int(
+            record.get("expected_outgoing_operation"),
+            "unresolved expected_outgoing_operation",
+        )
+
+        if source_timestamp > lifecycle_as_of:
+            raise TradeTimeUsdValuationError(
+                "unresolved source action falls after lifecycle as_of"
+            )
+
+        if direction == "inflow":
+            exact_source_action = bool(
+                actual_source_chain == "solana"
+                and actual_destination_chain == "x1"
+                and source_mint == SOLANA_USDC_MINT
+                and expected_source_mint == SOLANA_USDC_MINT
+                and expected_destination_mint == X1_USDC_X_MINT
+                and outgoing_operation == 1
+                and expected_outgoing_operation == 1
+            )
+            observation_cutoff = source_observed_at
+            action_effect = "source_reserve_lock"
+        elif direction == "outflow":
+            exact_source_action = bool(
+                actual_source_chain == "x1"
+                and actual_destination_chain == "solana"
+                and source_mint == X1_USDC_X_MINT
+                and expected_source_mint == X1_USDC_X_MINT
+                and expected_destination_mint == SOLANA_USDC_MINT
+                and outgoing_operation == 0
+                and expected_outgoing_operation == 0
+            )
+            observation_cutoff = destination_observed_at
+            action_effect = "destination_supply_burn"
+        else:
+            raise TradeTimeUsdValuationError(
+                "unresolved route direction is not inflow/outflow"
+            )
+
+        # Source-side actions at/before the target fact already belong to the
+        # historical state.  Their unresolved destination-side action is left in
+        # the current snapshot instead of being reversed, which is conservative:
+        # an unresolved post-fact mint can only make supply lower at the fact,
+        # while an unresolved post-fact release can only make reserve higher.
+        if source_timestamp <= fact:
+            conservative_source_actions.append(
+                {
+                    "reason": reason,
+                    "direction": direction,
+                    "source_timestamp": source_timestamp,
+                    "amount_raw": amount,
+                    "source_action_effect": action_effect,
+                    "source_action_reversed": False,
+                    "basis": "source_action_at_or_before_fact",
+                    "destination_settlement_assumed": False,
+                }
+            )
+            continue
+
+        # If the outgoing happened after the backing snapshot used on that
+        # chain, it did not affect that snapshot and therefore needs no reversal.
+        if source_timestamp > observation_cutoff:
+            conservative_source_actions.append(
+                {
+                    "reason": reason,
+                    "direction": direction,
+                    "source_timestamp": source_timestamp,
+                    "amount_raw": amount,
+                    "source_action_effect": action_effect,
+                    "source_action_reversed": False,
+                    "basis": "source_action_after_relevant_current_observation",
+                    "destination_settlement_assumed": False,
+                }
+            )
+            continue
+
+        if (
+            reason not in safe_unresolved_reasons
+            or not exact_source_action
+            or not source_action_creation_coverage_verified
+        ):
+            unresolved_effects_bounded = False
+            raise TradeTimeUsdValuationError(
+                "post-fact unresolved USDC route source action is not "
+                "independently bounded"
+            )
+
+        if direction == "inflow":
+            source_at_fact -= amount
+            source_reversed += 1
+        else:
+            # A non-native X1 source uses the accepted burn-side operation.
+            # Because the burn occurred after the fact but before the current X1
+            # supply observation, add it back to reconstruct the higher fact-time
+            # USDC.X supply.  Do not assume the missing Solana release.
+            destination_at_fact += amount
+            destination_reversed += 1
+
+        conservative_source_actions.append(
+            {
+                "reason": reason,
+                "direction": direction,
+                "source_timestamp": source_timestamp,
+                "amount_raw": amount,
+                "source_action_effect": action_effect,
+                "source_action_reversed": True,
+                "exact_source_mint_verified": True,
+                "expected_operation_topology_verified": True,
+                "source_action_creation_coverage_verified": True,
+                "destination_settlement_assumed": False,
+                "source_reserve_lower_bound_preserved": direction == "outflow",
+                "destination_supply_upper_bound_preserved": direction == "inflow",
+            }
+        )
+
     if source_at_fact < 0 or destination_at_fact < 0:
         raise TradeTimeUsdValuationError(
             "historical reserve/supply reconstruction produced negative state"
@@ -572,12 +736,28 @@ def evaluate_historical_usdcx_parity(
         "destination_actions_reversed": destination_reversed,
         "historical_source_reserve_raw": source_at_fact,
         "historical_destination_supply_raw": destination_at_fact,
+        "historical_source_reserve_lower_bound_raw": source_at_fact,
+        "historical_destination_supply_upper_bound_raw": destination_at_fact,
         "historical_reserve_surplus_raw": source_at_fact - destination_at_fact,
         "historical_source_reserve_gte_destination_supply": reserve_sufficient,
         "historical_usdcx_value_equivalence_verified": reserve_sufficient,
         "historical_value_equivalence_verified": reserve_sufficient,
         "lifecycle_coverage_verified": True,
-        "all_route_events_resolved": True,
+        "all_route_events_resolved": unresolved_total == 0,
+        "unresolved_route_event_count": unresolved_total,
+        "unresolved_route_effects_conservatively_bounded": unresolved_effects_bounded,
+        "source_action_creation_coverage_verified": (
+            source_action_creation_coverage_verified
+        ),
+        "conservative_unresolved_source_action_count": len(
+            conservative_source_actions
+        ),
+        "conservative_unresolved_source_actions": conservative_source_actions,
+        "missing_destination_settlement_assumed": False,
+        "historical_parity_proof_basis": (
+            "conservative_lower_bound_solana_reserve_gte_"
+            "conservative_upper_bound_x1_usdcx_supply"
+        ),
         "stable_name_one_dollar_assumption_used": False,
         "source_independence_verified": False,
         "execution_authorized": False,
