@@ -65,6 +65,61 @@ class X1NinjaRollingVolumeTransitionTests(unittest.TestCase):
         self.assertFalse(result["provider_fact_time_verified"])
         self.assertFalse(result["independent_usd_valuation_verified"])
         self.assertFalse(result["cmis_promotable"])
+
+    def test_independent_xnt_usd_evidence_can_verify_transition_value(self):
+        result = evaluate_x1_ninja_rolling_volume_transition(
+            before=BEFORE,
+            after=AFTER,
+            new_swap=NEW_SWAP,
+            independent_xnt_usd_evidence={
+                "fact_time_verified": True,
+                "historical_xnt_usd_price": "0.35795878225779656",
+                "provider_usd_price_used": False,
+                "current_price_substitution_used": False,
+                "stable_name_one_dollar_assumption_used": False,
+            },
+        )
+        self.assertTrue(result["independent_xnt_usd_evidence_eligible"])
+        self.assertTrue(result["independent_xnt_usd_matches_stored_basis"])
+        self.assertTrue(result["independent_transition_usd_value_verified"])
+        self.assertTrue(result["independent_usd_valuation_verified"])
+        self.assertFalse(result["provider_fact_time_verified"])
+        self.assertFalse(result["cmis_promotable"])
+        self.assertFalse(result["execution_authorized"])
+
+    def test_provider_or_current_price_evidence_cannot_verify_transition_value(self):
+        for evidence in (
+            {
+                "fact_time_verified": True,
+                "historical_xnt_usd_price": "0.35795878225779656",
+                "provider_usd_price_used": True,
+                "current_price_substitution_used": False,
+                "stable_name_one_dollar_assumption_used": False,
+            },
+            {
+                "fact_time_verified": True,
+                "historical_xnt_usd_price": "0.35795878225779656",
+                "provider_usd_price_used": False,
+                "current_price_substitution_used": True,
+                "stable_name_one_dollar_assumption_used": False,
+            },
+            {
+                "fact_time_verified": True,
+                "historical_xnt_usd_price": "0.35795878225779656",
+                "provider_usd_price_used": False,
+                "current_price_substitution_used": False,
+                "stable_name_one_dollar_assumption_used": True,
+            },
+        ):
+            result = evaluate_x1_ninja_rolling_volume_transition(
+                before=BEFORE,
+                after=AFTER,
+                new_swap=NEW_SWAP,
+                independent_xnt_usd_evidence=evidence,
+            )
+            self.assertFalse(result["independent_xnt_usd_evidence_eligible"])
+            self.assertFalse(result["independent_transition_usd_value_verified"])
+            self.assertFalse(result["independent_usd_valuation_verified"])
         self.assertFalse(result["execution_authorized"])
 
     def test_wrong_post_update_price_fails_relationship(self):
