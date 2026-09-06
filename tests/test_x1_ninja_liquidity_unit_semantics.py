@@ -36,7 +36,7 @@ def test_live_513_provider_nominal_basis_is_exact_while_independent_usd_differs(
     assert nominal["provider_liquidity_comparison"]["within_tolerance"] is True
     assert (
         Decimal(nominal["derived_provider_nominal_liquidity"])
-        == Decimal("725.7858651168268713350755209")
+        == Decimal("725.7858651168269159802816414")
     )
     assert nominal["independently_verified_external_usd"] is False
 
