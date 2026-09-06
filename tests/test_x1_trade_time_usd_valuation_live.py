@@ -15,6 +15,9 @@ from liquidity_scout.providers.x1.liquidity_freshness import (
     evaluate_x1_ninja_current_pool_scope,
 )
 from liquidity_scout.providers.x1.market import fetch_all_pools
+from liquidity_scout.providers.x1.ninja_rolling_volume_transition import (
+    evaluate_x1_ninja_rolling_volume_transition,
+)
 from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
 from liquidity_scout.providers.x1.rolling_24h_market_activity import (
     evaluate_x1_rolling_24h_market_activity,
@@ -503,6 +506,7 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         retained_sync_independent_xnt_usd = None
         retained_sync_relative_error = None
         retained_sync_reference_matches_stored_basis = False
+        retained_transition_evaluation = None
         if latest_reference_entry is not None:
             retained_sync_reference = capture_historical_xnt_usdcx_reference_rate(
                 fact_time=int(retained_sync_epoch),
@@ -523,6 +527,39 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             ) / retained_implied_stored_xnt_usd
             retained_sync_reference_matches_stored_basis = bool(
                 retained_sync_relative_error <= Decimal("0.01")
+            )
+            retained_transition_evaluation = (
+                evaluate_x1_ninja_rolling_volume_transition(
+                    before={
+                        "volume24h": retained_before_volume,
+                        "transactions24h": 1,
+                    },
+                    after={
+                        "volume24h": retained_after_volume,
+                        "transactions24h": 2,
+                        "priceUsd": "0.34766248451329623",
+                    },
+                    new_swap={
+                        "signature": (
+                            "5GLpV4oQt8jvPHn5JtW4nG8Xf6vVW1ESCm2FSpA8jUdc3MS2vbqR9ADsVyfaNh2x7QnuG5CzQt2snSyG5UHT6hvy"
+                        ),
+                        "slot": 76853761,
+                        "block_time": 1788657811,
+                        "asset_amount": retained_new_asset_amount,
+                        "quote_amount": "6.584980622999865",
+                        "price_native": retained_new_price_native,
+                    },
+                    independent_xnt_usd_evidence={
+                        "fact_time_verified": True,
+                        "historical_xnt_usd_price": (
+                            format(retained_sync_independent_xnt_usd, "f")
+                        ),
+                        "provider_usd_price_used": False,
+                        "current_price_substitution_used": False,
+                        "stable_name_one_dollar_assumption_used": False,
+                    },
+                    independent_relative_tolerance=Decimal("0.01"),
+                )
             )
 
         evidence = {
@@ -658,6 +695,7 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
                 "reference_matches_stored_basis_within_1pct": (
                     retained_sync_reference_matches_stored_basis
                 ),
+                "transition_evaluation": retained_transition_evaluation,
                 "provider_price_used_as_independent_input": False,
                 "execution_authorized": False,
             },
@@ -678,6 +716,13 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         self.assertTrue(
             retained_sync_reference_matches_stored_basis,
             "independent XNT/USD at the retained provider sync does not reproduce the stored rolling-volume contribution basis",
+        )
+        self.assertIsNotNone(retained_transition_evaluation)
+        self.assertTrue(
+            retained_transition_evaluation[
+                "independent_transition_usd_value_verified"
+            ],
+            "retained rolling-volume transition did not pass the independent USD valuation gate",
         )
         self.assertTrue(
             provider_trade_shared_xnt_basis_verified,
