@@ -42,6 +42,9 @@ jobs:
           import time
 
           from liquidity_scout.market.resolver import find_matches_for_term, pool_address
+          from liquidity_scout.providers.x1.current_usdcx_usd_capture import (
+              capture_current_usdcx_usd_equivalence_evidence,
+          )
           from liquidity_scout.providers.x1.liquidity_freshness import REFERENCE_POOL_ADDRESS
           from liquidity_scout.providers.x1.market import fetch_all_pools
           from liquidity_scout.providers.x1.xdex_price_history_import import WRAPPED_XNT_MINT
@@ -137,6 +140,12 @@ jobs:
                   f"actual={sorted(retained_addresses)}"
               )
 
+          usdcx = capture_current_usdcx_usd_equivalence_evidence()
+          equivalence = usdcx.get("equivalence") or {}
+          source_usdc_usd = equivalence.get("source_usdc_usd_price")
+          if source_usdc_usd is None:
+              raise SystemExit("current accepted USDC/USD equivalence price unavailable")
+
           evidence = {
               "schema": "instant_x1_scan_v4_provider_snapshot_513/v1",
               "captured_at": time.time(),
@@ -147,6 +156,17 @@ jobs:
               "selected": selected,
               "reference_pool_address": REFERENCE_POOL_ADDRESS,
               "xnt_price_usd": xnt_price,
+              "current_usdcx_usd_equivalence_verified": equivalence.get(
+                  "current_usdcx_usd_equivalence_verified"
+              ),
+              "source_usdc_usd_price": source_usdc_usd,
+              "source_usdc_usd_price_delta_from_one": abs(
+                  float(source_usdc_usd) - 1.0
+              ),
+              "liquidity_relative_tolerance": 0.0001,
+              "provider_xnt_basis_eligible_for_strict_liquidity_match": (
+                  abs(float(source_usdc_usd) - 1.0) <= 0.0001
+              ),
               "pools": retained,
               "provider_secret_included": False,
               "execution_authorized": False,
