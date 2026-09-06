@@ -27,7 +27,7 @@ The `liquidity_scout` namespace is a migration compatibility identifier, not a s
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.20.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v2` requires `>=1.14.0`.
+Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.21.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v2` requires `>=1.14.0`; `instant_x1_scan/v4` with `x1_current_market_freshness/v2` requires `>=1.21.0`.
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
