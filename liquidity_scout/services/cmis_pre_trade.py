@@ -222,6 +222,7 @@ def _upstream_failure_response(
             data={"trade": dict(trade) if isinstance(trade, Mapping) else {}},
             sources=sources,
             observed_at=effective_observed_at,
+            freshness=(envelope.get("freshness") if isinstance(envelope.get("freshness"), Mapping) else None),
             warnings=_copy_records(envelope.get("warnings")) or [{
                 "code": "risk_check_unavailable",
                 "message": "A deterministic risk_check result is required for pre_trade_check.",
@@ -237,6 +238,7 @@ def _upstream_failure_response(
             data={"trade": dict(trade) if isinstance(trade, Mapping) else {}},
             sources=sources,
             observed_at=effective_observed_at,
+            freshness=(envelope.get("freshness") if isinstance(envelope.get("freshness"), Mapping) else None),
             errors=_copy_records(envelope.get("errors")) or [{
                 "code": "risk_check_error",
                 "message": "The upstream risk_check service returned an error.",
@@ -398,6 +400,7 @@ def build_pre_trade_check_response(
         confidence=result.get("confidence"),
         sources=sources,
         observed_at=effective_observed_at,
+        freshness=(risk_envelope.get("freshness") if risk_envelope is not None and isinstance(risk_envelope.get("freshness"), Mapping) else None),
         warnings=_warnings(result),
         errors=[],
     )
