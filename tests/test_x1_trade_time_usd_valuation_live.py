@@ -370,6 +370,9 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             "normalized_usdc_route_unresolved_counts": normalized[
                 "unresolved_counts"
             ],
+            "normalized_usdc_route_unresolved_records": normalized.get(
+                "unresolved_records", []
+            ),
             "verified_transactions_24h": pool_window[
                 "verified_transactions_24h"
             ],
