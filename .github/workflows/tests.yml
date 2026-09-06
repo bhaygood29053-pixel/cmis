@@ -251,11 +251,11 @@ jobs:
           capabilities_test = Path("tests/test_cmis_capabilities.py").read_text()
           http_test = Path("tests/test_cmis_http_gateway.py").read_text()
 
-          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.22.0")' in capabilities_test
-          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.20.0")' not in capabilities_test
-          assert 'response["contract_version"], "1.22.0"' in http_test
-          assert 'response["contract_version"], "1.20.0"' not in http_test
-          print("CMIS_122_REGRESSION_EXPECTATIONS=PASS")
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.23.0")' in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.22.0")' not in capabilities_test
+          assert 'response["contract_version"], "1.23.0"' in http_test
+          assert 'response["contract_version"], "1.22.0"' not in http_test
+          print("CMIS_123_REGRESSION_EXPECTATIONS=PASS")
           PY
 
       - name: Test concentration warning intelligence v1
