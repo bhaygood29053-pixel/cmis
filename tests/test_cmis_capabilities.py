@@ -68,8 +68,12 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.26.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.27.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
+        freshness = manifest["response_freshness"]
+        self.assertEqual(freshness["contract_version"], "cmis_response_freshness/v1")
+        self.assertTrue(freshness["required_on_every_public_response"])
+        self.assertTrue(freshness["missing_service_specific_freshness_fails_closed"])
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
             set(SUPPORTED_SERVICES),
