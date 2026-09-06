@@ -160,6 +160,8 @@ class TradePriceImpactIntelligenceTests(unittest.TestCase):
         self.assertEqual(result["chain"], "x1")
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["data"]["contract_version"], CONTRACT_VERSION)
+        self.assertTrue(result["data"]["public_service_promoted"])
+        self.assertTrue(result["data"]["scout_reliance_promoted"])
 
         trade = result["data"]["wallet_trade"]
         self.assertEqual(trade["wallet_address"], WALLET)
