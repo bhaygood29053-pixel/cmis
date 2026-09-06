@@ -938,7 +938,7 @@ Accepted foundation state:
 - `compliance_conclusion_authorized=false`;
 - `execution_authorized=false`.
 
-That later gate is now complete through Issue #539 / public PR #540 and protected `cmis-core` Issue #42 / PR #43. CMIS 1.26 advertises the bounded X1 service with exact-mint binding, current-regulator provenance, and freshness enforcement. ROBERTA adoption remains a separate downstream gate.
+That later gate is complete through Issue #539 / public PR #540 and protected `cmis-core` Issue #42 / PR #43. CMIS 1.26 advertises the bounded X1 service with exact-mint binding, current-regulator provenance, and freshness enforcement. ROBERTA downstream adoption is also complete through ROBERTA #367 / PR #368 and protected `roberta-core` #68 / PR #69.
 
 ## Regulatory Evidence Runtime Promotion — Issue #539
 
@@ -963,11 +963,11 @@ Accepted promotion state:
 - `compliance_conclusion_authorized=false`;
 - `execution_authorized=false`.
 
-`COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain unauthorized. The next downstream gate is ROBERTA/X1 Scout adoption of the accepted CMIS 1.26 service without recomputation.
+`COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain unauthorized. ROBERTA/X1 Scout adoption of the accepted CMIS 1.26 service is complete through ROBERTA #367 / PR #368 and protected `roberta-core` #68 / PR #69.
 
 ## Live Regulatory Evidence Producer — Issue #543
 
-**ACTIVE.** Issue #543 replaces fixture-only/manual current-record injection with a deterministic live primary-source producer for the promoted CMIS 1.26 `regulatory_evidence/v1` service.
+**COMPLETE.** Issue #543 / PR #544 and protected `cmis-core` #45 / PR #46 replace fixture-only/manual current-record injection with a deterministic live primary-source producer, persistent canonical registry, and automatic runtime refresh path for the promoted CMIS 1.26 `regulatory_evidence/v1` service.
 
 Initial producer scope:
 
@@ -981,6 +981,20 @@ Initial producer scope:
 
 The public producer validates source identity markers and then validates its emitted record against the existing canonical regulatory contract. It fails closed on missing/malformed authoritative evidence.
 
-Paired protected `cmis-core` Issue #45 owns the persistent canonical registry and automatic runtime refresh path.
+Accepted runtime state:
+
+- public CMIS #543 / PR #544 provides the authoritative-source GENIUS Act producer;
+- protected `cmis-core` #45 / PR #46 owns a SQLite canonical regulatory registry;
+- the exact registry key is jurisdiction + framework + exact X1 mint;
+- standard `RuntimeCMISGateway` now performs `cache miss -> live producer -> canonical validation -> persist -> serve` without manual resolver injection;
+- persisted `status_as_of` survives restart and participates in a 15-minute default refresh cooldown;
+- refresh failure preserves an existing record, while the public freshness gate still fails closed if that record becomes stale;
+- empty registry plus producer failure yields no fabricated regulatory evidence;
+- unsupported subjects do not invoke the GENIUS Act producer;
+- custom operator resolvers remain available for specialized deployments but cannot be mixed ambiguously with the default registry composition;
+- there is no HTTP write surface for regulatory evidence;
+- Human and Machine ROBERTA adoption is already complete downstream.
+
+The initial producer uses a curated CMIS-owned authoritative-source registry. A newly published official final/effective implementation source still requires the registry to recognize that source before CMIS can promote the new state; arbitrary web discovery is not silently trusted.
 
 `COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain unauthorized.
