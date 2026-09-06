@@ -49,14 +49,20 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          from liquidity_scout.providers.x1.history_range import scan_address_history_range
           from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.ninja_price_fact_time import (
+              collect_ninja_price_fact_time_snapshot,
+          )
           from liquidity_scout.providers.x1.ninja_history import (
               fetch_pool_ohlcv_raw,
               fetch_pool_trades_raw,
           )
           from liquidity_scout.providers.x1.transaction_semantics import (
+              fetch_transaction,
               report_to_dict,
               verify_signature,
+              verify_transaction,
           )
           from liquidity_scout.providers.x1.xdex import fetch_price_history
           from liquidity_scout.providers.x1.xdex_price_history_import import (
@@ -94,6 +100,86 @@ jobs:
               limit=300,
           )
           catalog, xnt_price_usd = fetch_all_pools(sleep_seconds=0)
+          reference_snapshot = collect_ninja_price_fact_time_snapshot(
+              pool_addresses=[REFERENCE_POOL]
+          )
+          reference_snapshot_rows = [
+              row
+              for row in (reference_snapshot.get("pools") or [])
+              if isinstance(row, dict)
+              and row.get("pool_address") == REFERENCE_POOL
+              and row.get("status") == "ok"
+          ]
+          reference_chain_anchor = None
+          if reference_snapshot_rows:
+              rrpc = reference_snapshot_rows[0].get("rpc") or {}
+              vault0 = rrpc.get("vault_0")
+              vault1 = rrpc.get("vault_1")
+              mint0 = rrpc.get("mint_0")
+              mint1 = rrpc.get("mint_1")
+              history = scan_address_history_range(
+                  REFERENCE_POOL,
+                  start_epoch=TARGET_TIME - 3600,
+                  end_epoch=TARGET_TIME,
+                  max_signatures=5000,
+              )
+              eligible = []
+              for entry in history.get("entries") or []:
+                  bt = entry.get("block_time")
+                  if (
+                      entry.get("err") is not None
+                      or bt is None
+                      or float(bt) > TARGET_TIME
+                      or float(bt) < TARGET_TIME - 3600
+                  ):
+                      continue
+                  raw_tx = fetch_transaction(entry["signature"])
+                  report = report_to_dict(
+                      verify_transaction(
+                          raw_tx,
+                          signature=entry["signature"],
+                      )
+                  )
+                  by_account = {
+                      row.get("account"): row
+                      for row in report.get("token_deltas") or []
+                      if isinstance(row, dict)
+                  }
+                  d0 = by_account.get(vault0)
+                  d1 = by_account.get(vault1)
+                  if (
+                      report.get("found") is True
+                      and report.get("succeeded") is True
+                      and report.get("xdex_amm_invoked") is True
+                      and isinstance(d0, dict)
+                      and isinstance(d1, dict)
+                      and d0.get("mint") == mint0
+                      and d1.get("mint") == mint1
+                  ):
+                      eligible.append({
+                          "signature": entry["signature"],
+                          "slot": report.get("slot"),
+                          "block_time": report.get("block_time"),
+                          "vault_0": vault0,
+                          "mint_0": mint0,
+                          "pre_0": d0.get("pre_ui"),
+                          "post_0": d0.get("post_ui"),
+                          "delta_0": d0.get("delta_ui"),
+                          "vault_1": vault1,
+                          "mint_1": mint1,
+                          "pre_1": d1.get("pre_ui"),
+                          "post_1": d1.get("post_ui"),
+                          "delta_1": d1.get("delta_ui"),
+                      })
+              eligible.sort(key=lambda row: (row["block_time"], row["slot"]))
+              if eligible:
+                  reference_chain_anchor = {
+                      "history_range_proven": history.get("range_proven"),
+                      "history_integrity_verified": history.get("integrity_verified"),
+                      "latest_pool_vault_mutation_before_target": eligible[-1],
+                      "eligible_pool_vault_mutation_count": len(eligible),
+                  }
+
           ref_rows = [
               row
               for row in catalog
@@ -117,6 +203,7 @@ jobs:
               "xdex_xnt_usdcx_history": xdex_history,
               "ninja_xnt_usdcx_ohlcv": ninja_reference,
               "current_reference_pool_rows": ref_rows,
+              "reference_chain_anchor_before_target": reference_chain_anchor,
               "current_target_pool_rows": target_pool_rows,
               "current_ninja_xnt_price_usd": xnt_price_usd,
               "diagnostic_exact_quote_volume_x_current_ninja_xnt_usd": current_mark_expected,
