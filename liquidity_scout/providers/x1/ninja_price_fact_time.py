@@ -175,7 +175,7 @@ def collect_ninja_price_fact_time_snapshot(
     )
     observed_at_start = clock()
 
-    pools, _ = pool_fetcher(sleep_seconds=0)
+    pools, provider_xnt_price_usd = pool_fetcher(sleep_seconds=0)
     by_address = {
         _row_address(row): row
         for row in pools
@@ -280,6 +280,7 @@ def collect_ninja_price_fact_time_snapshot(
             "before": before,
             "after": after,
         },
+        "provider_xnt_price_usd": provider_xnt_price_usd,
         "provider_timestamp_candidates": {
             "global_lastUpdated_raw": global_last_updated,
             "global_lastUpdated_semantics_verified": False,
