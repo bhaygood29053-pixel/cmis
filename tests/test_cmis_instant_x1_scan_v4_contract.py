@@ -10,7 +10,86 @@ from liquidity_scout.services.cmis_instant_x1_scan_v4 import (
     FRESHNESS_CONTRACT_VERSION,
     build_instant_x1_scan_v4_response,
 )
-from tests.test_cmis_instant_x1_scan_v3_contract import fixtures
+def envelope(service, *, status="partial", data=None, confidence=None, risk=None):
+    return {
+        "service": service,
+        "chain": "x1",
+        "status": status,
+        "asset": {"symbol": "XNT", "name": "XNT", "mint": "WrappedXNT"},
+        "data": dict(data or {}),
+        "risk": risk,
+        "confidence": dict(confidence or {}),
+        "sources": [{"source": "test", "role": service}],
+        "warnings": [],
+        "errors": [],
+        "observed_at": 1000.0,
+    }
+
+
+def fixtures():
+    identity = envelope(
+        "asset_lookup",
+        status="ok",
+        data={
+            "resolved_by": "native",
+            "match_quality": "native",
+            "identity_key": "native:xnt",
+        },
+        confidence={"complete": True},
+    )
+    market = envelope(
+        "market_report",
+        data={
+            "price_usd": 1.0,
+            "liquidity_usd": 100000.0,
+            "volume_24h_usd": 10000.0,
+            "transactions_24h": 500,
+            "completeness": {
+                "price": True,
+                "liquidity": True,
+                "volume_24h": True,
+                "transactions_24h": True,
+                "holders": False,
+            },
+        },
+        confidence={"core_market_complete": True},
+    )
+    tokenomics = envelope(
+        "tokenomics",
+        data={
+            "supply_verified": True,
+            "mint_authority_verified": True,
+            "freeze_authority_verified": True,
+        },
+    )
+    history = envelope(
+        "historical_compare",
+        data={
+            "mode": "all_available",
+            "coverage_scope": "cmis_stored_verified_observations",
+            "available_metric_count": 1,
+            "multi_point_metric_count": 1,
+            "full_supported_pair_lifetime_verified": True,
+            "continuous_pair_price_coverage_verified": True,
+            "provider_range_complete_verified": True,
+            "historical_quote_usd_equivalence_verified": False,
+            "full_usd_lifetime_verified": False,
+            "full_asset_lifetime_verified": False,
+            "continuous_coverage_verified": False,
+            "price_lifetime_coverage": {
+                "base_mint": "WrappedXNT",
+                "quote_mint": "USDCX",
+                "full_supported_pair_lifetime_verified": True,
+            },
+            "metrics": {"price": {"status": "ok"}},
+        },
+    )
+    risk = envelope(
+        "risk_check",
+        risk={"recommendation": "WARN", "flags": [], "reasons": []},
+    )
+    return identity, market, tokenomics, history, risk
+
 
 
 def _freshness_v2(*, price=True, liquidity=True, volume=True, transactions=True):
