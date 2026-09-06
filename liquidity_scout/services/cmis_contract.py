@@ -92,6 +92,28 @@ def _response_freshness(
     return result
 
 
+
+def project_response_freshness(
+    response: Mapping[str, Any],
+    freshness: Optional[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """Project explicit service freshness into an existing CMIS envelope.
+
+    This is used by additive service-version projections that enrich a response
+    after the original envelope was built. It preserves every existing response
+    field and replaces only the universal top-level freshness summary.
+    """
+    if not isinstance(response, Mapping):
+        raise ValueError("response must be a mapping")
+    result = dict(response)
+    service_name = str(result.get("service") or "cmis_gateway").strip() or "cmis_gateway"
+    result["freshness"] = _response_freshness(
+        service_name,
+        result.get("observed_at"),
+        freshness,
+    )
+    return result
+
 def ensure_response_freshness(
     response: Mapping[str, Any],
     *,
@@ -170,4 +192,5 @@ __all__ = [
     "UNAVAILABLE",
     "build_service_envelope",
     "ensure_response_freshness",
+    "project_response_freshness",
 ]
