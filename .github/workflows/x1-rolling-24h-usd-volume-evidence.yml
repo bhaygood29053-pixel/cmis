@@ -123,7 +123,8 @@ jobs:
                   end_epoch=TARGET_TIME,
                   max_signatures=5000,
               )
-              eligible = []
+              classified_newer_entries = 0
+              latest_mutation = None
               for entry in history.get("entries") or []:
                   bt = entry.get("block_time")
                   if (
@@ -148,7 +149,7 @@ jobs:
                   }
                   d0 = by_account.get(vault0)
                   d1 = by_account.get(vault1)
-                  if (
+                  exact_mutation = (
                       report.get("found") is True
                       and report.get("succeeded") is True
                       and report.get("xdex_amm_invoked") is True
@@ -156,8 +157,9 @@ jobs:
                       and isinstance(d1, dict)
                       and d0.get("mint") == mint0
                       and d1.get("mint") == mint1
-                  ):
-                      eligible.append({
+                  )
+                  if exact_mutation:
+                      latest_mutation = {
                           "signature": entry["signature"],
                           "slot": report.get("slot"),
                           "block_time": report.get("block_time"),
@@ -171,14 +173,15 @@ jobs:
                           "pre_1": d1.get("pre_ui"),
                           "post_1": d1.get("post_ui"),
                           "delta_1": d1.get("delta_ui"),
-                      })
-              eligible.sort(key=lambda row: (row["block_time"], row["slot"]))
-              if eligible:
+                      }
+                      break
+                  classified_newer_entries += 1
+              if latest_mutation is not None:
                   reference_chain_anchor = {
                       "history_range_proven": history.get("range_proven"),
                       "history_integrity_verified": history.get("integrity_verified"),
-                      "latest_pool_vault_mutation_before_target": eligible[-1],
-                      "eligible_pool_vault_mutation_count": len(eligible),
+                      "latest_pool_vault_mutation_before_target": latest_mutation,
+                      "newer_pool_address_entries_classified_without_exact_two_vault_mutation": classified_newer_entries,
                   }
 
           ref_rows = [
