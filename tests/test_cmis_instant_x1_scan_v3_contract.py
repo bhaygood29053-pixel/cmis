@@ -207,9 +207,18 @@ def test_v3_preserves_verified_native_xnt_distribution():
     )
 
     holder = v3["data"]["sections"]["holder_concentration"]
+    assert holder["holders"] is None
+    assert holder["holders_verified"] is False
     assert holder["holders_state"] == "not_applicable"
+    assert holder["holder_semantics"]["counted_entity"] == "native_xnt_account_address"
+    assert holder["holder_semantics"]["token_holder_count_applicable"] is False
+    assert holder["holder_semantics"]["beneficial_owner_identity_verified"] is False
+    assert holder["holder_semantics"]["person_or_wallet_group_count_verified"] is False
     assert holder["top_account_concentration"]["verified"] is True
     assert holder["top_account_concentration"]["value"] == 22.8
+    assert holder["top_account_concentration"]["counted_entity"] == "native_xnt_account_address"
+    assert holder["native_account_concentration"]["verified"] is True
+    assert holder["native_account_concentration"]["counted_entity"] == "native_xnt_account_address"
     assert (
         "holder_count_requires_existing_verified_holder_semantics"
         not in v3["data"]["limitations"]

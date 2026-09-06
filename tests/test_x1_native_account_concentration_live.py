@@ -48,6 +48,15 @@ class X1NativeAccountConcentrationLiveTests(unittest.TestCase):
             + json.dumps(summary, sort_keys=True)
         )
 
+        self.assertEqual(result["status"], "verified")
+        self.assertTrue(result["native_account_concentration_verified"])
+        self.assertTrue(result["cmis_promotable"])
+        self.assertTrue(result["slot_scope_verified"])
+        self.assertGreaterEqual(result["returned_largest_account_count"], 20)
+        top_20 = result["buckets"]["top_20"]["percent_of_circulating_xnt"]
+        self.assertIsInstance(top_20, (int, float))
+        self.assertGreaterEqual(top_20, 0)
+        self.assertLessEqual(top_20, 100)
         self.assertEqual(result["holder_count_state"], "not_applicable")
         self.assertFalse(result["beneficial_owner_identity_verified"])
         self.assertFalse(result["person_or_wallet_group_count_verified"])

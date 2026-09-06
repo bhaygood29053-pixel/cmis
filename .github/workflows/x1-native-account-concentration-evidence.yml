@@ -12,7 +12,7 @@ permissions:
 jobs:
   native-xnt-concentration:
     name: Finalized native XNT account concentration
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/x1-native-account-concentration')
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/526-native-xnt-distribution-gate-b' || startsWith(github.head_ref, 'feat/x1-native-account-concentration')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
