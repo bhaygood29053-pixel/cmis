@@ -150,6 +150,40 @@ class X1ScrollArchiveProviderTests(unittest.TestCase):
         self.assertNotIn(secret, str(ctx.exception))
         self.assertNotIn(provider.rpc_url, str(ctx.exception))
 
+
+    def test_rate_limit_retries_are_bounded_and_sanitized(self):
+        secret = "rate-limit-secret"
+        calls = []
+
+        class RateLimitedResponse:
+            status_code = 429
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"error": {"code": 429, "message": "rate limited"}}
+
+        def post(url, json, timeout):
+            calls.append((url, json, timeout))
+            return RateLimitedResponse()
+
+        provider = X1ScrollArchiveProvider(
+            api_key=secret,
+            retries=2,
+            post=post,
+            sleep=lambda _seconds: None,
+        )
+
+        with self.assertRaises(X1ScrollArchiveError) as ctx:
+            provider.get_transaction("SigA")
+
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn(secret, str(ctx.exception))
+        self.assertNotIn(provider.rpc_url, str(ctx.exception))
+        self.assertIn("X1ScrollArchiveError", str(ctx.exception))
+
+
     def test_transport_exception_cannot_echo_secret_bearing_rpc_url(self):
         secret = "transport-secret-key"
 
