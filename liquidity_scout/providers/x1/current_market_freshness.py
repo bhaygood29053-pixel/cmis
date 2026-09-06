@@ -21,6 +21,7 @@ from liquidity_scout.providers.x1.instant_scan_freshness_policy import (
 FIELDS = ("price_usd", "liquidity_usd", "volume_24h_usd", "transactions_24h")
 V1_CONTRACT = "x1_current_market_freshness/v1"
 V2_CONTRACT = "x1_current_market_freshness/v2"
+V3_CONTRACT = "x1_current_market_freshness/v3"
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
@@ -333,4 +334,149 @@ def evaluate_current_market_freshness_v2(
     return result
 
 
-__all__ = ["FIELDS", "V1_CONTRACT", "V2_CONTRACT", "evaluate_current_market_freshness", "evaluate_current_market_freshness_v2"]
+
+
+def evaluate_current_market_freshness_v3(
+    market_envelope: Mapping[str, Any],
+    provider_history_backfill: Mapping[str, Any],
+    *,
+    evaluated_at: Any,
+    policy: Mapping[str, Any],
+    chain_corroboration: Mapping[str, Any] | None = None,
+    liquidity_freshness_evidence: Mapping[str, Any] | None = None,
+    liquidity_freshness_evidence_v2: Mapping[str, Any] | None = None,
+    rolling_activity_evidence: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Extend v2 with explicit provider-nominal and independent-USD liquidity.
+
+    The legacy liquidity_usd field keeps the exact v2 meaning. The new fields
+    may be promoted only from x1_ninja_liquidity_freshness/v2 and do not imply
+    provider fact-time or source independence.
+    """
+
+    base = evaluate_current_market_freshness_v2(
+        market_envelope,
+        provider_history_backfill,
+        evaluated_at=evaluated_at,
+        policy=policy,
+        chain_corroboration=chain_corroboration,
+        liquidity_freshness_evidence=liquidity_freshness_evidence,
+        rolling_activity_evidence=rolling_activity_evidence,
+    )
+    fields = {
+        name: dict(row)
+        for name, row in _mapping(base.get("fields")).items()
+        if isinstance(row, Mapping)
+    }
+
+    split = _mapping(liquidity_freshness_evidence_v2)
+    split_contract_ok = bool(
+        split.get("contract_version") == "x1_ninja_liquidity_freshness/v2"
+        and split.get("execution_authorized") is False
+        and split.get("provider_fact_time_verified") is False
+        and split.get("source_independence_verified") is False
+    )
+
+    provider_nominal_verified = bool(
+        split_contract_ok
+        and split.get("provider_nominal_liquidity_freshness_verified") is True
+        and split.get("provider_market_matches_nominal_basis") is True
+        and split.get("provider_numerical_unit") == "USDC.X_nominal_quote_basis"
+    )
+    independent_usd_verified = bool(
+        split_contract_ok
+        and split.get("independent_liquidity_usd_freshness_verified") is True
+        and split.get("current_usdcx_usd_equivalence_verified") is True
+    )
+
+    fields["provider_nominal_liquidity"] = {
+        "freshness_verified": provider_nominal_verified,
+        "reason": (
+            "provider_nominal_liquidity_reproduced_from_fresh_chain_state"
+            if provider_nominal_verified
+            else "provider_nominal_liquidity_current_chain_proof_incomplete"
+        ),
+        "value": split.get("provider_nominal_liquidity_value"),
+        "unit": (
+            split.get("provider_numerical_unit")
+            if split_contract_ok
+            else None
+        ),
+        "provider_fact_time_verified": False,
+        "source_independence_verified": False,
+        "evidence_contract": split.get("contract_version"),
+    }
+    fields["independent_liquidity_usd"] = {
+        "freshness_verified": independent_usd_verified,
+        "reason": (
+            "independent_current_usd_liquidity_valued_from_fresh_chain_state"
+            if independent_usd_verified
+            else "independent_current_usd_liquidity_proof_incomplete"
+        ),
+        "value": split.get("independent_liquidity_usd_value"),
+        "unit": "USD" if independent_usd_verified else None,
+        "provider_fact_time_verified": False,
+        "source_independence_verified": False,
+        "evidence_contract": split.get("contract_version"),
+    }
+
+    verified_field_count = sum(
+        1 for row in fields.values() if row.get("freshness_verified") is True
+    )
+    total_field_count = len(fields)
+    state = (
+        "VERIFIED"
+        if verified_field_count == total_field_count
+        else ("PARTIAL" if verified_field_count > 0 else "NOT_VERIFIED")
+    )
+
+    limitations = list(base.get("limitations") or [])
+    if not provider_nominal_verified:
+        limitations.append(
+            "provider_nominal_liquidity_current_chain_proof_incomplete"
+        )
+    if not independent_usd_verified:
+        limitations.append(
+            "independent_current_usd_liquidity_proof_incomplete"
+        )
+    limitations.extend(
+        [
+            "provider_nominal_liquidity_is_not_independent_external_usd",
+            "legacy_liquidity_usd_freshness_semantics_preserved_from_v2",
+        ]
+    )
+
+    result = dict(base)
+    result.update(
+        {
+            "contract_version": V3_CONTRACT,
+            "fields": fields,
+            "verified_field_count": verified_field_count,
+            "total_field_count": total_field_count,
+            "freshness_state": state,
+            "current_market_freshness_verified": (
+                verified_field_count == total_field_count
+            ),
+            "liquidity_freshness_evidence_v2": dict(split),
+            "provider_nominal_liquidity_freshness_verified": (
+                provider_nominal_verified
+            ),
+            "independent_liquidity_usd_freshness_verified": (
+                independent_usd_verified
+            ),
+            "limitations": list(dict.fromkeys(limitations)),
+            "execution_authorized": False,
+        }
+    )
+    return result
+
+
+__all__ = [
+    "FIELDS",
+    "V1_CONTRACT",
+    "V2_CONTRACT",
+    "V3_CONTRACT",
+    "evaluate_current_market_freshness",
+    "evaluate_current_market_freshness_v2",
+    "evaluate_current_market_freshness_v3",
+]
