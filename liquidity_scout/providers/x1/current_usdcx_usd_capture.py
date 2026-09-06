@@ -96,9 +96,10 @@ def capture_current_usdcx_usd_equivalence_evidence(
     if USDC_MINT != SOLANA_USDC_MINT:
         raise ValueError("Pyth USDC mint identity mismatch")
 
+    config_response = official_config_fetcher()
     collected_at = float(clock())
     route = build_warp_config_route_observation(
-        config_response=official_config_fetcher(),
+        config_response=config_response,
         route_id=WARP_USDC_ROUTE_ID,
         source=_endpoint("solana", SOLANA_USDC_MINT),
         destination=_endpoint("x1", X1_USDC_X_MINT),
