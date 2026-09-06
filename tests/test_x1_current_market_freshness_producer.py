@@ -52,6 +52,18 @@ def liquidity(*, execution=False):
     }
 
 
+def liquidity_v2(*, nominal=True, independent=True, execution=False):
+    return {
+        "contract_version": "x1_ninja_liquidity_freshness/v2",
+        "chain": "x1",
+        "provider_nominal_liquidity_freshness_verified": nominal,
+        "independent_liquidity_usd_freshness_verified": independent,
+        "provider_fact_time_verified": False,
+        "source_independence_verified": False,
+        "execution_authorized": execution,
+    }
+
+
 def rolling(*, volume=True, transactions=True):
     return {
         "contract_version": "x1_rolling_24h_market_activity/v1",
@@ -82,6 +94,7 @@ def common_kwargs():
         "snapshot_collector": lambda **_kwargs: {"pools": []},
         "current_usdcx_capturer": lambda: {"equivalence": {}},
         "liquidity_evaluator": lambda **_kwargs: liquidity(),
+        "liquidity_v2_evaluator": lambda **_kwargs: liquidity_v2(),
         "identity_capturer": identity,
     }
 
@@ -106,6 +119,8 @@ def test_full_liquidity_and_zero_rolling_success_skips_historical_context():
 
     assert result["schema"] == SCHEMA
     assert result["liquidity_freshness_verified"] is True
+    assert result["provider_nominal_liquidity_freshness_verified"] is True
+    assert result["independent_liquidity_usd_freshness_verified"] is True
     assert result["volume_24h_freshness_verified"] is True
     assert result["transactions_24h_freshness_verified"] is True
     assert calls["context"] == 0
@@ -191,6 +206,36 @@ def test_historical_usd_failure_preserves_transaction_freshness():
     )
 
 
+def test_legacy_liquidity_can_fail_while_v2_split_fields_pass():
+    kwargs = common_kwargs()
+    kwargs["liquidity_evaluator"] = lambda **_kwargs: {
+        **liquidity(),
+        "liquidity_freshness_verified": False,
+    }
+    seen = {}
+
+    def v2(**kwargs):
+        seen["legacy"] = kwargs.get("legacy_v1_evidence")
+        return liquidity_v2(nominal=True, independent=True)
+
+    kwargs["liquidity_v2_evaluator"] = v2
+
+    result = produce_x1_current_market_freshness_evidence(
+        market(),
+        **kwargs,
+        window_reconstructor=lambda **_kwargs: {"transactions": []},
+        rolling_evaluator=lambda **_kwargs: rolling(volume=True, transactions=True),
+    )
+
+    assert seen["legacy"]["liquidity_freshness_verified"] is False
+    assert result["liquidity_freshness_verified"] is False
+    assert result["provider_nominal_liquidity_freshness_verified"] is True
+    assert result["independent_liquidity_usd_freshness_verified"] is True
+    assert "liquidity_freshness_unverified" in result["failures"]
+    assert "liquidity_v2_freshness_partial_or_unverified" not in result["failures"]
+    assert result["execution_authorized"] is False
+
+
 def test_exact_scope_failure_stops_before_expensive_proof():
     kwargs = common_kwargs()
     kwargs["scope_evaluator"] = lambda **_kwargs: scope(False)
@@ -205,6 +250,7 @@ def test_exact_scope_failure_stops_before_expensive_proof():
     )
 
     assert result["liquidity_freshness_evidence"] is None
+    assert result["liquidity_freshness_evidence_v2"] is None
     assert result["rolling_activity_evidence"] is None
     assert "provider_scoped_pool_universe_unverified" in result["failures"]
 
