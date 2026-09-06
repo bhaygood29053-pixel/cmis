@@ -913,3 +913,25 @@ The promotion must not convert bounded zero wSOL.X activity into a global X1
 DEX claim, bridge flow into adoption, liquidity into volume, descriptive ratios
 into causality, or any result into an automatic risk conclusion. ROBERTA #314
 remains blocked until the paired public/protected #482 gate is accepted.
+
+## Regulatory Evidence — Issue #536
+
+**ACTIVE FOUNDATION / NON-PROMOTED.** Issue #536 introduces `regulatory_evidence/v1` as a deterministic, read-only regulatory evidence contract beginning with the U.S. GENIUS Act and USDC / USDC.X identity fixtures.
+
+The foundation separates statutory identity/status, authoritative-source provenance, effective-date semantics, current asset/issuer evidence, and native-versus-bridged dependencies. It intentionally does **not** emit COMPLIANT/NON_COMPLIANT conclusions.
+
+Current branch state:
+
+- deterministic v1 validator added;
+- GovInfo-backed GENIUS Act source identity recorded;
+- statutory earlier-of effective-date rule represented;
+- USDC and USDC.X fixtures added;
+- bridged USDC.X preserves bridge/custody dependency;
+- fail-closed tests added for compliance overreach, source-authority drift, legal-status drift, and erased bridge dependency;
+- `read_only=true`;
+- `public_service_promoted=false`;
+- `scout_reliance_promoted=false`;
+- `compliance_conclusion_authorized=false`;
+- `execution_authorized=false`.
+
+A later gate must add accepted runtime source ingestion, freshness policy, capability-manifest promotion, and Scout reliance before ROBERTA can treat this as current callable regulatory evidence.
