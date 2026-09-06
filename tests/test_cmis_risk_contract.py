@@ -99,6 +99,7 @@ class CMISRiskContractTests(unittest.TestCase):
                 "confidence",
                 "sources",
                 "observed_at",
+                "freshness",
                 "warnings",
                 "errors",
             ],
@@ -108,6 +109,10 @@ class CMISRiskContractTests(unittest.TestCase):
         self.assertEqual(response["status"], OK)
         self.assertEqual(response["data"], {})
         self.assertIsNone(response["risk"])
+        self.assertEqual(response["freshness"]["contract_version"], "cmis_response_freshness/v1")
+        self.assertEqual(response["freshness"]["state"], "UNKNOWN")
+        self.assertIsNone(response["freshness"]["freshness_verified"])
+        self.assertEqual(response["freshness"]["reason"], "service_specific_freshness_not_supplied")
         self.assertEqual(response["warnings"], [])
         self.assertEqual(response["errors"], [])
 
@@ -170,6 +175,10 @@ class CMISRiskContractTests(unittest.TestCase):
         self.assertIn("transactions_24h_freshness_unverified", codes)
         self.assertNotIn("price_freshness_unverified", codes)
         self.assertEqual(response["confidence"]["total_checks"], 12)
+        self.assertEqual(response["freshness"]["contract_version"], "cmis_response_freshness/v1")
+        self.assertEqual(response["freshness"]["state"], "PARTIAL")
+        self.assertFalse(response["freshness"]["freshness_verified"])
+        self.assertEqual(response["freshness"]["details"]["freshness_state"], "PARTIAL")
 
     def test_fully_verified_block_is_still_successful_service_response(self):
         response = build_risk_check_response(
