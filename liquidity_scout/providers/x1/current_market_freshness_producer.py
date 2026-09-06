@@ -414,21 +414,29 @@ def produce_x1_current_market_freshness_evidence(
 
         windows = unvalued_windows
         if swap_times:
-            context = historical_context_builder(
-                oldest_fact_time=min(swap_times),
-                clock=clock,
-            )
-            usd_resolver = historical_resolver_builder(context)
-            windows = [
-                window_reconstructor(
-                    pool_identity=identities[address],
-                    start_epoch=start_epoch,
-                    end_epoch=end_epoch,
-                    max_signatures=max_signatures,
-                    usd_quote_resolver=usd_resolver,
+            try:
+                context = historical_context_builder(
+                    oldest_fact_time=min(swap_times),
+                    clock=clock,
                 )
-                for address in addresses
-            ]
+                usd_resolver = historical_resolver_builder(context)
+                windows = [
+                    window_reconstructor(
+                        pool_identity=identities[address],
+                        start_epoch=start_epoch,
+                        end_epoch=end_epoch,
+                        max_signatures=max_signatures,
+                        usd_quote_resolver=usd_resolver,
+                    )
+                    for address in addresses
+                ]
+            except Exception as exc:
+                # Keep the exact unvalued windows so transaction-count freshness
+                # can still be independently evaluated. Only USD volume remains
+                # fail-closed.
+                result["failures"].append(
+                    f"historical_usd_production_failed:{type(exc).__name__}:{exc}"
+                )
 
         rolling = rolling_evaluator(
             market_envelope=market,
