@@ -26,6 +26,9 @@ from liquidity_scout.providers.x1.liquidity_freshness import (
     evaluate_x1_ninja_current_pool_scope,
     evaluate_x1_ninja_liquidity_freshness,
 )
+from liquidity_scout.providers.x1.liquidity_freshness_v2 import (
+    evaluate_x1_ninja_liquidity_freshness_v2,
+)
 from liquidity_scout.providers.x1.market import fetch_all_pools
 from liquidity_scout.providers.x1.ninja_price_fact_time import (
     collect_ninja_price_fact_time_snapshot,
@@ -292,6 +295,9 @@ def produce_x1_current_market_freshness_evidence(
     liquidity_evaluator: Callable[..., Mapping[str, Any]] = (
         evaluate_x1_ninja_liquidity_freshness
     ),
+    liquidity_v2_evaluator: Callable[..., Mapping[str, Any]] = (
+        evaluate_x1_ninja_liquidity_freshness_v2
+    ),
     identity_capturer: Callable[..., Mapping[str, Any]] = (
         capture_x1_current_pool_identity
     ),
@@ -330,6 +336,7 @@ def produce_x1_current_market_freshness_evidence(
         "asset_mint": mint,
         "started_at": started_at,
         "liquidity_freshness_evidence": None,
+        "liquidity_freshness_evidence_v2": None,
         "rolling_activity_evidence": None,
         "failures": [],
         "provider_fact_time_verified": False,
@@ -374,6 +381,30 @@ def produce_x1_current_market_freshness_evidence(
         result["liquidity_freshness_evidence"] = liquidity
         if liquidity.get("liquidity_freshness_verified") is not True:
             result["failures"].append("liquidity_freshness_unverified")
+
+        liquidity_v2 = liquidity_v2_evaluator(
+            market_envelope=market,
+            snapshot=snapshot,
+            current_usdcx_usd_equivalence=equivalence,
+            pool_scope_evidence=scope,
+            evaluated_at=float(clock()),
+            max_pools=150,
+            legacy_v1_evidence=liquidity,
+        )
+        if liquidity_v2.get("execution_authorized") is not False:
+            raise ValueError("liquidity v2 evidence attempted execution authority")
+        result["liquidity_freshness_evidence_v2"] = liquidity_v2
+        if not (
+            liquidity_v2.get(
+                "provider_nominal_liquidity_freshness_verified"
+            )
+            is True
+            and liquidity_v2.get(
+                "independent_liquidity_usd_freshness_verified"
+            )
+            is True
+        ):
+            result["failures"].append("liquidity_v2_freshness_partial_or_unverified")
     except Exception as exc:
         result["failures"].append(
             f"liquidity_production_failed:{type(exc).__name__}:{exc}"
@@ -463,6 +494,13 @@ def produce_x1_current_market_freshness_evidence(
             "liquidity_freshness_verified"
         )
         is True
+    )
+    liquidity_v2 = _mapping(result.get("liquidity_freshness_evidence_v2"))
+    result["provider_nominal_liquidity_freshness_verified"] = bool(
+        liquidity_v2.get("provider_nominal_liquidity_freshness_verified") is True
+    )
+    result["independent_liquidity_usd_freshness_verified"] = bool(
+        liquidity_v2.get("independent_liquidity_usd_freshness_verified") is True
     )
     rolling = _mapping(result.get("rolling_activity_evidence"))
     result["volume_24h_freshness_verified"] = bool(
