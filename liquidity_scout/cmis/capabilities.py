@@ -22,6 +22,10 @@ from liquidity_scout.services.cmis_trade_price_impact_intelligence import (
     CONTRACT_VERSION as TRADE_PRICE_IMPACT_CONTRACT_VERSION,
     SERVICE as TRADE_PRICE_IMPACT_SERVICE,
 )
+from liquidity_scout.services.cmis_large_trade_discovery import (
+    CONTRACT_VERSION as LARGE_TRADE_DISCOVERY_CONTRACT_VERSION,
+    SERVICE as LARGE_TRADE_DISCOVERY_SERVICE,
+)
 from liquidity_scout.services.cmis_cross_chain_provenance_public import (
     CONTRACT_VERSION as CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION,
     SERVICE as CROSS_CHAIN_PROVENANCE_SERVICE,
@@ -51,7 +55,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.24.0"
+CMIS_CONTRACT_VERSION = "1.25.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -74,6 +78,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "trade_verification",
     "verified_asset_activity",
     "trade_price_impact_intelligence",
+    "large_trade_discovery",
     "instant_x1_scan",
     "verification_evidence",
     "concentration_change_intelligence",
@@ -162,6 +167,60 @@ def _trade_price_impact_capability(*, available: bool) -> dict[str, Any]:
             "one_pool_is_not_every_x1_market_or_dex",
             "routed_or_multi_amm_transactions_fail_closed",
             "same_slot_next_trade_ordering_is_unavailable",
+            "source_independence_unverified_unless_separately_proven",
+            "no_automatic_risk_conclusion",
+            "no_trade_recommendation",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "execution_authorized": False,
+    }
+
+
+def _large_trade_discovery_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": LARGE_TRADE_DISCOVERY_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": [
+                "large_trade_discovery_not_available_for_chain"
+            ],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": False,
+        "service_contract_version": LARGE_TRADE_DISCOVERY_CONTRACT_VERSION,
+        "requirements": [
+            "exact_x1_asset_mint_identity",
+            "verified_provider_scoped_current_market_pool_set",
+            "aligned_complete_exact_pool_24h_windows",
+            "all_exact_pool_swaps_classified",
+            "verified_historical_usd_value_for_every_ranked_swap",
+            "deterministic_buy_sell_from_exact_vault_delta_signs",
+            "deterministic_verified_usd_notional_ranking",
+            "optional_verified_public_wallet_attribution",
+            "optional_trusted_trade_price_impact_evidence_handoff",
+        ],
+        "limitations": [
+            "provider_scoped_pool_universe_is_not_every_x1_dex",
+            "global_xdex_pool_universe_not_verified",
+            "global_x1_dex_trade_ranking_not_authorized",
+            "wallet_address_is_not_real_world_identity",
+            "large_wallet_is_not_whale_insider_owner_or_manipulator",
+            "missing_wallet_attribution_remains_unknown",
+            "intent_not_inferred",
+            "coordinated_wallet_activity_not_inferred",
+            "one_ranked_trade_is_not_whole_market_price_impact",
+            "volume_contribution_is_not_volume_causality",
             "source_independence_unverified_unless_separately_proven",
             "no_automatic_risk_conclusion",
             "no_trade_recommendation",
@@ -575,6 +634,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         TRADE_PRICE_IMPACT_SERVICE: _trade_price_impact_capability(
             available=True
         ),
+        LARGE_TRADE_DISCOVERY_SERVICE: _large_trade_discovery_capability(
+            available=True
+        ),
         "verification_evidence": _capability(
             "bounded",
             requirements=("exact_evidence_id_or_fact_type_subject_id",),
@@ -680,6 +742,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             limitations=("solana_verified_asset_activity_not_implemented",),
         ),
         TRADE_PRICE_IMPACT_SERVICE: _trade_price_impact_capability(
+            available=False
+        ),
+        LARGE_TRADE_DISCOVERY_SERVICE: _large_trade_discovery_capability(
             available=False
         ),
         "verification_evidence": _capability(

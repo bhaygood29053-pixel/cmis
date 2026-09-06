@@ -121,6 +121,11 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_cmis_trade_price_impact_intelligence.py
 
+      - name: Test verified large-trade discovery v1
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_cmis_large_trade_discovery.py
+
       - name: Validate Phase 6 public boundary
         shell: bash
         run: |
@@ -158,6 +163,7 @@ jobs:
               "trade_verification",
               "verified_asset_activity",
               "trade_price_impact_intelligence",
+              "large_trade_discovery",
               "instant_x1_scan",
               "verification_evidence",
               "concentration_change_intelligence",
@@ -193,7 +199,7 @@ jobs:
           print("EXECUTION_AUTHORIZED=FALSE")
           PY
 
-      - name: Validate CMIS 1.24 capability and Instant X1 Scan v6 history contract
+      - name: Validate CMIS 1.25 capability and Instant X1 Scan v6 history contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -208,7 +214,7 @@ jobs:
           policy = Path("liquidity_scout/providers/x1/instant_scan_freshness_policy.json").read_text()
           historical = Path("liquidity_scout/services/cmis_historical.py").read_text()
 
-          assert 'CMIS_CONTRACT_VERSION = "1.24.0"' in capabilities
+          assert 'CMIS_CONTRACT_VERSION = "1.25.0"' in capabilities
           assert '"service_contract_version": "instant_x1_scan/v6"' in capabilities
           assert '"concentration_warning_intelligence"' in capabilities
           assert 'CONCENTRATION_WARNING_CONTRACT_VERSION' in capabilities
@@ -249,7 +255,7 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_cmis_current_market_freshness_v117.py
 
-      - name: Validate CMIS 1.24 regression expectations
+      - name: Validate CMIS 1.25 regression expectations
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -257,12 +263,14 @@ jobs:
           capabilities_test = Path("tests/test_cmis_capabilities.py").read_text()
           http_test = Path("tests/test_cmis_http_gateway.py").read_text()
 
-          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.24.0")' in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.25.0")' in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.24.0")' not in capabilities_test
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.23.0")' not in capabilities_test
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.22.0")' not in capabilities_test
-          assert 'response["contract_version"], "1.24.0"' in http_test
+          assert 'response["contract_version"], "1.25.0"' in http_test
+          assert 'response["contract_version"], "1.24.0"' not in http_test
           assert 'response["contract_version"], "1.22.0"' not in http_test
-          print("CMIS_123_REGRESSION_EXPECTATIONS=PASS")
+          print("CMIS_125_REGRESSION_EXPECTATIONS=PASS")
           PY
 
       - name: Test concentration warning intelligence v1
