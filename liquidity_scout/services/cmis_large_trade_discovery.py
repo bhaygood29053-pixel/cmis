@@ -565,7 +565,7 @@ def build_large_trade_discovery_response(
             }
         )
 
-    return build_service_envelope(
+    response = build_service_envelope(
         SERVICE,
         SUPPORTED_CHAIN,
         OK,
@@ -643,6 +643,8 @@ def build_large_trade_discovery_response(
         ],
         errors=[],
     )
+    response["execution_authorized"] = False
+    return response
 
 
 __all__ = [
