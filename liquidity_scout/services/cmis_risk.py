@@ -200,6 +200,7 @@ def build_risk_check_response(
         confidence=risk_result.get("confidence"),
         sources=_sources(market_report, tokenomics_report, historical_report),
         observed_at=observed_at,
+        freshness=(freshness_report if isinstance(freshness_report, Mapping) else None),
         warnings=_warnings(risk_result, tokenomics_report),
         errors=[],
     )
