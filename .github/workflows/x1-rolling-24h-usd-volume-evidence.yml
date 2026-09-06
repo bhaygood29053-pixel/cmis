@@ -241,12 +241,29 @@ jobs:
           REFERENCE_POOL = "CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR"
           snapshots = []
 
+          def unwrap_pool(body):
+              if not isinstance(body, dict):
+                  return None
+              if any(
+                  key in body
+                  for key in ("priceUsd", "volume24h", "txns24h", "lastSyncedAt")
+              ):
+                  return body
+              for name in ("data", "pool", "result"):
+                  value = body.get(name)
+                  if isinstance(value, dict) and any(
+                      key in value
+                      for key in ("priceUsd", "volume24h", "txns24h", "lastSyncedAt")
+                  ):
+                      return value
+              return None
+
           for index in range(8):
               target_probe = fetch_pool_detail_raw(TARGET_POOL)
               reference_probe = fetch_pool_detail_raw(REFERENCE_POOL)
               trades = fetch_pool_trades_raw(TARGET_POOL)
-              target = target_probe.get("raw_response")
-              reference = reference_probe.get("raw_response")
+              target = unwrap_pool(target_probe.get("raw_response"))
+              reference = unwrap_pool(reference_probe.get("raw_response"))
               trade = next(
                   (
                       row
