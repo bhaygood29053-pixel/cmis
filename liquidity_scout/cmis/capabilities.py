@@ -47,7 +47,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.22.0"
+CMIS_CONTRACT_VERSION = "1.23.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -432,21 +432,26 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
                     "x1_current_market_freshness_v3",
                     "exact_rolling_24h_chain_window_evidence_when_promoted",
                     "deterministic_risk_core",
+                    "instant_x1_scan_history_adequacy_v1",
+                    "native_xnt_supported_pair_price_lifetime_when_history_completion_promoted",
                 ),
                 limitations=(
-                    "holder_count_may_remain_unverified",
-                    "current_top_account_concentration_not_promoted_in_v5",
+                    "holder_count_may_remain_unverified_for_non_native_assets",
+                    "native_xnt_distribution_uses_native_account_addresses_not_holders",
                     "provider_price_backfill_is_price_only",
                     "provider_source_independence_not_verified",
-                    "provider_archive_completeness_not_verified",
+                    "source_independence_is_stronger_optional_corroboration_for_scan_completion",
+                    "global_provider_archive_completeness_not_required_for_scan_completion",
                     "current_market_freshness_is_field_scoped",
                     "price_freshness_uses_timestamped_provider_backfill",
                     "rolling_volume_and_transaction_freshness_require_exact_chain_window_evidence",
                     "provider_fact_time_not_promoted_by_chain_reconstruction",
                     "source_independence_separate_from_freshness",
                     "collection_time_is_not_provider_fact_time",
-                    "history_does_not_imply_complete_asset_lifetime",
-                    "continuous_coverage_requires_separate_archive_completeness_proof",
+                    "history_completion_is_exact_supported_pair_price_lifetime_only",
+                    "full_usd_lifetime_not_required_for_supported_pair_scan_completion",
+                    "non_price_metric_lifetimes_not_required_for_scan_completion",
+                    "same_fact_provider_close_corroboration_does_not_prove_source_independence",
                     "proof_score_separate_from_risk",
                     "risk_score_unavailable_until_calibrated",
                     "execution_authorized_false",
@@ -455,7 +460,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             ),
             "read_only": True,
             "composition_only": True,
-            "service_contract_version": "instant_x1_scan/v5",
+            "service_contract_version": "instant_x1_scan/v6",
             "public_service_promoted": True,
             "scout_reliance_promoted": True,
             "execution_authorized": False,
