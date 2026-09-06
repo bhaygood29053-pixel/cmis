@@ -38,6 +38,7 @@ jobs:
           python -m pytest -q \
             tests/test_x1_warp_message_interval_retention.py \
             tests/test_x1_trade_time_usd_valuation.py \
+            tests/test_x1_ninja_rolling_volume_snapshot_semantics.py \
             tests/test_x1_rolling_24h_market_activity.py
 
   issue504-live:
