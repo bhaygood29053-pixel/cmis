@@ -1,92 +1,49 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-06**.
+Current reconciliation: **2026-09-06 12:00 America/New_York**.
 
-Read in this order:
+## Accepted platform
 
-1. `../ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md` — mirrored four-repository status/authority baseline.
-2. `CMIS_PRODUCT_ROADMAP.md` — authoritative living CMIS roadmap.
-3. `CHECKPOINT_2026-09-05_FOUR_REPOS.md` — four-repository checkpoint.
-4. Earlier dated reconciliation/status files — historical snapshots only.
+- current capability contract: `1.26.0`;
+- current flagship scan: `instant_x1_scan/v6`;
+- Burn, Discovery, WHAT CHANGED? upstream facts, history, identity, deterministic risk, pre-trade analysis, concentration intelligence, and field-scoped freshness remain accepted under their established contracts;
+- Bridge-to-XDEX utilization and cross-chain provenance are promoted for X1 Scout reliance;
+- `trade_price_impact_intelligence/v1` is accepted through CMIS #498 / PR #530 + protected `cmis-core` #33;
+- `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
+- GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
+- CMIS Web Discovery v1-v11 remains accepted as bounded discovery below the verification boundary.
 
-## Accepted CMIS platform
+## Active acceptance gate
 
-- capability contract `1.21.0`;
-- Instant X1 Scan v4 accepted, preserving v3 compatibility;
-- Burn Intelligence;
-- Discovery Intelligence;
-- field-scoped current-market freshness;
-- pull-only Concentration Warning Intelligence;
-- #409 Bridge Supply + current/prior 24h/7d/30d Flow Intelligence;
-- #410 Bridge-to-XDEX Utilization Intelligence;
-- internal CMIS Web Discovery v1-v5 through PR #481.
+### Protected cmis-core #41 — live Large-Trade → #498 handoff
 
-## Active flagship gates
+The deterministic protected suite is green, but the exact dedicated live workflow is still running.
 
-### #507 — Instant X1 Scan v4 rolling-freshness promotion: COMPLETE
+Acceptance requires a real live result to prove:
 
-#502 / #504 are complete; public PR #508 and protected `cmis-core` PR #26
-are merged. CMIS 1.21 now exposes `instant_x1_scan/v4` over exact
-`x1_current_market_freshness/v2`, while v3 remains backward compatible.
+`Large-Trade ranking -> returned result -> protected materializer -> exact wallet/direction/execution evidence -> public #498 composition -> stored tpi evidence -> rebuilt ready handoff -> same evidence resolves through #498`.
 
-Accepted rolling 24h volume/transaction freshness may flow into Instant X1
-Scan only when runtime-owned evidence satisfies the exact field contracts.
-Caller-supplied freshness proof is rejected. Missing runtime evidence remains
-fail-closed. Provider fact-time and source independence remain separate.
+Until that exact live run passes, **PR #41 must not be merged** and the deterministic CI pass must not be treated as equivalent evidence.
 
-#444 remains open for live evidence generation/refresh plus Gate B
-holder/concentration and Gate C historical completeness/source independence.
+## Regulatory state
 
+CMIS owns the current freshness-aware regulatory evidence service. It preserves primary-law/regulator provenance, rulemaking state, jurisdiction/framework scope, exact X1 asset identity, and evidence freshness.
 
-### #482 — cross-chain public-service / Scout promotion
+It does **not** authorize:
 
-#410 evidence is complete. PR #469 is merged.
+- legal advice;
+- COMPLIANT / NON_COMPLIANT labels;
+- automatic token/issuer risk conclusions;
+- execution.
 
-The next exact cross-chain task is **Issue #482**:
+ROBERTA adoption remains a separate upstream consumer gate.
 
-- promote `bridge_to_xdex_utilization/v1` through the public CMIS contract;
-- preserve exact route/mint/program-family/value-basis/24h coverage evidence;
-- fail closed on stale/missing/mismatched evidence;
-- then authorize X1 Scout reliance without recomputation.
+## Website / ROBERTA dependency
 
-ROBERTA #314 is blocked only on this promotion gate.
-
-### #461 — X1.Ninja USD liquidity
-
-Accepted prerequisites:
-
-- PR #465 fact-time / five-pool repeated-revaluation foundation;
-- PR #466 current Warp USDC reserve backing for USDC.X;
-- PR #468 current USDC.X/USD equivalence.
-
-Active:
-
-- PR #470 final five-pool X1.Ninja USD-liquidity semantic proof.
-- Its current deterministic suite is green and the repeated-revaluation live workflow is still in progress.
-- #459 remains the later liquidity/rolling-24h freshness promotion gate.
-
-Until #470 merges, `x1_ninja_liquidity_usd_semantics_verified` remains unpromoted.
-
-## Web Discovery
-
-CMIS Web Discovery v1-v5 is complete internally through PR #481; Issue #483 is the active v6 XDEX network-gap registry. Issue #483 is the active v6 XDEX network-gap registry.
-
-Current discovery stack includes:
-
-- six-source bounded discovery;
-- X1 Explorer structured discovery;
-- sanitized X1 Explorer network observation;
-- operator-controlled passive X1 Explorer browser capture;
-- structured XDEX endpoint discovery with handoff to existing XDEX verification contracts.
-
-Every result remains `DISCOVERED`; no Web Discovery layer creates verified market truth, source independence, risk, public-service promotion, Scout reliance, or execution authority by itself.
+The ROBERTA public website already exposes the current human-facing token, comparison, risk, trade, wallet, history, burn, and generic-question experience. Live regulatory evidence is not yet advertised as an end-to-end website service because ROBERTA public #368 and protected `roberta-core` #68 remain the adoption boundary.
 
 ## Parallel work
 
-- #444 Instant X1 Scan evidence completion.
-- #459 field-scoped freshness expansion.
-- #363 delayed-vault/X1.Ninja research.
-- #458 X1Scroll qualification/fallback research.
-- #498 verified trade attribution + pool price-impact intelligence: planned read-only X1 capability for wallet/transaction/timestamp, trade size, volume contribution, pre/execution/post pool prices, and next-trade price. Pool-local AMM state transition may be proven; broader market causality, wallet identity/intent/manipulation, risk, recommendation, and execution remain unauthorized.
+Provider-gap research, X1Scroll fallback qualification, delayed-departure research, Theo transport work, and historical provider investigations remain parallel unless a separately accepted roadmap gate promotes them.
 
 `execution_authorized=false`
