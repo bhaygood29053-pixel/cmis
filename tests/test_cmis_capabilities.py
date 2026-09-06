@@ -56,7 +56,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.21.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.22.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -162,7 +162,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertTrue(x1["scout_reliance_promoted"])
         self.assertEqual(
             x1["service_contract_version"],
-            "instant_x1_scan/v4",
+            "instant_x1_scan/v5",
         )
         self.assertIn(
             "current_top_account_concentration_not_promoted_in_v4",

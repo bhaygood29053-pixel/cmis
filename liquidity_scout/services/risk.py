@@ -19,9 +19,11 @@ BLOCK = "BLOCK"
 _STATUS_ORDER = {PASS: 0, WARN: 1, BLOCK: 2}
 CURRENT_MARKET_FRESHNESS_CONTRACT = "x1_current_market_freshness/v1"
 CURRENT_MARKET_FRESHNESS_V2_CONTRACT = "x1_current_market_freshness/v2"
+CURRENT_MARKET_FRESHNESS_V3_CONTRACT = "x1_current_market_freshness/v3"
 ACCEPTED_CURRENT_MARKET_FRESHNESS_CONTRACTS = frozenset({
     CURRENT_MARKET_FRESHNESS_CONTRACT,
     CURRENT_MARKET_FRESHNESS_V2_CONTRACT,
+    CURRENT_MARKET_FRESHNESS_V3_CONTRACT,
 })
 _RISK_FRESHNESS_FIELDS = (
     ("price_usd", "price_freshness_unverified", "Current price freshness is not verified."),

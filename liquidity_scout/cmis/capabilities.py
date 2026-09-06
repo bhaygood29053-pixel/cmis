@@ -47,7 +47,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.21.0"
+CMIS_CONTRACT_VERSION = "1.22.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -429,13 +429,13 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
                     "cmis_verified_history",
                     "bounded_verified_provider_price_backfill",
                     "field_scoped_current_market_freshness",
-                    "x1_current_market_freshness_v2",
+                    "x1_current_market_freshness_v3",
                     "exact_rolling_24h_chain_window_evidence_when_promoted",
                     "deterministic_risk_core",
                 ),
                 limitations=(
                     "holder_count_may_remain_unverified",
-                    "current_top_account_concentration_not_promoted_in_v4",
+                    "current_top_account_concentration_not_promoted_in_v5",
                     "provider_price_backfill_is_price_only",
                     "provider_source_independence_not_verified",
                     "provider_archive_completeness_not_verified",
@@ -455,7 +455,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             ),
             "read_only": True,
             "composition_only": True,
-            "service_contract_version": "instant_x1_scan/v4",
+            "service_contract_version": "instant_x1_scan/v5",
             "public_service_promoted": True,
             "scout_reliance_promoted": True,
             "execution_authorized": False,

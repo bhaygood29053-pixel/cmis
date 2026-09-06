@@ -1,5 +1,6 @@
 from liquidity_scout.services.risk import (
     CURRENT_MARKET_FRESHNESS_V2_CONTRACT,
+    CURRENT_MARKET_FRESHNESS_V3_CONTRACT,
     build_risk_check,
 )
 
@@ -55,3 +56,24 @@ def test_risk_rejects_unknown_freshness_contract():
         assert "accepted X1 current-market freshness contract" in str(exc)
     else:
         raise AssertionError("unknown freshness contract must fail closed")
+
+
+def test_risk_accepts_v3_without_promoting_new_liquidity_fields_into_legacy_risk():
+    report = _freshness()
+    report["contract_version"] = CURRENT_MARKET_FRESHNESS_V3_CONTRACT
+    report["total_field_count"] = 6
+    report["verified_field_count"] = 4
+    report["fields"]["liquidity_usd"]["freshness_verified"] = False
+    report["fields"]["provider_nominal_liquidity"] = {
+        "freshness_verified": True,
+        "unit": "USDC.X_nominal_quote_basis",
+    }
+    report["fields"]["independent_liquidity_usd"] = {
+        "freshness_verified": True,
+        "unit": "USD",
+    }
+
+    result = build_risk_check(_market(), freshness_report=report)
+    freshness = result["components"]["freshness"]
+    assert freshness["evidence"]["contract_version"] == CURRENT_MARKET_FRESHNESS_V3_CONTRACT
+    assert "liquidity_freshness_unverified" in freshness["flags"]
