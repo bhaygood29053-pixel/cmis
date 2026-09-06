@@ -87,6 +87,9 @@ class CMISHTTPGatewayTests(unittest.TestCase):
         self.assertEqual(response["chain"], "x1")
         self.assertEqual(response["data"]["echo_asset"], "AGI")
         self.assertEqual(running.gateway.requests[0]["asset"], "AGI")
+        self.assertEqual(response["freshness"]["contract_version"], "cmis_response_freshness/v1")
+        self.assertEqual(response["freshness"]["state"], "UNKNOWN")
+        self.assertEqual(response["freshness"]["scope"], "market_report.response")
 
     def test_capabilities_expose_versioned_chain_contract(self):
         with RunningServer() as running:
@@ -98,8 +101,11 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.26.0")
+        self.assertEqual(response["contract_version"], "1.27.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
+        self.assertEqual(response["response_freshness"]["contract_version"], "cmis_response_freshness/v1")
+        self.assertTrue(response["response_freshness"]["required_on_every_public_response"])
+        self.assertTrue(response["response_freshness"]["observation_time_alone_never_proves_provider_fact_freshness"])
         self.assertEqual(len(response["supported_services"]), 20)
         self.assertIn("burn_intelligence", response["supported_services"])
         self.assertIn("concentration_warning_intelligence", response["supported_services"])
