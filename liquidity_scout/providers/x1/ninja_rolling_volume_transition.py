@@ -69,8 +69,10 @@ def evaluate_x1_ninja_rolling_volume_transition(
     before: Mapping[str, Any],
     after: Mapping[str, Any],
     new_swap: Mapping[str, Any],
+    independent_xnt_usd_evidence: Mapping[str, Any] | None = None,
     relative_tolerance: Any = DEFAULT_RELATIVE_TOLERANCE,
     absolute_tolerance_usd: Any = DEFAULT_ABSOLUTE_TOLERANCE_USD,
+    independent_relative_tolerance: Any = Decimal("0.01"),
 ) -> dict[str, Any]:
     """Evaluate one exact 1->2 style rolling-volume transition."""
 
@@ -88,6 +90,10 @@ def evaluate_x1_ninja_rolling_volume_transition(
     rel = _nonnegative(relative_tolerance, name="relative tolerance")
     abs_usd = _nonnegative(
         absolute_tolerance_usd, name="absolute tolerance USD"
+    )
+    independent_rel = _nonnegative(
+        independent_relative_tolerance,
+        name="independent relative tolerance",
     )
 
     if asset_amount <= 0 or quote_amount <= 0 or post_price_usd <= 0 or price_native <= 0:
@@ -110,6 +116,53 @@ def evaluate_x1_ninja_rolling_volume_transition(
 
     implied_asset_usd = volume_delta / asset_amount
     implied_xnt_usd = volume_delta / (asset_amount * price_native)
+
+    independent_xnt_usd = None
+    independent_basis_error = None
+    independent_basis_allowed = None
+    independent_basis_matches = False
+    independent_evidence_eligible = False
+    if isinstance(independent_xnt_usd_evidence, Mapping):
+        independent_evidence_eligible = bool(
+            independent_xnt_usd_evidence.get("fact_time_verified") is True
+            and independent_xnt_usd_evidence.get("provider_usd_price_used") is False
+            and independent_xnt_usd_evidence.get(
+                "current_price_substitution_used"
+            )
+            is False
+            and independent_xnt_usd_evidence.get(
+                "stable_name_one_dollar_assumption_used"
+            )
+            is False
+        )
+        if independent_evidence_eligible:
+            candidate = independent_xnt_usd_evidence.get(
+                "historical_xnt_usd_price"
+            )
+            if candidate is None:
+                candidate = independent_xnt_usd_evidence.get("xnt_usd_price")
+            if candidate is not None:
+                independent_xnt_usd = _nonnegative(
+                    candidate, name="independent XNT/USD"
+                )
+                if independent_xnt_usd > 0:
+                    independent_basis_error = abs(
+                        implied_xnt_usd - independent_xnt_usd
+                    )
+                    independent_basis_allowed = max(
+                        Decimal("0.000000000001"),
+                        abs(implied_xnt_usd) * independent_rel,
+                    )
+                    independent_basis_matches = bool(
+                        independent_basis_error <= independent_basis_allowed
+                    )
+
+    independent_transition_usd_value_verified = bool(
+        one_new_transaction
+        and volume_delta > 0
+        and independent_evidence_eligible
+        and independent_basis_matches
+    )
 
     return {
         "contract": CONTRACT,
@@ -135,6 +188,26 @@ def evaluate_x1_ninja_rolling_volume_transition(
         ),
         "implied_stored_asset_usd_price": format(implied_asset_usd, "f"),
         "implied_stored_xnt_usd_price": format(implied_xnt_usd, "f"),
+        "independent_xnt_usd_evidence_eligible": independent_evidence_eligible,
+        "independent_xnt_usd_price": (
+            format(independent_xnt_usd, "f")
+            if independent_xnt_usd is not None
+            else None
+        ),
+        "independent_xnt_usd_absolute_error": (
+            format(independent_basis_error, "f")
+            if independent_basis_error is not None
+            else None
+        ),
+        "independent_xnt_usd_allowed_error": (
+            format(independent_basis_allowed, "f")
+            if independent_basis_allowed is not None
+            else None
+        ),
+        "independent_xnt_usd_matches_stored_basis": independent_basis_matches,
+        "independent_transition_usd_value_verified": (
+            independent_transition_usd_value_verified
+        ),
         "rolling_volume_transition_observed": bool(
             one_new_transaction and volume_delta > 0
         ),
@@ -144,7 +217,9 @@ def evaluate_x1_ninja_rolling_volume_transition(
         "provider_price_used_as_independent_valuation": False,
         "provider_internal_formula_verified": False,
         "provider_fact_time_verified": False,
-        "independent_usd_valuation_verified": False,
+        "independent_usd_valuation_verified": (
+            independent_transition_usd_value_verified
+        ),
         "cmis_promotable": False,
         "execution_authorized": False,
     }
