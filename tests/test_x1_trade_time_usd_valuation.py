@@ -17,6 +17,9 @@ from liquidity_scout.providers.x1.usdcx_destination_parity import (
     WARP_USDC_ROUTE_ID,
     X1_USDC_X_MINT,
 )
+from liquidity_scout.providers.x1.warp_message_interval_retention import (
+    CONTRACT as INTERVAL_RETENTION_CONTRACT,
+)
 from liquidity_scout.providers.x1.warp_message_lifecycle_retention import (
     CONTRACT as LIFECYCLE_CONTRACT,
 )
@@ -99,6 +102,19 @@ def _lifecycle():
     }
 
 
+def _interval_retention():
+    return {
+        "contract": INTERVAL_RETENTION_CONTRACT,
+        "requested_start": 1300,
+        "as_of": 2100,
+        "interval_retention_complete_verified": True,
+        "requested_window_coverage_verified": True,
+        "coverage_complete_verified": True,
+        "missing_history_zero_authorized": True,
+        "sixty_day_bridge_flow_retention_promoted": False,
+    }
+
+
 class _Response:
     def __init__(self, body, status_code=200):
         self._body = body
@@ -130,6 +146,31 @@ class TradeTimeUsdValuationTests(unittest.TestCase):
         self.assertTrue(result["historical_value_equivalence_verified"])
         self.assertFalse(result["stable_name_one_dollar_assumption_used"])
         self.assertFalse(result["execution_authorized"])
+
+
+    def test_historical_usdcx_parity_accepts_bounded_interval_retention(self):
+        result = evaluate_historical_usdcx_parity(
+            fact_time=FACT_TIME,
+            current_backing_evidence=_backing(),
+            normalized_events=_events(),
+            lifecycle_retention=_interval_retention(),
+        )
+        self.assertTrue(result["lifecycle_coverage_verified"])
+        self.assertTrue(result["historical_usdcx_value_equivalence_verified"])
+
+    def test_historical_usdcx_parity_rejects_short_interval_promoted_as_60_day(self):
+        retention = _interval_retention()
+        retention["sixty_day_bridge_flow_retention_promoted"] = True
+        with self.assertRaisesRegex(
+            TradeTimeUsdValuationError,
+            "must not be promoted as the 60-day gate",
+        ):
+            evaluate_historical_usdcx_parity(
+                fact_time=FACT_TIME,
+                current_backing_evidence=_backing(),
+                normalized_events=_events(),
+                lifecycle_retention=retention,
+            )
 
     def test_historical_usdcx_parity_fails_closed_on_unresolved_route_event(self):
         events = _events()
