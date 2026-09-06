@@ -564,11 +564,81 @@ def normalize_warp_route_events(
     }
 
     unresolved: dict[str, int] = {}
+    unresolved_records: list[dict[str, Any]] = []
     events = []
     candidate_route_outgoing_count = 0
 
-    def add_unresolved(reason: str) -> None:
+    def add_unresolved(
+        reason: str,
+        *,
+        outgoing: Mapping[str, Any],
+        incoming: Mapping[str, Any] | None,
+        spec: Mapping[str, Any],
+        expected_out_operation: int,
+        expected_in_operation: int,
+    ) -> None:
         unresolved[reason] = unresolved.get(reason, 0) + 1
+        unresolved_records.append(
+            {
+                "reason": reason,
+                "direction": spec["direction"],
+                "actual_source_chain": spec["actual_source_chain"],
+                "actual_destination_chain": spec["actual_destination_chain"],
+                "seq": int(outgoing["seq"]),
+                "source_timestamp": int(outgoing["timestamp"]),
+                "amount_raw": int(outgoing["amount_raw"]),
+                "source_mint": outgoing.get("token_mint"),
+                "expected_source_mint": spec["source_mint"],
+                "outgoing_operation": int(outgoing.get("operation", -1)),
+                "expected_outgoing_operation": expected_out_operation,
+                "incoming_present": incoming is not None,
+                "incoming_pubkey": (
+                    incoming.get("pubkey") if isinstance(incoming, Mapping) else None
+                ),
+                "incoming_token_mint": (
+                    incoming.get("token_mint")
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+                "expected_destination_mint": spec["destination_mint"],
+                "incoming_processed": (
+                    incoming.get("processed")
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+                "incoming_operation": (
+                    int(incoming.get("operation", -1))
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+                "expected_incoming_operation": expected_in_operation,
+                "incoming_executed_timestamp": (
+                    int(incoming.get("executed_timestamp") or 0)
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+                "incoming_source_timestamp": (
+                    int(incoming.get("source_timestamp") or 0)
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+                "incoming_claimable_after": (
+                    int(incoming.get("claimable_after") or 0)
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+                "incoming_claimed": (
+                    incoming.get("claimed")
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+                "incoming_legacy_layout": (
+                    incoming.get("legacy_layout")
+                    if isinstance(incoming, Mapping)
+                    else None
+                ),
+            }
+        )
 
     directions = [
         {
@@ -605,45 +675,129 @@ def normalize_warp_route_events(
             seq = int(outgoing["seq"])
             incoming = incoming_index.get(seq)
             if incoming is None:
-                add_unresolved("missing_destination_incoming")
+                add_unresolved(
+                    "missing_destination_incoming",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if incoming.get("token_mint") != spec["destination_mint"]:
-                add_unresolved("destination_mint_mismatch")
+                add_unresolved(
+                    "destination_mint_mismatch",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if incoming.get("sender") != outgoing.get("sender"):
-                add_unresolved("sender_mismatch")
+                add_unresolved(
+                    "sender_mismatch",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if int(incoming.get("amount_raw", -1)) != int(outgoing.get("amount_raw", -2)):
-                add_unresolved("amount_mismatch")
+                add_unresolved(
+                    "amount_mismatch",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if int(incoming.get("source_timestamp", -1)) != int(outgoing.get("timestamp", -2)):
-                add_unresolved("source_timestamp_mismatch")
+                add_unresolved(
+                    "source_timestamp_mismatch",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if int(outgoing.get("operation", -1)) != expected_out_operation:
-                add_unresolved("outgoing_operation_mismatch")
+                add_unresolved(
+                    "outgoing_operation_mismatch",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if int(incoming.get("operation", -1)) != expected_in_operation:
-                add_unresolved("incoming_operation_mismatch")
+                add_unresolved(
+                    "incoming_operation_mismatch",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if incoming.get("processed") is not True:
-                add_unresolved("destination_not_processed")
+                add_unresolved(
+                    "destination_not_processed",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
             if incoming.get("legacy_layout") is True:
-                add_unresolved("legacy_incoming_claim_semantics_unverified")
+                add_unresolved(
+                    "legacy_incoming_claim_semantics_unverified",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
 
             claimable_after = int(incoming.get("claimable_after") or 0)
             claimed = incoming.get("claimed")
             if claimable_after > 0:
                 if claimed is not True:
-                    add_unresolved("delayed_transfer_not_claimed")
+                    add_unresolved(
+                    "delayed_transfer_not_claimed",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 else:
-                    add_unresolved("delayed_claim_settlement_timestamp_unverified")
+                    add_unresolved(
+                    "delayed_claim_settlement_timestamp_unverified",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
 
             settled_at = int(incoming.get("executed_timestamp") or 0)
             if settled_at <= 0:
-                add_unresolved("executed_timestamp_missing")
+                add_unresolved(
+                    "executed_timestamp_missing",
+                    outgoing=outgoing,
+                    incoming=incoming,
+                    spec=spec,
+                    expected_out_operation=expected_out_operation,
+                    expected_in_operation=expected_in_operation,
+                )
                 continue
 
             transfer_id = (
@@ -691,6 +845,15 @@ def normalize_warp_route_events(
         "candidate_route_outgoing_count": candidate_route_outgoing_count,
         "accepted_settled_event_count": len(events),
         "unresolved_counts": dict(sorted(unresolved.items())),
+        "unresolved_records": sorted(
+            unresolved_records,
+            key=lambda item: (
+                int(item["source_timestamp"]),
+                str(item["direction"]),
+                int(item["seq"]),
+                str(item["reason"]),
+            ),
+        ),
         "events": events,
         "observed_coverage_start": coverage_start,
         "observed_latest_settlement": coverage_end_observed,
