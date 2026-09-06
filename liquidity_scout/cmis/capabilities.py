@@ -197,7 +197,7 @@ def _large_trade_discovery_capability(*, available: bool) -> dict[str, Any]:
         "callable": True,
         "read_only": True,
         "public_service_promoted": True,
-        "scout_reliance_promoted": False,
+        "scout_reliance_promoted": True,
         "service_contract_version": LARGE_TRADE_DISCOVERY_CONTRACT_VERSION,
         "requirements": [
             "exact_x1_asset_mint_identity",
