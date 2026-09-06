@@ -12,7 +12,7 @@ permissions:
 jobs:
   xnt-population:
     name: XNT supply-conservation population evidence
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/x1-positive-balance-population')
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/524-positive-balance-population-gate-b' || startsWith(github.head_ref, 'feat/x1-positive-balance-population')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
