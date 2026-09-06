@@ -243,7 +243,7 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_cmis_current_market_freshness_v117.py
 
-      - name: Validate CMIS 1.22 regression expectations
+      - name: Validate CMIS 1.23 regression expectations
         run: |
           python - <<'PY'
           from pathlib import Path
