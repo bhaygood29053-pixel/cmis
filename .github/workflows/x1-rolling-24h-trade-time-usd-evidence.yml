@@ -35,14 +35,17 @@ jobs:
 
       - name: Run deterministic #504 tests
         run: |
-          python -m pytest -q             tests/test_x1_trade_time_usd_valuation.py             tests/test_x1_rolling_24h_market_activity.py
+          python -m pytest -q \
+            tests/test_x1_warp_message_interval_retention.py \
+            tests/test_x1_trade_time_usd_valuation.py \
+            tests/test_x1_rolling_24h_market_activity.py
 
   issue504-live:
     name: Prove live nonzero X1 24h USD volume at trade fact time
     needs: issue504-unit
     if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feature/504-trade-time-usd-volume'
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 60
     env:
       PYTHONPATH: .
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
@@ -76,6 +79,7 @@ jobs:
           echo "Read-only X1 RPC, Warp, Solana RPC, X1.Ninja comparison, and public Kraken market-data evidence only."
           echo "X1.Ninja USD price/volume is never used as the valuation price source."
           echo "No current-price substitution and no stable-name-equals-one-dollar assumption."
+          echo "The short retention interval is scoped only to #504 fact-time valuation; it does not replace the accepted 60-day #441 gate."
           echo "Source independence remains separately unpromoted."
           echo "No transaction construction, signing, broadcast, custody, mint, burn, or value movement."
           echo "EXECUTION_AUTHORIZED=FALSE"
