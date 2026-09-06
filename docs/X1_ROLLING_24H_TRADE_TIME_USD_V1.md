@@ -83,6 +83,40 @@ Accordingly:
 - the rolling USD field remains fail-closed until its own stored-aggregate
   valuation basis can be independently reproduced.
 
+## Exact rolling-volume transition evidence
+
+PR #503 workflow `33999943283` captured the accepted target with one exact
+swap and:
+
+`volume24h = 2.3859003395922413`
+
+PR #506 workflow `34004319450` later captured the same retained swap plus one
+new exact swap at slot `76853761`, with:
+
+`volume24h = 4.7430519845924595`
+
+The provider aggregate therefore increased by:
+
+`2.3571516450002182 USD`
+
+For the new exact swap, the X1 RPC asset-side amount was
+`6.7800000000002` units. The post-update provider pool row at
+`lastSyncedAt = 2026-09-06T01:23:33.262Z` reported
+`priceUsd = 0.34766248451329623`.
+
+The deterministic
+`x1_ninja_rolling_volume_transition/v1` contract proves that:
+
+`6.7800000000002 * 0.34766248451329623`
+
+matches the exact `volume24h` increment to machine precision.
+
+This is provider-semantic evidence only. The provider `priceUsd` value is
+never accepted as an independent valuation source. The live #504 gate therefore
+also reconstructs the independent XNT/USDC.X reference basis at the retained
+provider update window and compares it to the XNT/USD basis implied by the
+stored aggregate contribution.
+
 ## Fail-closed rules
 
 The nonzero USD field stays unverified if any swap lacks any required leg,
