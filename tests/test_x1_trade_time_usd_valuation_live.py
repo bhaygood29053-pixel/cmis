@@ -56,6 +56,7 @@ from liquidity_scout.providers.x1.warp_message_retention_coverage import (
     fetch_classified_warp_config_account,
     fetch_official_warp_config,
 )
+from liquidity_scout.providers.x1.xdex_price_history_import import WRAPPED_XNT_MINT
 from liquidity_scout.providers.x1.warp_onchain_transfer_history import (
     capture_warp_message_state,
     normalize_warp_route_events,
@@ -148,14 +149,89 @@ def _build_usdc_route_observation():
     return official, observation, qualification
 
 
-def _target_market(pools, xnt_price_usd):
+def _token_mint(token):
+    if not isinstance(token, dict):
+        return None
+    return _text(token.get("mint") or token.get("address"))
+
+
+def _nonzero_candidates(pools, *, max_candidates=3):
+    candidates = []
+    seen = set()
+    for row in pools:
+        if not isinstance(row, dict):
+            continue
+        address = _text(pool_address(row))
+        if not address or address in seen:
+            continue
+        volume = _number(row.get("volume24h"))
+        txs = _number(
+            row.get("txns24h")
+            if row.get("txns24h") is not None
+            else row.get("transactions24h")
+        )
+        if (
+            volume is None
+            or volume <= 0
+            or txs is None
+            or txs <= 0
+            or txs > 3
+            or not float(txs).is_integer()
+        ):
+            continue
+        base = _token_mint(row.get("baseToken"))
+        quote = _token_mint(row.get("quoteToken"))
+        if base == WRAPPED_XNT_MINT and quote and quote != WRAPPED_XNT_MINT:
+            asset_mint = quote
+        elif quote == WRAPPED_XNT_MINT and base and base != WRAPPED_XNT_MINT:
+            asset_mint = base
+        else:
+            continue
+
+        matches = [
+            match
+            for match in find_matches_for_term(asset_mint, pools)
+            if len(match) >= 4 and match[3] >= 90
+        ]
+        addresses = []
+        match_seen = set()
+        for match in matches:
+            selected = _text(pool_address(match[0]))
+            if selected and selected not in match_seen:
+                match_seen.add(selected)
+                addresses.append(selected)
+        if addresses != [address]:
+            continue
+
+        seen.add(address)
+        candidates.append(
+            {
+                "pool_address": address,
+                "asset_mint": asset_mint,
+                "provider_volume24h": volume,
+                "provider_transactions24h": int(txs),
+                "liquidity": _number(row.get("liquidity")) or 0.0,
+            }
+        )
+
+    candidates.sort(
+        key=lambda row: (
+            row["provider_transactions24h"],
+            -row["liquidity"],
+            row["pool_address"],
+        )
+    )
+    return candidates[:max_candidates]
+
+
+def _target_market(pools, xnt_price_usd, *, target_pool=TARGET_POOL, target_asset=TARGET_ASSET):
     rows = [
         row
         for row in pools
-        if isinstance(row, dict) and _text(pool_address(row)) == TARGET_POOL
+        if isinstance(row, dict) and _text(pool_address(row)) == target_pool
     ]
     if len(rows) != 1:
-        raise AssertionError("accepted #504 target pool is unavailable")
+        raise AssertionError("selected #504 target pool is unavailable")
     row = rows[0]
     volume = _number(row.get("volume24h"))
     txs = _number(
@@ -165,12 +241,12 @@ def _target_market(pools, xnt_price_usd):
     )
     if volume is None or volume <= 0 or txs is None or txs <= 0:
         raise AssertionError(
-            "accepted #504 target no longer has nonzero provider 24h activity"
+            "selected #504 target has no nonzero provider 24h activity"
         )
 
     matches = [
         match
-        for match in find_matches_for_term(TARGET_ASSET, pools)
+        for match in find_matches_for_term(target_asset, pools)
         if len(match) >= 4 and match[3] >= 90
     ]
     addresses = []
@@ -180,9 +256,9 @@ def _target_market(pools, xnt_price_usd):
         if address and address not in seen:
             seen.add(address)
             addresses.append(address)
-    if addresses != [TARGET_POOL]:
+    if addresses != [target_pool]:
         raise AssertionError(
-            f"accepted #504 target pool scope changed: {addresses}"
+            f"selected #504 target pool scope changed: {addresses}"
         )
 
     catalog = SimpleNamespace(
@@ -190,7 +266,7 @@ def _target_market(pools, xnt_price_usd):
         last_refresh=time.time(),
     )
     market = build_market_report_response(
-        TARGET_ASSET,
+        target_asset,
         matches,
         catalog,
         chain="x1",
@@ -209,27 +285,101 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
     def test_prove_nonzero_trade_time_usd_volume(self):
         pools, xnt_price_usd = fetch_all_pools(sleep_seconds=0)
         self.assertTrue(pools, "X1.Ninja returned no current pool catalog")
-        market = _target_market(pools, xnt_price_usd)
-        scope = evaluate_x1_ninja_current_pool_scope(
-            market_envelope=market,
-            catalog_pools=pools,
-        )
-        self.assertTrue(scope["provider_scoped_pool_universe_verified"])
-        pool_identity = _identity_from_current_rpc(TARGET_POOL, TARGET_ASSET)
 
-        # First reconstruct the exact target window without USD valuation. This
-        # independently proves the swap set and gives the oldest transaction
-        # fact time. The retention proof below is then scoped to exactly the
-        # interval that historical parity reconstruction needs, rather than
-        # re-running #441's separate 60-day Bridge Flow gate.
+        # Select the first candidate by a predeclared non-USD ordering. USD
+        # agreement is never used to choose the market.
+        candidates = _nonzero_candidates(pools, max_candidates=3)
+        self.assertTrue(
+            candidates,
+            "no exact single-pool wrapped-XNT market with 1-3 provider transactions is available",
+        )
         end_epoch = int(time.time())
         start_epoch = end_epoch - 86400
-        unvalued_window = reconstruct_x1_pool_24h_chain_activity(
-            pool_identity=pool_identity,
-            start_epoch=start_epoch,
-            end_epoch=end_epoch,
-            max_signatures=MAX_SIGNATURES,
+        prequalification_attempts = []
+        selected = None
+
+        for candidate in candidates:
+            attempt = dict(candidate)
+            try:
+                candidate_market = _target_market(
+                    pools,
+                    xnt_price_usd,
+                    target_pool=candidate["pool_address"],
+                    target_asset=candidate["asset_mint"],
+                )
+                candidate_scope = evaluate_x1_ninja_current_pool_scope(
+                    market_envelope=candidate_market,
+                    catalog_pools=pools,
+                )
+                if candidate_scope.get(
+                    "provider_scoped_pool_universe_verified"
+                ) is not True:
+                    attempt["result"] = "pool_scope_unverified"
+                    prequalification_attempts.append(attempt)
+                    continue
+                candidate_identity = _identity_from_current_rpc(
+                    candidate["pool_address"],
+                    candidate["asset_mint"],
+                )
+                candidate_window = reconstruct_x1_pool_24h_chain_activity(
+                    pool_identity=candidate_identity,
+                    start_epoch=start_epoch,
+                    end_epoch=end_epoch,
+                    max_signatures=MAX_SIGNATURES,
+                )
+                attempt["history_range_proven"] = candidate_window.get(
+                    "history_range_proven"
+                )
+                attempt["chain_transactions_24h"] = candidate_window.get(
+                    "verified_transactions_24h"
+                )
+                attempt["provider_transactions24h"] = candidate[
+                    "provider_transactions24h"
+                ]
+                prequalification_attempts.append(attempt)
+                if (
+                    candidate_window.get("history_range_proven") is True
+                    and candidate_window.get(
+                        "all_successful_transactions_verified"
+                    )
+                    is True
+                    and candidate_window.get(
+                        "all_pool_relevant_transactions_classified"
+                    )
+                    is True
+                    and candidate_window.get("verified_transactions_24h")
+                    == candidate["provider_transactions24h"]
+                    and (candidate_window.get("verified_transactions_24h") or 0)
+                    > 0
+                ):
+                    selected = {
+                        "candidate": candidate,
+                        "market": candidate_market,
+                        "scope": candidate_scope,
+                        "pool_identity": candidate_identity,
+                        "window": candidate_window,
+                    }
+                    break
+            except Exception as exc:
+                attempt["result"] = "exception"
+                attempt["error"] = f"{type(exc).__name__}: {exc}"
+                prequalification_attempts.append(attempt)
+
+        self.assertIsNotNone(
+            selected,
+            f"no predeclared #504 candidate reproduced provider transaction count from exact X1 RPC: {prequalification_attempts}",
         )
+        target_pool = selected["candidate"]["pool_address"]
+        target_asset = selected["candidate"]["asset_mint"]
+        market = selected["market"]
+        scope = selected["scope"]
+        pool_identity = selected["pool_identity"]
+        unvalued_window = selected["window"]
+
+        # The exact target window is already reconstructed above. It gives the
+        # oldest transaction fact time. The retention proof below is scoped to
+        # exactly the interval historical parity reconstruction needs, rather
+        # than re-running #441's separate 60-day Bridge Flow gate.
         self.assertTrue(unvalued_window["history_range_proven"])
         self.assertTrue(unvalued_window["history_integrity_verified"])
         self.assertTrue(unvalued_window["all_successful_transactions_verified"])
@@ -365,7 +515,7 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         # RPC-verified swap signatures so #504 can test the provider's stored
         # USD valuation hypothesis without using those values as valuation
         # inputs.
-        provider_history = fetch_pool_trades_raw(TARGET_POOL)
+        provider_history = fetch_pool_trades_raw(target_pool)
         raw_provider_trades = (
             provider_history.get("raw_response", {}).get("trades", [])
         )
@@ -564,13 +714,18 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
 
         evidence = {
             "schema": "x1_504_nonzero_trade_time_usd_volume_live.v1",
-            "target_pool": TARGET_POOL,
-            "target_asset": TARGET_ASSET,
+            "candidate_selection_policy": (
+                "provider_transactions_asc_then_liquidity_desc_then_pool_address;"
+                "first_exact_rpc_transaction_count_match;usd_match_not_used_for_selection"
+            ),
+            "prequalification_attempts": prequalification_attempts,
+            "target_pool": target_pool,
+            "target_asset": target_asset,
             "provider_catalog_xnt_price_usd_raw": xnt_price_usd,
             "provider_catalog_target_pool_raw": {
                 key: row.get(key)
                 for row in pools
-                if _text(pool_address(row)) == TARGET_POOL
+                if _text(pool_address(row)) == target_pool
                 for key in (
                     "address",
                     "poolAddress",
