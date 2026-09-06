@@ -45,6 +45,44 @@ For each exact-pool swap classified by the #502/#503 chain reconstruction:
    `XNT amount × (USDC.X / XNT) × (USD / USDC)`.
 9. The resulting exact-swap values are summed and compared with the provider
    rolling 24h USD volume under the already accepted tolerance policy.
+## Provider surface-divergence evidence
+
+Two exact live #504 workflow captures now preserve the same two exact X1
+swap signatures while X1.Ninja's trade-history USD fields changed materially
+and the pool-level `volume24h` aggregate did not.
+
+The retained classifier is
+`x1_ninja_rolling_volume_snapshot_semantics/v1`.
+
+It may establish only these bounded observations:
+
+- the exact trade identity set is unchanged across the two captures;
+- within each capture, the returned trade rows share one common implied
+  XNT/USD conversion basis;
+- that common trade-row USD conversion basis changed between captures;
+- the sum of the returned trade-row `amountUsd` values therefore changed;
+- the pool-level `volume24h` value remained unchanged.
+
+This proves that the current trade-history USD display and the stored rolling
+pool aggregate are not the same mutable value surface. It does **not** prove
+the provider's internal aggregation query, stored database columns, event-time
+valuation formula, or provider fact-time semantics.
+
+The provider release notes independently describe pool volume/transaction stats
+as aggregate queries over the 24h trade database and separately document
+historical trade repricing. Those statements are corroborating provider
+documentation only; they are not a substitute for the exact X1/RPC evidence
+required by CMIS.
+
+Accordingly:
+
+- current trade-row `amountUsd` must never be summed and treated as proof of
+  the current `volume24h` field;
+- current catalog `xntPriceUsd` must never be substituted into historical
+  swaps to force agreement;
+- the rolling USD field remains fail-closed until its own stored-aggregate
+  valuation basis can be independently reproduced.
+
 ## Fail-closed rules
 
 The nonzero USD field stays unverified if any swap lacks any required leg,
