@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-05**.
+Current reconciliation: **2026-09-06**.
 
 Read in this order:
 
@@ -11,8 +11,8 @@ Read in this order:
 
 ## Accepted CMIS platform
 
-- capability contract `1.18.0`;
-- Instant X1 Scan v3;
+- capability contract `1.21.0` (candidate under #507 until merge);
+- Instant X1 Scan v4 candidate under #507, preserving v3 compatibility;
 - Burn Intelligence;
 - Discovery Intelligence;
 - field-scoped current-market freshness;
@@ -22,6 +22,24 @@ Read in this order:
 - internal CMIS Web Discovery v1-v5 through PR #481.
 
 ## Active flagship gates
+
+### #507 — Instant X1 Scan v4 rolling-freshness promotion
+
+#502 / #504 are complete and PR #506 is merged. Exact rolling 24h
+transaction-count freshness and nonzero USD-volume freshness are now proven
+under `x1_rolling_24h_market_activity/v1`.
+
+The active promotion gate is #507:
+
+- preserve `instant_x1_scan/v3` unchanged;
+- add `instant_x1_scan/v4`;
+- require exact `x1_current_market_freshness/v2`;
+- surface rolling volume/transaction freshness only from accepted evidence;
+- keep provider fact-time and source independence separate;
+- keep execution unauthorized.
+
+This is the Gate A promotion/wiring subtask of #444.
+
 
 ### #482 — cross-chain public-service / Scout promotion
 

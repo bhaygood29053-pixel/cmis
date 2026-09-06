@@ -1,6 +1,6 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-09-05 (America/New_York)
+Last reconciled: 2026-09-06 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
 
@@ -35,6 +35,10 @@ Fresh accepted CMIS/provider facts override remembered, retained, source-mastery
 
 ## Current accepted roadmap state
 
+- **#504 rolling 24h nonzero USD freshness: COMPLETE.** PR #506 merged after live run #33 reproduced a nonzero provider rolling USD volume inside the fixed tolerance from exact X1 RPC history and independent historical XNT/USD valuation. Transaction-count and volume freshness may now be true under the accepted rolling evidence contract when the exact market/window proof passes.
+- **#507 Instant X1 Scan v4 promotion: ACTIVE.** This is the narrow Gate A wiring/promotion subtask under #444. v3 remains unchanged.
+
+
 Accepted milestones on `main`:
 
 - **CMIS Phase 10 — Solana read-only provider foundation: COMPLETE.**
@@ -54,8 +58,8 @@ Accepted milestones on `main`:
 - **Verified Bridge Route Evidence / Warp Qualification foundation: COMPLETE internally via Issue #405 / PR #406 under `bridge_route_evidence/v1` and `warp_bridge_qualification/v1`.** Exact provenance-hop route id, source/destination chain-scoped asset identity, exact source URL binding, source-vs-collection timestamps, freshness, deterministic evidence identity, and candidate route/backing/custody fields remain fail-closed. The historical `blocked_endpoint_semantics` gate was resolved by Issue #407 / PR #429, which accepted exact Warp config semantics for provenance-qualified routes. Subsequent #441/#409 evidence completed bounded retention, bridged-supply closure, and flow integration; public-service / Scout promotion remains a separate gate.
 - **X1 verified-provider historical price backfill: COMPLETE under the bounded CMIS `1.12.0` contract.** Backfill is price-only and preserves non-independence, non-archive-completeness, non-continuity, historical stable-quote uncertainty, and non-lifetime-completeness limits.
 - **Oracle V2 structural X1 contract verification and freshness governance: COMPLETE for the accepted bounded evidence contracts.** Timestamp-unit semantics are verified as Unix milliseconds; the explicit current-price freshness policy is selected/applied (`max_age_ms=60000`, `max_future_skew_ms=5000`, `minimum_eligible_slots=3`). The latest live run classified all 30 relay slots stale, so current-price authority remains unpromoted.
-- **CMIS capability contract: `1.18.0`.** Burn Intelligence (`burn_intelligence/v1`) remains accepted under 1.15.0, Discovery Intelligence (`discovery_intelligence/v1`) under 1.16.0, field-scoped current-market freshness under 1.17.0, and pull-only Concentration Warning Intelligence (`concentration_warning_intelligence/v1`) under 1.18.0.
-- **Instant X1 Scan: COMPLETE as `instant_x1_scan/v3`.** v3 wraps the accepted v2 scan rather than forking identity/history/tokenomics/risk logic, and adds only `x1_current_market_freshness/v1`. Price freshness can be verified under explicit provider fact-time/value-linkage gates; liquidity, rolling 24h volume, and rolling transaction freshness remain unverified under 1.17.
+- **CMIS capability contract: `1.21.0` candidate under #507.** Burn Intelligence (`burn_intelligence/v1`) remains accepted under 1.15.0, Discovery Intelligence (`discovery_intelligence/v1`) under 1.16.0, field-scoped current-market freshness under 1.17.0, and pull-only Concentration Warning Intelligence (`concentration_warning_intelligence/v1`) under 1.18.0.
+- **Instant X1 Scan:** v3 remains accepted/backward compatible; #507 promotes `instant_x1_scan/v4` with exact `x1_current_market_freshness/v2` so accepted liquidity and rolling 24h volume/transaction evidence can be surfaced field-by-field without promoting provider fact-time or source independence.
 - **Six-phase public-shell/private-core migration: COMPLETE.** Protected CMIS implementation is removed from active public branch/tag history, public package boundaries fail closed without the required private core, and no public reconstruction fallback is accepted.
 - **Roberta adoption/readiness of the promoted X1 concentration-change service: COMPLETE.**
 - **Paired Roberta PR #226 / CMIS PR #269 architecture/source-of-truth reconciliation: COMPLETE.**

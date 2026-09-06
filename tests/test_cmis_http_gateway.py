@@ -98,7 +98,7 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.20.0")
+        self.assertEqual(response["contract_version"], "1.21.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
         self.assertEqual(len(response["supported_services"]), 17)
         self.assertIn("burn_intelligence", response["supported_services"])
