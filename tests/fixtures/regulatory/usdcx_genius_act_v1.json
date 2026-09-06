@@ -1,0 +1,47 @@
+{
+  "service": "regulatory_evidence",
+  "contract": "regulatory_evidence/v1",
+  "jurisdiction": "US",
+  "framework": "GENIUS Act",
+  "legal": {
+    "law_id": "Public Law 119-27",
+    "enacted_on": "2025-07-18",
+    "status": "enacted",
+    "effective_date_rule": {
+      "type": "earlier_of",
+      "fixed_date": "2027-01-18",
+      "days_after_final_rules": 120
+    }
+  },
+  "asset": {
+    "asset_id": "USDC.X",
+    "representation_type": "bridged",
+    "underlying_asset": "USDC",
+    "bridge_dependency": true,
+    "custody_dependency": true
+  },
+  "issuer": {
+    "name": "Circle",
+    "identity_status": "PROVIDER_REPORTED"
+  },
+  "applicability": "INSUFFICIENT_EVIDENCE",
+  "sources": [
+    {
+      "authority_class": "primary_law",
+      "publisher": "U.S. Government Publishing Office",
+      "title": "Public Law 119-27 — GENIUS Act",
+      "url": "https://www.govinfo.gov/app/details/PLAW-119publ27",
+      "published_on": "2025-07-18",
+      "retrieved_at": "2026-09-06T15:00:00Z"
+    }
+  ],
+  "retrieved_at": "2026-09-06T15:00:00Z",
+  "limitations": [
+    "Underlying USDC regulatory evidence does not establish USDC.X bridge, custody, liquidity, or redemption safety.",
+    "Fixture does not independently prove current bridge identity or current issuer licensing/compliance."
+  ],
+  "read_only": true,
+  "compliance_conclusion_authorized": false,
+  "compliance_conclusion": null,
+  "execution_authorized": false
+}
