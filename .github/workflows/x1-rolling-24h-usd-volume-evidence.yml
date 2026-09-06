@@ -225,6 +225,86 @@ jobs:
           assert xdex_history, "XDEX XNT/USDC.X historical window unavailable"
           PY
 
+      - name: Observe #504 rolling-volume reconciliation behavior
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          import time
+
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
+
+          TARGET_POOL = "CKtXmX82rLBqNkfpCBPUoHLmtZhgBdVWpVPW93hHHCCK"
+          TARGET_SIG = "2uWfa2LJcjo5qo916N9Ce7aUuu5xKctez9pL3NDCgzgAqUpQ7JZqZGKP4UtfyzmYiVWn6oJWifRhvqM6QDFPvynK"
+          snapshots = []
+
+          for index in range(6):
+              pools, xnt_price_usd = fetch_all_pools(sleep_seconds=0)
+              target = next(
+                  (
+                      row for row in pools
+                      if isinstance(row, dict)
+                      and (row.get("address") or row.get("poolAddress") or row.get("id"))
+                      == TARGET_POOL
+                  ),
+                  None,
+              )
+              trades = fetch_pool_trades_raw(TARGET_POOL)
+              trade = next(
+                  (
+                      row
+                      for row in (trades.get("raw_response") or {}).get("trades", [])
+                      if isinstance(row, dict) and row.get("txHash") == TARGET_SIG
+                  ),
+                  None,
+              )
+              if not isinstance(target, dict) or not isinstance(trade, dict):
+                  raise AssertionError("target pool/trade disappeared during bounded observation")
+
+              quote = float(trade["amountNative"])
+              current_mark = quote * float(xnt_price_usd)
+              snapshots.append({
+                  "index": index,
+                  "observed_at": time.time(),
+                  "pool_lastSyncedAt": target.get("lastSyncedAt"),
+                  "pool_volume24h": target.get("volume24h"),
+                  "pool_txns24h": target.get("txns24h"),
+                  "trade_amountNative": trade.get("amountNative"),
+                  "trade_amountUsd": trade.get("amountUsd"),
+                  "trade_priceUsd": trade.get("priceUsd"),
+                  "xnt_price_usd": xnt_price_usd,
+                  "quote_x_current_xnt_usd": current_mark,
+                  "pool_volume_minus_current_mark": (
+                      float(target.get("volume24h")) - current_mark
+                  ),
+              })
+              if index < 5:
+                  time.sleep(15)
+
+          volume_values = {str(row["pool_volume24h"]) for row in snapshots}
+          trade_usd_values = {str(row["trade_amountUsd"]) for row in snapshots}
+          xnt_values = {str(row["xnt_price_usd"]) for row in snapshots}
+          sync_values = {str(row["pool_lastSyncedAt"]) for row in snapshots}
+
+          result = {
+              "schema": "x1_504_reconciliation_series.v1",
+              "snapshots": snapshots,
+              "pool_volume_changed": len(volume_values) > 1,
+              "trade_amount_usd_changed": len(trade_usd_values) > 1,
+              "xnt_price_usd_changed": len(xnt_values) > 1,
+              "pool_lastSyncedAt_changed": len(sync_values) > 1,
+              "provider_fact_time_verified": False,
+              "volume_usd_semantics_verified": False,
+              "execution_authorized": False,
+          }
+          print("X1 #504 ROLLING VOLUME RECONCILIATION SERIES")
+          print(json.dumps(result, sort_keys=True, default=str))
+          assert len(snapshots) == 6
+          assert all(row["pool_txns24h"] == 1 for row in snapshots)
+          PY
+
       - name: Safety boundary
         if: always()
         run: |
