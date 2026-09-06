@@ -18,6 +18,10 @@ from liquidity_scout.services.cmis_bridge_to_xdex_public import (
     CONTRACT_VERSION as BRIDGE_TO_XDEX_CONTRACT_VERSION,
     SERVICE as BRIDGE_TO_XDEX_SERVICE,
 )
+from liquidity_scout.services.cmis_regulatory_evidence import (
+    CONTRACT_VERSION as REGULATORY_EVIDENCE_CONTRACT_VERSION,
+    SERVICE as REGULATORY_EVIDENCE_SERVICE,
+)
 from liquidity_scout.services.cmis_trade_price_impact_intelligence import (
     CONTRACT_VERSION as TRADE_PRICE_IMPACT_CONTRACT_VERSION,
     SERVICE as TRADE_PRICE_IMPACT_SERVICE,
@@ -55,7 +59,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.25.0"
+CMIS_CONTRACT_VERSION = "1.26.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -85,6 +89,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "concentration_warning_intelligence",
     "bridge_to_xdex_utilization",
     "cross_chain_asset_provenance",
+    "regulatory_evidence",
 )
 PUBLIC_SUPPORTED_CHAINS = ("x1",)
 PUBLIC_KNOWN_CHAINS = ("x1", "solana")
@@ -321,6 +326,55 @@ def _bridge_to_xdex_capability(*, available: bool) -> dict[str, Any]:
             "no_execution_authorization",
             "x1_only_initial_scope",
         ],
+        "execution_authorized": False,
+    }
+
+
+def _regulatory_evidence_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": REGULATORY_EVIDENCE_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": ["regulatory_evidence_not_available_for_chain"],
+            "compliance_conclusion_authorized": False,
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": REGULATORY_EVIDENCE_CONTRACT_VERSION,
+        "requirements": [
+            "canonical_cmis_owned_regulatory_record",
+            "exact_jurisdiction_and_framework_identity",
+            "exact_x1_mint_identity",
+            "primary_law_provenance",
+            "primary_regulator_provenance_for_current_state",
+            "explicit_current_rulemaking_status",
+            "verified_current_regulatory_fact_time",
+            "bounded_regulatory_evidence_freshness",
+            "native_vs_bridged_representation_preserved",
+        ],
+        "limitations": [
+            "proposed_rule_is_not_final_rule",
+            "final_rule_is_not_effective_without_separate_verification",
+            "regulatory_framework_evidence_is_not_issuer_compliance",
+            "underlying_asset_evidence_does_not_erase_bridge_or_custody_dependency",
+            "regulatory_evidence_does_not_establish_liquidity_or_redemption_safety",
+            "no_compliant_or_non_compliant_conclusion",
+            "no_legal_advice",
+            "no_automatic_risk_conclusion",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "compliance_conclusion_authorized": False,
         "execution_authorized": False,
     }
 
@@ -652,6 +706,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         CROSS_CHAIN_PROVENANCE_SERVICE: _cross_chain_provenance_capability(
             available=True
         ),
+        REGULATORY_EVIDENCE_SERVICE: _regulatory_evidence_capability(
+            available=True
+        ),
     },
     "solana": {
         "asset_lookup": _capability(
@@ -759,6 +816,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         ),
         BRIDGE_TO_XDEX_SERVICE: _bridge_to_xdex_capability(available=False),
         CROSS_CHAIN_PROVENANCE_SERVICE: _cross_chain_provenance_capability(
+            available=False
+        ),
+        REGULATORY_EVIDENCE_SERVICE: _regulatory_evidence_capability(
             available=False
         ),
     },

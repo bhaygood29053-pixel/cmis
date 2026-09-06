@@ -279,3 +279,29 @@ bridge/custody dependencies, or verification claims.
 The service proves structural identity continuity only. It does not prove live
 bridge state, backing, solvency, safety, custody truth, adoption, causality,
 source independence, or risk. Symbol/name equality never establishes identity.
+
+## CMIS 1.26 regulatory evidence promotion
+
+Issue #539 promotes the accepted `regulatory_evidence/v1` foundation as a
+bounded X1-only read service.
+
+```text
+service = regulatory_evidence
+service_contract_version = regulatory_evidence/v1
+chain = x1
+state = bounded
+callable = true
+read_only = true
+public_service_promoted = true
+scout_reliance_promoted = true
+compliance_conclusion_authorized = false
+execution_authorized = false
+```
+
+Promotion requires exact X1 mint binding, primary-law provenance,
+freshness-sensitive primary-regulator provenance, explicit current rulemaking
+status, and bounded evidence age. Proposed rules cannot be promoted as final or
+effective regulations. The service does not determine legal compliance, provide
+legal advice, infer risk, or authorize execution.
+
+Solana remains unavailable/non-callable/non-promoted for this service.

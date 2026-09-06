@@ -27,7 +27,7 @@ The `liquidity_scout` namespace is a migration compatibility identifier, not a s
 GET /v1/cmis/capabilities
 ```
 
-Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.21.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v2` requires `>=1.14.0`; `instant_x1_scan/v4` with `x1_current_market_freshness/v2` requires `>=1.21.0`.
+Capability schema `1` is required. Existing services retain the accepted global minimum `1.8.0`; current CMIS contract is `1.26.0`. The promoted concentration service continues to require CMIS `>=1.9.0`; all-available history requires `>=1.10.0`; normalized X1 identity requires `>=1.11.0`; verified provider-price backfill semantics require `>=1.12.0`; and `instant_x1_scan/v2` requires `>=1.14.0`; `instant_x1_scan/v4` with `x1_current_market_freshness/v2` requires `>=1.21.0`.
 
 Scouts validate service state/callability, chain requirements, Evidence Receipt / Proof Score declarations, risk/proof separation, missing-evidence-is-unknown semantics, and exact promotion metadata.
 
@@ -49,6 +49,7 @@ verification_evidence
 concentration_change_intelligence
 concentration_warning_intelligence
 bridge_to_xdex_utilization
+regulatory_evidence
 instant_x1_scan
 ```
 
@@ -160,3 +161,32 @@ and verification flags exactly as CMIS returns them. Scout must not infer
 identity from symbol/name equality, manufacture missing hops, convert bridge or
 custody dependency into risk, or infer backing, solvency, safety, adoption,
 causality, or current bridge state.
+
+## CMIS 1.26 regulatory evidence reliance
+
+X1 Scout may rely on `regulatory_evidence/v1` only when the live capability
+manifest advertises the service as bounded, callable, read-only,
+public-service promoted, Scout-reliance promoted, and
+`execution_authorized=false`.
+
+Initial promoted scope is deliberately narrow: U.S. GENIUS Act evidence for an
+exact X1 mint identity, beginning with the exact USDC.X mint
+`B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq`.
+
+Scout supplies only jurisdiction, framework, logical asset selector, exact X1
+mint, evaluation time, and maximum evidence age. It must not submit legal text,
+issuer claims, regulator status, source material, compliance conclusions,
+bridge/custody facts, risk, or a precomputed regulatory record.
+
+Scout must preserve these boundaries:
+
+- proposed rule is not final rule;
+- final rule is not effective regulation without separately verified effective state;
+- framework/applicability evidence is not issuer or asset compliance;
+- underlying USDC evidence does not erase USDC.X bridge/custody/liquidity/redemption dependencies;
+- regulatory evidence is not legal advice;
+- no automatic risk conclusion;
+- no execution authorization.
+
+Missing, stale, future-dated, symbol-only, or exact-mint-mismatched evidence
+fails closed.

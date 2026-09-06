@@ -935,3 +935,21 @@ Accepted foundation state:
 - `execution_authorized=false`.
 
 A later gate must add accepted runtime source ingestion, freshness policy, capability-manifest promotion, and Scout reliance before ROBERTA can treat this as current callable regulatory evidence.
+
+## Regulatory Evidence Runtime Promotion — Issue #539
+
+**ACTIVE.** The accepted #536 / PR #537 foundation is being promoted through a
+freshness-aware X1 runtime boundary under CMIS 1.26.
+
+Initial proof scope:
+
+- U.S. GENIUS Act;
+- exact X1 USDC.X mint `B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq`;
+- current regulator-state evidence from primary regulator sources;
+- exact proposed/final/effective distinction;
+- 24-hour default current-state freshness bound;
+- bridged representation and custody dependencies preserved.
+
+Public promotion work is paired with protected `cmis-core` Issue #42.
+`COMPLIANT/NON_COMPLIANT`, legal advice, automatic risk, and execution remain
+unauthorized.

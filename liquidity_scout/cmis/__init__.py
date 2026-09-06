@@ -36,6 +36,7 @@ SUPPORTED_SERVICES = (
     "concentration_warning_intelligence",
     "bridge_to_xdex_utilization",
     "cross_chain_asset_provenance",
+    "regulatory_evidence",
 )
 SUPPORTED_CHAINS = ("x1",)
 KNOWN_CHAINS = ("x1", "solana")

@@ -1,0 +1,65 @@
+{
+  "service": "regulatory_evidence",
+  "contract": "regulatory_evidence/v1",
+  "jurisdiction": "US",
+  "framework": "GENIUS Act",
+  "legal": {
+    "law_id": "Public Law 119-27",
+    "enacted_on": "2025-07-18",
+    "status": "enacted",
+    "effective_date_rule": {
+      "type": "earlier_of",
+      "fixed_date": "2027-01-18",
+      "days_after_final_rules": 120
+    }
+  },
+  "current_regulatory_state": {
+    "rulemaking_status": "proposed_rule",
+    "final_rule_verified": false,
+    "effective_now_verified": false,
+    "status_as_of": "2026-09-06T15:30:00Z"
+  },
+  "asset": {
+    "asset_id": "USDC.X",
+    "chain": "x1",
+    "asset_id_kind": "mint",
+    "chain_scoped_asset_id": "B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq",
+    "representation_type": "bridged",
+    "underlying_asset": "USDC",
+    "bridge_dependency": true,
+    "custody_dependency": true
+  },
+  "issuer": {
+    "name": "Circle",
+    "identity_status": "PROVIDER_REPORTED"
+  },
+  "applicability": "INSUFFICIENT_EVIDENCE",
+  "sources": [
+    {
+      "authority_class": "primary_law",
+      "publisher": "U.S. Government Publishing Office",
+      "title": "Public Law 119-27 — GENIUS Act",
+      "url": "https://www.govinfo.gov/app/details/PLAW-119publ27",
+      "published_on": "2025-07-18",
+      "retrieved_at": "2026-09-06T15:30:00Z"
+    },
+    {
+      "authority_class": "primary_regulator",
+      "publisher": "U.S. Department of the Treasury",
+      "title": "Treasury Seeks Public Comment on GENIUS Act Proposed Rulemaking",
+      "url": "https://home.treasury.gov/news/press-releases/sb0605",
+      "published_on": "2026-08-17",
+      "retrieved_at": "2026-09-06T15:30:00Z"
+    }
+  ],
+  "retrieved_at": "2026-09-06T15:30:00Z",
+  "limitations": [
+    "Current proposed-rule status does not establish final or effective implementing regulation.",
+    "Issuer licensing and compliance are not established by this record.",
+    "Underlying USDC evidence does not establish USDC.X bridge, custody, liquidity, or redemption safety."
+  ],
+  "read_only": true,
+  "compliance_conclusion_authorized": false,
+  "compliance_conclusion": null,
+  "execution_authorized": false
+}
