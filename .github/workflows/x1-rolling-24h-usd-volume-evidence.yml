@@ -138,6 +138,7 @@ jobs:
                       verify_transaction(
                           raw_tx,
                           signature=entry["signature"],
+                          rpc_url="https://rpc.mainnet.x1.xyz",
                       )
                   )
                   by_account = {
