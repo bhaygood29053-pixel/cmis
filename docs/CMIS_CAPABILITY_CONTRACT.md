@@ -31,6 +31,12 @@ Each known chain classifies each runtime-advertised public service as `supported
 
 A capability state describes service eligibility, not provider health and not a guarantee that an individual request returns `ok`. Request-time CMIS responses remain authoritative for status, facts, evidence, provenance, proof, freshness, risk, uncertainty, and failure state.
 
+## Universal response freshness — CMIS 1.27
+
+Every public CMIS service response includes top-level `freshness` using `cmis_response_freshness/v1`. This is an additive response-envelope invariant, including token requests that fail, resolve ambiguously, or lack service-specific fact-time proof.
+
+The common envelope never treats `observed_at` or collection time alone as provider-fact freshness. When a service supplies accepted freshness evidence, it is preserved under `freshness.details` and may promote `freshness.state`. When service-specific freshness evidence is absent, the response fails closed to `UNKNOWN` with `freshness_verified=null` rather than omitting freshness.
+
 ## Evidence-quality boundary
 
 The manifest preserves:

@@ -11,6 +11,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Iterable, Mapping
 
+from liquidity_scout.services.cmis_contract import RESPONSE_FRESHNESS_CONTRACT_VERSION
+
 from liquidity_scout.cmis.x1_evidence_capabilities import (
     build_x1_evidence_capability_manifest,
 )
@@ -59,7 +61,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.26.0"
+CMIS_CONTRACT_VERSION = "1.27.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -983,6 +985,12 @@ def build_capability_manifest(
         "schema_version": CAPABILITY_SCHEMA_VERSION,
         "contract_version": CMIS_CONTRACT_VERSION,
         "request_path": request_path,
+        "response_freshness": {
+            "contract_version": RESPONSE_FRESHNESS_CONTRACT_VERSION,
+            "required_on_every_public_response": True,
+            "observation_time_alone_never_proves_provider_fact_freshness": True,
+            "missing_service_specific_freshness_fails_closed": True,
+        },
         "evidence_quality": {
             "evidence_receipt_schema_version": EVIDENCE_RECEIPT_SCHEMA_VERSION,
             "proof_score_schema_version": PROOF_SCORE_SCHEMA_VERSION,
@@ -1035,6 +1043,7 @@ __all__ = [
     "INTELLIGENCE_EVIDENCE_SCHEMA_VERSION",
     "INTELLIGENCE_FOUNDATION_SCHEMA_VERSION",
     "PROOF_SCORE_SCHEMA_VERSION",
+    "RESPONSE_FRESHNESS_CONTRACT_VERSION",
     "PUBLIC_KNOWN_CHAINS",
     "PUBLIC_RUNTIME_SERVICES",
     "PUBLIC_SUPPORTED_CHAINS",

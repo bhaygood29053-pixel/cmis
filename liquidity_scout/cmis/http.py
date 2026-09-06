@@ -36,6 +36,8 @@ from .capabilities import (
     PUBLIC_SUPPORTED_CHAINS,
     build_capability_manifest,
 )
+from liquidity_scout.services.cmis_contract import ensure_response_freshness
+
 from liquidity_scout.cmis_private_core import (
     EXPECTED_PRIVATE_CONTRACT,
     PrivateCoreUnavailable,
@@ -220,6 +222,11 @@ def make_handler(gateway: Any, *, api_key: str = ""):
                 return
 
             response = gateway.dispatch(request)
+            if isinstance(response, dict):
+                response = ensure_response_freshness(
+                    response,
+                    service=(request.get("service") if isinstance(request, dict) else None),
+                )
             self._send_json(200, response)
 
         def log_message(self, format, *args):  # noqa: A003
