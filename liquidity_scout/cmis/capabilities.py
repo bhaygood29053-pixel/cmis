@@ -18,6 +18,10 @@ from liquidity_scout.services.cmis_bridge_to_xdex_public import (
     CONTRACT_VERSION as BRIDGE_TO_XDEX_CONTRACT_VERSION,
     SERVICE as BRIDGE_TO_XDEX_SERVICE,
 )
+from liquidity_scout.services.cmis_trade_price_impact_intelligence import (
+    CONTRACT_VERSION as TRADE_PRICE_IMPACT_CONTRACT_VERSION,
+    SERVICE as TRADE_PRICE_IMPACT_SERVICE,
+)
 from liquidity_scout.services.cmis_cross_chain_provenance_public import (
     CONTRACT_VERSION as CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION,
     SERVICE as CROSS_CHAIN_PROVENANCE_SERVICE,
@@ -47,7 +51,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.23.0"
+CMIS_CONTRACT_VERSION = "1.24.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -69,6 +73,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "pre_trade_check",
     "trade_verification",
     "verified_asset_activity",
+    "trade_price_impact_intelligence",
     "instant_x1_scan",
     "verification_evidence",
     "concentration_change_intelligence",
@@ -111,6 +116,60 @@ def _intelligence_capability(
         "limitations": list(limitations),
     }
 
+
+
+def _trade_price_impact_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": TRADE_PRICE_IMPACT_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": [
+                "trade_price_impact_intelligence_not_available_for_chain"
+            ],
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": TRADE_PRICE_IMPACT_CONTRACT_VERSION,
+        "requirements": [
+            "exact_x1_asset_mint_identity",
+            "cmis_owned_trade_evidence_resolver",
+            "verified_public_wallet_transaction_direction",
+            "verified_exact_selected_pool_membership",
+            "single_normalized_recognized_amm_attribution",
+            "exact_selected_pool_vault_deltas",
+            "verified_execution_price_from_exact_pool_leg_amounts",
+            "transaction_adjacent_pre_and_post_pool_reserves",
+            "verified_exact_pool_rolling_24h_window",
+            "same_verified_usd_basis_for_trade_and_window_volume",
+            "strictly_ordered_next_pool_trade_when_next_price_claimed",
+        ],
+        "limitations": [
+            "pool_local_price_impact_is_not_whole_market_price_impact",
+            "wallet_address_is_not_real_world_identity",
+            "large_wallet_is_not_whale_insider_owner_or_manipulator",
+            "volume_contribution_is_not_volume_causality",
+            "sequence_or_correlation_is_not_broader_market_causality",
+            "one_pool_is_not_every_x1_market_or_dex",
+            "routed_or_multi_amm_transactions_fail_closed",
+            "same_slot_next_trade_ordering_is_unavailable",
+            "source_independence_unverified_unless_separately_proven",
+            "no_automatic_risk_conclusion",
+            "no_trade_recommendation",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "execution_authorized": False,
+    }
 
 
 def _cross_chain_provenance_capability(*, available: bool) -> dict[str, Any]:
@@ -513,6 +572,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
                 "asset_wide_completeness_fails_closed",
             ),
         ),
+        TRADE_PRICE_IMPACT_SERVICE: _trade_price_impact_capability(
+            available=True
+        ),
         "verification_evidence": _capability(
             "bounded",
             requirements=("exact_evidence_id_or_fact_type_subject_id",),
@@ -616,6 +678,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         "verified_asset_activity": _capability(
             "unavailable",
             limitations=("solana_verified_asset_activity_not_implemented",),
+        ),
+        TRADE_PRICE_IMPACT_SERVICE: _trade_price_impact_capability(
+            available=False
         ),
         "verification_evidence": _capability(
             "unavailable",

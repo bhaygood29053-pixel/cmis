@@ -28,6 +28,7 @@ SUPPORTED_SERVICES = (
     "pre_trade_check",
     "trade_verification",
     "verified_asset_activity",
+    "trade_price_impact_intelligence",
     "instant_x1_scan",
     "verification_evidence",
     "concentration_change_intelligence",

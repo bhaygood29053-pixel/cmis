@@ -20,6 +20,10 @@ from liquidity_scout.services.cmis_cross_chain_provenance_public import (
     CONTRACT_VERSION as CROSS_CHAIN_PROVENANCE_CONTRACT_VERSION,
     SERVICE as CROSS_CHAIN_PROVENANCE_SERVICE,
 )
+from liquidity_scout.services.cmis_trade_price_impact_intelligence import (
+    CONTRACT_VERSION as TRADE_PRICE_IMPACT_CONTRACT_VERSION,
+    SERVICE as TRADE_PRICE_IMPACT_SERVICE,
+)
 from liquidity_scout.services.cmis_burn_intelligence import (
     CONTRACT_VERSION as BURN_INTELLIGENCE_CONTRACT_VERSION,
     SERVICE as BURN_INTELLIGENCE_SERVICE,
@@ -56,7 +60,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.23.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.24.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -68,6 +72,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
         self.assertIn(CONCENTRATION_INTELLIGENCE_SERVICE, SUPPORTED_SERVICES)
         self.assertIn(CONCENTRATION_WARNING_SERVICE, SUPPORTED_SERVICES)
+        self.assertIn(TRADE_PRICE_IMPACT_SERVICE, SUPPORTED_SERVICES)
         self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
         self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])
 
@@ -664,6 +669,38 @@ def test_cross_chain_provenance_promotion_is_x1_only_and_structural():
     assert x1["execution_authorized"] is False
 
     solana = manifest["chains"]["solana"]["services"][CROSS_CHAIN_PROVENANCE_SERVICE]
+    assert solana["state"] == "unavailable"
+    assert solana["callable"] is False
+    assert solana["public_service_promoted"] is False
+    assert solana["scout_reliance_promoted"] is False
+    assert solana["execution_authorized"] is False
+
+
+
+def test_trade_price_impact_promotion_is_x1_only_and_pool_local():
+    manifest = build_capability_manifest(
+        runtime_services=SUPPORTED_SERVICES,
+        legacy_supported_chains=SUPPORTED_CHAINS,
+        known_chains=KNOWN_CHAINS,
+    )
+    x1 = manifest["chains"]["x1"]["services"][TRADE_PRICE_IMPACT_SERVICE]
+    assert x1["state"] == "bounded"
+    assert x1["callable"] is True
+    assert x1["read_only"] is True
+    assert x1["public_service_promoted"] is True
+    assert x1["scout_reliance_promoted"] is True
+    assert x1["service_contract_version"] == TRADE_PRICE_IMPACT_CONTRACT_VERSION
+    assert "single_normalized_recognized_amm_attribution" in x1["requirements"]
+    assert "verified_exact_pool_rolling_24h_window" in x1["requirements"]
+    assert "pool_local_price_impact_is_not_whole_market_price_impact" in x1["limitations"]
+    assert "wallet_address_is_not_real_world_identity" in x1["limitations"]
+    assert "volume_contribution_is_not_volume_causality" in x1["limitations"]
+    assert "routed_or_multi_amm_transactions_fail_closed" in x1["limitations"]
+    assert "no_automatic_risk_conclusion" in x1["limitations"]
+    assert "no_trade_recommendation" in x1["limitations"]
+    assert x1["execution_authorized"] is False
+
+    solana = manifest["chains"]["solana"]["services"][TRADE_PRICE_IMPACT_SERVICE]
     assert solana["state"] == "unavailable"
     assert solana["callable"] is False
     assert solana["public_service_promoted"] is False
