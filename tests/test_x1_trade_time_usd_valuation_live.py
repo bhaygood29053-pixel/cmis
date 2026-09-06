@@ -41,8 +41,8 @@ from liquidity_scout.providers.x1.warp_config_semantics import (
 from liquidity_scout.providers.x1.warp_lifecycle_rpc_retry import (
     resilient_get_transaction_post,
 )
-from liquidity_scout.providers.x1.warp_message_lifecycle_retention import (
-    capture_warp_message_lifecycle_retention,
+from liquidity_scout.providers.x1.warp_message_interval_retention import (
+    capture_warp_message_interval_retention,
 )
 from liquidity_scout.providers.x1.warp_message_retention_coverage import (
     evaluate_warp_message_counter_closure,
@@ -210,6 +210,32 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         self.assertTrue(scope["provider_scoped_pool_universe_verified"])
         pool_identity = _identity_from_current_rpc(TARGET_POOL, TARGET_ASSET)
 
+        # First reconstruct the exact target window without USD valuation. This
+        # independently proves the swap set and gives the oldest transaction
+        # fact time. The retention proof below is then scoped to exactly the
+        # interval that historical parity reconstruction needs, rather than
+        # re-running #441's separate 60-day Bridge Flow gate.
+        end_epoch = int(time.time())
+        start_epoch = end_epoch - 86400
+        unvalued_window = reconstruct_x1_pool_24h_chain_activity(
+            pool_identity=pool_identity,
+            start_epoch=start_epoch,
+            end_epoch=end_epoch,
+            max_signatures=MAX_SIGNATURES,
+        )
+        self.assertTrue(unvalued_window["history_range_proven"])
+        self.assertTrue(unvalued_window["history_integrity_verified"])
+        self.assertTrue(unvalued_window["all_successful_transactions_verified"])
+        self.assertTrue(unvalued_window["all_pool_relevant_transactions_classified"])
+        self.assertGreater(unvalued_window["verified_transactions_24h"], 0)
+        swap_times = [
+            int(row["block_time"])
+            for row in unvalued_window["transactions"]
+            if row.get("classification") == "EXACT_POOL_SWAP"
+        ]
+        self.assertTrue(swap_times, "nonzero target has no exact swap fact time")
+        oldest_swap_fact_time = min(swap_times)
+
         # Capture exact current reserve/supply observations first. The
         # subsequently captured retained message universe covers these
         # observation times and lets the evaluator reverse route actions to each
@@ -251,16 +277,22 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         self.assertTrue(counter_closure["counter_account_closure_verified"])
         self.assertTrue(counter_closure["current_message_universe_count_closed"])
 
-        lifecycle = capture_warp_message_lifecycle_retention(
+        interval_retention = capture_warp_message_interval_retention(
             counter_closure=counter_closure,
             message_state=message_state,
+            requested_start=oldest_swap_fact_time,
             as_of=int(time.time()),
             post=resilient_get_transaction_post,
         )
-        self.assertTrue(lifecycle["historical_retention_complete_verified"])
-        self.assertTrue(lifecycle["requested_window_coverage_verified"])
-        self.assertTrue(lifecycle["coverage_complete_verified"])
-        self.assertTrue(lifecycle["missing_history_zero_authorized"])
+        self.assertTrue(
+            interval_retention["interval_retention_complete_verified"]
+        )
+        self.assertTrue(interval_retention["requested_window_coverage_verified"])
+        self.assertTrue(interval_retention["coverage_complete_verified"])
+        self.assertTrue(interval_retention["missing_history_zero_authorized"])
+        self.assertFalse(
+            interval_retention["sixty_day_bridge_flow_retention_promoted"]
+        )
 
         cache = {}
 
@@ -288,7 +320,7 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
                 fact_time=fact_time,
                 current_backing_evidence=backing,
                 normalized_events=normalized,
-                lifecycle_retention=lifecycle,
+                lifecycle_retention=interval_retention,
             )
             canonical = capture_kraken_usdc_usd_fact_price(
                 fact_time=fact_time,
@@ -304,8 +336,6 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             cache[key] = resolved
             return resolved
 
-        end_epoch = int(time.time())
-        start_epoch = end_epoch - 86400
         pool_window = reconstruct_x1_pool_24h_chain_activity(
             pool_identity=pool_identity,
             start_epoch=start_epoch,
@@ -328,8 +358,13 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             "current_usdcx_reserve_backing_verified": current_parity[
                 "current_reserve_backing_verified"
             ],
-            "historical_retention_complete_verified": lifecycle[
-                "historical_retention_complete_verified"
+            "interval_retention_complete_verified": interval_retention[
+                "interval_retention_complete_verified"
+            ],
+            "retention_requested_start": interval_retention["requested_start"],
+            "retention_as_of": interval_retention["as_of"],
+            "sixty_day_bridge_flow_retention_promoted": interval_retention[
+                "sixty_day_bridge_flow_retention_promoted"
             ],
             "normalized_usdc_route_event_count": len(normalized["events"]),
             "normalized_usdc_route_unresolved_counts": normalized[
