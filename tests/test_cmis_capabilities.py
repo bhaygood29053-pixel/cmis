@@ -56,7 +56,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.22.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.23.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         self.assertEqual(
             set(manifest["chains"]["x1"]["services"]),
@@ -162,17 +162,30 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertTrue(x1["scout_reliance_promoted"])
         self.assertEqual(
             x1["service_contract_version"],
-            "instant_x1_scan/v5",
-        )
-        self.assertIn(
-            "current_top_account_concentration_not_promoted_in_v4",
-            x1["limitations"],
+            "instant_x1_scan/v6",
         )
         self.assertIn("bounded_verified_provider_price_backfill", x1["requirements"])
-        self.assertIn("provider_price_backfill_is_price_only", x1["limitations"])
-        self.assertIn("provider_archive_completeness_not_verified", x1["limitations"])
+        self.assertIn("instant_x1_scan_history_adequacy_v1", x1["requirements"])
         self.assertIn(
-            "continuous_coverage_requires_separate_archive_completeness_proof",
+            "native_xnt_supported_pair_price_lifetime_when_history_completion_promoted",
+            x1["requirements"],
+        )
+        self.assertIn("provider_price_backfill_is_price_only", x1["limitations"])
+        self.assertIn("provider_source_independence_not_verified", x1["limitations"])
+        self.assertIn(
+            "source_independence_is_stronger_optional_corroboration_for_scan_completion",
+            x1["limitations"],
+        )
+        self.assertIn(
+            "global_provider_archive_completeness_not_required_for_scan_completion",
+            x1["limitations"],
+        )
+        self.assertIn(
+            "full_usd_lifetime_not_required_for_supported_pair_scan_completion",
+            x1["limitations"],
+        )
+        self.assertIn(
+            "same_fact_provider_close_corroboration_does_not_prove_source_independence",
             x1["limitations"],
         )
         self.assertFalse(x1["execution_authorized"])
