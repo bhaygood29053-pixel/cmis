@@ -99,6 +99,7 @@ def _lifecycle():
         "requested_window_coverage_verified": True,
         "coverage_complete_verified": True,
         "missing_history_zero_authorized": True,
+        "expected_outgoing_creations_verified": True,
     }
 
 
@@ -111,6 +112,7 @@ def _interval_retention():
         "requested_window_coverage_verified": True,
         "coverage_complete_verified": True,
         "missing_history_zero_authorized": True,
+        "expected_outgoing_creations_verified": True,
         "sixty_day_bridge_flow_retention_promoted": False,
     }
 
@@ -172,17 +174,126 @@ class TradeTimeUsdValuationTests(unittest.TestCase):
                 lifecycle_retention=retention,
             )
 
-    def test_historical_usdcx_parity_fails_closed_on_unresolved_route_event(self):
+    def test_historical_usdcx_parity_rejects_unreconciled_unresolved_records(self):
         events = _events()
         events["unresolved_counts"] = {"missing_destination_incoming": 1}
+        events["unresolved_records"] = []
         with self.assertRaisesRegex(
-            TradeTimeUsdValuationError, "unresolved USDC route events"
+            TradeTimeUsdValuationError, "counts/records do not reconcile"
         ):
             evaluate_historical_usdcx_parity(
                 fact_time=FACT_TIME,
                 current_backing_evidence=_backing(),
                 normalized_events=events,
                 lifecycle_retention=_lifecycle(),
+            )
+
+    def test_historical_usdcx_parity_reconstructs_post_fact_x1_burn_conservatively(self):
+        backing = _backing()
+        backing["source"]["amount_raw"] = 1250
+        backing["destination"]["raw_supply"] = 1080
+        events = _events()
+        events["events"] = []
+        events["unresolved_counts"] = {"missing_destination_incoming": 1}
+        events["unresolved_records"] = [
+            {
+                "reason": "missing_destination_incoming",
+                "direction": "outflow",
+                "actual_source_chain": "x1",
+                "actual_destination_chain": "solana",
+                "source_timestamp": 1600,
+                "amount_raw": 170,
+                "source_mint": X1_USDC_X_MINT,
+                "expected_source_mint": X1_USDC_X_MINT,
+                "expected_destination_mint": SOLANA_USDC_MINT,
+                "outgoing_operation": 0,
+                "expected_outgoing_operation": 0,
+            }
+        ]
+        result = evaluate_historical_usdcx_parity(
+            fact_time=FACT_TIME,
+            current_backing_evidence=backing,
+            normalized_events=events,
+            lifecycle_retention=_interval_retention(),
+        )
+        self.assertEqual(result["historical_source_reserve_lower_bound_raw"], 1250)
+        self.assertEqual(result["historical_destination_supply_upper_bound_raw"], 1250)
+        self.assertEqual(result["historical_reserve_surplus_raw"], 0)
+        self.assertTrue(result["historical_usdcx_value_equivalence_verified"])
+        self.assertFalse(result["all_route_events_resolved"])
+        self.assertTrue(result["unresolved_route_effects_conservatively_bounded"])
+        self.assertFalse(result["missing_destination_settlement_assumed"])
+        self.assertEqual(result["conservative_unresolved_source_action_count"], 1)
+        action = result["conservative_unresolved_source_actions"][0]
+        self.assertEqual(action["source_action_effect"], "destination_supply_burn")
+        self.assertTrue(action["source_action_reversed"])
+        self.assertTrue(action["source_reserve_lower_bound_preserved"])
+
+    def test_historical_usdcx_parity_conservative_margin_can_fail(self):
+        backing = _backing()
+        backing["source"]["amount_raw"] = 1249
+        backing["destination"]["raw_supply"] = 1080
+        events = _events()
+        events["events"] = []
+        events["unresolved_counts"] = {"missing_destination_incoming": 1}
+        events["unresolved_records"] = [
+            {
+                "reason": "missing_destination_incoming",
+                "direction": "outflow",
+                "actual_source_chain": "x1",
+                "actual_destination_chain": "solana",
+                "source_timestamp": 1600,
+                "amount_raw": 170,
+                "source_mint": X1_USDC_X_MINT,
+                "expected_source_mint": X1_USDC_X_MINT,
+                "expected_destination_mint": SOLANA_USDC_MINT,
+                "outgoing_operation": 0,
+                "expected_outgoing_operation": 0,
+            }
+        ]
+        result = evaluate_historical_usdcx_parity(
+            fact_time=FACT_TIME,
+            current_backing_evidence=backing,
+            normalized_events=events,
+            lifecycle_retention=_interval_retention(),
+        )
+        self.assertEqual(result["historical_source_reserve_lower_bound_raw"], 1249)
+        self.assertEqual(result["historical_destination_supply_upper_bound_raw"], 1250)
+        self.assertFalse(result["historical_usdcx_value_equivalence_verified"])
+        self.assertFalse(result["historical_value_equivalence_verified"])
+
+    def test_historical_usdcx_parity_requires_source_action_creation_coverage(self):
+        backing = _backing()
+        backing["source"]["amount_raw"] = 1250
+        backing["destination"]["raw_supply"] = 1080
+        events = _events()
+        events["events"] = []
+        events["unresolved_counts"] = {"missing_destination_incoming": 1}
+        events["unresolved_records"] = [
+            {
+                "reason": "missing_destination_incoming",
+                "direction": "outflow",
+                "actual_source_chain": "x1",
+                "actual_destination_chain": "solana",
+                "source_timestamp": 1600,
+                "amount_raw": 170,
+                "source_mint": X1_USDC_X_MINT,
+                "expected_source_mint": X1_USDC_X_MINT,
+                "expected_destination_mint": SOLANA_USDC_MINT,
+                "outgoing_operation": 0,
+                "expected_outgoing_operation": 0,
+            }
+        ]
+        retention = _interval_retention()
+        retention["expected_outgoing_creations_verified"] = False
+        with self.assertRaisesRegex(
+            TradeTimeUsdValuationError, "source action is not independently bounded"
+        ):
+            evaluate_historical_usdcx_parity(
+                fact_time=FACT_TIME,
+                current_backing_evidence=backing,
+                normalized_events=events,
+                lifecycle_retention=retention,
             )
 
     def test_historical_usdcx_parity_fails_outside_accepted_retention(self):
