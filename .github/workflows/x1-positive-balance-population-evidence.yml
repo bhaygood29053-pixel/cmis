@@ -11,8 +11,8 @@ permissions:
 
 jobs:
   xnt-population:
-    name: XNT supply-conservation population evidence
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/x1-positive-balance-population')
+    name: XENCAT supply-conservation population evidence
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/524-positive-balance-population-gate-b' || startsWith(github.head_ref, 'feat/x1-positive-balance-population')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -32,7 +32,7 @@ jobs:
       - name: Run deterministic population evidence tests
         run: |
           python -m unittest tests.test_x1_rpc_token_account_enumeration tests.test_x1_positive_balance_population_evidence -v
-      - name: Run repeated XNT population evidence
+      - name: Run repeated XENCAT population evidence
         run: |
           python -m unittest tests.test_x1_positive_balance_population_live -v
       - name: Safety boundary

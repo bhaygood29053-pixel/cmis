@@ -25,7 +25,7 @@ from liquidity_scout.providers.x1.rpc_token_supply import (
 )
 
 
-VERSION = "1.0"
+VERSION = "1.1"
 DEFAULT_MAX_SLOT_SPAN = 2
 DEFAULT_MINIMUM_OBSERVATIONS = 3
 AUTHORITY_BUCKETS = (1, 5, 10, 20)
@@ -119,8 +119,10 @@ def evaluate_x1_positive_balance_population_observation(
     seen: set[str] = set()
     returned_balance = 0
     positive_accounts = 0
+    zero_balance_accounts = 0
+    positive_authority_fields_complete = True
     authority_balances: dict[str, int] = defaultdict(int)
-    account_rows: list[tuple[str, str, int]] = []
+    account_rows: list[tuple[str, str | None, int]] = []
 
     for index, item in enumerate(accounts):
         if not isinstance(item, Mapping):
@@ -152,10 +154,12 @@ def evaluate_x1_positive_balance_population_observation(
         if raw > 0:
             positive_accounts += 1
             if authority is None:
-                errors.append(f"account_{index}_positive_balance_authority_missing")
+                positive_authority_fields_complete = False
             else:
                 authority_balances[authority] += raw
-                account_rows.append((address, authority, raw))
+            account_rows.append((address, authority, raw))
+        else:
+            zero_balance_accounts += 1
 
     slot_span = (
         abs(enum_slot - supply_slot)
@@ -185,13 +189,20 @@ def evaluate_x1_positive_balance_population_observation(
         not errors
         and conservation
         and slot_scope_bounded
+    )
+    authority_candidate_complete = (
+        candidate_complete
+        and positive_authority_fields_complete
         and len(authority_balances) <= positive_accounts
     )
 
     digest = sha256(
         "\n".join(
-            f"{address}|{authority}|{raw}"
-            for address, authority, raw in sorted(account_rows)
+            f"{address}|{authority or ''}|{raw}"
+            for address, authority, raw in sorted(
+                account_rows,
+                key=lambda row: row[0],
+            )
         ).encode("utf-8")
     ).hexdigest()
 
@@ -212,8 +223,15 @@ def evaluate_x1_positive_balance_population_observation(
             str(supply_amount) if supply_amount is not None else None
         ),
         "supply_conservation_observed": conservation,
+        "returned_token_account_count": len(seen),
         "positive_balance_token_account_count": positive_accounts,
-        "unique_positive_balance_authority_address_count": len(authority_balances),
+        "zero_balance_returned_token_account_count": zero_balance_accounts,
+        "positive_balance_authority_fields_complete": positive_authority_fields_complete,
+        "unique_positive_balance_authority_address_count": (
+            len(authority_balances)
+            if positive_authority_fields_complete
+            else None
+        ),
         "authority_address_distribution": {
             "counted_entity": "token_account_authority_address",
             "beneficial_owner_semantics_verified": False,
@@ -221,15 +239,34 @@ def evaluate_x1_positive_balance_population_observation(
         },
         "population_evidence_sha256": digest,
         "positive_balance_population_candidate_complete": candidate_complete,
+        "positive_balance_token_account_population_candidate_complete": candidate_complete,
+        "positive_balance_authority_address_population_candidate_complete": (
+            authority_candidate_complete
+        ),
         "positive_balance_population_coverage_verified": False,
+        "positive_balance_token_account_population_complete_verified": False,
+        "positive_balance_authority_address_population_complete_verified": False,
+        "zero_balance_token_account_population_complete_verified": False,
+        "wallet_identity_verified": False,
         "holder_semantics_verified": False,
         "beneficial_owner_identity_verified": False,
+        "source_independence_verified": False,
         "cmis_promotable": False,
         "errors": list(dict.fromkeys(errors)),
-        "warnings": [
-            "single_observation_does_not_prove_repeatable_rpc_population_completeness",
-            "token_account_authority_addresses_are_not_beneficial_owner_identities",
-        ],
+        "warnings": list(
+            dict.fromkeys(
+                [
+                    "single_observation_does_not_prove_repeatable_rpc_population_completeness",
+                    "zero_balance_token_account_population_completeness_is_unverified",
+                    "token_account_authority_addresses_are_not_wallet_or_beneficial_owner_identities",
+                ]
+                + (
+                    ["one_or_more_positive_balance_authority_fields_missing"]
+                    if not positive_authority_fields_complete
+                    else []
+                )
+            )
+        ),
         "execution_authorized": False,
     }
 
@@ -357,6 +394,11 @@ def verify_x1_positive_balance_population_series(
     identity_stable = len(mints) == 1 and None not in mints and len(programs) == 1 and None not in programs
 
     coverage_verified = all_candidates_complete and identity_stable
+    authority_coverage_verified = coverage_verified and all(
+        item.get("positive_balance_authority_address_population_candidate_complete")
+        is True
+        for item in usable
+    )
 
     return {
         "service": "x1_positive_balance_population_series",
@@ -370,15 +412,32 @@ def verify_x1_positive_balance_population_series(
         "all_supply_conservation_observations_passed": all_candidates_complete,
         "identity_stable": identity_stable,
         "positive_balance_population_coverage_verified": coverage_verified,
+        "positive_balance_token_account_population_complete_verified": coverage_verified,
+        "positive_balance_authority_address_population_complete_verified": (
+            authority_coverage_verified
+        ),
+        "zero_balance_token_account_population_complete_verified": False,
         "counted_entity": "positive_balance_token_account",
         "authority_distribution_counted_entity": "token_account_authority_address",
+        "wallet_identity_verified": False,
         "holder_semantics_verified": False,
         "beneficial_owner_identity_verified": False,
+        "source_independence_verified": False,
         "cmis_promotable": False,
-        "warnings": [
-            "verified_positive_balance_population_is_not_beneficial_owner_population",
-            "authority_addresses_may_include_wallets_program_derived_addresses_or_other_controllers",
-        ],
+        "warnings": list(
+            dict.fromkeys(
+                [
+                    "zero_balance_token_account_population_completeness_is_unverified",
+                    "verified_positive_balance_token_account_population_is_not_a_wallet_or_beneficial_owner_population",
+                    "authority_addresses_may_include_wallets_program_derived_addresses_or_other_controllers",
+                ]
+                + (
+                    ["positive_balance_authority_address_population_incomplete"]
+                    if not authority_coverage_verified
+                    else []
+                )
+            )
+        ),
         "execution_authorized": False,
     }
 
