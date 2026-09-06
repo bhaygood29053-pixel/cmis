@@ -16,7 +16,7 @@ Accepted baseline:
 
 - capability schema: `1`
 - global existing-service minimum: `1.8.0`
-- current CMIS contract: `1.20.0`
+- current CMIS contract: `1.21.0`
 - request path: `/v1/cmis`
 - Evidence Receipt schema: `1`
 - Proof Score schema: `1`
@@ -242,6 +242,17 @@ conclusion is authorized. Global on-chain DEX discovery and recognized-program
 registry exhaustiveness remain false; source independence remains false unless
 separately proven.
 
+
+## Instant X1 Scan v4 — CMIS 1.21.0
+
+CMIS 1.21 promotes `instant_x1_scan/v4` as the bounded X1 composition for
+`x1_current_market_freshness/v2`. v3 remains unchanged and backward
+compatible.
+
+v4 may surface field-scoped rolling 24h volume and transaction freshness only
+from accepted exact rolling-window evidence. It does not convert provider
+collection time into provider fact time, does not establish source
+independence, and does not authorize execution.
 
 ## Cross-Chain Asset Provenance — CMIS 1.20.0
 
