@@ -215,7 +215,7 @@ jobs:
           policy = Path("liquidity_scout/providers/x1/instant_scan_freshness_policy.json").read_text()
           historical = Path("liquidity_scout/services/cmis_historical.py").read_text()
 
-          assert 'CMIS_CONTRACT_VERSION = "1.26.0"' in capabilities
+          assert 'CMIS_CONTRACT_VERSION = "1.27.0"' in capabilities
           assert '"service_contract_version": "instant_x1_scan/v6"' in capabilities
           assert '"concentration_warning_intelligence"' in capabilities
           assert 'CONCENTRATION_WARNING_CONTRACT_VERSION' in capabilities
@@ -264,8 +264,8 @@ jobs:
           capabilities_test = Path("tests/test_cmis_capabilities.py").read_text()
           http_test = Path("tests/test_cmis_http_gateway.py").read_text()
 
-          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.26.0")' in capabilities_test
-          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.25.0")' not in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.27.0")' in capabilities_test
+          assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.26.0")' not in capabilities_test
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.23.0")' not in capabilities_test
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.22.0")' not in capabilities_test
           assert 'response["contract_version"], "1.26.0"' in http_test
