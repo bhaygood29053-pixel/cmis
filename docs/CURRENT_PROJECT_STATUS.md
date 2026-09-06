@@ -11,8 +11,8 @@ Read in this order:
 
 ## Accepted CMIS platform
 
-- capability contract `1.21.0` (candidate under #507 until merge);
-- Instant X1 Scan v4 candidate under #507, preserving v3 compatibility;
+- capability contract `1.21.0`;
+- Instant X1 Scan v4 accepted, preserving v3 compatibility;
 - Burn Intelligence;
 - Discovery Intelligence;
 - field-scoped current-market freshness;
@@ -23,22 +23,19 @@ Read in this order:
 
 ## Active flagship gates
 
-### #507 — Instant X1 Scan v4 rolling-freshness promotion
+### #507 — Instant X1 Scan v4 rolling-freshness promotion: COMPLETE
 
-#502 / #504 are complete and PR #506 is merged. Exact rolling 24h
-transaction-count freshness and nonzero USD-volume freshness are now proven
-under `x1_rolling_24h_market_activity/v1`.
+#502 / #504 are complete; public PR #508 and protected `cmis-core` PR #26
+are merged. CMIS 1.21 now exposes `instant_x1_scan/v4` over exact
+`x1_current_market_freshness/v2`, while v3 remains backward compatible.
 
-The active promotion gate is #507:
+Accepted rolling 24h volume/transaction freshness may flow into Instant X1
+Scan only when runtime-owned evidence satisfies the exact field contracts.
+Caller-supplied freshness proof is rejected. Missing runtime evidence remains
+fail-closed. Provider fact-time and source independence remain separate.
 
-- preserve `instant_x1_scan/v3` unchanged;
-- add `instant_x1_scan/v4`;
-- require exact `x1_current_market_freshness/v2`;
-- surface rolling volume/transaction freshness only from accepted evidence;
-- keep provider fact-time and source independence separate;
-- keep execution unauthorized.
-
-This is the Gate A promotion/wiring subtask of #444.
+#444 remains open for live evidence generation/refresh plus Gate B
+holder/concentration and Gate C historical completeness/source independence.
 
 
 ### #482 — cross-chain public-service / Scout promotion
