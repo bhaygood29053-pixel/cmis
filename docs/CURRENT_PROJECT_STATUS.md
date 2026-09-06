@@ -13,17 +13,17 @@ Current reconciliation: **2026-09-06 12:00 America/New_York**.
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery v1-v11 remains accepted as bounded discovery below the verification boundary.
 
-## Active acceptance gate
+## Latest accepted live gate
 
 ### Protected cmis-core #41 — live Large-Trade → #498 handoff
 
-The deterministic protected suite is green, but the exact dedicated live workflow is still running.
+**ACCEPTED.** The exact dedicated live workflow passed on run #7 at protected head `9ff63bcac15d9bd7f46868489f444508ed126c06`. PR #41 then merged as `f659f53f3d565bd5886dfae3e1a12370100cddc9`, and Issue #40 closed completed.
 
-Acceptance requires a real live result to prove:
+The accepted proof covers:
 
 `Large-Trade ranking -> returned result -> protected materializer -> exact wallet/direction/execution evidence -> public #498 composition -> stored tpi evidence -> rebuilt ready handoff -> same evidence resolves through #498`.
 
-Until that exact live run passes, **PR #41 must not be merged** and the deterministic CI pass must not be treated as equivalent evidence.
+The proof remains provider-scoped, pool-local, read-only, and fail-closed. It does not establish real-world wallet identity, whole-market causality, every-X1-DEX coverage, automatic risk conclusions, recommendations, or execution authority.
 
 ## Regulatory state
 
@@ -40,7 +40,7 @@ ROBERTA adoption remains a separate upstream consumer gate.
 
 ## Website / ROBERTA dependency
 
-The ROBERTA public website already exposes the current human-facing token, comparison, risk, trade, wallet, history, burn, and generic-question experience. Live regulatory evidence is not yet advertised as an end-to-end website service because ROBERTA public #368 and protected `roberta-core` #68 remain the adoption boundary.
+ROBERTA regulatory adoption is accepted end to end through public PR #368, protected `roberta-core` PR #69, and reconciliation PR #369. Website claims must remain synchronized to accepted ROBERTA capabilities and preserve X1 Scout → CMIS as the authority path.
 
 ## Parallel work
 
