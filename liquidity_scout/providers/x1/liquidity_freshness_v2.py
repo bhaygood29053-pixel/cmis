@@ -67,16 +67,21 @@ def evaluate_x1_ninja_liquidity_freshness_v2(
     pool_scope_evidence: Mapping[str, Any],
     evaluated_at: float,
     max_pools: int = 150,
+    legacy_v1_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Produce separate nominal-provider and independent-USD freshness claims."""
 
-    legacy = evaluate_x1_ninja_liquidity_freshness(
-        market_envelope=market_envelope,
-        snapshot=snapshot,
-        current_usdcx_usd_equivalence=current_usdcx_usd_equivalence,
-        pool_scope_evidence=pool_scope_evidence,
-        evaluated_at=evaluated_at,
-        max_pools=max_pools,
+    legacy = (
+        dict(legacy_v1_evidence)
+        if isinstance(legacy_v1_evidence, Mapping)
+        else evaluate_x1_ninja_liquidity_freshness(
+            market_envelope=market_envelope,
+            snapshot=snapshot,
+            current_usdcx_usd_equivalence=current_usdcx_usd_equivalence,
+            pool_scope_evidence=pool_scope_evidence,
+            evaluated_at=evaluated_at,
+            max_pools=max_pools,
+        )
     )
 
     failures: list[str] = []
