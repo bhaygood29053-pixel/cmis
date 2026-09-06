@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from liquidity_scout.services.cmis_contract import project_response_freshness
 from liquidity_scout.services.cmis_instant_x1_scan_v4 import (
     HISTORY_METRICS,
     SERVICE,
@@ -165,6 +166,7 @@ def build_instant_x1_scan_v5_response(
         if limitation not in limitations:
             limitations.append(limitation)
 
+    result = project_response_freshness(result, freshness)
     return result
 
 

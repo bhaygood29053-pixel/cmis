@@ -135,6 +135,11 @@ def test_v5_preserves_v4_sections_and_projects_split_liquidity():
     assert market["volume_24h_freshness_verified"] is True
     assert market["transactions_24h_freshness_verified"] is True
     assert v5["data"]["execution_authorized"] is False
+    assert v5["freshness"]["contract_version"] == "cmis_response_freshness/v1"
+    assert v5["freshness"]["scope"] == "instant_x1_scan.response"
+    assert v5["freshness"]["state"] == "PARTIAL"
+    assert v5["freshness"]["freshness_verified"] is False
+    assert v5["freshness"]["details"] == market["freshness"]
 
 
 def test_v5_without_v3_assessment_fails_closed_for_split_fields():
@@ -148,6 +153,11 @@ def test_v5_without_v3_assessment_fails_closed_for_split_fields():
     assert market["independent_liquidity_usd_freshness_verified"] is False
     assert market["volume_24h_freshness_verified"] is False
     assert market["transactions_24h_freshness_verified"] is False
+    assert v5["freshness"]["contract_version"] == "cmis_response_freshness/v1"
+    assert v5["freshness"]["state"] == "NOT_VERIFIED"
+    assert v5["freshness"]["freshness_verified"] is False
+    assert v5["freshness"]["details"] == market["freshness"]
+    assert "reason" not in v5["freshness"]
 
 
 def test_v5_rejects_v2_or_execution_authorizing_freshness():
