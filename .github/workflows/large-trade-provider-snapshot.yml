@@ -52,6 +52,7 @@ jobs:
         run: |
           python -m pytest -q tests/test_large_trade_provider_snapshot.py
 
+      # The committed sanitized fixture makes follow-up exact-head runs non-mutating.
       - name: Capture live provider snapshot once
         shell: bash
         run: |
