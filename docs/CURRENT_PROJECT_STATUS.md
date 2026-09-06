@@ -4,8 +4,9 @@ Current reconciliation: **2026-09-06 12:00 America/New_York**.
 
 ## Accepted platform
 
-- current capability contract: `1.26.0`;
+- current capability contract: `1.27.0`;
 - current flagship scan: `instant_x1_scan/v6`;
+- universal public response freshness: `cmis_response_freshness/v1` on every CMIS response;
 - Burn, Discovery, WHAT CHANGED? upstream facts, history, identity, deterministic risk, pre-trade analysis, concentration intelligence, and field-scoped freshness remain accepted under their established contracts;
 - Bridge-to-XDEX utilization and cross-chain provenance are promoted for X1 Scout reliance;
 - `trade_price_impact_intelligence/v1` is accepted through CMIS #498 / PR #530 + protected `cmis-core` #33;
