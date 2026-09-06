@@ -225,13 +225,12 @@ jobs:
           assert xdex_history, "XDEX XNT/USDC.X historical window unavailable"
           PY
 
-      - name: Observe #504 exact-pool reconciliation behavior
+      - name: Confirm #504 stale LB aggregate diagnostic
         env:
           PYTHONPATH: .
         run: |
           python - <<'PY'
           import json
-          import time
 
           from liquidity_scout.providers.x1.ninja_history import fetch_pool_trades_raw
           from liquidity_scout.providers.x1.ninja_pool_detail import fetch_pool_detail_raw
@@ -239,89 +238,51 @@ jobs:
           TARGET_POOL = "CKtXmX82rLBqNkfpCBPUoHLmtZhgBdVWpVPW93hHHCCK"
           TARGET_SIG = "2uWfa2LJcjo5qo916N9Ce7aUuu5xKctez9pL3NDCgzgAqUpQ7JZqZGKP4UtfyzmYiVWn6oJWifRhvqM6QDFPvynK"
           REFERENCE_POOL = "CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR"
-          snapshots = []
 
-          def unwrap_pool(body):
+          def unwrap(body):
               if not isinstance(body, dict):
                   return None
-              if any(
-                  key in body
-                  for key in ("priceUsd", "volume24h", "txns24h", "lastSyncedAt")
-              ):
+              if any(k in body for k in ("priceUsd", "volume24h", "txns24h")):
                   return body
               for name in ("data", "pool", "result"):
                   value = body.get(name)
                   if isinstance(value, dict) and any(
-                      key in value
-                      for key in ("priceUsd", "volume24h", "txns24h", "lastSyncedAt")
+                      k in value for k in ("priceUsd", "volume24h", "txns24h")
                   ):
                       return value
               return None
 
-          for index in range(8):
-              target_probe = fetch_pool_detail_raw(TARGET_POOL)
-              reference_probe = fetch_pool_detail_raw(REFERENCE_POOL)
-              trades = fetch_pool_trades_raw(TARGET_POOL)
-              target = unwrap_pool(target_probe.get("raw_response"))
-              reference = unwrap_pool(reference_probe.get("raw_response"))
-              trade = next(
-                  (
-                      row
-                      for row in (trades.get("raw_response") or {}).get("trades", [])
-                      if isinstance(row, dict) and row.get("txHash") == TARGET_SIG
-                  ),
-                  None,
-              )
-              if (
-                  not isinstance(target, dict)
-                  or not isinstance(reference, dict)
-                  or not isinstance(trade, dict)
-              ):
-                  raise AssertionError("target/reference/trade evidence disappeared")
-
-              native = float(trade["amountNative"])
-              reference_xnt_usd = float(reference["priceUsd"])
-              snapshots.append({
-                  "index": index,
-                  "observed_at": time.time(),
-                  "pool_lastSyncedAt": target.get("lastSyncedAt"),
-                  "pool_volume24h": target.get("volume24h"),
-                  "pool_txns24h": target.get("txns24h"),
-                  "trade_amountNative": trade.get("amountNative"),
-                  "trade_amountUsd": trade.get("amountUsd"),
-                  "trade_priceUsd": trade.get("priceUsd"),
-                  "reference_xnt_priceUsd": reference.get("priceUsd"),
-                  "reference_lastSyncedAt": reference.get("lastSyncedAt"),
-                  "quote_x_reference_xnt_usd": native * reference_xnt_usd,
-                  "pool_volume_minus_current_reference_mark": (
-                      float(target["volume24h"]) - native * reference_xnt_usd
-                  ),
-                  "trade_amount_usd_minus_current_reference_mark": (
-                      float(trade["amountUsd"]) - native * reference_xnt_usd
-                  ),
-              })
-              if index < 7:
-                  time.sleep(10)
-
-          def changed(field):
-              return len({str(row[field]) for row in snapshots}) > 1
-
+          target = unwrap(fetch_pool_detail_raw(TARGET_POOL)["raw_response"])
+          reference = unwrap(fetch_pool_detail_raw(REFERENCE_POOL)["raw_response"])
+          trades = fetch_pool_trades_raw(TARGET_POOL)
+          trade = next(
+              row
+              for row in (trades.get("raw_response") or {}).get("trades", [])
+              if isinstance(row, dict) and row.get("txHash") == TARGET_SIG
+          )
+          native = float(trade["amountNative"])
+          current_mark = native * float(reference["priceUsd"])
           result = {
-              "schema": "x1_504_exact_pool_reconciliation_series.v2",
-              "snapshots": snapshots,
-              "pool_volume_changed": changed("pool_volume24h"),
-              "trade_amount_usd_changed": changed("trade_amountUsd"),
-              "reference_xnt_price_usd_changed": changed("reference_xnt_priceUsd"),
-              "pool_lastSyncedAt_changed": changed("pool_lastSyncedAt"),
-              "reference_lastSyncedAt_changed": changed("reference_lastSyncedAt"),
-              "provider_fact_time_verified": False,
-              "volume_usd_semantics_verified": False,
+              "schema": "x1_504_stale_lb_aggregate.v1",
+              "pool_volume24h": target.get("volume24h"),
+              "pool_txns24h": target.get("txns24h"),
+              "pool_lastSyncedAt": target.get("lastSyncedAt"),
+              "trade_amountNative": trade.get("amountNative"),
+              "trade_amountUsd": trade.get("amountUsd"),
+              "reference_xnt_priceUsd": reference.get("priceUsd"),
+              "quote_x_reference_xnt_usd": current_mark,
+              "trade_row_matches_current_reference_mark": abs(
+                  float(trade["amountUsd"]) - current_mark
+              ) <= 0.01,
+              "pool_aggregate_matches_current_reference_mark": abs(
+                  float(target["volume24h"]) - current_mark
+              ) <= 0.01,
+              "volume_usd_freshness_verified": False,
               "execution_authorized": False,
           }
-          print("X1 #504 EXACT-POOL RECONCILIATION SERIES")
+          print("X1 #504 STALE LB AGGREGATE DIAGNOSTIC")
           print(json.dumps(result, sort_keys=True, default=str))
-          assert len(snapshots) == 8
-          assert all(row["pool_txns24h"] == 1 for row in snapshots)
+          assert result["trade_row_matches_current_reference_mark"] is True
           PY
 
       - name: Discover reconciled nonzero XNT-volume candidate
@@ -361,7 +322,7 @@ jobs:
               except ValueError:
                   return None
 
-          candidates = []
+          preselected = []
           for pool in pools:
               if not isinstance(pool, dict):
                   continue
@@ -399,6 +360,26 @@ jobs:
                       matched_addresses.append(a)
               if matched_addresses != [address]:
                   continue
+
+              preselected.append({
+                  "pool": pool,
+                  "address": address,
+                  "asset": asset,
+                  "txs": txs,
+                  "liquidity": float(pool.get("liquidity") or 0),
+              })
+
+          preselected.sort(
+              key=lambda row: (row["txs"], -row["liquidity"], row["address"])
+          )
+          preselected = preselected[:30]
+
+          candidates = []
+          for selected in preselected:
+              pool = selected["pool"]
+              address = selected["address"]
+              asset = selected["asset"]
+              txs = selected["txs"]
 
               try:
                   trade_observation = fetch_pool_trades_raw(address)
@@ -471,6 +452,7 @@ jobs:
 
           result = {
               "schema": "x1_504_reconciled_candidate_discovery.v1",
+              "preselected_candidate_count": len(preselected),
               "candidate_count": len(candidates),
               "reconciled_candidate_count": len(reconciled),
               "reconciled_candidates": reconciled[:10],
