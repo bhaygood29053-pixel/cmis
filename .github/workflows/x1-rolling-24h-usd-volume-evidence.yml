@@ -1,0 +1,133 @@
+name: X1 Rolling 24h USD Volume Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  usd-volume-evidence:
+    name: Prove nonzero X1 rolling 24h USD valuation
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/504-nonzero-usd-volume'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
+      X1_RPC_URL: https://rpc.mainnet.x1.xyz
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Verify X1.Ninja key
+        shell: bash
+        run: |
+          if [ -z "${X1_NINJA_API_KEY:-}" ]; then
+            echo "X1_NINJA_API_KEY repository secret is unavailable."
+            exit 1
+          fi
+
+      - name: Probe #504 exact trade and historical XNT price evidence
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          from liquidity_scout.providers.x1.market import fetch_all_pools
+          from liquidity_scout.providers.x1.ninja_history import (
+              fetch_pool_ohlcv_raw,
+              fetch_pool_trades_raw,
+          )
+          from liquidity_scout.providers.x1.transaction_semantics import (
+              report_to_dict,
+              verify_signature,
+          )
+          from liquidity_scout.providers.x1.xdex import fetch_price_history
+          from liquidity_scout.providers.x1.xdex_price_history_import import (
+              USDC_X_MINT,
+              WRAPPED_XNT_MINT,
+          )
+
+          TARGET_POOL = "CKtXmX82rLBqNkfpCBPUoHLmtZhgBdVWpVPW93hHHCCK"
+          TARGET_SIG = "2uWfa2LJcjo5qo916N9Ce7aUuu5xKctez9pL3NDCgzgAqUpQ7JZqZGKP4UtfyzmYiVWn6oJWifRhvqM6QDFPvynK"
+          TARGET_TIME = 1788618043
+          REFERENCE_POOL = "CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR"
+
+          tx = report_to_dict(
+              verify_signature(
+                  TARGET_SIG,
+                  expected_mint="Dj7AY5CXLHtcT5gZ59Kg3nYgx4FUNMR38dZdQcGT3PA6",
+              )
+          )
+          trades = fetch_pool_trades_raw(TARGET_POOL)
+          target_rows = [
+              row
+              for row in (trades.get("raw_response") or {}).get("trades", [])
+              if isinstance(row, dict) and row.get("txHash") == TARGET_SIG
+          ]
+
+          xdex_history = fetch_price_history(
+              WRAPPED_XNT_MINT,
+              USDC_X_MINT,
+              time_from=TARGET_TIME - 300,
+              time_to=TARGET_TIME + 300,
+          )
+          ninja_reference = fetch_pool_ohlcv_raw(
+              REFERENCE_POOL,
+              timeframe="1m",
+              limit=300,
+          )
+          catalog, xnt_price_usd = fetch_all_pools(sleep_seconds=0)
+          ref_rows = [
+              row
+              for row in catalog
+              if isinstance(row, dict)
+              and (row.get("address") or row.get("poolAddress") or row.get("id"))
+              == REFERENCE_POOL
+          ]
+
+          result = {
+              "schema": "x1_504_probe.v1",
+              "target_transaction": tx,
+              "target_trade_rows": target_rows,
+              "xdex_xnt_usdcx_history": xdex_history,
+              "ninja_xnt_usdcx_ohlcv": ninja_reference,
+              "current_reference_pool_rows": ref_rows,
+              "current_ninja_xnt_price_usd": xnt_price_usd,
+              "target_time": TARGET_TIME,
+              "historical_usdcx_usd_equivalence_verified": False,
+              "execution_authorized": False,
+          }
+          print("X1 #504 FACT-TIME VALUATION PROBE")
+          print(json.dumps(result, sort_keys=True, default=str))
+          assert tx["found"] is True
+          assert tx["succeeded"] is True
+          assert tx["block_time"] == TARGET_TIME
+          assert target_rows, "target Ninja trade row unavailable"
+          assert xdex_history, "XDEX XNT/USDC.X historical window unavailable"
+          PY
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Read-only evidence only."
+          echo "No current-price substitution."
+          echo "No nearest-candle substitution is authorized."
+          echo "Historical USDC.X/USD equivalence remains a separate required gate."
+          echo "execution_authorized=false"
