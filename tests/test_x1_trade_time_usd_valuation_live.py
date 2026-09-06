@@ -424,12 +424,36 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             for row in provider_trade_usd_conversion_diagnostics
             if row.get("slot") is not None
         }
-        provider_trade_current_xnt_relationship_verified = bool(
-            len(provider_trade_usd_conversion_diagnostics) >= 2
-            and len(distinct_trade_slots) >= 2
-            and all(
-                row["matches_current_catalog_xnt_price_at_1e_12"]
-                for row in provider_trade_usd_conversion_diagnostics
+        implied_xnt_prices = [
+            Decimal(row["amount_usd_div_amount_native"])
+            for row in provider_trade_usd_conversion_diagnostics
+        ]
+        shared_trade_xnt_basis_relative_spread = None
+        provider_trade_shared_xnt_basis_verified = False
+        if len(implied_xnt_prices) >= 2:
+            shared_min = min(implied_xnt_prices)
+            shared_max = max(implied_xnt_prices)
+            shared_trade_xnt_basis_relative_spread = (
+                (shared_max - shared_min) / shared_min
+                if shared_min > 0
+                else None
+            )
+            provider_trade_shared_xnt_basis_verified = bool(
+                len(distinct_trade_slots) >= 2
+                and shared_trade_xnt_basis_relative_spread is not None
+                and shared_trade_xnt_basis_relative_spread <= Decimal("1e-12")
+            )
+
+        current_trade_row_usd_sum = sum(
+            (Decimal(str(row.get("amountUsd"))) for row in provider_trade_rows),
+            Decimal(0),
+        )
+        provider_pool_volume = Decimal(str(rolling["provider_volume_24h_usd"]))
+        provider_volume_equals_current_trade_row_sum = bool(
+            abs(provider_pool_volume - current_trade_row_usd_sum)
+            <= max(
+                Decimal("0.01"),
+                abs(provider_pool_volume) * Decimal("0.01"),
             )
         )
 
@@ -518,8 +542,19 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
             "provider_trade_usd_conversion_diagnostics": (
                 provider_trade_usd_conversion_diagnostics
             ),
-            "provider_trade_current_xnt_relationship_verified": (
-                provider_trade_current_xnt_relationship_verified
+            "provider_trade_shared_xnt_basis_verified": (
+                provider_trade_shared_xnt_basis_verified
+            ),
+            "provider_trade_shared_xnt_basis_relative_spread": (
+                format(shared_trade_xnt_basis_relative_spread, "e")
+                if shared_trade_xnt_basis_relative_spread is not None
+                else None
+            ),
+            "provider_current_trade_row_usd_sum": format(
+                current_trade_row_usd_sum, "f"
+            ),
+            "provider_volume_equals_current_trade_row_sum": (
+                provider_volume_equals_current_trade_row_sum
             ),
             "provider_trade_row_financial_semantics_promoted": False,
             "provider_trade_usd_revaluation_semantics_promoted": False,
@@ -529,8 +564,12 @@ class X1Rolling24hUsdVolumeLiveTests(unittest.TestCase):
         print(json.dumps(evidence, sort_keys=True, default=str))
 
         self.assertTrue(
-            provider_trade_current_xnt_relationship_verified,
-            "current provider trade-row USD fields do not share the current catalog XNT/USD relationship",
+            provider_trade_shared_xnt_basis_verified,
+            "provider trade rows at distinct slots do not share one common XNT/USD conversion basis",
+        )
+        self.assertFalse(
+            provider_volume_equals_current_trade_row_sum,
+            "pool volume24h unexpectedly equals the dynamically returned trade-row USD sum",
         )
         self.assertGreater(pool_window["verified_transactions_24h"], 0)
         self.assertTrue(pool_window["history_range_proven"])
