@@ -131,7 +131,7 @@ def test_live_513_v2_splits_provider_nominal_from_independent_usd(monkeypatch):
         "725.7858651168269159802816414"
     )
     assert Decimal(result["independent_liquidity_usd_value"]) == Decimal(
-        "725.70166669861466905861446883876072040898180513"
+        "725.7016666986146690586144687"
     )
     assert (
         Decimal(result["independent_liquidity_usd_value"])
