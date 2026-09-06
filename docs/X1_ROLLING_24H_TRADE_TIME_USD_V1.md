@@ -27,16 +27,24 @@ For each exact-pool swap classified by the #502/#503 chain reconstruction:
    oldest exact swap fact in this market window through the current backing
    observation. Every retained, paired, settled USDC-route bridge action inside
    that interval is reversed on the chain where that action actually occurred.
-5. The reconstructed historical Solana USDC reserve must cover the reconstructed
-   historical X1 USDC.X supply at equal six-decimal units.
-6. Canonical USDC/USD is observed from Kraken's public `USDC/USD` PostTrade
+5. An unresolved destination-side Warp record may be bounded only when its
+   source-side action is independently fixed by the exact route mint, expected
+   native/non-native operation topology, and verified outgoing-account creation
+   coverage. For a post-fact X1 -> Solana USDC.X outflow, CMIS adds the verified
+   X1 burn amount back to current USDC.X supply but does **not** assume the
+   missing Solana release occurred. Current Solana reserve therefore remains a
+   conservative lower bound and reconstructed historical USDC.X supply is a
+   conservative upper bound.
+6. The conservative reconstructed historical Solana USDC reserve must cover the
+   conservative reconstructed historical X1 USDC.X supply at equal six-decimal
+   units.
+7. Canonical USDC/USD is observed from Kraken's public `USDC/USD` PostTrade
    feed. The accepted policy is the last exact-pair trade at or before the swap
    fact time with maximum age 120 seconds.
-7. Decimal arithmetic composes:
+8. Decimal arithmetic composes:
    `XNT amount × (USDC.X / XNT) × (USD / USDC)`.
-8. The resulting exact-swap values are summed and compared with the provider
+9. The resulting exact-swap values are summed and compared with the provider
    rolling 24h USD volume under the already accepted tolerance policy.
-
 ## Fail-closed rules
 
 The nonzero USD field stays unverified if any swap lacks any required leg,
@@ -45,7 +53,8 @@ including:
 - incomplete X1 RPC vault history;
 - a missing or ambiguous vault anchor;
 - exact-mint or unit/direction mismatch;
-- unresolved Warp USDC route events;
+- an unresolved Warp USDC route event whose source-side effect cannot be
+  conservatively and independently bounded;
 - incomplete bounded Warp interval-retention coverage;
 - reconstructed USDC reserve below reconstructed USDC.X supply;
 - no Kraken USDC/USD trade within the 120-second last-observation policy;
