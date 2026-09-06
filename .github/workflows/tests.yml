@@ -200,7 +200,7 @@ jobs:
           print("EXECUTION_AUTHORIZED=FALSE")
           PY
 
-      - name: Validate CMIS 1.26 capability and Instant X1 Scan v6 history contract
+      - name: Validate CMIS 1.27 capability and Instant X1 Scan v6 history contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -256,7 +256,7 @@ jobs:
           PYTHONPATH: .
         run: python -m pytest -q tests/test_cmis_current_market_freshness_v117.py
 
-      - name: Validate CMIS 1.26 regression expectations
+      - name: Validate CMIS 1.27 regression expectations
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -268,10 +268,10 @@ jobs:
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.26.0")' not in capabilities_test
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.23.0")' not in capabilities_test
           assert 'self.assertEqual(CMIS_CONTRACT_VERSION, "1.22.0")' not in capabilities_test
-          assert 'response["contract_version"], "1.26.0"' in http_test
-          assert 'response["contract_version"], "1.25.0"' not in http_test
+          assert 'response["contract_version"], "1.27.0"' in http_test
+          assert 'response["contract_version"], "1.26.0"' not in http_test
           assert 'response["contract_version"], "1.22.0"' not in http_test
-          print("CMIS_126_REGRESSION_EXPECTATIONS=PASS")
+          print("CMIS_127_REGRESSION_EXPECTATIONS=PASS")
           PY
 
       - name: Test regulatory evidence runtime promotion v1
