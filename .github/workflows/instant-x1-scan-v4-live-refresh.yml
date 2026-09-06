@@ -18,8 +18,6 @@ jobs:
     env:
       X1_RPC_URL: https://rpc.mainnet.x1.xyz
       X1_NINJA_API_KEY: ${{ secrets.X1_NINJA_API_KEY }}
-      X1_513_ELIGIBILITY_MAX_ATTEMPTS: "30"
-      X1_513_ELIGIBILITY_INTERVAL_SECONDS: "10"
 
     steps:
       - name: Check out public CMIS shell
@@ -36,7 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Capture bounded provider snapshot
+      - name: Capture fixed exact provider snapshot
         run: |
           mkdir -p artifacts
           python - <<'PY'
@@ -44,12 +42,8 @@ jobs:
           import time
 
           from liquidity_scout.market.resolver import find_matches_for_term, pool_address
-          from liquidity_scout.providers.x1.current_usdcx_usd_capture import (
-              capture_current_usdcx_usd_equivalence_evidence,
-          )
           from liquidity_scout.providers.x1.liquidity_freshness import REFERENCE_POOL_ADDRESS
           from liquidity_scout.providers.x1.market import fetch_all_pools
-          from liquidity_scout.providers.x1.xdex_price_history_import import WRAPPED_XNT_MINT
 
           def text(value):
               value = str(value or "").strip()
@@ -63,173 +57,80 @@ jobs:
               except (TypeError, ValueError):
                   return None
 
-          def token_mint(token):
-              if not isinstance(token, dict):
-                  return None
-              return text(token.get("mint") or token.get("address"))
-
-          import os
-
-          max_attempts = int(os.getenv("X1_513_ELIGIBILITY_MAX_ATTEMPTS", "30"))
-          interval_seconds = float(
-              os.getenv("X1_513_ELIGIBILITY_INTERVAL_SECONDS", "10")
-          )
-          if not 1 <= max_attempts <= 60:
-              raise SystemExit("X1_513_ELIGIBILITY_MAX_ATTEMPTS must be 1..60")
-          if not 0 <= interval_seconds <= 60:
-              raise SystemExit("X1_513_ELIGIBILITY_INTERVAL_SECONDS must be 0..60")
-
-          # Fixed live target retained from the first non-cherry-picked #513
-          # capture. Do not switch pools based on USD agreement.
           target_pool = "8ztGiYGDvQA8bMoyaFgBNvNWgDraYpMeU3E63kaEHBWG"
           target_asset = "7k79DrpoyY1GkD2m14WCwwew1yQsixkZzJhbCzLHdUKu"
-          attempts = []
-          evidence = None
 
-          for attempt_index in range(max_attempts):
-              pools, xnt_price = fetch_all_pools(sleep_seconds=0)
-              target_rows = [
-                  row
-                  for row in pools
-                  if isinstance(row, dict) and text(pool_address(row)) == target_pool
-              ]
-              if len(target_rows) != 1:
-                  attempts.append(
-                      {
-                          "attempt": attempt_index,
-                          "eligible": False,
-                          "reason": "fixed_target_pool_unavailable",
-                      }
-                  )
-              else:
-                  target_row = target_rows[0]
-                  matches = [
-                      match
-                      for match in find_matches_for_term(target_asset, pools)
-                      if len(match) >= 4 and match[3] >= 90
-                  ]
-                  addresses = []
-                  seen = set()
-                  for match in matches:
-                      address = text(pool_address(match[0]))
-                      if address and address not in seen:
-                          seen.add(address)
-                          addresses.append(address)
+          pools, xnt_price = fetch_all_pools(sleep_seconds=0)
+          target_rows = [
+              row
+              for row in pools
+              if isinstance(row, dict) and text(pool_address(row)) == target_pool
+          ]
+          if len(target_rows) != 1:
+              raise SystemExit("fixed #513 target pool unavailable")
+          target_row = target_rows[0]
 
-                  volume = number(target_row.get("volume24h"))
-                  txs = number(
-                      target_row.get("txns24h")
-                      if target_row.get("txns24h") is not None
-                      else target_row.get("transactions24h")
-                  )
-                  exact_target = bool(
-                      addresses == [target_pool]
-                      and volume == 0.0
-                      and txs == 0.0
-                  )
-                  required = {target_pool, REFERENCE_POOL_ADDRESS}
-                  retained = [
-                      dict(row)
-                      for row in pools
-                      if text(pool_address(row)) in required
-                  ]
-                  retained_addresses = {
-                      text(pool_address(row)) for row in retained
-                  }
-
-                  try:
-                      usdcx = capture_current_usdcx_usd_equivalence_evidence()
-                      equivalence = usdcx.get("equivalence") or {}
-                      source_usdc_usd = equivalence.get("source_usdc_usd_price")
-                      delta = (
-                          abs(float(source_usdc_usd) - 1.0)
-                          if source_usdc_usd is not None
-                          else None
-                      )
-                      eligible = bool(
-                          exact_target
-                          and retained_addresses == required
-                          and equivalence.get(
-                              "current_usdcx_usd_equivalence_verified"
-                          )
-                          is True
-                          and delta is not None
-                          and delta <= 0.0001
-                      )
-                      attempt = {
-                          "attempt": attempt_index,
-                          "captured_at": time.time(),
-                          "source_usdc_usd_price": source_usdc_usd,
-                          "source_usdc_usd_price_delta_from_one": delta,
-                          "fixed_target_exact_zero_activity": exact_target,
-                          "eligible": eligible,
-                      }
-                      attempts.append(attempt)
-
-                      if eligible:
-                          selected = {
-                              "asset_mint": target_asset,
-                              "pool_address": target_pool,
-                              "liquidity": number(target_row.get("liquidity")) or 0.0,
-                              "provider_volume24h": volume,
-                              "provider_transactions24h": int(txs),
-                          }
-                          evidence = {
-                              "schema": "instant_x1_scan_v4_provider_snapshot_513/v1",
-                              "captured_at": attempt["captured_at"],
-                              "selection_policy": (
-                                  "fixed_target_from_first_non_cherry_picked_capture;"
-                                  "no_pool_switching_during_usdc_eligibility_sampling"
-                              ),
-                              "selected": selected,
-                              "reference_pool_address": REFERENCE_POOL_ADDRESS,
-                              "xnt_price_usd": xnt_price,
-                              "current_usdcx_usd_equivalence_verified": True,
-                              "source_usdc_usd_price": source_usdc_usd,
-                              "source_usdc_usd_price_delta_from_one": delta,
-                              "liquidity_relative_tolerance": 0.0001,
-                              "provider_xnt_basis_eligible_for_strict_liquidity_match": True,
-                              "eligibility_attempts": attempts,
-                              "pools": retained,
-                              "provider_secret_included": False,
-                              "execution_authorized": False,
-                          }
-                          break
-                  except Exception as exc:
-                      attempts.append(
-                          {
-                              "attempt": attempt_index,
-                              "eligible": False,
-                              "reason": f"{type(exc).__name__}: {exc}",
-                          }
-                      )
-
-              if attempt_index + 1 < max_attempts and interval_seconds:
-                  time.sleep(interval_seconds)
-
-          if evidence is None:
-              blocked = {
-                  "schema": "instant_x1_scan_v4_provider_snapshot_513_blocked/v1",
-                  "fixed_target_pool": target_pool,
-                  "fixed_target_asset": target_asset,
-                  "liquidity_relative_tolerance": 0.0001,
-                  "attempts": attempts,
-                  "provider_secret_included": False,
-                  "execution_authorized": False,
-              }
-              rendered = json.dumps(blocked, sort_keys=True, default=str)
-              with open(
-                  "artifacts/x1-provider-snapshot-513-blocked.json",
-                  "w",
-                  encoding="utf-8",
-              ) as handle:
-                  handle.write(rendered + "\n")
-              print("X1 #513 PROVIDER SNAPSHOT BLOCKED BY LIVE USD BASIS")
-              print(rendered)
+          matches = [
+              match
+              for match in find_matches_for_term(target_asset, pools)
+              if len(match) >= 4 and match[3] >= 90
+          ]
+          addresses = []
+          seen = set()
+          for match in matches:
+              address = text(pool_address(match[0]))
+              if address and address not in seen:
+                  seen.add(address)
+                  addresses.append(address)
+          if addresses != [target_pool]:
               raise SystemExit(
-                  "fixed #513 target never entered strict liquidity USD eligibility"
+                  f"fixed #513 target exact market scope changed: {addresses}"
               )
 
+          volume = number(target_row.get("volume24h"))
+          txs = number(
+              target_row.get("txns24h")
+              if target_row.get("txns24h") is not None
+              else target_row.get("transactions24h")
+          )
+          if volume != 0.0 or txs != 0.0:
+              raise SystemExit(
+                  f"fixed #513 target no longer zero activity: volume={volume} txs={txs}"
+              )
+
+          required = {target_pool, REFERENCE_POOL_ADDRESS}
+          retained = [
+              dict(row)
+              for row in pools
+              if text(pool_address(row)) in required
+          ]
+          retained_addresses = {text(pool_address(row)) for row in retained}
+          if retained_addresses != required:
+              raise SystemExit(
+                  f"required provider rows unavailable: {sorted(retained_addresses)}"
+              )
+
+          evidence = {
+              "schema": "instant_x1_scan_v4_provider_snapshot_513/v1",
+              "captured_at": time.time(),
+              "selection_policy": (
+                  "fixed_target_from_first_non_cherry_picked_capture;"
+                  "no_pool_switching;no_usdc_parity_prescreen"
+              ),
+              "selected": {
+                  "asset_mint": target_asset,
+                  "pool_address": target_pool,
+                  "liquidity": number(target_row.get("liquidity")) or 0.0,
+                  "provider_volume24h": volume,
+                  "provider_transactions24h": int(txs),
+              },
+              "reference_pool_address": REFERENCE_POOL_ADDRESS,
+              "xnt_price_usd": xnt_price,
+              "provider_xnt_basis_eligible_for_strict_liquidity_match": False,
+              "pools": retained,
+              "provider_secret_included": False,
+              "execution_authorized": False,
+          }
           rendered = json.dumps(evidence, sort_keys=True, default=str)
           with open(
               "artifacts/x1-provider-snapshot-513.json",
@@ -245,12 +146,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: x1-provider-snapshot-513
-          path: artifacts/*.json
+          path: artifacts/x1-provider-snapshot-513.json
           if-no-files-found: error
 
       - name: Safety boundary
         if: always()
         run: |
           echo "Snapshot contains provider market data only; no API key or private core source."
+          echo "USDC/USD is not used as a provider-snapshot eligibility filter."
           echo "No transaction construction, signing, broadcast, custody, mint, burn, swap, or value movement."
           echo "EXECUTION_AUTHORIZED=FALSE"
