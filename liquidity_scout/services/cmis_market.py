@@ -235,6 +235,7 @@ def build_market_report_response(
         confidence=confidence,
         sources=_sources(report),
         observed_at=effective_observed_at,
+        freshness=report.get("freshness"),
         warnings=_warnings(report),
         errors=[],
     )
