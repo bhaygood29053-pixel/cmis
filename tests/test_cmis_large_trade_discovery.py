@@ -53,7 +53,7 @@ def swap(
         "asset_vault_delta_ui": str(asset_delta),
         "counter_vault_delta_ui": str(counter_delta),
         "quote_mint": QUOTE,
-        "quote_volume": str(abs(counter_delta)),
+        "quote_volume": str(counter_delta).lstrip("-"),
         "historical_usd_value_verified": True,
         "usd_value": str(usd),
         "usd_evidence": {
