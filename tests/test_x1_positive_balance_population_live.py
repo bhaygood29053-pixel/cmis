@@ -56,8 +56,17 @@ class X1PositiveBalancePopulationLiveTests(unittest.TestCase):
                 "supply_conservation_observed": observation[
                     "supply_conservation_observed"
                 ],
+                "returned_token_account_count": observation[
+                    "returned_token_account_count"
+                ],
                 "positive_balance_token_account_count": observation[
                     "positive_balance_token_account_count"
+                ],
+                "zero_balance_returned_token_account_count": observation[
+                    "zero_balance_returned_token_account_count"
+                ],
+                "positive_balance_authority_fields_complete": observation[
+                    "positive_balance_authority_fields_complete"
                 ],
                 "unique_positive_balance_authority_address_count": observation[
                     "unique_positive_balance_authority_address_count"
@@ -84,8 +93,20 @@ class X1PositiveBalancePopulationLiveTests(unittest.TestCase):
         )
 
         self.assertEqual(series["observation_count"], 3)
+        self.assertTrue(series["positive_balance_population_coverage_verified"])
+        self.assertTrue(
+            series["positive_balance_token_account_population_complete_verified"]
+        )
+        self.assertTrue(
+            series["positive_balance_authority_address_population_complete_verified"]
+        )
+        self.assertFalse(
+            series["zero_balance_token_account_population_complete_verified"]
+        )
+        self.assertFalse(series["wallet_identity_verified"])
         self.assertFalse(series["holder_semantics_verified"])
         self.assertFalse(series["beneficial_owner_identity_verified"])
+        self.assertFalse(series["source_independence_verified"])
         self.assertFalse(series["cmis_promotable"])
         self.assertFalse(series["execution_authorized"])
 
