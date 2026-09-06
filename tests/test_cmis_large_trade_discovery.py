@@ -224,7 +224,7 @@ class LargeTradeDiscoveryTests(unittest.TestCase):
         self.assertEqual(data["result_count"], 4)
         self.assertTrue(data["ranking_complete_for_scope"])
         self.assertTrue(data["public_service_promoted"])
-        self.assertFalse(data["scout_reliance_promoted"])
+        self.assertTrue(data["scout_reliance_promoted"])
         self.assertFalse(data["execution_authorized"])
 
         ranked = data["results"]
