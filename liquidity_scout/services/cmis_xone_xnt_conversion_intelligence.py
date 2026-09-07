@@ -24,6 +24,7 @@ from liquidity_scout.providers.xone_xnt import (
     X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
     XONE_XNT_X1_BINDING_CONTRACT_VERSION,
     XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
+    MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
     discover_x1_binding_candidates,
     discover_xnt_distribution_candidates,
     extract_xnt_mechanism_claims,
@@ -36,6 +37,9 @@ from liquidity_scout.providers.xone_xnt import (
     qualify_xnt_distribution_candidate,
     source_catalog,
     verify_moonparty_source_semantics,
+    discover_moonparty_deployment_candidates,
+    verify_moonparty_deployment_candidate,
+    corroborate_moonparty_deployment,
 )
 
 
@@ -62,6 +66,9 @@ def _truth_state() -> dict[str, Any]:
         "x1_binding_identified": False,
         "moonparty_authoritative_source_semantics_verified": False,
         "moonparty_deployment_verified": False,
+        "moonparty_deployment_chain_verified": False,
+        "moonparty_runtime_compatible": False,
+        "moonparty_xone_binding_verified": False,
         "xone_to_xnt_credit_design_link_verified": False,
         "xnt_credit_to_native_xnt_equivalence_verified": False,
         "xnt_distribution_mechanism_identified": False,
@@ -616,6 +623,92 @@ class CMISXoneXntConversionIntelligenceService:
                     proof["authoritative_source_semantics_verified"],
                 "xone_to_xnt_credit_design_link_verified":
                     proof["xone_to_xnt_credit_design_link_verified"],
+            },
+        }
+
+    def discover_moonparty_deployment_candidates(
+        self,
+        documents: Sequence[Mapping[str, Any]],
+        *,
+        max_candidates: int = 25,
+    ) -> dict[str, Any]:
+        """Discover exact MoonParty address candidates from bounded source context."""
+
+        discovery = discover_moonparty_deployment_candidates(
+            documents,
+            max_candidates=max_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "moonparty_deployment_contract":
+                MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
+            "state": STATE,
+            "moonparty_deployment_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **_truth_state(),
+        }
+
+    def verify_moonparty_deployment_candidate(
+        self,
+        candidate_address: str,
+        *,
+        artifact: Mapping[str, Any],
+        rpc_call: Any,
+        source_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Direct-RPC qualify one exact MoonParty deployment candidate."""
+
+        proof = verify_moonparty_deployment_candidate(
+            candidate_address,
+            artifact=artifact,
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "moonparty_deployment_contract":
+                MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
+            "state": STATE,
+            "moonparty_deployment_candidate": proof,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "moonparty_runtime_compatible":
+                    proof["moonparty_runtime_compatible"],
+                "moonparty_xone_binding_verified":
+                    proof["moonparty_xone_binding_verified"],
+            },
+        }
+
+    def corroborate_moonparty_deployment(
+        self,
+        proofs: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Promote deployment identity only after multi-RPC corroboration."""
+
+        corroboration = corroborate_moonparty_deployment(proofs)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "moonparty_deployment_contract":
+                MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
+            "state": STATE,
+            "moonparty_deployment": corroboration,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "moonparty_deployment_verified": True,
+                "moonparty_deployment_chain_verified": True,
+                "moonparty_runtime_compatible": True,
+                "moonparty_xone_binding_verified": True,
             },
         }
 
