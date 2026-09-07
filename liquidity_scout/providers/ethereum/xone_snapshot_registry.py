@@ -698,15 +698,13 @@ def promote_official_snapshot(
     *,
     source_candidate: Mapping[str, Any],
     registry_proof: Mapping[str, Any],
-    official_registry_artifact_verified: bool = False,
-    xnt_allocation_binding_verified: bool = False,
 ) -> dict[str, Any]:
     """Bind an authoritative exact-block claim to a reconstructed registry.
 
     This is deliberately narrow. A source candidate must be authoritative and
     contain exactly one block that equals the independently reconstructed block.
-    XNT allocation remains a separate flag and cannot be inferred from snapshot
-    identity alone.
+    Registry-artifact identity, holder eligibility rules, and XNT allocation
+    binding remain separate future proofs and cannot be inferred here.
     """
 
     if source_candidate.get("authoritative_source") is not True:
@@ -747,11 +745,9 @@ def promote_official_snapshot(
         "source_role": source_candidate.get("source_role"),
         "reconstructed_registry_verified": True,
         "official_xone_snapshot_verified": True,
-        "official_registry_artifact_verified":
-            bool(official_registry_artifact_verified),
-        "xone_snapshot_eligibility_verified": True,
-        "xone_snapshot_xnt_allocation_binding_verified":
-            bool(xnt_allocation_binding_verified),
+        "official_registry_artifact_verified": False,
+        "xone_snapshot_eligibility_verified": False,
+        "xone_snapshot_xnt_allocation_binding_verified": False,
         "xnt_issuance_verified": False,
         "xnt_vesting_or_unlock_verified": False,
         "october_6_unlock_applies_to_xone_verified": False,
