@@ -1,6 +1,6 @@
 # CMIS Web Discovery v1
 
-Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472, with accepted source-specific layers for X1 Explorer, XDEX, X1.Ninja, FortiBlox, and X1 Agents Radio. Radio source discovery is accepted via #564 / PR #566 and `x1_agents_radio_structured_discovery/v1` via #568 / PR #569. The entire Web Discovery stack remains subordinate to CMIS verification, non-promoted as truth, and `execution_authorized=false`.
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472, with accepted source-specific layers for X1 Explorer, XDEX, X1.Ninja, FortiBlox, and X1 Agents Radio. Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, and `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572. The entire Web Discovery stack remains subordinate to CMIS verification, non-promoted as truth, and `execution_authorized=false`.
 
 ## Purpose
 
@@ -53,7 +53,7 @@ The structured layer does not establish program identity, program semantics, ins
 
 #### X1 Agents Radio → X1 RPC Corroboration v1
 
-Issue #571 adds `x1_agents_radio_rpc_corroboration/v1` as the direct-chain
+Issue #571 / PR #572 accepts `x1_agents_radio_rpc_corroboration/v1` as the direct-chain
 verification handoff above Radio candidates. Canonical X1 RPC may verify exact
 current program-account existence/executable/owner state, bounded finalized
 address history, and successful transaction activity at a provider-reported
