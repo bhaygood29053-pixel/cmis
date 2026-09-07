@@ -17,6 +17,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - **X1.Ninja USD-liquidity semantics and rolling freshness work: COMPLETE through the accepted later scan/freshness stack.** Historical #461/#459 blockers are no longer the current flagship gate.
 - **CMIS Web Discovery v1-v11: COMPLETE internally through PR #497.** Discovery remains subordinate to CMIS verification and never creates market truth by itself.
 - Controlled Execution remains locked: `execution_authorized=false`.
+- **Programmable Market Intelligence foundation (#552): IMPLEMENTED ON THIS WORKSTREAM / NON-PROMOTED.** Adds deterministic `uniswap_v4_hook_intelligence/v1`, `reflection_flow_intelligence/v1`, `yield_provenance/v1`, and an additive Robinhood→X1 companion over accepted `cross_chain_asset_provenance/v1`. Discovery remains subordinate to verification; hook permission bits do not prove business logic; missing incentives are never zero-filled; Robinhood custody/backing/route state remain unverified without separate accepted evidence; the public CMIS 1.27 capability manifest is unchanged and `execution_authorized=false` remains mandatory.
 
 ## Product naming invariant
 
