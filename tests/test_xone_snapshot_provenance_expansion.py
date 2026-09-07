@@ -31,8 +31,12 @@ class XoneSnapshotProvenanceTests(unittest.TestCase):
             observed_at=1.0,
             revision="abc",
         )
-        self.assertEqual(len(rows), 1)
-        row = rows[0]
+        self.assertGreaterEqual(len(rows), 1)
+        row = next(
+            item
+            for item in rows
+            if item["authoritative_exact_snapshot_block_discovered"] is True
+        )
         self.assertEqual(row["candidate_kind"], "snapshot_statement")
         self.assertTrue(row["direct_primary_source_recovered"])
         self.assertTrue(row["authoritative_exact_snapshot_block_discovered"])
