@@ -36,11 +36,13 @@ Live acceptance requires at least two distinct HTTPS RPC transport hosts to retu
 
 The workflow currently probes:
 
-- PublicNode: `https://ethereum-rpc.publicnode.com`
+- Tenderly public gateway: `https://gateway.tenderly.co/public/mainnet`
+- Blast public Ethereum: `https://eth-mainnet.public.blastapi.io`
+- Merkle: `https://eth.merkle.io`
 - dRPC: `https://eth.drpc.org`
 - 1RPC: `https://public.1rpc.io/eth`
 
-At least two successful matching proofs are required so one temporary public endpoint outage does not create a false identity failure. The transport retries are bounded; persistent unavailability remains visible rather than being treated as identity disagreement.
+At least two successful matching proofs are required. The quorum intentionally includes several public transports because free RPC endpoints can differ in historical transaction/receipt retention and can fail transiently. Provider unavailability is reported as availability evidence, not an identity disagreement.
 
 ## Secondary explorer corroboration
 
