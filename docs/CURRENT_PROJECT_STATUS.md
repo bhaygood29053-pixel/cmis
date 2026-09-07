@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 09:28 America/New_York**.
+Current reconciliation: **2026-09-07 09:54 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,19 @@ Current reconciliation: **2026-09-07 09:28 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally via #575 / PR #578; exact Ethereum XONE identity is accepted via #580 / PR #581; bounded canonical XONE event observation is accepted via #583 / PR #584 under `ethereum_xone_event_observer/v1`. Live multi-RPC evidence verified the creation-block mint of exactly 500,000,000 XONE from the zero address to deployer `0xc73fc08c931efe3fce850c09278472e8a81c2e05`. Exact lock/migration/conversion sink semantics, X1 XNT issuance/vesting events, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally via #575 / PR #578; exact Ethereum XONE identity via #580 / PR #581; bounded canonical XONE event observation via #583 / PR #584; and XONE burn/redeemer semantics via #586 / PR #587 under `ethereum_xone_migration_sink_semantics/v1`. Live multi-RPC evidence verifies the readable `userBurns(address)` surface and the burn-redeemer callback model while correctly leaving `migration_sink_identified=false`. The zero address and deployer each returned `userBurns=0` in the accepted live probe; this is not evidence of zero lifetime/global burns. Exact XONE→XNT candidate-role binding, X1 XNT issuance/vesting/claim events, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### Ethereum XONE Event Observer v1
+### Ethereum XONE Migration Sink Semantics v1
+
+**ACCEPTED.** Ethereum XONE Migration Sink Semantics run #1 passed deterministic and live jobs at PR #587 head `ed0ea9694b0ee0cb415541a3c1b23e7f95471253`; Liquidity Scout Tests run #1761 also passed. Tenderly and Blast satisfied the required direct-RPC quorum; dRPC and 1RPC also returned compatible burn-surface observations. Merkle was rate-limited on one identity receipt request and was not needed for acceptance. The evidence artifact digest is `sha256:e1a4b56476f87b733bfb71b4187758e1b3c8c31a74479075addb69d74ea5a808`.
+
+The live gate directly verified the exact XONE `userBurns(address)` accounting surface. The two bounded probes — zero address and deployer `0xc73fc08c931efe3fce850c09278472e8a81c2e05` — each returned `0`. Those values apply only to those two addresses at the observed finalized state and do not establish zero lifetime/global XONE burns.
+
+The accepted semantic result is intentionally fail-closed: XONE supports a burn/redeemer design in which a future conversion mechanism may use a callback contract; this gate does not require or identify a passive transfer sink. `migration_sink_identified=false`, `xone_xnt_conversion_verified=false`, `xnt_issuance_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`. PR #587 merged as `cdba7189c5d9faf0b24e7e0df7c1e12d0a41e501`; Issue #586 closed completed.
+
+### Previous accepted live gate — Ethereum XONE Event Observer v1
 
 **ACCEPTED.** Ethereum XONE Event Observer run #1 passed deterministic and live jobs at PR #584 head `742d83edee9986765e51a42fd285d23452b4bccb`; Liquidity Scout Tests run #1757 also passed. The live acceptance window was the exact XONE creation block `18,609,736` and was corroborated across multiple public Ethereum RPC transports. It contained one canonical ERC-20 `Transfer` classified as a mint: zero address → `0xc73fc08c931efe3fce850c09278472e8a81c2e05`, amount `500,000,000 XONE`, transaction `0x6d2f0492d54b56044f03a3de5ad1889b6fe115914e9bcfc58e28950ddda6eea5`, timestamp `1700443835`. Burn count in that exact window was zero. PR #584 merged as `3d344acd3964df77e3161abab6c1415659a50b4c`; Issue #583 closed completed.
 
