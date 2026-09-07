@@ -14,6 +14,9 @@ from liquidity_scout.providers.x1.agents_radio_rpc_corroboration import (
     corroborate_agents_radio_with_x1_rpc,
 )
 from liquidity_scout.providers.x1.rpc import rpc_request
+from liquidity_scout.providers.x1.program_upgrade_semantics import (
+    verify_program_upgrade_semantics,
+)
 from liquidity_scout.providers.web_discovery import (
     CONTRACT as PROVIDER_CONTRACT,
     WebDiscoveryError,
@@ -307,6 +310,28 @@ class CMISWebDiscoveryService:
             "authentication_authorized": False,
             "subscription_authorized": False,
             "webhook_registration_authorized": False,
+            "request_signing_authorized": False,
+            **_service_truth_state(),
+        }
+
+    def verify_x1_program_upgrade_semantics(
+        self,
+        rpc_corroboration: Mapping[str, Any],
+        *,
+        rpc_call: Any = rpc_request,
+    ) -> dict[str, Any]:
+        semantic_verification = verify_program_upgrade_semantics(
+            rpc_corroboration,
+            rpc_call=rpc_call,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "x1_agents_radio",
+            "semantic_verification": semantic_verification,
+            "read_only": True,
+            "authentication_authorized": False,
             "request_signing_authorized": False,
             **_service_truth_state(),
         }
