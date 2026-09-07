@@ -15,6 +15,7 @@ from .base import (
     WebDiscoveryHTTPError,
     WebDiscoverySource,
 )
+from .fortiblox import FORTIBLOX_APP_SOURCE, FortiBloxAppWebDiscoveryProvider
 from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider
 from .registry import build_provider, provider_catalog, provider_ids
 from .x1_docs import X1_DOCS_SOURCE, X1DocsDiscoveryProvider
@@ -112,6 +113,8 @@ __all__ = [
     "CMISWebDiscoveryProvider",
     "CONTRACT",
     "DISCOVERED",
+    "FORTIBLOX_APP_SOURCE",
+    "FortiBloxAppWebDiscoveryProvider",
     "GITHUB_WEB_SOURCE",
     "GitHubWebDiscoveryProvider",
     "SourceBoundaryError",

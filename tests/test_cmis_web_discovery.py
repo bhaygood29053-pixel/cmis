@@ -5,6 +5,7 @@ import unittest
 
 from liquidity_scout.providers.web_discovery import (
     DISCOVERED,
+    FortiBloxAppWebDiscoveryProvider,
     GitHubWebDiscoveryProvider,
     SourceBoundaryError,
     WebDiscoveryContentError,
@@ -57,7 +58,7 @@ class FailingSession:
 
 
 class CMISWebDiscoveryTests(unittest.TestCase):
-    def test_registry_contains_all_six_initial_sources(self):
+    def test_registry_contains_initial_sources_plus_fortiblox_app(self):
         self.assertEqual(
             provider_ids(),
             (
@@ -65,18 +66,57 @@ class CMISWebDiscoveryTests(unittest.TestCase):
                 "xdex",
                 "x1_ninja",
                 "x1report",
+                "fortiblox_app",
                 "x1_docs",
                 "github",
             ),
         )
         catalog = provider_catalog()
-        self.assertEqual(len(catalog), 6)
+        self.assertEqual(len(catalog), 7)
         self.assertTrue(all(row["read_only"] for row in catalog))
         self.assertTrue(all(row["discovery_only"] for row in catalog))
         self.assertTrue(all(row["cmis_verified"] is False for row in catalog))
         self.assertTrue(
             all(row["execution_authorized"] is False for row in catalog)
         )
+
+    def test_fortiblox_app_root_and_machine_discovery_are_bounded(self):
+        root = "https://app.fortiblox.com/"
+        body = """
+        <html>
+          <head><title>FortiBlox</title></head>
+          <body>
+            X1 app discovery
+            <a href="/api/x402/discovery">x402 discovery</a>
+            <a href="/llms.txt">llms</a>
+            <a href="https://example.com/outside">outside</a>
+          </body>
+        </html>
+        """
+        provider = FortiBloxAppWebDiscoveryProvider(
+            session=FakeSession(FakeResponse(body, url=root)),
+            observed_at_fn=lambda: 456.0,
+        )
+
+        result = provider.discover_url(root, query="X1 discovery")
+
+        self.assertEqual(result["source"]["id"], "fortiblox_app")
+        self.assertEqual(result["retrieval"]["observed_at"], 456.0)
+        self.assertTrue(result["query"]["matched"])
+        self.assertEqual(
+            result["content"]["links"],
+            [
+                "https://app.fortiblox.com/api/x402/discovery",
+                "https://app.fortiblox.com/llms.txt",
+            ],
+        )
+        self.assertEqual(result["content"]["external_links_omitted"], 1)
+        self.assertFalse(result["truth_state"]["cmis_verified"])
+        self.assertFalse(result["cmis_promotable"])
+        self.assertFalse(result["execution_authorized"])
+
+        with self.assertRaises(SourceBoundaryError):
+            provider.discover_url("https://explorer.fortiblox.com/")
 
     def test_source_allowlist_rejects_foreign_url(self):
         provider = X1ExplorerDiscoveryProvider(
@@ -227,7 +267,7 @@ class CMISWebDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(result["service_contract"], "cmis_web_discovery/v1")
         self.assertEqual(result["state"], "internal_foundation")
-        self.assertEqual(len(result["sources"]), 6)
+        self.assertEqual(len(result["sources"]), 7)
         self.assertTrue(result["read_only"])
         self.assertFalse(result["public_service_promoted"])
         self.assertFalse(result["scout_reliance_promoted"])

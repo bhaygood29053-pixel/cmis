@@ -18,7 +18,7 @@ The authority path remains:
 
 CMIS Web Discovery is a provider-side discovery capability beneath CMIS. It is not a replacement for X1 RPC, deterministic verification, Evidence Receipts, Proof Score, risk, or the existing provider contracts.
 
-## Initial source providers
+## Registered source providers
 
 | Source id | Provider | Initial allowed hosts | Source role |
 |---|---|---|---|
@@ -26,8 +26,11 @@ CMIS Web Discovery is a provider-side discovery capability beneath CMIS. It is n
 | xdex | XDEX | xdexdocs.gitbook.io, api.xdex.xyz, oracle.xdex.xyz | protocol_native_web_api_discovery |
 | x1_ninja | X1.Ninja | x1.ninja, api.x1.ninja | third_party_indexer_web_api_discovery |
 | x1report | X1Report | x1report.com, www.x1report.com | third_party_reporting_discovery |
+| fortiblox_app | FortiBlox App | app.fortiblox.com | third_party_x1_app_web_api_discovery |
 | x1_docs | X1 Docs | docs.x1.xyz, next.x1.xyz | official_documentation_discovery |
 | github | GitHub | github.com, api.github.com, raw.githubusercontent.com | public_source_repository_discovery |
+
+The FortiBlox App source includes the root application URL plus the provider-documented `/api/x402/discovery` and `/llms.txt` GET surfaces as bounded discovery targets. This does not qualify FortiSwap execution endpoints or provider assertions as verified CMIS facts.
 
 Different source names do not establish source independence. Source independence remains separately unverified unless an accepted CMIS contract proves it.
 
@@ -168,7 +171,7 @@ A later gate is required before any of the following:
 
 Deterministic regression coverage includes:
 
-- all six initial source registrations;
+- all six initial source registrations plus the bounded `fortiblox_app` registration;
 - allowlist rejection;
 - redirect escape rejection;
 - bounded body-size failure;
