@@ -1,6 +1,6 @@
 # Ethereum XONE Exact Identity v1
 
-Status: **IMPLEMENTATION FOR ISSUE #580 — NOT ACCEPTED UNTIL LIVE DUAL-RPC CI PASSES AND PR MERGES**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #580 / PR #581. Exact-head Ethereum XONE Identity run #6 passed deterministic and live jobs, Liquidity Scout Tests run #1753 passed, and PR #581 merged as `3e0373d15517fd3a0233c180341199e1a20c021c`. The accepted live evidence contains three successful direct Ethereum RPC proofs; the required quorum was satisfied by Tenderly and Blast with matching exact identity facts and runtime-code digest. No XONE→XNT conversion, XNT issuance, public/Scout reliance, or execution authority is promoted.
 
 Contract:
 
@@ -19,7 +19,7 @@ Candidate under test:
 - expected ERC-20 symbol: `XONE`
 - expected decimals: `18`
 
-These constants are acceptance expectations. The contract does not mark them verified unless live Ethereum JSON-RPC proves them.
+These values are now accepted as the exact Ethereum mainnet XONE identity under this narrow contract because the live JSON-RPC gate proved them.
 
 ## Direct-chain proof
 
@@ -52,7 +52,7 @@ That explorer evidence is useful corroboration, but it does **not** replace the 
 
 ## What this proves
 
-If accepted, CMIS may say:
+CMIS may now say:
 
 > The exact Ethereum mainnet XONE contract identity has been verified as
 > `0x4DCDa2274899d9BbA3Bb6f5A852C107Dd6E4fE1c`.
@@ -92,6 +92,6 @@ scout_reliance_promoted = false
 execution_authorized = false
 ```
 
-## Next slice after acceptance
+## Next slice
 
-Once the exact Ethereum XONE identity is accepted, the next implementation slice is a bounded XONE event observer for the verified contract. It should classify burns, transfers, locks/migration deposits, and holder-specific activity only from direct Ethereum evidence, while keeping any XNT-side consequence unverified until an exact X1 migration/distribution contract is identified.
+The next implementation slice is a bounded XONE event observer for the now-verified contract. It should classify burns, transfers, locks/migration deposits, and holder-specific activity only from direct Ethereum evidence, while keeping any XNT-side consequence unverified until an exact X1 migration/distribution contract is identified.
