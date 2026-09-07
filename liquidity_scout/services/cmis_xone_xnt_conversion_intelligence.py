@@ -32,7 +32,10 @@ from liquidity_scout.providers.xone_xnt import (
     XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
     MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
     XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION,
+    XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION,
     discover_repository_path_candidates,
+    extract_archival_provenance_candidates,
+    summarize_archival_recovery,
     extract_provenance_candidates,
     rank_provenance_candidates,
     discover_x1_binding_candidates,
@@ -69,6 +72,11 @@ def _truth_state() -> dict[str, Any]:
         "xone_burn_accounting_surface_verified": False,
         "xone_snapshot_source_discovery_verified": False,
         "xone_snapshot_provenance_expansion_verified": False,
+        "xone_snapshot_archival_source_recovery_verified": False,
+        "archival_capture_discovered": False,
+        "archival_capture_retrieved": False,
+        "stable_primary_url_recovered": False,
+        "direct_primary_archival_source_recovered": False,
         "provenance_candidate_discovered": False,
         "direct_primary_source_recovered": False,
         "snapshot_artifact_candidate_discovered": False,
@@ -406,6 +414,80 @@ class CMISXoneXntConversionIntelligenceService:
                 **_truth_state(),
                 "ethereum_xone_identity_verified": True,
                 "xone_burn_accounting_surface_verified": True,
+            },
+        }
+
+    def recover_xone_snapshot_archival_sources(
+        self,
+        captures: Sequence[Mapping[str, Any]],
+        *,
+        observed_at: float,
+        stable_primary_urls: Sequence[Mapping[str, Any]] = (),
+        max_candidates_per_capture: int = 50,
+        max_ranked_candidates: int = 100,
+    ) -> dict[str, Any]:
+        """Extract bounded snapshot provenance from validated archival captures."""
+
+        if not captures:
+            raise ValueError("captures must not be empty")
+
+        candidates: list[dict[str, Any]] = []
+        retrieved_rows: list[dict[str, Any]] = []
+        for capture in captures:
+            if not isinstance(capture, Mapping):
+                raise ValueError("each capture must be a mapping")
+            text_value = capture.get("text")
+            if not isinstance(text_value, str):
+                raise ValueError("each capture requires retrieved text")
+            metadata = dict(capture)
+            metadata["archival_capture_retrieved"] = True
+            retrieved_rows.append(metadata)
+            candidates.extend(
+                extract_archival_provenance_candidates(
+                    text_value,
+                    capture=metadata,
+                    observed_at=observed_at,
+                    max_candidates=max_candidates_per_capture,
+                )
+            )
+
+        recovery = summarize_archival_recovery(
+            retrieved_rows,
+            candidates,
+            stable_primary_urls=stable_primary_urls,
+            max_candidates=max_ranked_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "snapshot_archival_recovery_contract":
+                XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION,
+            "state": STATE,
+            "archival_recovery": recovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "xone_snapshot_archival_source_recovery_verified": True,
+                "archival_capture_discovered":
+                    recovery["archival_capture_count"] > 0,
+                "archival_capture_retrieved":
+                    recovery["archival_capture_retrieved_count"] > 0,
+                "stable_primary_url_recovered":
+                    recovery["stable_primary_url_count"] > 0,
+                "direct_primary_archival_source_recovered":
+                    recovery[
+                        "direct_primary_archival_source_candidate_count"
+                    ] > 0,
+                "snapshot_artifact_candidate_discovered":
+                    recovery["provenance"][
+                        "snapshot_artifact_candidate_count"
+                    ] > 0,
+                "authoritative_exact_snapshot_block_discovered":
+                    recovery[
+                        "authoritative_exact_snapshot_block_discovered"
+                    ],
             },
         }
 
