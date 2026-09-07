@@ -344,6 +344,7 @@ def corroborate_xone_identity_proofs(
         "contract_version": CONTRACT_VERSION,
         "chain": CHAIN,
         "network": NETWORK,
+        "chain_id": CHAIN_ID,
         "contract_address": XONE_CONTRACT,
         "creation_transaction": XONE_CREATION_TX,
         "deployer": XONE_DEPLOYER,
