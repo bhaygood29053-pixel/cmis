@@ -1,0 +1,128 @@
+name: Ethereum XONE Event Observer
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/ethereum/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_ethereum_xone_event_observer.py'
+      - 'tests/test_ethereum_xone_identity.py'
+      - 'scripts/observe_ethereum_xone_events.py'
+      - 'docs/ETHEREUM_XONE_EVENT_OBSERVER_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/ethereum-xone-event-observer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'liquidity_scout/providers/ethereum/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_ethereum_xone_event_observer.py'
+      - 'tests/test_ethereum_xone_identity.py'
+      - 'scripts/observe_ethereum_xone_events.py'
+      - 'docs/ETHEREUM_XONE_EVENT_OBSERVER_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/ethereum-xone-event-observer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test Ethereum XONE event observer contract
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_event_observer.py
+      - name: Re-run accepted XONE identity boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_identity.py
+      - name: Re-run dedicated XONE/XNT conversion boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_conversion_scraper.py
+
+  live-events:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify bounded live XONE event window across Ethereum RPC transports
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/observe_ethereum_xone_events.py \
+            --rpc https://gateway.tenderly.co/public/mainnet \
+            --rpc https://eth-mainnet.public.blastapi.io \
+            --rpc https://eth.merkle.io \
+            --rpc https://eth.drpc.org \
+            --rpc https://public.1rpc.io/eth \
+            --minimum-proofs 2 \
+            | tee evidence/ethereum-xone-event-observer.json
+
+          python - <<'PY'
+          import json
+
+          data = json.load(open("evidence/ethereum-xone-event-observer.json"))
+          assert data["status"] == "PASS"
+          identity = data["identity"]
+          window = data["event_window"]
+
+          assert identity["contract_version"] == "ethereum_xone_identity/v1"
+          assert identity["contract_address"] == "0x4dcda2274899d9bba3bb6f5a852c107dd6e4fe1c"
+          assert identity["exact_ethereum_xone_identity_verified"] is True
+
+          assert window["contract_version"] == "ethereum_xone_event_observer/v1"
+          assert window["contract_address"] == identity["contract_address"]
+          assert window["from_block"] == window["to_block"] == int(identity["creation_block"], 16)
+          assert window["multi_rpc_corroborated"] is True
+          assert window["transport_provider_diversity_verified"] is True
+          assert window["ethereum_log_window_verified"] is True
+          assert window["lock_or_migration_verified"] is False
+          assert window["xone_xnt_conversion_verified"] is False
+          assert window["xnt_issuance_verified"] is False
+          assert window["cross_chain_correlation_verified"] is False
+          assert window["public_service_promoted"] is False
+          assert window["scout_reliance_promoted"] is False
+          assert window["execution_authorized"] is False
+
+          for event in window["events"]:
+              assert event["event_type"] in {"mint", "transfer", "burn"}
+              assert event["ethereum_event_verified"] is True
+              assert event["lock_or_migration_verified"] is False
+              assert event["xone_xnt_conversion_verified"] is False
+              assert event["execution_authorized"] is False
+
+          print(f"ETHEREUM_XONE_EVENT_WINDOW=PASS events={window['event_count']}")
+          print(f"XONE_BURN_EVENTS={window['burn_count']}")
+          print("LOCK_OR_MIGRATION_VERIFIED=FALSE")
+          print("XONE_XNT_CONVERSION_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-xone-event-observer-evidence
+          path: evidence/ethereum-xone-event-observer.json
+          if-no-files-found: error
