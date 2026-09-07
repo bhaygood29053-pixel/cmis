@@ -28,6 +28,7 @@ from liquidity_scout.providers.xone_xnt import (
     CANDIDATE_DISCOVERY_CONTRACT_VERSION,
     SCRAPER_CONTRACT,
     X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
+    XONE_XNT_X1_ALLOCATION_RECORD_CONTRACT_VERSION,
     XONE_XNT_X1_BINDING_CONTRACT_VERSION,
     XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
     MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
@@ -44,6 +45,9 @@ from liquidity_scout.providers.xone_xnt import (
     summarize_archival_recovery,
     extract_provenance_candidates,
     rank_provenance_candidates,
+    extract_x1_allocation_records,
+    summarize_x1_allocation_records,
+    qualify_x1_allocation_candidate,
     discover_x1_binding_candidates,
     discover_xnt_distribution_candidates,
     extract_xnt_mechanism_claims,
@@ -101,6 +105,10 @@ def _truth_state() -> dict[str, Any]:
         "conversion_candidate_discovery_verified": False,
         "x1_xnt_mechanism_discovery_verified": False,
         "x1_xnt_candidate_account_state_verified": False,
+        "x1_allocation_record_discovery_verified": False,
+        "x1_allocation_record_candidate_discovered": False,
+        "x1_allocation_candidate_account_state_verified": False,
+        "x1_allocation_semantics_verified": False,
         "x1_binding_candidate_discovery_verified": False,
         "x1_binding_candidate_history_verified": False,
         "x1_binding_identified": False,
@@ -681,6 +689,109 @@ class CMISXoneXntConversionIntelligenceService:
                 "conversion_candidate_discovery_verified": True,
                 "burn_redeemer_interface_verified":
                     qualification.get("burn_redeemer_interface_verified") is True,
+            },
+        }
+
+    def discover_xone_xnt_x1_allocation_records(
+        self,
+        documents: Sequence[Mapping[str, Any]],
+        *,
+        observed_at: float,
+        max_records_per_document: int = 100,
+        max_candidates: int = 100,
+    ) -> dict[str, Any]:
+        """Discover exact Ethereum-address -> X1-pubkey allocation records."""
+
+        if not documents:
+            raise ValueError("documents must not be empty")
+        records: list[dict[str, Any]] = []
+        for document in documents:
+            if not isinstance(document, Mapping):
+                raise ValueError("each document must be a mapping")
+            source_id = str(document.get("source_id") or "").strip()
+            source_role = str(document.get("source_role") or "").strip()
+            url = str(document.get("url") or "").strip()
+            text_value = document.get("text")
+            if (
+                not source_id
+                or not source_role
+                or not url
+                or not isinstance(text_value, str)
+            ):
+                raise ValueError(
+                    "each document requires source_id, source_role, url, and text"
+                )
+            path_value = document.get("path")
+            revision_value = document.get("revision")
+            records.extend(
+                extract_x1_allocation_records(
+                    text_value,
+                    source_id=source_id,
+                    source_role=source_role,
+                    url=url,
+                    observed_at=observed_at,
+                    path=str(path_value) if path_value is not None else None,
+                    revision=(
+                        str(revision_value)
+                        if revision_value is not None
+                        else None
+                    ),
+                    max_records=max_records_per_document,
+                )
+            )
+
+        discovery = summarize_x1_allocation_records(
+            records,
+            max_candidates=max_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "x1_allocation_record_discovery_contract":
+                XONE_XNT_X1_ALLOCATION_RECORD_CONTRACT_VERSION,
+            "state": STATE,
+            "allocation_record_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "x1_allocation_record_discovery_verified": True,
+                "x1_allocation_record_candidate_discovered":
+                    discovery["candidate_count"] > 0,
+            },
+        }
+
+    def qualify_xone_xnt_x1_allocation_candidate(
+        self,
+        candidate: Mapping[str, Any],
+        *,
+        rpc_call: Any,
+        source_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Qualify one exact X1 account without promoting allocation semantics."""
+
+        qualification = qualify_x1_allocation_candidate(
+            candidate,
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "x1_allocation_record_discovery_contract":
+                XONE_XNT_X1_ALLOCATION_RECORD_CONTRACT_VERSION,
+            "state": STATE,
+            "allocation_record_qualification": qualification,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "x1_allocation_record_discovery_verified": True,
+                "x1_allocation_record_candidate_discovered": True,
+                "x1_allocation_candidate_account_state_verified":
+                    qualification.get("account_state_verified") is True,
             },
         }
 
