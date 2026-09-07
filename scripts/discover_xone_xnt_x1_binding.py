@@ -51,7 +51,10 @@ def main() -> int:
     parser.add_argument("--transaction-limit", type=int, default=10)
     args = parser.parse_args()
 
-    scraper = XoneXntConversionScraper(\n        observed_at_fn=time.time,\n        max_bytes=1_000_000,\n    )
+    scraper = XoneXntConversionScraper(
+        observed_at_fn=time.time,
+        max_bytes=1_000_000,
+    )
     source_results = []
     claims = []
 
