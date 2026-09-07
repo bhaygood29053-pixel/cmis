@@ -325,12 +325,26 @@ def _normalize_program_record(
     decoded_length = _base58_decoded_length(program_id) if program_id is not None else None
     program_id_syntax_valid = decoded_length == 32
 
-    _, name_value = _first_value(record, _NAME_FIELDS)
-    _, category_value = _first_value(record, _CATEGORY_FIELDS)
-    _, instruction_value = _first_value(record, _INSTRUCTION_FIELDS)
+    nested_program = record.get("program")
+    nested = nested_program if isinstance(nested_program, Mapping) else {}
 
-    activity = _normalize_alias_fields(record, _ACTIVITY_ALIASES)
-    deployment = _normalize_alias_fields(record, _DEPLOYMENT_ALIASES)
+    _, name_value = _first_value(record, _NAME_FIELDS)
+    if name_value is None and nested:
+        _, name_value = _first_value(nested, _NAME_FIELDS)
+
+    _, category_value = _first_value(record, _CATEGORY_FIELDS)
+    if category_value is None and nested:
+        _, category_value = _first_value(nested, _CATEGORY_FIELDS)
+
+    _, instruction_value = _first_value(record, _INSTRUCTION_FIELDS)
+    if instruction_value is None and nested:
+        _, instruction_value = _first_value(nested, _INSTRUCTION_FIELDS)
+
+    activity = _normalize_alias_fields(nested, _ACTIVITY_ALIASES)
+    activity.update(_normalize_alias_fields(record, _ACTIVITY_ALIASES))
+
+    deployment = _normalize_alias_fields(nested, _DEPLOYMENT_ALIASES)
+    deployment.update(_normalize_alias_fields(record, _DEPLOYMENT_ALIASES))
     transaction_signature = _bounded_text(deployment.get("transaction_signature"))
 
     return {
@@ -348,6 +362,9 @@ def _normalize_program_record(
         "provider_activity": activity,
         "provider_deployment": deployment,
         "unmapped_provider_fields": _unmapped_fields(record),
+        "unmapped_nested_program_fields": (
+            _unmapped_fields(nested) if nested else []
+        ),
         "verification_handoff": _record_handoff(
             program_id=program_id,
             program_id_syntax_valid=program_id_syntax_valid,
