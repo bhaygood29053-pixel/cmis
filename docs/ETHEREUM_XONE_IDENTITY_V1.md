@@ -37,10 +37,10 @@ Live acceptance requires at least two distinct HTTPS RPC transport hosts to retu
 The workflow currently probes:
 
 - PublicNode: `https://ethereum-rpc.publicnode.com`
-- LlamaNodes: `https://eth.llamarpc.com`
+- dRPC: `https://eth.drpc.org`
 - 1RPC: `https://public.1rpc.io/eth`
 
-At least two successful matching proofs are required so one temporary public endpoint outage does not create a false identity failure.
+At least two successful matching proofs are required so one temporary public endpoint outage does not create a false identity failure. The transport retries are bounded; persistent unavailability remains visible rather than being treated as identity disagreement.
 
 ## Secondary explorer corroboration
 
