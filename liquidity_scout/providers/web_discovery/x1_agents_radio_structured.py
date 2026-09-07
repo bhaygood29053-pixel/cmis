@@ -395,8 +395,7 @@ def _walk_program_records(
     if isinstance(value, Mapping):
         if _looks_like_program_record(value):
             result.append((path, value))
-            if len(result) >= max_records:
-                return result
+            return result
 
         for key, child in value.items():
             if len(result) >= max_records:
