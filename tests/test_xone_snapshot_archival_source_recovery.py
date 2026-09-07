@@ -13,6 +13,7 @@ from liquidity_scout.providers.xone_xnt import (
     parse_cdx_json,
     rank_archival_captures,
     recover_stable_x_urls,
+    select_diverse_archival_captures,
     source_role_for_original_url,
     summarize_archival_recovery,
 )
@@ -181,6 +182,37 @@ class XoneSnapshotArchivalRecoveryTests(unittest.TestCase):
             archival_url_relevance_score(snap["original"]),
             archival_url_relevance_score(root["original"]),
         )
+
+    def test_diverse_selector_spreads_replays_across_original_hosts(self):
+        rows = []
+        for host in ("xen.network", "x1.xyz", "docs.x1.xyz"):
+            for month in range(1, 7):
+                capture = self._capture(
+                    f"https://{host}/"
+                )
+                capture["capture_id"] = f"{host}-{month}"
+                capture["timestamp"] = f"2024{month:02d}02030405"
+                capture["replay_url"] = build_wayback_replay_url(
+                    timestamp=capture["timestamp"],
+                    original_url=capture["original"],
+                )
+                rows.append(capture)
+
+        selected = select_diverse_archival_captures(
+            rows,
+            max_captures=9,
+        )
+        hosts = {
+            __import__("urllib.parse", fromlist=["urlparse"]).urlparse(
+                row["original"]
+            ).hostname
+            for row in selected
+        }
+        self.assertEqual(
+            hosts,
+            {"xen.network", "x1.xyz", "docs.x1.xyz"},
+        )
+        self.assertEqual(len(selected), 9)
 
     def test_summary_keeps_zero_result_scoped(self):
         capture = self._capture()
