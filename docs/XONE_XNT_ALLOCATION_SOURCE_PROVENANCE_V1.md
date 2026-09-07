@@ -1,6 +1,6 @@
 # XONE → XNT Allocation Source Provenance v1
 
-Status: **IMPLEMENTATION FOR ISSUE #619 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE PROVENANCE + FULL LIQUIDITY SCOUT TEST GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #619 / PR #620. XONE XNT Allocation Source Provenance run #6 passed deterministic and live jobs at head `1fa258507b61a49ec000e8228534cd65476dac7a`; Liquidity Scout Tests run #1832 passed; PR #620 merged as `fe541b9969aa851e658b7abb4bf02c2e734be295`.
 
 Contract:
 
@@ -262,8 +262,51 @@ Acceptance requires:
 - full Liquidity Scout Tests;
 - merge to `main`.
 
-## Next gate after acceptance
+## Accepted live result
 
-If a concrete XONE allocation source is recovered, proceed to exact source verification and **snapshot → XNT allocation binding**.
+Final accepted run #6 covered:
 
-If the accepted live result is zero, the next investigation should not repeat this same repository/release/current-page corpus. The remaining path should become source-specific: newly surfaced primary artifacts, exact deployment/program evidence, or externally supplied registry/export material.
+- **3/3** bounded repositories available;
+- **41** provenance-shaped repository files retrieved;
+- **3/3** release queries available;
+- **3/3** official X1 targets available;
+- **10** surviving architecture-analogue candidates;
+- **0** qualifying XONE allocation-source candidates;
+- **0** exact-XONE-source-bound candidates.
+
+Final source-class counts:
+
+- `x1_program_schema = 10`
+- `api_endpoint = 0`
+- `merkle_artifact = 0`
+- `content_addressed_artifact = 0`
+- `registry_export_artifact = 0`
+- `release_asset = 0`
+- `structured_allocation_file = 0`
+
+The 10 analogue artifacts are all from `x1-labs/xenblocks-airdrop` and are limited to real program/Anchor/IDL/PDA/account-schema surfaces. Every one is explicitly non-XONE: `xone_named=false`, `exact_xone_contract_mentioned=false`, and `qualifying_xone_allocation_source_candidate=false`.
+
+Earlier live cycles were intentionally not accepted at face value. Manual inspection found source-id semantic leakage, generic TypeScript export/config noise, generic RPC URLs, a `pda` substring false match inside `update`, and IDL dual-classification. Each defect was fixed and converted into deterministic regression coverage before the accepted run.
+
+Evidence artifact:
+
+- artifact id: `10033477532`
+- digest: `sha256:26e43c87579aad3abbd6932df2e54923f73e2f575abf8ab880a5070056d6811f`
+
+The accepted zero-XONE result is scoped to this bounded public source set. It does **not** prove that no private, unpublished, deleted, separately distributed, or future XONE allocation source exists.
+
+## Next gate
+
+The accepted live result is zero for XONE-qualified public allocation-source provenance, so do **not** repeat the same current repository/release/official-page corpus.
+
+The remaining path is source-specific primary-artifact resolution / evidence intake. Resume only when an exact lead appears, such as:
+
+- an XONE registry/export;
+- holder-allocation CSV/JSON/JSONL;
+- authoritative allocation/claim API;
+- Merkle root/tree/proof source;
+- IPFS/Arweave allocation artifact;
+- exact deployed X1 program/account schema explicitly tied to XONE;
+- an externally supplied primary artifact with preservable provenance.
+
+A recovered source must then pass exact source verification and a separate **snapshot → XNT allocation binding** contract before any issuance, vesting, unlock, October 6, or cross-chain conclusion is eligible.
