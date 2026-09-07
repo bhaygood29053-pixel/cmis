@@ -122,7 +122,28 @@ def _reported_event_type(candidate: Mapping[str, Any]) -> str | None:
     direct = _text(candidate.get("event_type"))
     if direct:
         return direct.casefold()
-    return _text(_provider_deployment(candidate).get("event_type"))
+    nested = _text(_provider_deployment(candidate).get("event_type"))
+    return nested.casefold() if nested else None
+
+
+def _reported_transaction_signature(candidate: Mapping[str, Any]) -> str | None:
+    direct = _text(candidate.get("transaction_signature"))
+    if direct:
+        return direct
+
+    deployment = _provider_deployment(candidate)
+    nested = _text(deployment.get("transaction_signature"))
+    if nested:
+        return nested
+
+    raw = candidate.get("raw")
+    if isinstance(raw, Mapping):
+        return (
+            _text(raw.get("transaction_signature"))
+            or _text(raw.get("tx_signature"))
+            or _text(raw.get("signature"))
+        )
+    return None
 
 
 def _provider_claim(candidate: Mapping[str, Any], direct: str, structured: str) -> Any:
@@ -185,6 +206,12 @@ def _normalize_candidate(candidate: Any) -> dict[str, Any]:
     candidate_type = _candidate_type(candidate)
     reported_slot = _reported_slot(candidate)
     event_type = _reported_event_type(candidate)
+    reported_signature = _reported_transaction_signature(candidate)
+    reported_signature_syntax_valid = (
+        _base58_decoded_length(reported_signature) == 64
+        if reported_signature is not None
+        else None
+    )
 
     if candidate_type == DEPLOYMENT_CANDIDATE and reported_slot is None:
         raise X1AgentsRadioRPCCorroborationError(
@@ -206,6 +233,8 @@ def _normalize_candidate(candidate: Any) -> dict[str, Any]:
         "candidate_type": candidate_type,
         "reported_slot": reported_slot,
         "reported_event_type": event_type,
+        "reported_transaction_signature": reported_signature,
+        "reported_transaction_signature_syntax_valid": reported_signature_syntax_valid,
         "provider_claims": {
             "name": _provider_claim(candidate, "name", "provider_name"),
             "category": _provider_claim(candidate, "category", "provider_category"),
@@ -524,17 +553,26 @@ def corroborate_agents_radio_with_x1_rpc(
     ]
     reported_slot_activity_verified = bool(matching_successful)
 
+    reported_signature = normalized["reported_transaction_signature"]
+    reported_signature_syntax_valid = normalized[
+        "reported_transaction_signature_syntax_valid"
+    ]
+    signature_to_inspect = None
+    if reported_signature and reported_signature_syntax_valid is True:
+        signature_to_inspect = reported_signature
+    elif matching_successful:
+        signature_to_inspect = matching_successful[0]["signature"]
+
     transaction: dict[str, Any] | None = None
     if (
         reported_slot is not None
-        and matching_successful
+        and signature_to_inspect is not None
         and inspect_reported_slot_transaction
     ):
-        signature = matching_successful[0]["signature"]
         transaction_result = rpc_call(
             "getTransaction",
             [
-                signature,
+                signature_to_inspect,
                 {
                     "encoding": "jsonParsed",
                     "commitment": "finalized",
@@ -544,7 +582,7 @@ def corroborate_agents_radio_with_x1_rpc(
         )
         transaction = _parse_transaction(
             transaction_result,
-            signature=signature,
+            signature=signature_to_inspect,
             program_id=program_id,
             reported_slot=reported_slot,
         )
@@ -552,6 +590,9 @@ def corroborate_agents_radio_with_x1_rpc(
     transaction_corroborated = bool(
         isinstance(transaction, Mapping)
         and transaction.get("reported_slot_transaction_corroborated") is True
+    )
+    reported_slot_activity_verified = bool(
+        reported_slot_activity_verified or transaction_corroborated
     )
     exact_program_account_corroborated = bool(
         account.get("account_existence_verified") is True
@@ -621,6 +662,8 @@ def corroborate_agents_radio_with_x1_rpc(
         "candidate_type": normalized["candidate_type"],
         "reported_event_type": normalized["reported_event_type"],
         "reported_slot": reported_slot,
+        "reported_transaction_signature": reported_signature,
+        "reported_transaction_signature_syntax_valid": reported_signature_syntax_valid,
         "provider_claims": normalized["provider_claims"],
         "rpc": {
             "account": account,
