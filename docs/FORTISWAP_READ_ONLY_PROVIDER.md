@@ -11,7 +11,7 @@ Official machine discovery:
 - `https://app.fortiblox.com/api/x402/discovery`
 - `https://app.fortiblox.com/llms.txt`
 
-Officially documented priced routes at qualification time:
+Officially documented priced routes at the original qualification time:
 
 - `GET /api/tokens`
 - `GET /api/token/{mint}`
@@ -19,7 +19,26 @@ Officially documented priced routes at qualification time:
 - `POST /api/quote`
 - `POST /api/tx/build`
 
-CMIS qualifies only the first four as read-only observation surfaces. The implementation normalizes already-obtained paid responses but does not implement x402 payment or API-key handling.
+CMIS originally qualified only the first four as read-only observation surfaces. The implementation normalizes already-obtained paid responses but does not implement x402 payment or API-key handling.
+
+### Live-qualified ramp availability route
+
+Issue #559 / the FortiBlox Ramp Availability Semantic Evidence gate later qualified the browser-discovered public route:
+
+- `GET /api/ramp/availability`
+
+The bounded live response was HTTP 200 JSON with this exact semantic shape:
+
+- `country`: two-letter provider-reported code;
+- `buy.available`: boolean provider availability claim;
+- `buy.providers`: provider-name strings;
+- `sell.available`: boolean provider availability claim;
+- `sell.providers`: provider-name strings;
+- `reason`: string or null.
+
+The acceptance is intentionally narrow. The response did not expose asset scope, network scope, quote data, price data, limits, provider timestamp, or freshness metadata. CMIS therefore preserves all of those semantics as unverified/unavailable. The country code is also retained as provider-reported rather than independently interpreted as a verified jurisdiction standard.
+
+The live U.S. observation at qualification time reported buy availability through Coinbase, Stripe, Transak, and MoonPay, and sell availability through Coinbase, Transak, and MoonPay. Those are provider availability claims only and are not CMIS guarantees that any provider, asset, jurisdiction, account, payment method, or transaction will be usable for a particular user.
 
 ## Authority boundary
 
