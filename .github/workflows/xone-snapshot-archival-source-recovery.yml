@@ -1,0 +1,176 @@
+name: XONE Snapshot Archival Source Recovery
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/providers/ethereum/xone_snapshot_registry.py'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_snapshot_archival_source_recovery.py'
+      - 'scripts/recover_xone_snapshot_archival_sources.py'
+      - 'docs/XONE_SNAPSHOT_ARCHIVAL_SOURCE_RECOVERY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-snapshot-archival-source-recovery.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/providers/ethereum/xone_snapshot_registry.py'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_snapshot_archival_source_recovery.py'
+      - 'scripts/recover_xone_snapshot_archival_sources.py'
+      - 'docs/XONE_SNAPSHOT_ARCHIVAL_SOURCE_RECOVERY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-snapshot-archival-source-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test XONE snapshot archival recovery
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_snapshot_archival_source_recovery.py
+      - name: Re-run snapshot provenance boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_snapshot_provenance_expansion.py
+      - name: Re-run Ethereum XONE snapshot registry boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_snapshot_registry.py
+
+  live-archival-recovery:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Recover bounded archival XONE snapshot sources
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/recover_xone_snapshot_archival_sources.py             --cdx-limit 100             --max-replays 24             --log-chunk-blocks 50000             --balance-sample-size 25             | tee evidence/xone-snapshot-archival-source-recovery.json
+
+          python - <<'PY'
+          import json
+
+          path = "evidence/xone-snapshot-archival-source-recovery.json"
+          data = json.load(open(path))
+
+          assert data["status"] == "PASS"
+          assert data["contract_version"] == "xone_snapshot_archival_source_recovery/v1"
+          assert data["source_gate_passed"] is True
+          assert data["cdx_available_query_count"] >= 3
+          assert len(data["cdx_available_original_hosts"]) >= 2
+          assert data["index_available_count"] >= 1
+
+          recovery = data["recovery"]
+          assert recovery["official_xone_snapshot_verified"] is False
+          assert recovery["official_registry_artifact_verified"] is False
+          assert recovery["xone_snapshot_eligibility_verified"] is False
+          assert recovery["xone_snapshot_xnt_allocation_binding_verified"] is False
+          assert recovery["private_or_unpublished_snapshot_absence_proven"] is False
+
+          blocks = recovery["authoritative_exact_snapshot_block_candidates"]
+          if blocks:
+              assert len(blocks) == 1
+              assert recovery["provenance"]["authoritative_snapshot_block_conflict"] is False
+              assert data[
+                  "reconstruction_required_by_authoritative_exact_block"
+              ] is True
+              assert data["reconstruction_gate_passed"] is True
+              assert data["reconstruction"]["attempted"] is True
+              assert data["reconstruction"]["corroboration"][
+                  "multi_rpc_corroborated"
+              ] is True
+              assert data["official_xone_snapshot_verified"] is True
+          else:
+              assert recovery[
+                  "zero_authoritative_blocks_are_scoped_archival_evidence_only"
+              ] is True
+              assert data[
+                  "zero_authoritative_blocks_are_scoped_archival_evidence_only"
+              ] is True
+              assert data[
+                  "reconstruction_required_by_authoritative_exact_block"
+              ] is False
+              assert data["reconstruction_gate_passed"] is True
+              assert data["official_xone_snapshot_verified"] is False
+
+          assert data["official_registry_artifact_verified"] is False
+          assert data["xone_snapshot_eligibility_verified"] is False
+          assert data["xone_snapshot_xnt_allocation_binding_verified"] is False
+          assert data["xnt_issuance_verified"] is False
+          assert data["xnt_vesting_or_unlock_verified"] is False
+          assert data["october_6_unlock_applies_to_xone_verified"] is False
+          assert data["xone_xnt_conversion_verified"] is False
+          assert data["cross_chain_correlation_verified"] is False
+          assert data["private_or_unpublished_snapshot_absence_proven"] is False
+          assert data["public_service_promoted"] is False
+          assert data["scout_reliance_promoted"] is False
+          assert data["execution_authorized"] is False
+
+          print(
+              "CDX_AVAILABLE_QUERIES="
+              f"{data['cdx_available_query_count']}"
+          )
+          print(
+              "ARCHIVAL_CAPTURES_DISCOVERED="
+              f"{data['archival_capture_discovered_count']}"
+          )
+          print(
+              "ARCHIVAL_CAPTURES_RETRIEVED="
+              f"{data['archival_capture_retrieved_count']}"
+          )
+          print(
+              "STABLE_PRIMARY_URLS="
+              f"{data['stable_primary_url_count']}"
+          )
+          print(
+              "ARCHIVAL_PROVENANCE_CANDIDATES="
+              f"{recovery['provenance']['candidate_count']}"
+          )
+          print(
+              "DIRECT_PRIMARY_ARCHIVAL_CANDIDATES="
+              f"{recovery['direct_primary_archival_source_candidate_count']}"
+          )
+          print(
+              "AUTHORITATIVE_EXACT_SNAPSHOT_BLOCKS="
+              f"{len(blocks)}"
+          )
+          print(
+              "OFFICIAL_XONE_SNAPSHOT_VERIFIED="
+              f"{str(data['official_xone_snapshot_verified']).upper()}"
+          )
+          print("XONE_SNAPSHOT_XNT_ALLOCATION_BINDING_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xone-snapshot-archival-source-recovery-evidence
+          path: evidence/xone-snapshot-archival-source-recovery.json
+          if-no-files-found: error
