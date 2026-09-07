@@ -1,0 +1,88 @@
+name: FortiBlox Multi-Page Browser Network Inventory
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/fortiblox-multi-page-network-inventory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-fortiblox-multipage-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out CMIS
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime and browser
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Run bounded multi-page FortiBlox inventory
+        env:
+          PYTHONPATH: .
+        run: |
+          mkdir -p evidence
+          python scripts/capture_fortiblox_route_inventory.py             "https://app.fortiblox.com/"             --max-routes 20             --max-pages 10             --route-discovery-dwell-seconds 5             --capture-dwell-seconds 5             --max-network-events-per-page 150             > evidence/fortiblox-multipage-network.json
+
+      - name: Validate sanitized evidence and summarize
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p=Path("evidence/fortiblox-multipage-network.json")
+          data=json.loads(p.read_text())
+
+          assert data["contract"] == "fortiblox_route_inventory/v1"
+          assert data["source_id"] == "fortiblox_app"
+          assert data["pages_attempted"] <= 10
+          assert len(data["selected_navigation_routes"]) <= 10
+          assert data["raw_har_retained"] is False
+          assert data["raw_network_records_retained"] is False
+          assert data["raw_request_bodies_retained"] is False
+          assert data["raw_response_bodies_retained"] is False
+          assert data["request_replay_authorized"] is False
+          assert data["payment_authorized"] is False
+          assert data["execution_authorized"] is False
+
+          summary={
+              "contract":data["contract"],
+              "navigation_routes_discovered":data["route_discovery"]["navigation_routes"],
+              "pages_attempted":data["pages_attempted"],
+              "page_results":data["page_results"],
+              "sanitized_observation_count":data["sanitized_observation_count"],
+              "qualification_counts":data["qualification_counts"],
+              "unqualified_get_candidates":data["unqualified_get_candidates"],
+              "execution_authorized":False,
+              "payment_authorized":False,
+              "promotion_authorized":False,
+          }
+          Path("evidence/fortiblox-multipage-network-summary.json").write_text(
+              json.dumps(summary,indent=2,sort_keys=True)+"\n"
+          )
+          print(json.dumps(summary,indent=2,sort_keys=True))
+          PY
+
+      - name: Upload sanitized evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortiblox-multipage-network-inventory
+          path: |
+            evidence/fortiblox-multipage-network.json
+            evidence/fortiblox-multipage-network-summary.json
+          if-no-files-found: error
+          retention-days: 30
