@@ -55,6 +55,18 @@ HTTP 402 may be recorded only as `payment_required_observed=true`. No payment he
 
 The browser capture performs zero clicks, zero form submissions, zero wallet interaction, zero authentication, and zero payments. It supplies no persistent storage state, blocks service workers, disables downloads, and preserves `execution_authorized=false`.
 
+### FortiBlox multi-page route inventory
+
+Issue #561 adds a bounded operator inventory contract:
+
+- `fortiblox_route_inventory/v1`
+
+The inventory opens one explicit FortiBlox App page, reads at most 200 `a[href]` destinations without clicking, keeps only same-host HTTPS navigation pages with no query/fragment/API path, deduplicates them to at most 20 routes, and passively opens at most 10 pages one at a time through the accepted FortiBlox browser/network sanitizer.
+
+Per page, at most 150 network events are considered. Only sanitized observations survive. Unknown same-host GET JSON/text APIs remain `unqualified_get_candidate`; known read-only routes remain bounded observations; execution routes remain excluded.
+
+The inventory does not retain raw HAR, raw request/response bodies, cookies, auth/payment headers, or browser storage state. It performs no clicks, forms, wallet interaction, authentication, payments, request replay, transaction construction, or broadcast, and preserves `execution_authorized=false`.
+
 Different source names do not establish source independence. Source independence remains separately unverified unless an accepted CMIS contract proves it.
 
 ## Contract
