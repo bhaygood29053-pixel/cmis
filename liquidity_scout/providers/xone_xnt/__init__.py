@@ -66,6 +66,7 @@ from .snapshot_archival_recovery import (
     parse_cdx_json,
     rank_archival_captures,
     recover_stable_x_urls,
+    select_diverse_archival_captures,
     source_role_for_original_url,
     summarize_archival_recovery,
 )
@@ -109,6 +110,7 @@ __all__ = [
     "parse_cdx_json",
     "rank_archival_captures",
     "recover_stable_x_urls",
+    "select_diverse_archival_captures",
     "source_role_for_original_url",
     "summarize_archival_recovery",
     "XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION",
