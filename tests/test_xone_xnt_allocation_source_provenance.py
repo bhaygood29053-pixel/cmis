@@ -195,6 +195,52 @@ class AllocationSourceProvenanceTests(unittest.TestCase):
         )
         self.assertEqual(rows, [])
 
+    def test_source_id_does_not_leak_airdrop_semantics(self):
+        rows = extract_allocation_source_provenance(
+            '{"compilerOptions":{"rootDir":"src","sourceMap":true}}',
+            source_id="x1_labs_xenblocks_airdrop_file",
+            source_role="x1_labs_architecture_analogue",
+            url="https://raw.githubusercontent.com/x1-labs/xenblocks-airdrop/main/tsconfig.json",
+            observed_at=100.0,
+            path="tsconfig.json",
+            revision="abc123",
+            architecture_analogue=True,
+        )
+        self.assertEqual(rows, [])
+
+    def test_generic_typescript_export_is_not_registry_export(self):
+        rows = extract_allocation_source_provenance(
+            "export interface OnChainState { total: bigint; }",
+            source_id="x1_labs_xenblocks_airdrop_file",
+            source_role="x1_labs_architecture_analogue",
+            url="https://raw.githubusercontent.com/x1-labs/xenblocks-airdrop/main/src/types.ts",
+            observed_at=100.0,
+            path="src/types.ts",
+            revision="abc123",
+            architecture_analogue=True,
+        )
+        self.assertEqual(rows, [])
+
+    def test_generic_rpc_url_is_not_allocation_api(self):
+        text = (
+            f"Airdrop program ID {PROGRAM_ID}; "
+            "RPC endpoint https://rpc.testnet.x1.xyz/."
+        )
+        rows = extract_allocation_source_provenance(
+            text,
+            source_id="x1_labs_xenblocks_airdrop_file",
+            source_role="x1_labs_architecture_analogue",
+            url="https://raw.githubusercontent.com/x1-labs/xenblocks-airdrop/main/Anchor.toml",
+            observed_at=100.0,
+            path="Anchor.toml",
+            revision="abc123",
+            architecture_analogue=True,
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["api_urls"], [])
+        self.assertIn("x1_program_schema", rows[0]["source_classes"])
+        self.assertNotIn("api_endpoint", rows[0]["source_classes"])
+
     def test_container_registry_is_not_allocation_registry(self):
         rows = extract_allocation_source_provenance(
             "XONE container registry image published to ghcr.io/FairCrypto/x1-app.",
