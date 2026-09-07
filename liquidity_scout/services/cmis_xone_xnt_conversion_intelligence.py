@@ -8,9 +8,14 @@ from typing import Any, Optional
 from liquidity_scout.providers.ethereum import (
     CONTRACT_VERSION as ETHEREUM_XONE_IDENTITY_CONTRACT,
     XONE_EVENT_OBSERVER_CONTRACT_VERSION,
+    XONE_MIGRATION_SINK_SEMANTICS_CONTRACT_VERSION,
+    classify_migration_candidate,
+    corroborate_xone_burn_surface,
     corroborate_xone_event_observations,
     corroborate_xone_identity_proofs,
     observe_xone_transfer_events,
+    verify_burn_redeemer_candidate,
+    verify_xone_burn_surface,
     verify_xone_identity,
 )
 from liquidity_scout.providers.xone_xnt import (
@@ -35,6 +40,8 @@ def _truth_state() -> dict[str, Any]:
         "ethereum_event_window_verified": False,
         "ethereum_event_verified": False,
         "xone_burn_verified": False,
+        "burn_redeemer_interface_verified": False,
+        "migration_sink_identified": False,
         "lock_or_migration_verified": False,
         "x1_event_verified": False,
         "cross_chain_correlation_verified": False,
@@ -251,6 +258,97 @@ class CMISXoneXntConversionIntelligenceService:
                 "ethereum_event_window_verified": True,
                 "ethereum_event_verified": corroboration["ethereum_event_verified"],
                 "xone_burn_verified": corroboration["xone_burn_verified"],
+            },
+        }
+
+    def verify_ethereum_xone_burn_surface(
+        self,
+        *,
+        rpc_call: Any,
+        source_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Verify exact XONE identity and its readable burn-accounting surface."""
+
+        identity = verify_xone_identity(rpc_call=rpc_call, source_url=source_url)
+        burn_surface = verify_xone_burn_surface(
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_identity_contract": ETHEREUM_XONE_IDENTITY_CONTRACT,
+            "ethereum_migration_sink_semantics_contract":
+                XONE_MIGRATION_SINK_SEMANTICS_CONTRACT_VERSION,
+            "state": STATE,
+            "ethereum_identity": identity,
+            "ethereum_burn_surface": burn_surface,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
+            },
+        }
+
+    def verify_ethereum_xone_redeemer_candidate(
+        self,
+        candidate_address: str,
+        *,
+        rpc_call: Any,
+        source_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Verify technical IBurnRedeemable compatibility without migration promotion."""
+
+        proof = verify_burn_redeemer_candidate(
+            candidate_address,
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        classification = classify_migration_candidate(
+            candidate_address=candidate_address,
+            burn_redeemer_proof=proof,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_migration_sink_semantics_contract":
+                XONE_MIGRATION_SINK_SEMANTICS_CONTRACT_VERSION,
+            "state": STATE,
+            "redeemer_candidate": proof,
+            "migration_classification": classification,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
+                "burn_redeemer_interface_verified":
+                    proof["burn_redeemer_interface_verified"],
+            },
+        }
+
+    def corroborate_ethereum_xone_burn_surface(
+        self,
+        proofs: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Require matching burn-accounting state across distinct RPC transports."""
+
+        corroboration = corroborate_xone_burn_surface(proofs)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_migration_sink_semantics_contract":
+                XONE_MIGRATION_SINK_SEMANTICS_CONTRACT_VERSION,
+            "state": STATE,
+            "ethereum_burn_surface": corroboration,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
             },
         }
 
