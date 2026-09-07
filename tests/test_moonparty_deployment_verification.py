@@ -198,7 +198,7 @@ class MoonPartyDeploymentVerificationTests(unittest.TestCase):
         rpc = FakeRPC(xone=OTHER)
         with self.assertRaisesRegex(
             MoonPartyDeploymentVerificationError,
-            "XONE\(\) binding mismatch",
+            r"XONE\(\) binding mismatch",
         ):
             verify_moonparty_deployment_candidate(
                 CANDIDATE,
