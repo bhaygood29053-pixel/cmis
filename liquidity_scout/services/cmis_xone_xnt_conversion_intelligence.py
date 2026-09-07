@@ -5,6 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
+from liquidity_scout.providers.ethereum import (
+    CONTRACT_VERSION as ETHEREUM_XONE_IDENTITY_CONTRACT,
+    corroborate_xone_identity_proofs,
+    verify_xone_identity,
+)
 from liquidity_scout.providers.xone_xnt import (
     SCRAPER_CONTRACT,
     XoneXntConversionScraper,
@@ -23,6 +28,7 @@ def _truth_state() -> dict[str, Any]:
     return {
         "discovery_only": True,
         "web_claim_verified": False,
+        "ethereum_xone_identity_verified": False,
         "ethereum_event_verified": False,
         "x1_event_verified": False,
         "cross_chain_correlation_verified": False,
@@ -122,6 +128,55 @@ class CMISXoneXntConversionIntelligenceService:
             "read_only": True,
             "xone_xnt_only": True,
             **_truth_state(),
+        }
+
+    def verify_ethereum_xone_identity(
+        self,
+        *,
+        rpc_call: Any,
+        source_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Verify only the exact Ethereum XONE contract identity."""
+
+        proof = verify_xone_identity(
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_identity_contract": ETHEREUM_XONE_IDENTITY_CONTRACT,
+            "state": STATE,
+            "ethereum_identity": proof,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
+            },
+        }
+
+    def corroborate_ethereum_xone_identity(
+        self,
+        proofs: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Require matching exact-identity proofs from distinct RPC transports."""
+
+        corroboration = corroborate_xone_identity_proofs(proofs)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_identity_contract": ETHEREUM_XONE_IDENTITY_CONTRACT,
+            "state": STATE,
+            "ethereum_identity": corroboration,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
+            },
         }
 
     def normalize_documents(
