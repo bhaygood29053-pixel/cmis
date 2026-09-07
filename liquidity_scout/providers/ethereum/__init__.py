@@ -1,5 +1,16 @@
 """Narrow Ethereum provider contracts beneath CMIS."""
 
+from .xone_event_observer import (
+    CONTRACT_VERSION as XONE_EVENT_OBSERVER_CONTRACT_VERSION,
+    DEFAULT_MAX_BLOCKS as XONE_EVENT_DEFAULT_MAX_BLOCKS,
+    DEFAULT_MAX_EVENTS as XONE_EVENT_DEFAULT_MAX_EVENTS,
+    EthereumXoneEventError,
+    TRANSFER_TOPIC as XONE_TRANSFER_TOPIC,
+    ZERO_ADDRESS as ETHEREUM_ZERO_ADDRESS,
+    corroborate_xone_event_observations,
+    observe_xone_transfer_events,
+    parse_xone_transfer_log,
+)
 from .xone_identity import (
     CHAIN,
     CHAIN_ID,
@@ -19,6 +30,15 @@ from .xone_identity import (
 )
 
 __all__ = [
+    "ETHEREUM_ZERO_ADDRESS",
+    "EthereumXoneEventError",
+    "XONE_EVENT_DEFAULT_MAX_BLOCKS",
+    "XONE_EVENT_DEFAULT_MAX_EVENTS",
+    "XONE_EVENT_OBSERVER_CONTRACT_VERSION",
+    "XONE_TRANSFER_TOPIC",
+    "corroborate_xone_event_observations",
+    "observe_xone_transfer_events",
+    "parse_xone_transfer_log",
     "CHAIN",
     "CHAIN_ID",
     "CONTRACT_VERSION",
