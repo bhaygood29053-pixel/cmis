@@ -333,6 +333,7 @@ class XoneSnapshotRegistryTests(unittest.TestCase):
             "source_role": "jack_levin_direct",
             "url": "https://example.test/jack",
             "authoritative_source": True,
+            "exact_xone_contract_mentioned": True,
             "snapshot_block_candidates": [XONE_CREATION_BLOCK + 1],
         }
         registry_one = dict(registry)
