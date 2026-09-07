@@ -12,6 +12,7 @@ from liquidity_scout.providers.x1.agents_radio_rpc_corroboration import (
     X1AgentsRadioRPCCorroborationError,
     corroborate_agents_radio_with_x1_rpc,
 )
+from liquidity_scout.services.cmis_web_discovery import CMISWebDiscoveryService
 
 
 PROGRAM_ID = "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN"
@@ -493,6 +494,32 @@ class X1AgentsRadioRPCCorroborationTests(unittest.TestCase):
                 direct_candidate(),
                 rpc_call=FakeRPC(history={"not": "a list"}),
             )
+
+
+    def test_internal_web_discovery_service_wraps_rpc_without_public_promotion(self):
+        service = CMISWebDiscoveryService()
+        rpc = FakeRPC(history=[])
+
+        result = service.corroborate_x1_agents_radio_rpc(
+            direct_candidate(),
+            rpc_call=rpc,
+        )
+
+        self.assertEqual(result["source_id"], "x1_agents_radio")
+        self.assertEqual(
+            result["corroboration"]["contract_version"],
+            CONTRACT_VERSION,
+        )
+        self.assertTrue(
+            result["corroboration"]["exact_program_account_corroborated"]
+        )
+        self.assertTrue(result["read_only"])
+        self.assertFalse(result["cmis_verified"])
+        self.assertFalse(result["source_independence_verified"])
+        self.assertFalse(result["public_service_promoted"])
+        self.assertFalse(result["scout_reliance_promoted"])
+        self.assertFalse(result["cmis_promotable"])
+        self.assertFalse(result["execution_authorized"])
 
     def test_transaction_inspection_can_be_disabled_without_promoting_semantics(self):
         rpc = FakeRPC()
