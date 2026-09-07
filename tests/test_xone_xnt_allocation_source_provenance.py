@@ -167,6 +167,7 @@ class AllocationSourceProvenanceTests(unittest.TestCase):
         self.assertFalse(row["xone_source_binding_verified"])
         self.assertFalse(row["qualifying_xone_allocation_source_candidate"])
         self.assertIn("x1_program_schema", row["source_classes"])
+        self.assertNotIn("structured_allocation_file", row["source_classes"])
 
     def test_generic_airdrop_without_xone_is_not_candidate(self):
         rows = extract_allocation_source_provenance(
@@ -207,6 +208,20 @@ class AllocationSourceProvenanceTests(unittest.TestCase):
             architecture_analogue=True,
         )
         self.assertEqual(rows, [])
+
+    def test_update_filename_does_not_match_pda(self):
+        rows = extract_allocation_source_provenance(
+            "export async function updateAuthority() {}",
+            source_id="x1_labs_xenblocks_airdrop_file",
+            source_role="x1_labs_architecture_analogue",
+            url="https://raw.githubusercontent.com/x1-labs/xenblocks-airdrop/main/src/update-authority.ts",
+            observed_at=100.0,
+            path="src/update-authority.ts",
+            revision="abc123",
+            architecture_analogue=True,
+        )
+        self.assertEqual(rows, [])
+        self.assertLess(provenance_path_score("src/update-authority.ts"), 5)
 
     def test_generic_typescript_export_is_not_registry_export(self):
         rows = extract_allocation_source_provenance(
