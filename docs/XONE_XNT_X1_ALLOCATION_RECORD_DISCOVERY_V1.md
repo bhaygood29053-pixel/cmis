@@ -1,6 +1,6 @@
 # X1-side XONE → XNT Allocation Record Discovery v1
 
-Status: **IMPLEMENTATION FOR ISSUE #616 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE SOURCE + FULL LIQUIDITY SCOUT TEST GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #616 / PR #617. XONE XNT X1 Allocation Record Discovery run #7 passed deterministic and live jobs at head `6d1b9bbedc7b21c0256fdff31c93407f250a053b`; Liquidity Scout Tests run #1823 passed; PR #617 merged as `2499511af489173a4a37af76674d03be533d1b2d`.
 
 Contract:
 
@@ -153,8 +153,33 @@ Acceptance requires:
 - full Liquidity Scout Tests;
 - merge to `main`.
 
-## Next gate after acceptance
+## Accepted live result
 
-If an exact XONE-specific allocation record is recovered, the next contract should prove **snapshot → XNT allocation binding**: the source of eligibility, ratio/formula, exclusions/minimums, Ethereum→X1 mapping semantics, claim/allocation state, and whether the allocation is already fixed.
+Accepted run #7 covered:
 
-If the live result is zero, do not repeat generic web/archive searches. Move to a narrower exact-record source class or a newly supplied/publicly discovered artifact.
+- **3/3** bounded repositories available;
+- **15** ranked repository files retrieved;
+- **3/3** official X1 targets available;
+- **0** qualifying allocation records;
+- **0** candidates;
+- **0** XONE-specific candidates;
+- **0** exact-XONE-identity-bound candidates;
+- **0** XNT-amount candidates;
+- **0** amount conflicts.
+
+Evidence artifact:
+
+- artifact id: `10031487515`
+- digest: `sha256:cd30ba9f18eb90c7ededecda6ab5b0949ed41aab567553575a008b8e20f663ac`
+
+The accepted result was reached only after removing a live false-positive class. Run #4 had surfaced 12 apparent pairs from `FairCrypto/x1-app/public/abi/XONE.json`. Those alleged X1 pubkeys were Base58-looking slices of ABI/EVM bytecode, not typed allocation keys. Ordinary ABI artifacts and bytecode-substring matches are now rejected and covered by deterministic regression tests.
+
+The accepted zero result is scoped to the bounded public source set. It does **not** prove that no private, unpublished, deleted, non-indexed, future, or separately distributed allocation registry exists.
+
+## Next gate
+
+Do not repeat the already-exhausted generic current-web / archive / archived-asset / bounded repository scan.
+
+Move to **allocation-source provenance**: exact XONE-linked registry/export/API/Merkle artifacts, released CSV/JSON holder-allocation files, exact X1 program IDs/account schemas tied to allocation logic, or newly supplied/publicly discovered primary evidence.
+
+If such an artifact is recovered, the following contract must separately prove **snapshot → XNT allocation binding**: source of eligibility, ratio/formula, exclusions/minimums, Ethereum→X1 mapping semantics, claim/allocation state, and whether the allocation is already fixed.
