@@ -45,6 +45,12 @@ Issue #564 adds `x1_agents_radio` as a bounded machine-readable program/deployme
 The documented `x1radio.vercel.app` entrypoint currently redirects to `x1agentsradio.xyz`; both hosts are retained inside one source boundary so the migration does not create a false source-independence claim. The signed subscriber surfaces `/api/programs` and `/api/digest/latest` are deliberately excluded from this adapter. CMIS does not sign Radio requests, subscribe an agent, register a webhook, or treat Radio program labels, categories, instructions, activity, deployment status, or upgrade labels as verified chain truth. Exact claims must hand off to an accepted CMIS/RPC/provider verification contract.
 
 
+#### X1 Agents Radio Structured Discovery v1
+
+Issue #568 adds `x1_agents_radio_structured_discovery/v1` above the accepted Radio source. It classifies the four public endpoints, normalizes bounded program/deployment/activity/instruction/health candidates across flexible JSON envelopes, validates candidate X1/SVM program-id syntax, surfaces unknown provider fields, and emits explicit X1 RPC / CMIS verification handoffs.
+
+The structured layer does not establish program identity, program semantics, instruction semantics, deployment/upgrade truth, activity truth, freshness, source independence, Scout reliance, public promotion, or execution authority. See `docs/X1_AGENTS_RADIO_STRUCTURED_DISCOVERY_V1.md`.
+
 ### FortiBlox browser/network discovery
 
 Issue #555 extends `fortiblox_app` with two internal discovery contracts:
@@ -220,6 +226,7 @@ A later gate is required before any of the following:
 Deterministic regression coverage includes:
 
 - all registered source providers, including bounded `fortiblox_app` and `x1_agents_radio` registrations;
+- X1 Agents Radio structured endpoint/payload normalization, bounds, program-id syntax, unknown-field visibility, verification handoffs, and non-promotion invariants;
 - allowlist rejection;
 - redirect escape rejection;
 - bounded body-size failure;
