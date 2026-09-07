@@ -352,8 +352,15 @@ def resolve_primary_allocation_artifact(
     handoffs = _handoffs(candidate, snapshot_blocks=snapshot_blocks)
     content_integrity_verified = expected_sha_match is True
     content_addressed_locally = bool(body_sha)
+    content_addressed_provenance_complete = bool(
+        SOURCE_CLASS_CONTENT_ADDRESSED in source_classes
+        and (candidate.get("ipfs_cids") or candidate.get("arweave_ids"))
+        and url
+        and body_sha
+    )
     locator_provenance_complete = bool(
         candidate.get("source_provenance_fields_verified")
+        or content_addressed_provenance_complete
     )
 
     resolved_for_handoff = bool(
@@ -391,6 +398,8 @@ def resolve_primary_allocation_artifact(
         "content_integrity_verified": content_integrity_verified,
         "content_addressed_locally": content_addressed_locally,
         "locator_pinned": pinned,
+        "content_addressed_provenance_complete":
+            content_addressed_provenance_complete,
         "locator_provenance_complete": locator_provenance_complete,
         "source_classes": source_classes,
         "snapshot_block_candidates": snapshot_blocks,
