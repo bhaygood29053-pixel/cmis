@@ -40,6 +40,7 @@ def _truth_state() -> dict[str, Any]:
         "ethereum_event_window_verified": False,
         "ethereum_event_verified": False,
         "xone_burn_verified": False,
+        "xone_burn_accounting_surface_verified": False,
         "burn_redeemer_interface_verified": False,
         "migration_sink_identified": False,
         "lock_or_migration_verified": False,
@@ -289,6 +290,7 @@ class CMISXoneXntConversionIntelligenceService:
             **{
                 **_truth_state(),
                 "ethereum_xone_identity_verified": True,
+                "xone_burn_accounting_surface_verified": True,
             },
         }
 
@@ -349,6 +351,7 @@ class CMISXoneXntConversionIntelligenceService:
             **{
                 **_truth_state(),
                 "ethereum_xone_identity_verified": True,
+                "xone_burn_accounting_surface_verified": True,
             },
         }
 
