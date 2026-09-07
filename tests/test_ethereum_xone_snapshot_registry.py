@@ -7,6 +7,7 @@ from liquidity_scout.providers.ethereum import (
     XONE_CONTRACT,
     XONE_CREATION_BLOCK,
     XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
+    corroborate_xone_registry_proofs,
     discover_official_snapshot_candidates,
     extract_xone_snapshot_claims,
     fetch_and_verify_xone_registry,
@@ -334,9 +335,21 @@ class XoneSnapshotRegistryTests(unittest.TestCase):
             "authoritative_source": True,
             "snapshot_block_candidates": [XONE_CREATION_BLOCK + 1],
         }
+        registry_one = dict(registry)
+        registry_one["historical_balance_sample_verified"] = True
+        registry_one["source_url"] = "https://rpc-one.example"
+        registry_two = dict(registry)
+        registry_two["historical_balance_sample_verified"] = True
+        registry_two["source_url"] = "https://rpc-two.example"
+        corroborated = corroborate_xone_registry_proofs(
+            [registry_one, registry_two]
+        )
+        self.assertTrue(corroborated["multi_rpc_corroborated"])
+        self.assertEqual(corroborated["rpc_proof_count"], 2)
+
         result = promote_official_snapshot(
             source_candidate=candidate,
-            registry_proof=registry,
+            registry_proof=corroborated,
         )
         self.assertTrue(result["official_xone_snapshot_verified"])
         self.assertTrue(result["reconstructed_registry_verified"])
@@ -354,8 +367,40 @@ class XoneSnapshotRegistryTests(unittest.TestCase):
         ):
             promote_official_snapshot(
                 source_candidate=secondary,
-                registry_proof=registry,
+                registry_proof=corroborated,
             )
+
+    def test_registry_corroboration_requires_distinct_rpc_hosts(self):
+        registry = reconstruct_xone_registry(
+            parsed_events(),
+            snapshot_block=XONE_CREATION_BLOCK + 1,
+            snapshot_block_hash=BLOCK_HASH,
+            snapshot_timestamp=1_700_000_000,
+            coverage_ranges=[
+                (XONE_CREATION_BLOCK, XONE_CREATION_BLOCK + 1),
+            ],
+            total_supply_base_units=480,
+        )
+        one = dict(registry)
+        one["historical_balance_sample_verified"] = True
+        one["source_url"] = "https://rpc-one.example"
+        two = dict(registry)
+        two["historical_balance_sample_verified"] = True
+        two["source_url"] = "https://rpc-two.example"
+
+        proof = corroborate_xone_registry_proofs([one, two])
+        self.assertTrue(proof["multi_rpc_corroborated"])
+        self.assertTrue(proof["reconstructed_registry_verified"])
+        self.assertFalse(proof["official_xone_snapshot_verified"])
+        self.assertFalse(proof["xone_snapshot_xnt_allocation_binding_verified"])
+
+        same = dict(two)
+        same["source_url"] = "https://rpc-one.example/other"
+        with self.assertRaisesRegex(
+            EthereumXoneSnapshotRegistryError,
+            "two distinct RPC transport hosts",
+        ):
+            corroborate_xone_registry_proofs([one, same])
 
     def test_service_snapshot_discovery_preserves_boundaries(self):
         service = CMISXoneXntConversionIntelligenceService()
