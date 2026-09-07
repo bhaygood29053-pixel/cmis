@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 09:14 America/New_York**.
+Current reconciliation: **2026-09-07 09:28 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,17 @@ Current reconciliation: **2026-09-07 09:14 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally via #575 / PR #578, and exact Ethereum XONE identity is now accepted via #580 / PR #581 under `ethereum_xone_identity/v1`. The verified Ethereum mainnet XONE contract is `0x4DCDa2274899d9BbA3Bb6f5A852C107Dd6E4fE1c`; exact creation/deployer, runtime bytecode, and ERC-20 metadata were proven by live multi-RPC evidence. Ethereum conversion/burn/migration semantics, X1 XNT issuance/vesting events, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally via #575 / PR #578; exact Ethereum XONE identity is accepted via #580 / PR #581; bounded canonical XONE event observation is accepted via #583 / PR #584 under `ethereum_xone_event_observer/v1`. Live multi-RPC evidence verified the creation-block mint of exactly 500,000,000 XONE from the zero address to deployer `0xc73fc08c931efe3fce850c09278472e8a81c2e05`. Exact lock/migration/conversion sink semantics, X1 XNT issuance/vesting events, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### Ethereum XONE Exact Identity v1
+### Ethereum XONE Event Observer v1
+
+**ACCEPTED.** Ethereum XONE Event Observer run #1 passed deterministic and live jobs at PR #584 head `742d83edee9986765e51a42fd285d23452b4bccb`; Liquidity Scout Tests run #1757 also passed. The live acceptance window was the exact XONE creation block `18,609,736` and was corroborated across multiple public Ethereum RPC transports. It contained one canonical ERC-20 `Transfer` classified as a mint: zero address → `0xc73fc08c931efe3fce850c09278472e8a81c2e05`, amount `500,000,000 XONE`, transaction `0x6d2f0492d54b56044f03a3de5ad1889b6fe115914e9bcfc58e28950ddda6eea5`, timestamp `1700443835`. Burn count in that exact window was zero. PR #584 merged as `3d344acd3964df77e3161abab6c1415659a50b4c`; Issue #583 closed completed.
+
+This gate proves bounded canonical Ethereum XONE event observation. It does not prove lifetime supply, lifetime burn totals, any lock/migration/conversion sink, XNT issuance/vesting/claim state, or Ethereum→X1 correlation.
+
+### Previous accepted live gate — Ethereum XONE Exact Identity v1
 
 **ACCEPTED.** Ethereum XONE Identity run #6 passed both deterministic and live jobs at PR #581 head `06525bdfe59e255e254901699768054156e9430b`; Liquidity Scout Tests run #1753 also passed. The live gate directly proved Ethereum mainnet chain ID, exact creation transaction/deployer, successful receipt to the exact XONE contract, 8,932-byte runtime code with SHA-256 `ad56471d77d0f1cf018de7aee79d711dc7ee8ca62154fac3f2300308763aff8e`, and ERC-20 name/symbol/decimals `XONE` / `XONE` / 18. Tenderly and Blast satisfied the required two-provider quorum, and 1RPC independently returned a third matching proof. PR #581 merged as `3e0373d15517fd3a0233c180341199e1a20c021c`; Issue #580 closed completed.
 
