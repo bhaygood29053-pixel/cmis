@@ -505,8 +505,17 @@ def _candidate_source_classes(
     if release_asset and classes:
         classes.append(SOURCE_CLASS_RELEASE_ASSET)
 
+    classes = list(dict.fromkeys(classes))
+    # IDL/Anchor/PDA/account-schema JSON is program schema, not a holder
+    # allocation dataset merely because its filename contains "airdrop".
+    if (
+        SOURCE_CLASS_X1_PROGRAM_SCHEMA in classes
+        and SOURCE_CLASS_STRUCTURED_FILE in classes
+    ):
+        classes.remove(SOURCE_CLASS_STRUCTURED_FILE)
+
     return (
-        list(dict.fromkeys(classes)),
+        classes,
         {
             "structured_filenames": structured_files,
             "api_urls": api_urls,
