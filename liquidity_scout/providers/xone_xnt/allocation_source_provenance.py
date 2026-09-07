@@ -411,16 +411,19 @@ def _path_source_classes(
         if semantic.get("allocation_language_present") or semantic.get("xone_named"):
             classes.append(SOURCE_CLASS_REGISTRY_EXPORT)
 
+    pda_path = bool(
+        re.search(r"(^|[/_.-])pda(?:s)?([/_.-]|$)", normalized)
+    )
     if (
         "/idl/" in f"/{normalized}"
         or normalized.endswith("anchor.toml")
+        or pda_path
         or any(
             term in normalized
             for term in (
                 "account_schema",
                 "account-schema",
                 "onchain/types",
-                "pda",
                 "programs/",
             )
         )
@@ -466,7 +469,11 @@ def _candidate_source_classes(
         for name in structured_files
         if any(term in name.casefold() for term in allocation_file_terms)
     ]
-    if relevant_structured_files and semantic.get("allocation_language_present"):
+    if (
+        relevant_structured_files
+        and semantic.get("allocation_language_present")
+        and SOURCE_CLASS_X1_PROGRAM_SCHEMA not in classes
+    ):
         classes.append(SOURCE_CLASS_STRUCTURED_FILE)
 
     lowered_text = _text(text).casefold()
@@ -745,7 +752,6 @@ def provenance_path_score(path: str) -> int:
         ("distribution", 6),
         ("eligibility", 8),
         ("idl", 5),
-        ("pda", 5),
         ("program", 4),
         ("account", 4),
         ("manifest", 5),
@@ -754,6 +760,9 @@ def provenance_path_score(path: str) -> int:
     for term, weight in weighted:
         if term in normalized:
             score += weight
+
+    if re.search(r"(^|[/_.-])pda(?:s)?([/_.-]|$)", normalized):
+        score += 5
 
     if normalized.endswith(STRUCTURED_EXTENSIONS):
         score += 8
