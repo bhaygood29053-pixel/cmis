@@ -131,6 +131,38 @@ class X1AllocationRecordDiscoveryTests(unittest.TestCase):
         self.assertEqual(summary["amount_conflict_candidate_count"], 0)
         self.assertFalse(summary["candidates"][0]["amount_conflict"])
 
+    def test_rejects_ordinary_xone_abi_artifact(self):
+        abi_like = (
+            f'{{"name":"XONE","address":"{ETH}",'
+            '"bytecode":"0x6000518481527f8c5be1e5ebec7d5bd14f71427d1e84f3dd00",'
+            '"name":"allocation"}}'
+        )
+        records = extract_x1_allocation_records(
+            abi_like,
+            source_id="faircrypto_x1_app_file",
+            source_role="faircrypto_x1_app_primary",
+            url=URL,
+            observed_at=100.0,
+            path="public/abi/XONE.json",
+        )
+        self.assertEqual(records, [])
+
+    def test_does_not_slice_x1_pubkey_from_long_hex_bytecode(self):
+        text = (
+            f"XONE allocation holder {ETH}; "
+            "bytecode 0x6000518481527f8c5be1e5ebec7d5bd14f71427d1e84f3dd00 "
+            "for XNT claim logic."
+        )
+        records = extract_x1_allocation_records(
+            text,
+            source_id="source_code",
+            source_role="faircrypto_x1_app_primary",
+            url="https://raw.githubusercontent.com/FairCrypto/x1-app/main/src/xone.ts",
+            observed_at=100.0,
+            path="src/xone.ts",
+        )
+        self.assertEqual(records, [])
+
     def test_rejects_generic_cross_chain_address_pair_without_xone(self):
         payload = {
             "type": "generic allocation registry",
