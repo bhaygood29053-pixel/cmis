@@ -68,7 +68,9 @@ jobs:
           set -euo pipefail
           mkdir -p evidence
           python scripts/verify_ethereum_xone_identity.py \
-            --rpc https://ethereum-rpc.publicnode.com \
+            --rpc https://gateway.tenderly.co/public/mainnet \
+            --rpc https://eth-mainnet.public.blastapi.io \
+            --rpc https://eth.merkle.io \
             --rpc https://eth.drpc.org \
             --rpc https://public.1rpc.io/eth \
             --minimum-proofs 2 \
