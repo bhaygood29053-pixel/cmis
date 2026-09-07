@@ -44,7 +44,7 @@ ROOT_QUERIES = (
 )
 
 
-def _safe_get(url: str, *, allowed_hosts: set[str], params=None, timeout=35):
+def _safe_get(url: str, *, allowed_hosts: set[str], params=None, timeout=20):
     current = url
     for _ in range(MAX_REDIRECTS + 1):
         parsed = urlparse(current)
@@ -87,13 +87,13 @@ def _fetch_cdx_exact(url: str, *, limit: int = 50):
         "limit": str(limit),
     }
     last_error = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             response = _safe_get(
                 WAYBACK_CDX,
                 allowed_hosts={"web.archive.org"},
                 params=params,
-                timeout=40,
+                timeout=20,
             )
             return parse_cdx_json(
                 response.json(),
@@ -101,8 +101,8 @@ def _fetch_cdx_exact(url: str, *, limit: int = 50):
             ), None
         except Exception as exc:
             last_error = exc
-            if attempt < 2:
-                time.sleep(1.25 * (attempt + 1))
+            if attempt < 1:
+                time.sleep(1.0)
     return [], {
         "error_type": type(last_error).__name__,
         "error": str(last_error),
@@ -172,7 +172,7 @@ def _replay_roots(captures, *, max_replays: int, max_refs_per_node: int):
             response = _safe_get(
                 capture["replay_url"],
                 allowed_hosts={"web.archive.org"},
-                timeout=40,
+                timeout=20,
             )
         except Exception as exc:
             root_results.append({
@@ -322,7 +322,7 @@ def _traverse_assets(
             response = _safe_get(
                 capture["replay_url"],
                 allowed_hosts={"web.archive.org"},
-                timeout=40,
+                timeout=20,
             )
         except Exception as exc:
             replay_results.append({
