@@ -69,7 +69,7 @@ jobs:
           mkdir -p evidence
           python scripts/verify_ethereum_xone_identity.py \
             --rpc https://ethereum-rpc.publicnode.com \
-            --rpc https://eth.llamarpc.com \
+            --rpc https://eth.drpc.org \
             --rpc https://public.1rpc.io/eth \
             --minimum-proofs 2 \
             | tee evidence/ethereum-xone-identity.json
