@@ -1,6 +1,6 @@
 # X1 Agents Radio → X1 RPC Corroboration v1
 
-Status: **IMPLEMENTATION FOR ISSUE #571 — NOT ACCEPTED UNTIL PR/CI MERGE**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #571 / PR #572. Exact-head Liquidity Scout Tests run #1735 passed before merge. The contract verifies only bounded direct-chain fields, remains non-promoted as a public/Scout capability, and preserves `execution_authorized=false`.
 
 Contract:
 
