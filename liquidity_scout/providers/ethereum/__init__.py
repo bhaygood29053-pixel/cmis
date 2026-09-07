@@ -11,6 +11,20 @@ from .xone_event_observer import (
     observe_xone_transfer_events,
     parse_xone_transfer_log,
 )
+from .xone_migration_sink_semantics import (
+    BURN_SELECTOR as XONE_BURN_SELECTOR,
+    CONTRACT_VERSION as XONE_MIGRATION_SINK_SEMANTICS_CONTRACT_VERSION,
+    EthereumXoneMigrationSemanticsError,
+    ON_TOKEN_BURNED_INTERFACE_ID,
+    SUPPORTS_INTERFACE_SELECTOR,
+    USER_BURNS_SELECTOR,
+    classify_migration_candidate,
+    corroborate_xone_burn_surface,
+    supports_interface_calldata,
+    user_burns_calldata,
+    verify_burn_redeemer_candidate,
+    verify_xone_burn_surface,
+)
 from .xone_identity import (
     CHAIN,
     CHAIN_ID,
@@ -30,6 +44,18 @@ from .xone_identity import (
 )
 
 __all__ = [
+    "EthereumXoneMigrationSemanticsError",
+    "ON_TOKEN_BURNED_INTERFACE_ID",
+    "SUPPORTS_INTERFACE_SELECTOR",
+    "USER_BURNS_SELECTOR",
+    "XONE_BURN_SELECTOR",
+    "XONE_MIGRATION_SINK_SEMANTICS_CONTRACT_VERSION",
+    "classify_migration_candidate",
+    "corroborate_xone_burn_surface",
+    "supports_interface_calldata",
+    "user_burns_calldata",
+    "verify_burn_redeemer_candidate",
+    "verify_xone_burn_surface",
     "ETHEREUM_ZERO_ADDRESS",
     "EthereumXoneEventError",
     "XONE_EVENT_DEFAULT_MAX_BLOCKS",
