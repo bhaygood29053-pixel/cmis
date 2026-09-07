@@ -32,6 +32,27 @@ CMIS Web Discovery is a provider-side discovery capability beneath CMIS. It is n
 
 The FortiBlox App source includes the root application URL plus the provider-documented `/api/x402/discovery` and `/llms.txt` GET surfaces as bounded discovery targets. This does not qualify FortiSwap execution endpoints or provider assertions as verified CMIS facts.
 
+### FortiBlox browser/network discovery
+
+Issue #555 extends `fortiblox_app` with two internal discovery contracts:
+
+- `fortiblox_network_observation/v1` sanitizes browser-exported HAR-like entries;
+- `fortiblox_browser_capture/v1` passively opens one explicit `app.fortiblox.com` page in an ephemeral Chromium context and immediately sanitizes eligible responses.
+
+The network observer retains only bounded metadata and hashes. It never retains cookies, authorization headers, `PAYMENT-SIGNATURE`, `PAYMENT-REQUIRED`, raw request bodies, raw response bodies, or raw HAR records.
+
+Eligible observations are:
+
+- the public `GET /api/x402/discovery` and `GET /llms.txt` discovery surfaces;
+- FortiSwap routes already classified as read-only observation surfaces;
+- unknown same-host GET JSON/text routes as `unqualified_get_candidate` so new machine surfaces can be discovered without silently gaining authority.
+
+Known execution routes such as transaction build/send/status are dropped. Unknown non-GET routes are also dropped. Passive observation of the already-qualified `POST /api/quote` route is allowed only as hashed metadata; the request body is not retained and the request is never replayed.
+
+HTTP 402 may be recorded only as `payment_required_observed=true`. No payment header is retained, no payment is performed, and `payment_authorized=false`.
+
+The browser capture performs zero clicks, zero form submissions, zero wallet interaction, zero authentication, and zero payments. It supplies no persistent storage state, blocks service workers, disables downloads, and preserves `execution_authorized=false`.
+
 Different source names do not establish source independence. Source independence remains separately unverified unless an accepted CMIS contract proves it.
 
 ## Contract
@@ -181,6 +202,7 @@ Deterministic regression coverage includes:
 - JSON parsing/normalization;
 - query matching;
 - crawl page/depth bounds;
+- FortiBlox same-host browser/network sanitization, 402 metadata handling, unknown-GET candidate discovery, and execution-route exclusion;
 - public-promotion and execution-authority invariants;
 - visible per-source failure in multi-source collection.
 
