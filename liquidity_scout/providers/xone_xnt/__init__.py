@@ -33,6 +33,13 @@ from .x1_xnt_distribution_mechanism import (
     normalize_x1_pubkey,
     qualify_xnt_distribution_candidate,
 )
+from .moonparty_deployment_verification import (
+    CONTRACT_VERSION as MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
+    MoonPartyDeploymentVerificationError,
+    corroborate_moonparty_deployment,
+    discover_moonparty_deployment_candidates,
+    verify_moonparty_deployment_candidate,
+)
 from .moonparty_source_semantics import (
     CONTRACT_VERSION as XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
     FAIRCRYPTO_X1_APP_COMMIT,
@@ -72,6 +79,11 @@ from .scraper import (
 )
 
 __all__ = [
+    "MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION",
+    "MoonPartyDeploymentVerificationError",
+    "corroborate_moonparty_deployment",
+    "discover_moonparty_deployment_candidates",
+    "verify_moonparty_deployment_candidate",
     "XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION",
     "FAIRCRYPTO_X1_APP_COMMIT",
     "FAIRCRYPTO_X1_APP_REPO",
