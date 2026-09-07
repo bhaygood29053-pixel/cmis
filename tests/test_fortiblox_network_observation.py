@@ -14,6 +14,7 @@ APP_PAGE = "https://app.fortiblox.com/"
 TOKENS_URL = "https://app.fortiblox.com/api/tokens"
 QUOTE_URL = "https://app.fortiblox.com/api/quote"
 BUILD_URL = "https://app.fortiblox.com/api/tx/build"
+RAMP_URL = "https://app.fortiblox.com/api/ramp/availability"
 
 
 def har_entry(
@@ -163,6 +164,32 @@ class FortiBloxNetworkObservationTests(unittest.TestCase):
             )
         )
         self.assertEqual(observations, [])
+
+    def test_qualified_ramp_availability_is_read_only_observation(self):
+        observations = list_fortiblox_network_observations(
+            har(
+                har_entry(
+                    url=RAMP_URL,
+                    response_body={
+                        "country": "US",
+                        "buy": {"available": True, "providers": ["coinbase"]},
+                        "sell": {"available": True, "providers": ["coinbase"]},
+                        "reason": None,
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(len(observations), 1)
+        item = observations[0]
+        self.assertEqual(item["route"]["qualification"], "allowed_read_only")
+        self.assertEqual(
+            item["route"]["route_template"],
+            "/api/ramp/availability",
+        )
+        self.assertTrue(item["truth_state"]["route_semantics_verified"])
+        self.assertFalse(item["truth_state"]["cmis_verified"])
+        self.assertFalse(item["execution_authorized"])
 
     def test_unknown_same_host_get_json_is_discovery_candidate_only(self):
         url = "https://app.fortiblox.com/api/new-read-surface?limit=10"
