@@ -1,6 +1,6 @@
 # XONE/XNT Conversion Intelligence v1
 
-Status: **INITIAL INTERNAL FOUNDATION** for Issue #575. This capability is deliberately separate from the generic `cmis_web_discovery/v1` provider registry.
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #575 / PR #578. Dedicated XONE/XNT Scraper run #2 and Liquidity Scout Tests run #1744 passed before merge. This capability remains deliberately separate from the generic `cmis_web_discovery/v1` provider registry, non-promoted for public/Scout reliance, and `execution_authorized=false`.
 
 ## Purpose
 
