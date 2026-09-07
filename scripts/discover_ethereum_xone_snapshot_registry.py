@@ -563,9 +563,17 @@ def main() -> int:
         and analogue["available_count"] >= 2
     )
 
-    reconstruction_gate = True
-    if reconstruction["attempted"]:
-        reconstruction_gate = reconstruction["official_snapshot"] is not None
+    authoritative_blocks = discovery["authoritative_exact_block_candidates"]
+    reconstruction_required = bool(authoritative_blocks)
+    reconstruction_gate = (
+        not reconstruction_required
+        or (
+            len(authoritative_blocks) == 1
+            and not discovery["authoritative_block_conflict"]
+            and reconstruction["attempted"] is True
+            and reconstruction["official_snapshot"] is not None
+        )
+    )
 
     status = "PASS" if source_gate and reconstruction_gate else "FAIL"
     official = reconstruction["official_snapshot"]
@@ -581,6 +589,9 @@ def main() -> int:
             "x1report": corpus["x1report"],
         },
         "snapshot_claim_count": len(corpus["claims"]),
+        "reconstruction_required_by_authoritative_exact_block":
+            reconstruction_required,
+        "reconstruction_gate_passed": reconstruction_gate,
         "snapshot_claims": corpus["claims"],
         "snapshot_discovery": discovery,
         "architecture_analogue": analogue,
