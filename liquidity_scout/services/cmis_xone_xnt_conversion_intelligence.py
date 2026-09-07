@@ -15,6 +15,7 @@ from liquidity_scout.providers.ethereum import (
     corroborate_xone_event_observations,
     corroborate_xone_identity_proofs,
     observe_xone_transfer_events,
+    corroborate_xone_registry_proofs,
     discover_official_snapshot_candidates,
     extract_xone_snapshot_claims,
     fetch_and_verify_xone_registry,
@@ -810,6 +811,29 @@ class CMISXoneXntConversionIntelligenceService:
             **{
                 **_truth_state(),
                 "ethereum_xone_identity_verified": True,
+                "reconstructed_xone_registry_verified": True,
+            },
+        }
+
+    def corroborate_ethereum_xone_registry(
+        self,
+        proofs: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Require matching reconstructed XONE registries from distinct RPC hosts."""
+
+        corroboration = corroborate_xone_registry_proofs(proofs)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "xone_snapshot_registry_contract":
+                XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
+            "state": STATE,
+            "xone_registry": corroboration,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
                 "reconstructed_xone_registry_verified": True,
             },
         }
