@@ -258,8 +258,10 @@ def _runtime_compatibility(
 
     exact_length = len(runtime_code) == len(artifact_runtime)
     artifact_meta = _metadata_trailer(artifact_runtime)
-    runtime_meta = _metadata_trailer(runtime_code)
-    metadata_matches = runtime_meta == artifact_meta
+    metadata_matches = False
+    if exact_length:
+        runtime_meta = _metadata_trailer(runtime_code)
+        metadata_matches = runtime_meta == artifact_meta
     selector_presence = {
         selector: bytes.fromhex(selector[2:]) in runtime_code
         for selector in REQUIRED_RUNTIME_SELECTORS
