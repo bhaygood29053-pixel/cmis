@@ -548,8 +548,11 @@ def extract_x1_allocation_records(
             )
         )
 
-    deduped: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str]] = set()
+    # Structured JSON can expose the same logical pair at an enclosing
+    # registry object and again at its narrower nested record. Merge those
+    # representations so exact identity context from the parent and
+    # amount/claim/vesting fields from the child are both preserved.
+    merged: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for row in rows:
         key = (
             row["ethereum_address"],
@@ -557,11 +560,71 @@ def extract_x1_allocation_records(
             row["url"],
             row.get("path") or "",
         )
-        if key in seen:
+        current = merged.get(key)
+        if current is None:
+            current = dict(row)
+            current["component_record_ids"] = [row["record_id"]]
+            merged[key] = current
             continue
-        seen.add(key)
-        deduped.append(row)
-    return deduped[:max_records]
+
+        if row["record_id"] not in current["component_record_ids"]:
+            current["component_record_ids"].append(row["record_id"])
+
+        for flag in (
+            "xone_named",
+            "exact_xone_contract_mentioned",
+            "xnt_named",
+            "allocation_language_present",
+            "claim_language_present",
+            "vesting_or_unlock_language_present",
+            "xone_specific_context",
+            "xone_identity_binding_verified",
+            "xnt_amount_field_present",
+        ):
+            current[flag] = bool(current.get(flag) or row.get(flag))
+
+        for field in (
+            "structured_amount_fields",
+            "structured_claim_fields",
+            "structured_vesting_fields",
+            "structured_identifier_fields",
+        ):
+            combined = dict(current.get(field) or {})
+            combined.update(dict(row.get(field) or {}))
+            current[field] = combined
+
+        amounts = list(current.get("xnt_amount_values") or [])
+        seen_amounts = {
+            (
+                _text(item.get("amount")),
+                _text(item.get("unit")),
+                _text(item.get("raw")),
+            )
+            for item in amounts
+            if isinstance(item, Mapping)
+        }
+        for amount in row.get("xnt_amount_values", []) or []:
+            if not isinstance(amount, Mapping):
+                continue
+            amount_key = (
+                _text(amount.get("amount")),
+                _text(amount.get("unit")),
+                _text(amount.get("raw")),
+            )
+            if amount_key not in seen_amounts:
+                amounts.append(dict(amount))
+                seen_amounts.add(amount_key)
+        current["xnt_amount_values"] = amounts
+        current["xnt_amount_field_present"] = bool(
+            amounts or current["structured_amount_fields"]
+        )
+
+        if len(_text(row.get("context_excerpt"))) > len(
+            _text(current.get("context_excerpt"))
+        ):
+            current["context_excerpt"] = row["context_excerpt"]
+
+    return list(merged.values())[:max_records]
 
 
 def summarize_x1_allocation_records(
