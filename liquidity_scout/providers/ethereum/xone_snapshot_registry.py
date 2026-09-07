@@ -694,6 +694,112 @@ def fetch_and_verify_xone_registry(
     return proof
 
 
+def corroborate_xone_registry_proofs(
+    proofs: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Require matching reconstructed registries from distinct RPC transports."""
+
+    if not isinstance(proofs, Sequence) or isinstance(
+        proofs, (str, bytes, bytearray)
+    ):
+        raise EthereumXoneSnapshotRegistryError("proofs must be a sequence")
+    if len(proofs) < 2:
+        raise EthereumXoneSnapshotRegistryError(
+            "at least two reconstructed registry proofs are required"
+        )
+
+    hosts: set[str] = set()
+    normalized: list[Mapping[str, Any]] = []
+    for proof in proofs:
+        if not isinstance(proof, Mapping):
+            raise EthereumXoneSnapshotRegistryError("each proof must be a mapping")
+        if proof.get("reconstructed_registry_verified") is not True:
+            raise EthereumXoneSnapshotRegistryError(
+                "all proofs must verify reconstructed registry state"
+            )
+        if proof.get("historical_total_supply_matches") is not True:
+            raise EthereumXoneSnapshotRegistryError(
+                "all proofs must match historical totalSupply"
+            )
+        if proof.get("historical_balance_sample_verified") is not True:
+            raise EthereumXoneSnapshotRegistryError(
+                "all proofs must verify historical balance samples"
+            )
+        source_url = _text(proof.get("source_url"))
+        host = (urlparse(source_url).hostname or "").casefold()
+        if not host:
+            raise EthereumXoneSnapshotRegistryError(
+                "each proof requires a valid source_url"
+            )
+        hosts.add(host)
+        normalized.append(proof)
+
+    if len(hosts) < 2:
+        raise EthereumXoneSnapshotRegistryError(
+            "two distinct RPC transport hosts are required"
+        )
+
+    baseline = normalized[0]
+    exact_fields = (
+        "contract_address",
+        "snapshot_block",
+        "snapshot_block_hash",
+        "snapshot_timestamp",
+        "coverage_start_block",
+        "coverage_end_block",
+        "transfer_event_count",
+        "holder_count",
+        "total_supply_base_units",
+        "reconstructed_supply_base_units",
+        "registry_sha256",
+        "canonical_registry_format",
+    )
+    for proof in normalized[1:]:
+        for field in exact_fields:
+            if proof.get(field) != baseline.get(field):
+                raise EthereumXoneSnapshotRegistryError(
+                    f"RPC registry proofs disagree on {field}"
+                )
+
+    return {
+        "contract_version": CONTRACT_VERSION,
+        "chain": CHAIN,
+        "network": NETWORK,
+        "chain_id": CHAIN_ID,
+        "contract_address": XONE_CONTRACT,
+        "snapshot_block": baseline["snapshot_block"],
+        "snapshot_block_hash": baseline["snapshot_block_hash"],
+        "snapshot_timestamp": baseline["snapshot_timestamp"],
+        "transfer_event_count": baseline["transfer_event_count"],
+        "holder_count": baseline["holder_count"],
+        "total_supply_base_units": baseline["total_supply_base_units"],
+        "total_supply_xone": baseline["total_supply_xone"],
+        "registry_sha256": baseline["registry_sha256"],
+        "canonical_registry_format": baseline["canonical_registry_format"],
+        "rpc_proof_count": len(normalized),
+        "rpc_transport_hosts": sorted(hosts),
+        "multi_rpc_corroborated": True,
+        "transport_provider_diversity_verified": True,
+        "rpc_backend_source_independence_verified": False,
+        "reconstructed_registry_verified": True,
+        "historical_total_supply_matches": True,
+        "historical_balance_sample_verified": True,
+        "official_xone_snapshot_verified": False,
+        "official_registry_artifact_verified": False,
+        "xone_snapshot_eligibility_verified": False,
+        "xone_snapshot_xnt_allocation_binding_verified": False,
+        "xnt_issuance_verified": False,
+        "xnt_vesting_or_unlock_verified": False,
+        "october_6_unlock_applies_to_xone_verified": False,
+        "xone_xnt_conversion_verified": False,
+        "cross_chain_correlation_verified": False,
+        "public_service_promoted": False,
+        "scout_reliance_promoted": False,
+        "read_only": True,
+        "execution_authorized": False,
+    }
+
+
 def promote_official_snapshot(
     *,
     source_candidate: Mapping[str, Any],
@@ -724,6 +830,10 @@ def promote_official_snapshot(
     if registry_proof.get("reconstructed_registry_verified") is not True:
         raise EthereumXoneSnapshotRegistryError(
             "registry must be independently reconstructed and verified"
+        )
+    if registry_proof.get("multi_rpc_corroborated") is not True:
+        raise EthereumXoneSnapshotRegistryError(
+            "official snapshot promotion requires multi-RPC registry corroboration"
         )
     registry_block = _block_number(
         registry_proof.get("snapshot_block"),
@@ -768,6 +878,7 @@ __all__ = [
     "EthereumXoneSnapshotRegistryError",
     "TOTAL_SUPPLY_SELECTOR",
     "XONE_CREATION_BLOCK",
+    "corroborate_xone_registry_proofs",
     "discover_official_snapshot_candidates",
     "extract_xone_snapshot_claims",
     "fetch_and_verify_xone_registry",
