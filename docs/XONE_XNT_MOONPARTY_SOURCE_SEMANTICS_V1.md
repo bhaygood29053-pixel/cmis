@@ -1,6 +1,6 @@
 # XONE/XNT MoonParty Source Semantics v1
 
-Status: **IMPLEMENTATION FOR ISSUE #598 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE PINNED-SOURCE GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #598 / PR #599. XONE XNT MoonParty Source Semantics run #1 passed deterministic and live pinned-source jobs at head `57912a8204c9e919722a3bbec8dd7c7d78efc610`, Liquidity Scout Tests run #1781 passed, and PR #599 merged as `751d90207c2a852880d4e86617fec4a948f8d439`.
 
 Contract:
 
@@ -46,6 +46,21 @@ XONE participation/redemption
     -> XNT credit allocation accounting
 ```
 
+## Accepted live result
+
+The pinned-source live gate retrieved all seven required FairCrypto artifacts directly from their exact commits and verified the complete source-level design link. The uploaded evidence artifact digest is `sha256:4f8474b99e43cea59e52b15886d1e383d9c993c7e4605608f97ae96df26a24ea`.
+
+The accepted source-semantic result is:
+
+```text
+authoritative_source_semantics_verified = true
+xone_participation_in_moonparty_source_verified = true
+xnt_credit_allocation_surface_in_moonparty_source_verified = true
+xone_to_xnt_credit_design_link_verified = true
+```
+
+This is the first accepted XONE/XNT slice that directly ties XONE participation/redemption and XNT-credit accounting inside the same authoritative FairCrypto design surface.
+
 ## What this does not yet prove
 
 The source artifact is not itself deployment proof.
@@ -81,6 +96,6 @@ FairCrypto/XONE:
 
 The verifier requires these exact provenance identities for acceptance.
 
-## Next gate after acceptance
+## Next gate
 
-Find the exact MoonParty deployed contract address and deployment chain, then verify runtime bytecode/ABI compatibility and direct `XONE()` binding to the already accepted Ethereum XONE contract. Only after that should CMIS query live MoonParty credit state or attempt any Ethereum→X1 issuance correlation.
+Find the exact MoonParty deployed contract address and deployment chain, then verify runtime bytecode/ABI compatibility and direct `XONE()` binding to the already accepted Ethereum XONE contract. Only after deployment identity is independently verified should CMIS query live MoonParty credit state or attempt any Ethereum→X1 issuance correlation.
