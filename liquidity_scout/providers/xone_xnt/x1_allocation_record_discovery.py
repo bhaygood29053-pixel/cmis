@@ -150,6 +150,10 @@ def _ethereum_addresses(text: str) -> list[str]:
     rows: list[str] = []
     for match in _ETHEREUM_ADDRESS_RE.finditer(_text(text)):
         address = normalize_ethereum_address(match.group(0))
+        # The accepted XONE token contract may appear in the same artifact as
+        # holder/allocation records. It is identity metadata, not a holder key.
+        if address == XONE_CONTRACT_NORMALIZED:
+            continue
         if address not in rows:
             rows.append(address)
     return rows
@@ -677,11 +681,15 @@ def summarize_x1_allocation_records(
     candidates = list(grouped.values())
     for group in candidates:
         normalized_amounts = {
-            tuple(item) for item in group["xnt_amount_values"]
-        } | {
-            ("field", f"{key}={value}")
-            for key, value in group["structured_amount_field_values"]
+            str(item[0]).replace(",", "").strip()
+            for item in group["xnt_amount_values"]
+            if item and str(item[0]).strip()
         }
+        normalized_amounts.update(
+            str(value).replace(",", "").strip()
+            for _key, value in group["structured_amount_field_values"]
+            if str(value).strip()
+        )
         group["amount_conflict"] = len(normalized_amounts) > 1
 
     candidates.sort(
