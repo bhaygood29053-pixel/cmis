@@ -47,7 +47,6 @@ _PROGRAM_ID_FIELDS = (
     "address",
     "pubkey",
     "__container_key_program_id",
-    "id",
 )
 _NAME_FIELDS = ("name", "program_name", "programName", "label")
 _CATEGORY_FIELDS = ("category", "program_category", "programCategory", "program_type", "programType")
@@ -198,21 +197,24 @@ def _program_id_candidate(record: Mapping[str, Any]) -> tuple[str | None, str | 
         text = _bounded_text(value)
         if text is not None:
             return f"program.{field}", text
+        fallback = _bounded_text(nested.get("id"))
+        if fallback is not None and _base58_decoded_length(fallback) == 32:
+            return "program.id", fallback
     elif isinstance(nested, str):
         text = _bounded_text(nested)
         if text is not None:
             return "program", text
+
+    fallback = _bounded_text(record.get("id"))
+    if fallback is not None and _base58_decoded_length(fallback) == 32:
+        return "id", fallback
 
     return None, None
 
 
 def _looks_like_program_record(record: Mapping[str, Any]) -> bool:
     field, candidate = _program_id_candidate(record)
-    if field is None or candidate is None:
-        return False
-    if field.endswith(".id") or field == "id":
-        return _base58_decoded_length(candidate) == 32
-    return True
+    return field is not None and candidate is not None
 
 
 def _bounded_instructions(value: Any) -> list[str]:
