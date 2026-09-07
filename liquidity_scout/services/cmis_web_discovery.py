@@ -10,6 +10,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Optional
 
+from liquidity_scout.providers.x1.agents_radio_rpc_corroboration import (
+    corroborate_agents_radio_with_x1_rpc,
+)
+from liquidity_scout.providers.x1.rpc import rpc_request
 from liquidity_scout.providers.web_discovery import (
     CONTRACT as PROVIDER_CONTRACT,
     WebDiscoveryError,
@@ -271,6 +275,34 @@ class CMISWebDiscoveryService:
             "source_id": "x1_agents_radio",
             "structured_endpoint": endpoint,
             "structured_payload": structured_payload,
+            "read_only": True,
+            "authentication_authorized": False,
+            "subscription_authorized": False,
+            "webhook_registration_authorized": False,
+            "request_signing_authorized": False,
+            **_service_truth_state(),
+        }
+
+    def corroborate_x1_agents_radio_rpc(
+        self,
+        candidate: Mapping[str, Any],
+        *,
+        rpc_call: Any = rpc_request,
+        history_limit: int = 25,
+        inspect_reported_slot_transaction: bool = True,
+    ) -> dict[str, Any]:
+        corroboration = corroborate_agents_radio_with_x1_rpc(
+            candidate,
+            rpc_call=rpc_call,
+            history_limit=history_limit,
+            inspect_reported_slot_transaction=inspect_reported_slot_transaction,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "x1_agents_radio",
+            "corroboration": corroboration,
             "read_only": True,
             "authentication_authorized": False,
             "subscription_authorized": False,

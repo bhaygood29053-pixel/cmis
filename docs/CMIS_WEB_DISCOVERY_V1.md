@@ -51,6 +51,16 @@ Issue #568 adds `x1_agents_radio_structured_discovery/v1` above the accepted Rad
 
 The structured layer does not establish program identity, program semantics, instruction semantics, deployment/upgrade truth, activity truth, freshness, source independence, Scout reliance, public promotion, or execution authority. See `docs/X1_AGENTS_RADIO_STRUCTURED_DISCOVERY_V1.md`.
 
+#### X1 Agents Radio → X1 RPC Corroboration v1
+
+Issue #571 adds `x1_agents_radio_rpc_corroboration/v1` as the direct-chain
+verification handoff above Radio candidates. Canonical X1 RPC may verify exact
+current program-account existence/executable/owner state, bounded finalized
+address history, and successful transaction activity at a provider-reported
+slot. It does not verify Radio names/categories/frameworks/instruction
+semantics, Radio activity-count completeness, or deployment-vs-upgrade
+semantics. RPC agreement is not treated as source-independence proof.
+
 ### FortiBlox browser/network discovery
 
 Issue #555 extends `fortiblox_app` with two internal discovery contracts:
