@@ -27,10 +27,23 @@ CMIS Web Discovery is a provider-side discovery capability beneath CMIS. It is n
 | x1_ninja | X1.Ninja | x1.ninja, api.x1.ninja | third_party_indexer_web_api_discovery |
 | x1report | X1Report | x1report.com, www.x1report.com | third_party_reporting_discovery |
 | fortiblox_app | FortiBlox App | app.fortiblox.com | third_party_x1_app_web_api_discovery |
+| x1_agents_radio | X1 Agents Radio | x1radio.vercel.app, x1agentsradio.xyz | third_party_x1_agent_registry_web_api_discovery |
 | x1_docs | X1 Docs | docs.x1.xyz, next.x1.xyz | official_documentation_discovery |
 | github | GitHub | github.com, api.github.com, raw.githubusercontent.com | public_source_repository_discovery |
 
 The FortiBlox App source includes the root application URL plus the provider-documented `/api/x402/discovery` and `/llms.txt` GET surfaces as bounded discovery targets. This does not qualify FortiSwap execution endpoints or provider assertions as verified CMIS facts.
+
+### X1 Agents Radio discovery
+
+Issue #564 adds `x1_agents_radio` as a bounded machine-readable program/deployment discovery source. X1Report documents the public X1 Agents Radio endpoints as:
+
+- `GET /api/bootstrap` — core program IDs and instructions;
+- `GET /api/catalog` — indexed programs with provider-reported activity data;
+- `GET /api/deployments` — newly deployed/upgraded program candidates;
+- `GET /api/health` — watcher/service health.
+
+The documented `x1radio.vercel.app` entrypoint currently redirects to `x1agentsradio.xyz`; both hosts are retained inside one source boundary so the migration does not create a false source-independence claim. The signed subscriber surfaces `/api/programs` and `/api/digest/latest` are deliberately excluded from this adapter. CMIS does not sign Radio requests, subscribe an agent, register a webhook, or treat Radio program labels, categories, instructions, activity, deployment status, or upgrade labels as verified chain truth. Exact claims must hand off to an accepted CMIS/RPC/provider verification contract.
+
 
 ### FortiBlox browser/network discovery
 
@@ -206,7 +219,7 @@ A later gate is required before any of the following:
 
 Deterministic regression coverage includes:
 
-- all six initial source registrations plus the bounded `fortiblox_app` registration;
+- all registered source providers, including bounded `fortiblox_app` and `x1_agents_radio` registrations;
 - allowlist rejection;
 - redirect escape rejection;
 - bounded body-size failure;

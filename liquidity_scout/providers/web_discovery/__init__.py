@@ -43,6 +43,14 @@ from .fortiblox_network import (
 )
 from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider
 from .registry import build_provider, provider_catalog, provider_ids
+from .x1_agents_radio import (
+    CURRENT_HOST as X1_AGENTS_RADIO_CURRENT_HOST,
+    LEGACY_HOST as X1_AGENTS_RADIO_LEGACY_HOST,
+    PUBLIC_DISCOVERY_PATHS as X1_AGENTS_RADIO_PUBLIC_DISCOVERY_PATHS,
+    X1_AGENTS_RADIO_SOURCE,
+    X1AgentsRadioDiscoveryProvider,
+    validate_x1_agents_radio_public_url,
+)
 from .x1_docs import X1_DOCS_SOURCE, X1DocsDiscoveryProvider
 from .x1_explorer import X1_EXPLORER_SOURCE, X1ExplorerDiscoveryProvider
 from .x1_explorer_browser_capture import (
@@ -166,6 +174,12 @@ __all__ = [
     "WebDiscoveryError",
     "WebDiscoveryHTTPError",
     "WebDiscoverySource",
+    "X1_AGENTS_RADIO_CURRENT_HOST",
+    "X1_AGENTS_RADIO_LEGACY_HOST",
+    "X1_AGENTS_RADIO_PUBLIC_DISCOVERY_PATHS",
+    "X1_AGENTS_RADIO_SOURCE",
+    "X1AgentsRadioDiscoveryProvider",
+    "validate_x1_agents_radio_public_url",
     "X1_DOCS_SOURCE",
     "X1_EXPLORER_SOURCE",
     "X1_EXPLORER_STRUCTURED_CONTRACT",
