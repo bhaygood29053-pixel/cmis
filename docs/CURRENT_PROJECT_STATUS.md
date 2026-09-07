@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 11:36 America/New_York**.
+Current reconciliation: **2026-09-07 12:01 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,17 @@ Current reconciliation: **2026-09-07 11:36 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), and #598 / PR #599 (`xone_xnt_moonparty_source_semantics/v1`). The latest pinned FairCrypto proof directly verifies a source-level design link from XONE participation/redemption through MoonParty burn/redeemer semantics to XNT-credit allocation accounting. MoonParty deployment identity, native-XNT equivalence, issuance/vesting, XONE-specific unlock applicability, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), #598 / PR #599 (MoonParty source semantics), and #601 / PR #602 (`moonparty_deployment_verification/v1`). The MoonParty source design directly links XONE participation/redemption to XNT-credit allocation accounting, but the bounded deployment run found 0 exact deployment-address candidates across 35 inspected pinned/current frontend documents. That is scoped corpus evidence only, not proof of non-deployment. MoonParty deployment identity/runtime/XONE binding, native-XNT equivalence, issuance/vesting, XONE-specific unlock applicability, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### XONE/XNT MoonParty Source Semantics v1
+### MoonParty Deployment Verification v1
+
+**ACCEPTED BOUNDED FOUNDATION.** MoonParty Deployment Verification run #2 passed deterministic and live jobs at PR #602 head `b6396af0052a68f4bfe5db1dea099df2e333b000`; Liquidity Scout Tests run #1786 also passed. The live source gate retrieved 4/4 pinned FairCrypto sources, 6/6 current `xen.network` / `preview.xen.network` frontend targets, and 26/28 same-host JavaScript chunks. Across 35 inspected documents, the exact MoonParty candidate extractor produced 0 deployment-address candidates. The evidence artifact digest is `sha256:56198255749d41ddba7d5bb7f65eac874b4eddd3191737fd8adebd4888fc9a68`.
+
+The accepted interpretation is strictly scoped: this corpus did not expose the exact deployment address needed to run the direct Ethereum runtime/`XONE()`/two-RPC qualification gate. It does not prove MoonParty was never deployed. `moonparty_deployment_verified=false`, `moonparty_deployment_chain_verified=false`, `moonparty_runtime_compatible=false`, `moonparty_xone_binding_verified=false`, `xnt_credit_to_native_xnt_equivalence_verified=false`, `xnt_issuance_verified=false`, `xnt_vesting_or_unlock_verified=false`, `october_6_unlock_applies_to_xone_verified=false`, `xone_xnt_conversion_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`. PR #602 merged as `2b73ec07c775eebe7ea86ff54155e29b866d0d9a`; Issue #601 closed completed.
+
+### Previous accepted live gate — XONE/XNT MoonParty Source Semantics v1
 
 **ACCEPTED.** XONE XNT MoonParty Source Semantics run #1 passed deterministic and live pinned-source jobs at PR #599 head `57912a8204c9e919722a3bbec8dd7c7d78efc610`; Liquidity Scout Tests run #1781 also passed. The live gate retrieved all required artifacts from pinned FairCrypto/x1-app commit `abf168fad119e91a8da0773625fd6115e8756cb4` and FairCrypto/XONE commit `267bfeaabd69bf81f272cfd52aa5082333cd317a`. The evidence artifact digest is `sha256:4f8474b99e43cea59e52b15886d1e383d9c993c7e4605608f97ae96df26a24ea`.
 
