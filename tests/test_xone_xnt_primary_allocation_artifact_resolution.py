@@ -276,6 +276,8 @@ class PrimaryAllocationArtifactResolutionTests(unittest.TestCase):
             }
         )
         self.assertTrue(result["locator_pinned"])
+        self.assertTrue(result["content_addressed_provenance_complete"])
+        self.assertTrue(result["locator_provenance_complete"])
         self.assertTrue(result["primary_artifact_resolved_for_handoff"])
         self.assertIn(HANDOFF_CONTENT_RETRIEVAL, _contracts(result))
 
