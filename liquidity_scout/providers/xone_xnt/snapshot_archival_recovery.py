@@ -275,6 +275,119 @@ def rank_archival_captures(
     return rows[:max_captures]
 
 
+def _even_sample(rows: Sequence[Mapping[str, Any]], count: int) -> list[dict[str, Any]]:
+    if count <= 0 or not rows:
+        return []
+    values = [dict(row) for row in rows]
+    if count >= len(values):
+        return values
+    if count == 1:
+        return [values[len(values) // 2]]
+    indexes = [
+        round(index * (len(values) - 1) / (count - 1))
+        for index in range(count)
+    ]
+    result = []
+    seen = set()
+    for index in indexes:
+        if index in seen:
+            continue
+        seen.add(index)
+        result.append(values[index])
+    return result
+
+
+def _take_scored_temporal_sample(
+    rows: Sequence[Mapping[str, Any]],
+    count: int,
+) -> list[dict[str, Any]]:
+    """Prefer high-relevance paths, then spread captures across time."""
+
+    if count <= 0:
+        return []
+    buckets: dict[int, list[dict[str, Any]]] = {}
+    for raw in rows:
+        row = dict(raw)
+        score = int(row.get("relevance_score", 0))
+        buckets.setdefault(score, []).append(row)
+
+    selected: list[dict[str, Any]] = []
+    for score in sorted(buckets, reverse=True):
+        bucket = sorted(
+            buckets[score],
+            key=lambda row: (
+                str(row.get("timestamp") or ""),
+                str(row.get("original") or ""),
+            ),
+        )
+        remaining = count - len(selected)
+        if remaining <= 0:
+            break
+        if len(bucket) <= remaining:
+            selected.extend(bucket)
+        else:
+            selected.extend(_even_sample(bucket, remaining))
+    return selected[:count]
+
+
+def select_diverse_archival_captures(
+    captures: Sequence[Mapping[str, Any]],
+    *,
+    max_captures: int = 24,
+) -> list[dict[str, Any]]:
+    """Select replay captures across original hosts and historical time.
+
+    A global relevance sort can accidentally spend the entire replay budget on
+    one host when root-page captures tie. This selector allocates a deterministic
+    quota to each original host, prefers higher-relevance paths inside that host,
+    and spreads tied captures across the available time range.
+    """
+
+    if isinstance(max_captures, bool) or not isinstance(max_captures, int) or max_captures < 1:
+        raise ValueError("max_captures must be a positive integer")
+    ranked = rank_archival_captures(
+        captures,
+        max_captures=max(len(captures), max_captures),
+    )
+    if len(ranked) <= max_captures:
+        return ranked
+
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in ranked:
+        host = (urlparse(str(row["original"])).hostname or "").casefold()
+        if not host:
+            continue
+        groups.setdefault(host, []).append(row)
+    if not groups:
+        return ranked[:max_captures]
+
+    hosts = sorted(groups)
+    base = max_captures // len(hosts)
+    remainder = max_captures % len(hosts)
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+
+    for index, host in enumerate(hosts):
+        quota = base + (1 if index < remainder else 0)
+        quota = max(1, quota)
+        rows = _take_scored_temporal_sample(groups[host], quota)
+        for row in rows:
+            capture_id = str(row.get("capture_id") or "")
+            if capture_id and capture_id not in selected_ids:
+                selected_ids.add(capture_id)
+                selected.append(row)
+
+    if len(selected) < max_captures:
+        leftovers = [
+            row for row in ranked
+            if str(row.get("capture_id") or "") not in selected_ids
+        ]
+        for row in leftovers[: max_captures - len(selected)]:
+            selected.append(row)
+
+    return selected[:max_captures]
+
+
 def recover_stable_x_urls(text: str) -> list[dict[str, Any]]:
     """Recover stable original X/X Spaces URLs from mirror/index text."""
 
@@ -463,6 +576,7 @@ __all__ = [
     "parse_cdx_json",
     "rank_archival_captures",
     "recover_stable_x_urls",
+    "select_diverse_archival_captures",
     "source_role_for_original_url",
     "summarize_archival_recovery",
 ]
