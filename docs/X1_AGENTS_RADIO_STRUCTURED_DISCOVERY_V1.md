@@ -133,6 +133,12 @@ handoff to:
 
 No handoff result is assumed successful by this contract.
 
+Issue #571 implements the first explicit direct-chain handoff as
+`x1_agents_radio_rpc_corroboration/v1`. That follow-on contract can verify
+exact current program-account state and bounded transaction activity through
+canonical X1 RPC while keeping Radio names/categories/instructions and
+deployment-vs-upgrade semantics unverified.
+
 ## Bounds
 
 Default/max structured program records:
