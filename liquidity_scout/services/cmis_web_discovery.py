@@ -22,6 +22,7 @@ from liquidity_scout.providers.web_discovery import (
     capture_x1_explorer_page_network,
     list_fortiblox_network_observations,
     capture_fortiblox_page_network,
+    capture_fortiblox_route_inventory,
     parse_xdex_url,
     classify_xdex_network_surface,
     xdex_network_gap_report,
@@ -215,6 +216,28 @@ class CMISWebDiscoveryService:
             "state": STATE,
             "source_id": "fortiblox_app",
             "capture": result,
+            "read_only": True,
+            "request_replay_authorized": False,
+            "background_monitoring_authorized": False,
+            "payment_authorized": False,
+            **_service_truth_state(),
+        }
+
+    def capture_fortiblox_route_inventory(
+        self,
+        page_url: str = "https://app.fortiblox.com/",
+        **inventory_kwargs: Any,
+    ) -> dict[str, Any]:
+        result = capture_fortiblox_route_inventory(
+            page_url,
+            **inventory_kwargs,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "fortiblox_app",
+            "route_inventory": result,
             "read_only": True,
             "request_replay_authorized": False,
             "background_monitoring_authorized": False,
