@@ -817,6 +817,16 @@ def promote_official_snapshot(
         raise EthereumXoneSnapshotRegistryError(
             "official snapshot promotion requires an authoritative source"
         )
+    source_id = _text(source_candidate.get("source_id")).casefold()
+    exact_contract_mentioned = (
+        source_candidate.get("exact_xone_contract_mentioned") is True
+    )
+    exact_xone_repository_lineage = source_id.startswith("faircrypto_xone")
+    if not (exact_contract_mentioned or exact_xone_repository_lineage):
+        raise EthereumXoneSnapshotRegistryError(
+            "official snapshot promotion requires exact XONE identity binding"
+        )
+
     blocks = source_candidate.get("snapshot_block_candidates")
     if (
         not isinstance(blocks, Sequence)
