@@ -1,6 +1,6 @@
 # X1 Agents Radio Structured Discovery v1
 
-Status: **IMPLEMENTATION FOR ISSUE #568 — NOT ACCEPTED UNTIL PR/CI MERGE**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #568 / PR #569. Exact-head Liquidity Scout Tests run #1731 passed before merge. The contract remains discovery-only, non-promoted, and `execution_authorized=false`.
 
 Contract:
 
