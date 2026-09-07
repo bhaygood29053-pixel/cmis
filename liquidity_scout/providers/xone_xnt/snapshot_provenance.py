@@ -222,7 +222,31 @@ def _candidate_kind(
     path_lower = _text(path).casefold()
     has_xone = "xone" in lowered or "xone" in path_lower
     has_snapshot = any(term in lowered or term in path_lower for term in SNAPSHOT_TERMS)
-    has_artifact = bool(_artifact_indicators(text, path=path))
+    indicators = _artifact_indicators(text, path=path)
+    strong_artifact_indicators = {
+        "snapshot",
+        "registry",
+        "merkle",
+        "proof",
+        "eligibility",
+        "allocation",
+        "claim",
+        "airdrop",
+        "vesting",
+        "unlock",
+        "distribution",
+        "export",
+        "csv",
+        "json",
+        "jsonl",
+        "ndjson",
+        "tsv",
+        "ipfs",
+        "arweave",
+    }
+    has_artifact = any(
+        indicator in strong_artifact_indicators for indicator in indicators
+    )
     has_history = any(term in lowered for term in HISTORICAL_CONTEXT_TERMS)
 
     if has_xone and has_snapshot:
