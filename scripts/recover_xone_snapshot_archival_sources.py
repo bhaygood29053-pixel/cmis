@@ -25,6 +25,7 @@ from liquidity_scout.providers.xone_xnt import (
     parse_cdx_json,
     rank_archival_captures,
     recover_stable_x_urls,
+    select_diverse_archival_captures,
     summarize_archival_recovery,
 )
 
@@ -232,7 +233,10 @@ def _scan_cdx(*, limit):
 
 
 def _retrieve_archival_captures(captures, *, max_replays):
-    selected = rank_archival_captures(captures, max_captures=max_replays)
+    selected = select_diverse_archival_captures(
+        captures,
+        max_captures=max_replays,
+    )
     results = []
     recovered_candidates = []
     retrieved = []
