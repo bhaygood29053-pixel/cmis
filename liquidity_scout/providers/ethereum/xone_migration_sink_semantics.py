@@ -268,10 +268,12 @@ def classify_migration_candidate(
     candidate_address: str,
     burn_redeemer_proof: Optional[Mapping[str, Any]] = None,
     direct_transfer_to_candidate_verified: bool = False,
-    authoritative_xone_xnt_role_evidence: bool = False,
-    x1_issuance_binding_verified: bool = False,
 ) -> dict[str, Any]:
-    """Combine bounded candidate facts while refusing semantic shortcuts."""
+    """Combine bounded candidate facts without allowing caller-supplied promotion.
+
+    v1 has no accepted XNT-side binding contract, so even a technically valid
+    IBurnRedeemable contract remains only a candidate.
+    """
 
     candidate = _address(candidate_address, field="candidate address")
 
@@ -283,12 +285,6 @@ def classify_migration_candidate(
             burn_redeemer_proof.get("burn_redeemer_interface_verified") is True
         )
 
-    migration_verified = (
-        authoritative_xone_xnt_role_evidence
-        and x1_issuance_binding_verified
-        and (redeemer_supported or direct_transfer_to_candidate_verified)
-    )
-
     return {
         "contract_version": CONTRACT_VERSION,
         "chain": CHAIN,
@@ -299,15 +295,25 @@ def classify_migration_candidate(
         "direct_transfer_to_candidate_verified": bool(
             direct_transfer_to_candidate_verified
         ),
-        "authoritative_xone_xnt_role_evidence": bool(
-            authoritative_xone_xnt_role_evidence
+        "candidate_semantic_state": (
+            "burn_redeemer_candidate"
+            if redeemer_supported
+            else (
+                "transfer_recipient_candidate"
+                if direct_transfer_to_candidate_verified
+                else "unqualified_candidate"
+            )
         ),
-        "x1_issuance_binding_verified": bool(x1_issuance_binding_verified),
-        "migration_sink_identified": migration_verified,
-        "lock_or_migration_verified": migration_verified,
-        "xone_xnt_conversion_verified": migration_verified,
-        "xnt_issuance_verified": bool(x1_issuance_binding_verified),
-        "cross_chain_correlation_verified": migration_verified,
+        "required_next_proof": [
+            "authoritative_exact_xone_xnt_role_binding",
+            "exact_x1_xnt_issuance_or_allocation_binding",
+            "ethereum_to_x1_event_correlation",
+        ],
+        "migration_sink_identified": False,
+        "lock_or_migration_verified": False,
+        "xone_xnt_conversion_verified": False,
+        "xnt_issuance_verified": False,
+        "cross_chain_correlation_verified": False,
         "public_service_promoted": False,
         "scout_reliance_promoted": False,
         "risk_conclusion_authorized": False,
