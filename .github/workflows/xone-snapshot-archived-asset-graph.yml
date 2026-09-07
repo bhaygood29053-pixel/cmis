@@ -1,0 +1,180 @@
+name: XONE Snapshot Archived Asset Graph
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/providers/ethereum/xone_snapshot_registry.py'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_snapshot_archived_asset_graph.py'
+      - 'scripts/resolve_xone_snapshot_archived_asset_graph.py'
+      - 'docs/XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-snapshot-archived-asset-graph.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/providers/ethereum/xone_snapshot_registry.py'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_snapshot_archived_asset_graph.py'
+      - 'scripts/resolve_xone_snapshot_archived_asset_graph.py'
+      - 'docs/XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-snapshot-archived-asset-graph.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test archived XONE snapshot asset graph
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_snapshot_archived_asset_graph.py
+      - name: Re-run archival recovery boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_snapshot_archival_source_recovery.py
+      - name: Re-run snapshot registry boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_snapshot_registry.py
+      - name: Re-run provenance false-positive boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_snapshot_provenance_expansion.py
+
+  live-asset-graph:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Traverse bounded archived XEN/X1 asset graph
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/resolve_xone_snapshot_archived_asset_graph.py --root-cdx-limit 15 --max-root-replays 6 --max-refs-per-node 50 --max-asset-lookups 8 --max-asset-replays 6 --log-chunk-blocks 50000 --balance-sample-size 25 | tee evidence/xone-snapshot-archived-asset-graph.json
+
+          python - <<'PY'
+          import json
+
+          path = "evidence/xone-snapshot-archived-asset-graph.json"
+          data = json.load(open(path))
+
+          assert data["status"] == "PASS"
+          assert (
+              data["contract_version"]
+              == "xone_snapshot_archived_asset_graph_resolution/v1"
+          )
+          assert data["source_gate_passed"] is True
+          assert data["root_cdx_query_available_count"] >= 3
+          assert data["root_capture_discovered_count"] > 0
+          assert data["root_replay_available_count"] >= 1
+          assert data["asset_cdx_lookup_attempted_count"] > 0
+          assert data["asset_cdx_lookup_available_count"] > 0
+
+          graph = data["asset_graph"]
+          assert graph["asset_graph_traversal_verified"] is True
+          assert graph["asset_edge_count"] > 0
+          assert graph["same_origin_traversable_edge_count"] > 0
+          assert graph["private_or_unpublished_snapshot_absence_proven"] is False
+
+          blocks = graph["authoritative_exact_snapshot_block_candidates"]
+          if blocks:
+              assert len(blocks) == 1
+              assert graph["provenance"]["authoritative_snapshot_block_conflict"] is False
+              assert data[
+                  "reconstruction_required_by_authoritative_exact_block"
+              ] is True
+              assert data["reconstruction_gate_passed"] is True
+              assert data["reconstruction"]["attempted"] is True
+              assert data["reconstruction"]["corroboration"][
+                  "multi_rpc_corroborated"
+              ] is True
+              assert data["official_xone_snapshot_verified"] is True
+          else:
+              assert graph[
+                  "zero_semantic_candidates_are_scoped_asset_graph_evidence_only"
+              ] in (True, False)
+              assert data[
+                  "reconstruction_required_by_authoritative_exact_block"
+              ] is False
+              assert data["reconstruction_gate_passed"] is True
+              assert data["official_xone_snapshot_verified"] is False
+
+          assert data["official_registry_artifact_verified"] is False
+          assert data["xone_snapshot_eligibility_verified"] is False
+          assert data["xone_snapshot_xnt_allocation_binding_verified"] is False
+          assert data["xnt_issuance_verified"] is False
+          assert data["xnt_vesting_or_unlock_verified"] is False
+          assert data["october_6_unlock_applies_to_xone_verified"] is False
+          assert data["xone_xnt_conversion_verified"] is False
+          assert data["cross_chain_correlation_verified"] is False
+          assert data["private_or_unpublished_snapshot_absence_proven"] is False
+          assert data["public_service_promoted"] is False
+          assert data["scout_reliance_promoted"] is False
+          assert data["execution_authorized"] is False
+
+          print(f"ROOT_CAPTURES={data['root_capture_discovered_count']}")
+          print(f"ROOT_REPLAYS={data['root_replay_available_count']}")
+          print(f"ASSET_EDGES={graph['asset_edge_count']}")
+          print(
+              "TRAVERSABLE_ASSET_EDGES="
+              f"{graph['same_origin_traversable_edge_count']}"
+          )
+          print(
+              "ASSET_CAPTURES_RETRIEVED="
+              f"{graph['asset_capture_retrieved_count']}"
+          )
+          print(
+              "ASSET_SEMANTIC_CANDIDATES="
+              f"{graph['asset_semantic_candidate_count']}"
+          )
+          print(
+              "STABLE_PRIMARY_SOCIAL_URLS="
+              f"{graph['stable_primary_social_url_count']}"
+          )
+          print(
+              "CONTENT_ADDRESSED_POINTERS="
+              f"{graph['content_addressed_pointer_count']}"
+          )
+          print(
+              "AUTHORITATIVE_EXACT_SNAPSHOT_BLOCKS="
+              f"{len(blocks)}"
+          )
+          print(
+              "OFFICIAL_XONE_SNAPSHOT_VERIFIED="
+              f"{str(data['official_xone_snapshot_verified']).upper()}"
+          )
+          print("XONE_SNAPSHOT_XNT_ALLOCATION_BINDING_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xone-snapshot-archived-asset-graph-evidence
+          path: evidence/xone-snapshot-archived-asset-graph.json
+          if-no-files-found: error

@@ -56,6 +56,19 @@ from .moonparty_source_semantics import (
     XoneXntMoonPartySourceSemanticsError,
     verify_moonparty_source_semantics,
 )
+from .snapshot_archived_asset_graph import (
+    CONTRACT_VERSION as XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_CONTRACT_VERSION,
+    MAX_GRAPH_DEPTH as XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_MAX_DEPTH,
+    TRAVERSABLE_ASSET_KINDS,
+    XoneSnapshotArchivedAssetGraphError,
+    annotate_retrieved_asset_capture,
+    asset_reference_relevance_score,
+    build_asset_graph_edges,
+    classify_archived_asset_kind,
+    extract_archived_asset_references,
+    extract_asset_provenance_candidates,
+    summarize_archived_asset_graph,
+)
 from .snapshot_archival_recovery import (
     CONTRACT_VERSION as XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION,
     XoneSnapshotArchivalRecoveryError,
@@ -101,6 +114,17 @@ from .scraper import (
 )
 
 __all__ = [
+    "XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_CONTRACT_VERSION",
+    "XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_MAX_DEPTH",
+    "TRAVERSABLE_ASSET_KINDS",
+    "XoneSnapshotArchivedAssetGraphError",
+    "annotate_retrieved_asset_capture",
+    "asset_reference_relevance_score",
+    "build_asset_graph_edges",
+    "classify_archived_asset_kind",
+    "extract_archived_asset_references",
+    "extract_asset_provenance_candidates",
+    "summarize_archived_asset_graph",
     "XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION",
     "XoneSnapshotArchivalRecoveryError",
     "archival_url_relevance_score",
