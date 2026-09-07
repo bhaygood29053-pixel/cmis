@@ -28,6 +28,7 @@ from liquidity_scout.providers.xone_xnt import (
     CANDIDATE_DISCOVERY_CONTRACT_VERSION,
     SCRAPER_CONTRACT,
     X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
+    XONE_XNT_ALLOCATION_SOURCE_PROVENANCE_CONTRACT_VERSION,
     XONE_XNT_X1_ALLOCATION_RECORD_CONTRACT_VERSION,
     XONE_XNT_X1_BINDING_CONTRACT_VERSION,
     XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
@@ -36,6 +37,8 @@ from liquidity_scout.providers.xone_xnt import (
     XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION,
     XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_CONTRACT_VERSION,
     annotate_retrieved_asset_capture,
+    extract_allocation_source_provenance,
+    summarize_allocation_source_provenance,
     build_asset_graph_edges,
     extract_archived_asset_references,
     extract_asset_provenance_candidates,
@@ -105,6 +108,10 @@ def _truth_state() -> dict[str, Any]:
         "conversion_candidate_discovery_verified": False,
         "x1_xnt_mechanism_discovery_verified": False,
         "x1_xnt_candidate_account_state_verified": False,
+        "allocation_source_provenance_discovery_verified": False,
+        "allocation_source_candidate_discovered": False,
+        "allocation_source_provenance_verified": False,
+        "authoritative_allocation_source_verified": False,
         "x1_allocation_record_discovery_verified": False,
         "x1_allocation_record_candidate_discovered": False,
         "x1_allocation_candidate_account_state_verified": False,
@@ -689,6 +696,98 @@ class CMISXoneXntConversionIntelligenceService:
                 "conversion_candidate_discovery_verified": True,
                 "burn_redeemer_interface_verified":
                     qualification.get("burn_redeemer_interface_verified") is True,
+            },
+        }
+
+    def discover_xone_xnt_allocation_source_provenance(
+        self,
+        documents: Sequence[Mapping[str, Any]],
+        *,
+        observed_at: float,
+        max_candidates_per_document: int = 50,
+        max_candidates: int = 100,
+    ) -> dict[str, Any]:
+        """Discover concrete XONE/XNT allocation-source provenance."""
+
+        if not documents:
+            raise ValueError("documents must not be empty")
+
+        candidates: list[dict[str, Any]] = []
+        for document in documents:
+            if not isinstance(document, Mapping):
+                raise ValueError("each document must be a mapping")
+            source_id = str(document.get("source_id") or "").strip()
+            source_role = str(document.get("source_role") or "").strip()
+            url = str(document.get("url") or "").strip()
+            text_value = document.get("text")
+            if (
+                not source_id
+                or not source_role
+                or not url
+                or not isinstance(text_value, str)
+            ):
+                raise ValueError(
+                    "each document requires source_id, source_role, url, and text"
+                )
+            candidates.extend(
+                extract_allocation_source_provenance(
+                    text_value,
+                    source_id=source_id,
+                    source_role=source_role,
+                    url=url,
+                    observed_at=observed_at,
+                    path=(
+                        str(document.get("path"))
+                        if document.get("path") is not None
+                        else None
+                    ),
+                    revision=(
+                        str(document.get("revision"))
+                        if document.get("revision") is not None
+                        else None
+                    ),
+                    release_name=(
+                        str(document.get("release_name"))
+                        if document.get("release_name") is not None
+                        else None
+                    ),
+                    content_type=(
+                        str(document.get("content_type"))
+                        if document.get("content_type") is not None
+                        else None
+                    ),
+                    body_sha256=(
+                        str(document.get("body_sha256"))
+                        if document.get("body_sha256") is not None
+                        else None
+                    ),
+                    release_asset=bool(document.get("release_asset")),
+                    architecture_analogue=bool(
+                        document.get("architecture_analogue")
+                    ),
+                    max_candidates=max_candidates_per_document,
+                )
+            )
+
+        discovery = summarize_allocation_source_provenance(
+            candidates,
+            max_candidates=max_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "allocation_source_provenance_contract":
+                XONE_XNT_ALLOCATION_SOURCE_PROVENANCE_CONTRACT_VERSION,
+            "state": STATE,
+            "allocation_source_provenance": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "allocation_source_provenance_discovery_verified": True,
+                "allocation_source_candidate_discovered":
+                    discovery["qualifying_xone_candidate_count"] > 0,
             },
         }
 
