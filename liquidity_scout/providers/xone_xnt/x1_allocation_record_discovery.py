@@ -36,7 +36,7 @@ XONE_CONTRACT_NORMALIZED = XONE_CONTRACT.casefold()
 
 _ETHEREUM_ADDRESS_RE = re.compile(r"(?<![0-9A-Fa-f])0x[0-9A-Fa-f]{40}(?![0-9A-Fa-f])")
 _BASE58_RE = re.compile(
-    r"(?<![1-9A-HJ-NP-Za-km-z])[1-9A-HJ-NP-Za-km-z]{32,44}(?![1-9A-HJ-NP-Za-km-z])"
+    r"(?<![A-Za-z0-9])[1-9A-HJ-NP-Za-km-z]{32,44}(?![A-Za-z0-9])"
 )
 _XNT_AMOUNT_RE = re.compile(
     r"\b(?P<amount>\d[\d,]*(?:\.\d+)?)\s*(?P<unit>XNT|credits?)\b",
@@ -163,6 +163,11 @@ def _x1_pubkeys(text: str) -> list[str]:
     rows: list[str] = []
     for match in _BASE58_RE.finditer(_text(text)):
         value = match.group(0)
+        # Long EVM bytecode / hashes can contain Base58-valid substrings.
+        # A pure hexadecimal token is ambiguous here and is not accepted as an
+        # X1 allocation key without a separate stronger typed source.
+        if re.fullmatch(r"[0-9A-Fa-f]{32,44}", value):
+            continue
         try:
             pubkey = normalize_x1_pubkey(value)
         except X1XntMechanismDiscoveryError:
@@ -523,6 +528,13 @@ def extract_x1_allocation_records(
         raise ValueError("text must be a string")
     max_records = _positive_int(max_records, name="max_records", maximum=500)
     _normalize_source_url(url)
+
+    normalized_path = _text(path).replace("\\", "/").casefold()
+    if (
+        normalized_path.startswith("abi/")
+        or "/abi/" in f"/{normalized_path}"
+    ):
+        return []
 
     rows = _structured_records(
         text,
