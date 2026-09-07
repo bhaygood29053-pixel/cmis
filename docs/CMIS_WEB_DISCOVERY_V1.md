@@ -49,6 +49,8 @@ Eligible observations are:
 
 Known execution routes such as transaction build/send/status are dropped. Unknown non-GET routes are also dropped. Passive observation of the already-qualified `POST /api/quote` route is allowed only as hashed metadata; the request body is not retained and the request is never replayed.
 
+Issue #559 subsequently qualified `GET /api/ramp/availability` as an accepted read-only observation route after a bounded live semantic probe established only the response schema for provider-reported country, buy/sell availability, provider names, and optional reason. Asset/network scope, price/quote/limit semantics, freshness, independent country-code semantics, and execution remain unverified.
+
 HTTP 402 may be recorded only as `payment_required_observed=true`. No payment header is retained, no payment is performed, and `payment_authorized=false`.
 
 The browser capture performs zero clicks, zero form submissions, zero wallet interaction, zero authentication, and zero payments. It supplies no persistent storage state, blocks service workers, disables downloads, and preserves `execution_authorized=false`.
