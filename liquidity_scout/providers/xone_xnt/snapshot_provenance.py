@@ -220,9 +220,15 @@ def _candidate_kind(
 ) -> str | None:
     lowered = text.casefold()
     path_lower = _text(path).casefold()
+
+    # A path may bind otherwise ambiguous file contents to XONE, but an ordinary
+    # XONE ABI/config filename must not turn every JSON line into a snapshot
+    # artifact. Snapshot/artifact semantics must appear in the bounded text
+    # itself. Repository path discovery passes the path as text explicitly, so
+    # meaningful names such as xone-holder-snapshot.json still become leads.
     has_xone = "xone" in lowered or "xone" in path_lower
-    has_snapshot = any(term in lowered or term in path_lower for term in SNAPSHOT_TERMS)
-    indicators = _artifact_indicators(text, path=path)
+    has_snapshot = any(term in lowered for term in SNAPSHOT_TERMS)
+    indicators = _artifact_indicators(text, path=None)
     strong_artifact_indicators = {
         "snapshot",
         "registry",
@@ -236,11 +242,6 @@ def _candidate_kind(
         "unlock",
         "distribution",
         "export",
-        "csv",
-        "json",
-        "jsonl",
-        "ndjson",
-        "tsv",
         "ipfs",
         "arweave",
     }
