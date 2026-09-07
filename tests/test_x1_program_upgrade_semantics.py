@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+import json
 import unittest
+from pathlib import Path
 
 from liquidity_scout.providers.x1.program_upgrade_semantics import (
     BPF_UPGRADEABLE_LOADER,
@@ -258,6 +260,22 @@ class FakeRPC:
 
 
 class X1ProgramUpgradeSemanticVerificationTests(unittest.TestCase):
+    def test_existing_xdex_fixture_matches_upgradeable_program_envelope(self):
+        fixture = json.loads(
+            (
+                Path(__file__).parent
+                / "fixtures"
+                / "xdex_program_recent_20260904.json"
+            ).read_text()
+        )
+        info = fixture["program_information"]
+
+        self.assertEqual(fixture["program_account"], PROGRAM_ID)
+        self.assertEqual(info["owner"], BPF_UPGRADEABLE_LOADER)
+        self.assertEqual(info["status"], "Executable")
+        self.assertEqual(info["data_size_bytes"], 36)
+        self.assertTrue(info["upgradeable"])
+
     def test_decodes_upgradeable_loader_program_state(self):
         result = decode_upgradeable_loader_state(program_state())
 
