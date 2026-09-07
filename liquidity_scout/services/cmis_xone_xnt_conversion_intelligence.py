@@ -33,6 +33,12 @@ from liquidity_scout.providers.xone_xnt import (
     MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
     XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION,
     XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION,
+    XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_CONTRACT_VERSION,
+    annotate_retrieved_asset_capture,
+    build_asset_graph_edges,
+    extract_archived_asset_references,
+    extract_asset_provenance_candidates,
+    summarize_archived_asset_graph,
     discover_repository_path_candidates,
     extract_archival_provenance_candidates,
     summarize_archival_recovery,
@@ -73,6 +79,11 @@ def _truth_state() -> dict[str, Any]:
         "xone_snapshot_source_discovery_verified": False,
         "xone_snapshot_provenance_expansion_verified": False,
         "xone_snapshot_archival_source_recovery_verified": False,
+        "xone_snapshot_archived_asset_graph_resolution_verified": False,
+        "archived_asset_graph_traversal_verified": False,
+        "archived_asset_reference_discovered": False,
+        "archived_asset_capture_retrieved": False,
+        "archived_asset_semantic_candidate_discovered": False,
         "archival_capture_discovered": False,
         "archival_capture_retrieved": False,
         "stable_primary_url_recovered": False,
@@ -414,6 +425,128 @@ class CMISXoneXntConversionIntelligenceService:
                 **_truth_state(),
                 "ethereum_xone_identity_verified": True,
                 "xone_burn_accounting_surface_verified": True,
+            },
+        }
+
+    def resolve_xone_snapshot_archived_asset_graph(
+        self,
+        root_captures: Sequence[Mapping[str, Any]],
+        asset_documents: Sequence[Mapping[str, Any]],
+        *,
+        observed_at: float,
+        max_references_per_document: int = 100,
+        max_ranked_candidates: int = 100,
+    ) -> dict[str, Any]:
+        """Resolve bounded archived application assets without snapshot promotion."""
+
+        if not root_captures:
+            raise ValueError("root_captures must not be empty")
+
+        edges: list[dict[str, Any]] = []
+        asset_captures: list[dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
+
+        roots_by_id = {
+            str(row.get("capture_id") or ""): dict(row)
+            for row in root_captures
+            if isinstance(row, Mapping) and row.get("capture_id")
+        }
+
+        for document in asset_documents:
+            if not isinstance(document, Mapping):
+                raise ValueError("each asset document must be a mapping")
+            parent_id = str(document.get("parent_capture_id") or "").strip()
+            parent = roots_by_id.get(parent_id)
+            if parent is None:
+                # A nested asset may carry its complete parent capture metadata.
+                parent_value = document.get("parent_capture")
+                if isinstance(parent_value, Mapping):
+                    parent = dict(parent_value)
+            if parent is None:
+                raise ValueError("asset document requires a known parent capture")
+
+            text_value = document.get("text")
+            if not isinstance(text_value, str):
+                raise ValueError("asset document requires text")
+            depth = int(document.get("depth") or 1)
+            references = extract_archived_asset_references(
+                text_value,
+                parent_original_url=str(parent.get("original") or ""),
+                content_type=str(document.get("content_type") or ""),
+                max_references=max_references_per_document,
+            )
+            edges.extend(build_asset_graph_edges(
+                parent,
+                references,
+                depth=depth,
+            ))
+
+            capture = document.get("asset_capture")
+            if isinstance(capture, Mapping):
+                annotated = annotate_retrieved_asset_capture(
+                    capture,
+                    root_capture_id=str(
+                        document.get("root_capture_id")
+                        or parent.get("root_capture_id")
+                        or parent.get("capture_id")
+                        or ""
+                    ),
+                    parent_capture_id=str(parent.get("capture_id") or ""),
+                    depth=depth,
+                    retrieved_bytes=int(document.get("retrieved_bytes") or 0),
+                    retrieved_content_type=str(
+                        document.get("content_type") or ""
+                    ),
+                    content_sha256=str(
+                        document.get("content_sha256") or ""
+                    ),
+                )
+                asset_captures.append(annotated)
+                candidates.extend(extract_asset_provenance_candidates(
+                    text_value,
+                    asset_capture=annotated,
+                    observed_at=observed_at,
+                    max_candidates=50,
+                ))
+
+        summary = summarize_archived_asset_graph(
+            list(roots_by_id.values()),
+            edges,
+            asset_captures,
+            candidates,
+            max_candidates=max_ranked_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "snapshot_archived_asset_graph_contract":
+                XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_CONTRACT_VERSION,
+            "state": STATE,
+            "archived_asset_graph": summary,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "xone_snapshot_archived_asset_graph_resolution_verified": True,
+                "archived_asset_graph_traversal_verified":
+                    summary["asset_graph_traversal_verified"],
+                "archived_asset_reference_discovered":
+                    summary["asset_edge_count"] > 0,
+                "archived_asset_capture_retrieved":
+                    summary["asset_capture_retrieved_count"] > 0,
+                "archived_asset_semantic_candidate_discovered":
+                    summary["asset_semantic_candidate_count"] > 0,
+                "stable_primary_url_recovered":
+                    summary["stable_primary_social_url_count"] > 0,
+                "snapshot_artifact_candidate_discovered":
+                    summary["provenance"][
+                        "snapshot_artifact_candidate_count"
+                    ] > 0,
+                "authoritative_exact_snapshot_block_discovered":
+                    summary[
+                        "authoritative_exact_snapshot_block_discovered"
+                    ],
             },
         }
 
