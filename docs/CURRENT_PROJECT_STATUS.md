@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-06 12:00 America/New_York**.
+Current reconciliation: **2026-09-07 08:16 America/New_York**.
 
 ## Accepted platform
 
@@ -12,7 +12,7 @@ Current reconciliation: **2026-09-06 12:00 America/New_York**.
 - `trade_price_impact_intelligence/v1` is accepted through CMIS #498 / PR #530 + protected `cmis-core` #33;
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
-- CMIS Web Discovery v1-v11 remains accepted as bounded discovery below the verification boundary.
+- CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, and `x1_agents_radio_structured_discovery/v1` is accepted via #568 / PR #569 with explicit X1 RPC / CMIS verification handoffs and no public/Scout promotion.
 
 ## Latest accepted live gate
 
