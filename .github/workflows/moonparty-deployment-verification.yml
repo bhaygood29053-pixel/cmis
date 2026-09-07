@@ -1,0 +1,112 @@
+name: MoonParty Deployment Verification
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_moonparty_deployment_verification.py'
+      - 'scripts/verify_moonparty_deployment.py'
+      - 'docs/MOONPARTY_DEPLOYMENT_VERIFICATION_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/moonparty-deployment-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test exact MoonParty deployment verification
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_moonparty_deployment_verification.py
+      - name: Re-run MoonParty source semantics boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_moonparty_source_semantics.py
+      - name: Re-run XONE burn/redeemer boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_migration_sink_semantics.py
+
+  live-deployment-discovery:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Discover and qualify bounded MoonParty deployment candidates
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/verify_moonparty_deployment.py             | tee evidence/moonparty-deployment-verification.json
+
+          python - <<'PY'
+          import json
+
+          path = "evidence/moonparty-deployment-verification.json"
+          data = json.load(open(path))
+          assert data["status"] == "PASS"
+          assert data["contract_version"] == "moonparty_deployment_verification/v1"
+          assert data["source_gate_passed"] is True
+          assert data["pinned_sources"]["artifact_available"] is True
+          assert data["frontend_sources"]["target_available_count"] >= 1
+
+          discovery = data["candidate_discovery"]
+          assert discovery["deployment_candidate_discovery_verified"] is True
+          if discovery["deployment_candidate_count"] == 0:
+              assert data["zero_candidates_are_scoped_corpus_evidence_only"] is True
+              assert discovery["zero_candidates_do_not_prove_non_deployment"] is True
+              assert data["moonparty_deployment_verified"] is False
+          elif data["moonparty_deployment_verified"]:
+              proof = data["verified_deployment"]
+              assert proof["rpc_proof_count"] >= 2
+              assert proof["moonparty_deployment_chain_verified"] is True
+              assert proof["moonparty_runtime_compatible"] is True
+              assert proof["moonparty_xone_binding_verified"] is True
+              assert proof["xone_to_xnt_credit_design_link_deployment_bound"] is True
+
+          assert data["xnt_credit_to_native_xnt_equivalence_verified"] is False
+          assert data["xnt_credit_transferability_verified"] is False
+          assert data["xnt_issuance_verified"] is False
+          assert data["xnt_vesting_or_unlock_verified"] is False
+          assert data["october_6_unlock_applies_to_xone_verified"] is False
+          assert data["xone_xnt_conversion_verified"] is False
+          assert data["cross_chain_correlation_verified"] is False
+          assert data["public_service_promoted"] is False
+          assert data["scout_reliance_promoted"] is False
+          assert data["execution_authorized"] is False
+
+          print(f"DEPLOYMENT_CANDIDATES={discovery['deployment_candidate_count']}")
+          print(f"MOONPARTY_DEPLOYMENT_VERIFIED={str(data['moonparty_deployment_verified']).upper()}")
+          print(f"MOONPARTY_XONE_BINDING_VERIFIED={str(data['moonparty_xone_binding_verified']).upper()}")
+          print("NATIVE_XNT_EQUIVALENCE_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moonparty-deployment-verification-evidence
+          path: evidence/moonparty-deployment-verification.json
+          if-no-files-found: error
