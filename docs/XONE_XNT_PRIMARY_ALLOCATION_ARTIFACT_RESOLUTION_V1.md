@@ -1,6 +1,6 @@
 # XONE → XNT Primary Allocation Artifact Resolution v1
 
-Status: **IMPLEMENTATION FOR ISSUE #622 — NOT ACCEPTED UNTIL DETERMINISTIC + NO-LEAD OPERATIONAL + FULL LIQUIDITY SCOUT TEST GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #622 / PR #623. Dedicated resolver run #3 passed deterministic and NO_LEAD operational jobs at head `21be1b27f10ffd1be4ab5d91ec6b1554b60f64c9`; Liquidity Scout Tests #1838 passed; PR #623 merged as `e288ed4bf4620654f64b57615a963efbe64e7700`.
 
 Contract:
 
@@ -270,6 +270,31 @@ Acceptance requires:
 - operational `NO_LEAD` proof with zero network discovery;
 - full Liquidity Scout Tests;
 - merge to `main`.
+
+## Accepted operational result
+
+Final accepted run #3 proves the intended idle state:
+
+- `resolution_state=NO_LEAD`
+- `NETWORK_CLIENT_IMPORTS=0`
+- `network_discovery_performed=false`
+- `network_request_count=0`
+- `lead_supplied=false`
+- `primary_artifact_candidate_discovered=false`
+- `primary_artifact_resolved_for_handoff=false`
+- `handoffs=[]`
+- `execution_authorized=false`
+
+The resolver and previous allocation-source/allocation-record regression suites passed, and full Liquidity Scout Tests #1838 passed.
+
+The first CI cycle rejected the initial content-addressed completeness behavior: IPFS/Arweave correctly pinned the locator but did not satisfy the inherited repo/release provenance-completeness predicate. The accepted implementation treats a valid immutable content address plus retrieved content hash/source URL as complete content-addressed locator provenance while leaving other source classes strict. That behavior is regression-tested.
+
+Evidence artifact:
+
+- artifact id: `10034667373`
+- digest: `sha256:c77ce4033a4421e9bb5b33bc6368b6ff1caa30008b511f78556a42915c5a67d5`
+
+No real XONE allocation artifact was supplied during acceptance, so no candidate or handoff is claimed.
 
 ## Next gate
 

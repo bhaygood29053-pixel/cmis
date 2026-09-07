@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 17:39 America/New_York**.
+Current reconciliation: **2026-09-07 18:44 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,29 @@ Current reconciliation: **2026-09-07 17:39 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #619 / PR #620 `xone_xnt_allocation_source_provenance/v1`, following the earlier identity/event/burn/candidate/X1-binding/snapshot/provenance/archive/asset-graph/allocation-record gates. Accepted provenance run #6 covered **3/3 repositories, 41 provenance-shaped repository files, 3/3 release queries, and 3/3 official X1 targets**. It retained **10 clean X1 Labs program/Anchor/IDL/PDA/account-schema architecture analogues**, all with `xone=false`, `exact_xone_contract_mentioned=false`, and `qualifying_xone_allocation_source_candidate=false`. It found **0 qualifying XONE allocation-source candidates and 0 exact-XONE-bound sources**. No public XONE API/Merkle/content-addressed/registry-export/release/structured-holder-file/program-schema source survived the accepted filter. This is scoped public evidence only: `private_or_unpublished_allocation_source_absence_proven=false`. The primary target remains the Ethereum XONE holder snapshot/registry, but broad public discovery is now at a genuine evidence bottleneck. The next evidence class is source-specific primary-artifact resolution / evidence intake from a newly surfaced exact registry, export, API, Merkle pointer, deployment/program reference, or externally supplied primary artifact. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified; `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #622 / PR #623 `xone_xnt_primary_allocation_artifact_resolution/v1`, following the prior identity/event/burn/candidate/X1-binding/snapshot/provenance/archive/asset-graph/allocation-record/allocation-source gates. The new resolver is deliberately **lead-driven**. Accepted run #3 passed deterministic and `NO_LEAD` operational jobs; Liquidity Scout Tests #1838 passed. The operational proof has **zero network-client imports, `network_discovery_performed=false`, `network_request_count=0`, no lead, and no handoffs**. No XONE primary allocation artifact has been resolved yet. CMIS is now ready to ingest one already-retrieved exact registry/export/holder file/API/Merkle/content-addressed/X1-program artifact, verify hash/provenance/exact XONE binding, and expose only an authorized verification *handoff route* while keeping every allocation/issuance/vesting truth flag false. Broad public discovery stays paused. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified; `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### XONE → XNT Allocation Source Provenance v1
+### XONE → XNT Primary Allocation Artifact Resolution v1
+
+**ACCEPTED INTERNAL FOUNDATION.** XONE XNT Primary Allocation Artifact Resolution run #3 passed deterministic and no-lead operational jobs at PR #623 head `21be1b27f10ffd1be4ab5d91ec6b1554b60f64c9`; Liquidity Scout Tests run #1838 also passed. PR #623 merged as `e288ed4bf4620654f64b57615a963efbe64e7700`; Issue #622 closed completed.
+
+The accepted operational result is intentionally **NO_LEAD**. The runner imports no network client, reports `network_discovery_performed=false`, `network_request_count=0`, `lead_supplied=false`, `primary_artifact_candidate_discovered=false`, `primary_artifact_resolved_for_handoff=false`, and performs no handoff. This is the correct state because bounded public allocation-source provenance previously found no qualifying XONE source and broad discovery is not being repeated.
+
+The resolver is now ready for one explicit already-retrieved primary artifact. It distinguishes `NO_LEAD`, `REJECTED`, `CANDIDATE`, and `RESOLVED_FOR_HANDOFF`; verifies/recomputes SHA-256; fails closed on an expected-hash mismatch; preserves exact XONE-contract binding separately from name-only XONE; rejects ordinary ABI/generic config; preserves non-XONE program architecture as analogue only; and routes exact reproducible artifacts by class into the already-accepted or future stronger verifier without executing that handoff.
+
+Supported routes include structured holder/export → `xone_xnt_x1_allocation_record_discovery/v1`; explicit snapshot block → `ethereum_xone_snapshot_registry/v1`; Merkle → future snapshot→allocation binding verification; exact X1 program/account schema → future finalized RPC qualification; allocation API → future exact endpoint verification; IPFS/Arweave → future immutable artifact verification; release asset → future release provenance resolution.
+
+The first CI cycle caught one narrow integrity-model defect: an IPFS CID correctly pinned the locator but the resolver still inherited the older repository/release completeness rule. The implementation was corrected so immutable content addressing can itself complete locator provenance without weakening repo/release/API pinning, and the case became a permanent regression before acceptance.
+
+Evidence artifact id: `10034667373`; digest: `sha256:c77ce4033a4421e9bb5b33bc6368b6ff1caa30008b511f78556a42915c5a67d5`.
+
+No actual XONE primary allocation artifact has yet been resolved. `allocation_source_provenance_verified=false`, `authoritative_allocation_source_verified=false`, `official_xone_snapshot_verified=false`, `official_registry_artifact_verified=false`, `xone_snapshot_eligibility_verified=false`, `xone_snapshot_xnt_allocation_binding_verified=false`, `allocation_semantics_verified=false`, `claim_state_verified=false`, `vesting_or_unlock_state_verified=false`, `xnt_issuance_verified=false`, `xnt_vesting_or_unlock_verified=false`, `october_6_unlock_applies_to_xone_verified=false`, `xone_xnt_conversion_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`.
+
+**Current next gate:** remain in `NO_LEAD` until a new exact primary artifact is surfaced or supplied. Resolve that artifact first; only `RESOLVED_FOR_HANDOFF` may trigger the appropriate stronger verifier. Do not automatically resume broad generic scraping.
+
+### Previous accepted live gate — XONE → XNT Allocation Source Provenance v1
 
 **ACCEPTED INTERNAL FOUNDATION.** XONE XNT Allocation Source Provenance run #6 passed deterministic and live jobs at PR #620 head `1fa258507b61a49ec000e8228534cd65476dac7a`; Liquidity Scout Tests run #1832 also passed. PR #620 merged as `fe541b9969aa851e658b7abb4bf02c2e734be295`; Issue #619 closed completed.
 
