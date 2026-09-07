@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          python scripts/resolve_xone_snapshot_archived_asset_graph.py             --root-cdx-limit 40             --max-root-replays 12             --max-refs-per-node 80             --max-asset-lookups 40             --max-asset-replays 20             --log-chunk-blocks 50000             --balance-sample-size 25             | tee evidence/xone-snapshot-archived-asset-graph.json
+          python scripts/resolve_xone_snapshot_archived_asset_graph.py --root-cdx-limit 15 --max-root-replays 6 --max-refs-per-node 50 --max-asset-lookups 8 --max-asset-replays 6 --log-chunk-blocks 50000 --balance-sample-size 25 | tee evidence/xone-snapshot-archived-asset-graph.json
 
           python - <<'PY'
           import json
