@@ -165,6 +165,7 @@ def _reference_record(value: Any, *, mint: str) -> dict[str, Any]:
             name=f"{source_id}.price_usd",
             nonnegative=True,
         ),
+        "price_comparable": row.get("price_comparable") is not False,
         "price_semantics_verified": row.get("price_semantics_verified") is True,
         "price_freshness_verified": row.get("price_freshness_verified") is True,
         "price_observed_at_ms": row.get("price_observed_at_ms"),
@@ -173,6 +174,7 @@ def _reference_record(value: Any, *, mint: str) -> dict[str, Any]:
             name=f"{source_id}.volume_24h_usd",
             nonnegative=True,
         ),
+        "volume_comparable": row.get("volume_comparable") is not False,
         "volume_semantics_verified": row.get("volume_semantics_verified") is True,
         "volume_freshness_verified": row.get("volume_freshness_verified") is True,
         "volume_window_seconds": row.get("volume_window_seconds"),
@@ -195,6 +197,14 @@ def _price_reconciliation(
     source = reference["source_id"]
     reference_price = reference["price_usd"]
 
+    if reference["price_comparable"] is not True:
+        return {
+            "field": "price_usd",
+            "source_id": source,
+            "state": NOT_COMPARABLE,
+            "reason": "reference_marks_price_not_comparable",
+            "current_fact_corroboration": False,
+        }
     if fortiblox_price is None or reference_price is None:
         return {
             "field": "price_usd",
@@ -261,6 +271,14 @@ def _volume_reconciliation(
     source = reference["source_id"]
     reference_volume = reference["volume_24h_usd"]
 
+    if reference["volume_comparable"] is not True:
+        return {
+            "field": "volume_24h_usd",
+            "source_id": source,
+            "state": NOT_COMPARABLE,
+            "reason": "reference_marks_volume_not_comparable",
+            "current_fact_corroboration": False,
+        }
     if fortiblox_volume is None or reference_volume is None:
         return {
             "field": "volume_24h_usd",
@@ -334,6 +352,28 @@ def _volume_reconciliation(
         "fortiblox_volume_freshness_verified": fortiblox_volume_freshness_verified,
         "reference_volume_freshness_verified": reference["volume_freshness_verified"],
         "current_fact_corroboration": state == AGREE and freshness_aligned,
+    }
+
+
+def accepted_fortiblox_token_field_evidence() -> dict[str, Any]:
+    """Return the currently accepted FortiBlox token-field semantic boundary.
+
+    The normalized provider contract accepts the provider-labeled priceUsd field
+    as a USD price observation. It does not yet prove exact per-field fact time
+    for price or exact rolling-window/scope semantics for volume24hUsd.
+    """
+
+    return {
+        "contract_version": "fortiblox_token_field_evidence/v1",
+        "price_semantics_verified": True,
+        "price_freshness_verified": False,
+        "volume_semantics_verified": False,
+        "volume_freshness_verified": False,
+        "volume_window_seconds": None,
+        "volume_scope_id": None,
+        "source_independence_verified": False,
+        "cmis_verified": False,
+        "execution_authorized": False,
     }
 
 
@@ -592,5 +632,6 @@ __all__ = [
     "NOT_COMPARABLE",
     "ROLLING_24H_SECONDS",
     "SCOPE_MISMATCH",
+    "accepted_fortiblox_token_field_evidence",
     "reconcile_fortiblox_cross_source",
 ]
