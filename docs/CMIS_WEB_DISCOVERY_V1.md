@@ -61,6 +61,17 @@ slot. It does not verify Radio names/categories/frameworks/instruction
 semantics, Radio activity-count completeness, or deployment-vs-upgrade
 semantics. RPC agreement is not treated as source-independence proof.
 
+#### X1 Program/Upgrade Semantic Verification v1
+
+Issue #574 adds `x1_program_upgrade_semantic_verification/v1` above accepted
+Radio -> X1 RPC corroboration. It decodes the exact BPF Upgradeable Loader
+Program -> ProgramData linkage, current ProgramData last-modified slot and
+upgrade-authority state, and the exact DeployWithMaxDataLen/Upgrade loader
+instruction/account ordering inside the corroborated finalized transaction.
+Ordinary program activity cannot become upgrade proof, Radio labels are compared
+only after chain semantics are established, and no public-service/Scout
+promotion or execution authority is implied.
+
 ### FortiBlox browser/network discovery
 
 Issue #555 extends `fortiblox_app` with two internal discovery contracts:

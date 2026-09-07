@@ -119,6 +119,11 @@ Only when all of those are true:
 That is **activity-at-slot corroboration**, not deployment or upgrade semantic
 proof.
 
+Issue #574 adds the next verification layer,
+`x1_program_upgrade_semantic_verification/v1`, which decodes the exact
+Upgradeable Loader Program/ProgramData state and DeployWithMaxDataLen/Upgrade
+instruction semantics before a deployment or upgrade label may be accepted.
+
 ## What RPC does not prove here
 
 This v1 contract always preserves the following Radio claims as unverified by
