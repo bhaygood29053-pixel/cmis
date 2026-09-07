@@ -1,5 +1,12 @@
 """Dedicated XONE/XNT conversion evidence providers."""
 
+from .candidate_discovery import (
+    CONTRACT_VERSION as CANDIDATE_DISCOVERY_CONTRACT_VERSION,
+    DISCOVERED as CANDIDATE_DISCOVERED,
+    XoneXntCandidateDiscoveryError,
+    discover_conversion_candidates,
+    qualify_conversion_candidate,
+)
 from .scraper import (
     DEFAULT_MAX_BYTES,
     DEFAULT_MAX_CLAIMS,
@@ -23,6 +30,11 @@ from .scraper import (
 )
 
 __all__ = [
+    "CANDIDATE_DISCOVERED",
+    "CANDIDATE_DISCOVERY_CONTRACT_VERSION",
+    "XoneXntCandidateDiscoveryError",
+    "discover_conversion_candidates",
+    "qualify_conversion_candidate",
     "DEFAULT_MAX_BYTES",
     "DEFAULT_MAX_CLAIMS",
     "DEFAULT_MAX_SITEMAP_URLS",
