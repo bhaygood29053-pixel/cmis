@@ -10,6 +10,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 PROVENANCE_CONTRACT = "cross_chain_asset_provenance/v1"
+ROBINHOOD_X1_EXTENSION_CONTRACT = "cross_chain_asset_provenance_robinhood_x1/v1"
 DISALLOWED_ID_KINDS = frozenset({"symbol", "ticker", "name", "label"})
 DEFAULT_EXECUTION_AUTHORIZED = False
 
@@ -192,9 +193,96 @@ def build_cross_chain_asset_provenance(
     }
 
 
+def build_robinhood_x1_provenance_extension(
+    *,
+    canonical_asset_id: Any,
+    origin: Any,
+    current: Any,
+    hops: Any,
+    source_asset_class: Any,
+    custody_dependency: Any = None,
+    route_evidence_id: Any = None,
+) -> dict[str, Any]:
+    """Compose a Robinhood-origin to X1 provenance view over accepted v1.
+
+    This is an additive structural extension. It does not alter the accepted
+    `cross_chain_asset_provenance/v1` object or promote live bridge, backing,
+    custody, tokenized-equity entitlement, or route-state claims.
+    """
+
+    base = build_cross_chain_asset_provenance(
+        canonical_asset_id=canonical_asset_id,
+        origin=origin,
+        current=current,
+        hops=hops,
+    )
+
+    robinhood_chains = {"robinhood", "robinhood chain", "robinhood_chain"}
+    if base["origin"]["chain"] not in robinhood_chains:
+        raise ValueError("Robinhood→X1 extension requires a Robinhood origin")
+    if base["current"]["chain"] != "x1":
+        raise ValueError("Robinhood→X1 extension requires current chain x1")
+
+    asset_class = _required_text(source_asset_class, "source_asset_class").casefold()
+    custody = _optional_text(custody_dependency)
+    route_evidence = _optional_text(route_evidence_id)
+
+    direct_robinhood_x1_hops = [
+        hop
+        for hop in base["lineage"]
+        if hop["source"]["chain"] in robinhood_chains
+        and hop["destination"]["chain"] == "x1"
+    ]
+
+    return {
+        "contract": ROBINHOOD_X1_EXTENSION_CONTRACT,
+        "base_provenance_contract": PROVENANCE_CONTRACT,
+        "canonical_asset_id": base["canonical_asset_id"],
+        "origin": base["origin"],
+        "current": base["current"],
+        "representation_depth": base["representation_depth"],
+        "lineage": base["lineage"],
+        "dependencies": base["dependencies"],
+        "source_context": {
+            "source_asset_class": asset_class,
+            "custody_dependency": custody,
+            "route_evidence_id": route_evidence,
+            "direct_robinhood_to_x1_hop_present": bool(direct_robinhood_x1_hops),
+        },
+        "verification": {
+            **base["verification"],
+            "robinhood_origin_structurally_bound": True,
+            "x1_destination_structurally_bound": True,
+            "source_asset_class_verified": False,
+            "tokenized_equity_entitlement_verified": False,
+            "live_robinhood_x1_route_verified": False,
+            "route_evidence_resolved": False,
+            "custody_verified": False,
+            "backing_verified": False,
+        },
+        "boundaries": {
+            "source_asset_class_is_descriptive_only": True,
+            "custody_dependency_is_descriptive_only": True,
+            "route_evidence_id_is_selector_only": route_evidence is not None,
+            "bridge_availability_claim_authorized": False,
+            "custody_safety_claim_authorized": False,
+            "backing_sufficiency_claim_authorized": False,
+            "tokenized_equity_ownership_claim_authorized": False,
+            "automatic_risk_conclusion_authorized": False,
+            "trade_recommendation_authorized": False,
+        },
+        "read_only": True,
+        "public_service_promoted": False,
+        "scout_reliance_promoted": False,
+        "execution_authorized": DEFAULT_EXECUTION_AUTHORIZED,
+    }
+
+
 __all__ = [
     "DEFAULT_EXECUTION_AUTHORIZED",
     "DISALLOWED_ID_KINDS",
     "PROVENANCE_CONTRACT",
+    "ROBINHOOD_X1_EXTENSION_CONTRACT",
     "build_cross_chain_asset_provenance",
+    "build_robinhood_x1_provenance_extension",
 ]
