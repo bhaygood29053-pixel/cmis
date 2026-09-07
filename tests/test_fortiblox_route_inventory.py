@@ -6,6 +6,7 @@ from liquidity_scout.providers.web_discovery import (
     discover_fortiblox_navigation_routes,
     normalize_fortiblox_navigation_urls,
 )
+from liquidity_scout.services.cmis_web_discovery import CMISWebDiscoveryService
 
 
 ROOT = "https://app.fortiblox.com/"
@@ -242,6 +243,36 @@ class FortiBloxRouteInventoryTests(unittest.TestCase):
             result["page_results"][1]["error_type"],
             "RuntimeError",
         )
+        self.assertFalse(result["execution_authorized"])
+
+    def test_service_wrapper_preserves_internal_authority_boundary(self):
+        def route_discovery_fn(page_url, **kwargs):
+            return {
+                "navigation_routes": [ROOT],
+                "execution_authorized": False,
+            }
+
+        def capture_fn(route, **kwargs):
+            return {
+                "network_events_seen": 1,
+                "observation_count": 0,
+                "observations": [],
+                "execution_authorized": False,
+            }
+
+        result = CMISWebDiscoveryService().capture_fortiblox_route_inventory(
+            ROOT,
+            route_discovery_fn=route_discovery_fn,
+            capture_fn=capture_fn,
+        )
+
+        self.assertEqual(result["source_id"], "fortiblox_app")
+        self.assertEqual(result["route_inventory"]["pages_attempted"], 1)
+        self.assertFalse(result["request_replay_authorized"])
+        self.assertFalse(result["background_monitoring_authorized"])
+        self.assertFalse(result["payment_authorized"])
+        self.assertFalse(result["public_service_promoted"])
+        self.assertFalse(result["scout_reliance_promoted"])
         self.assertFalse(result["execution_authorized"])
 
     def test_bounds_fail_closed(self):
