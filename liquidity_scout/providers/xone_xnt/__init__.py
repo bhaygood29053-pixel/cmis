@@ -56,6 +56,20 @@ from .moonparty_source_semantics import (
     XoneXntMoonPartySourceSemanticsError,
     verify_moonparty_source_semantics,
 )
+from .snapshot_archival_recovery import (
+    CONTRACT_VERSION as XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION,
+    XoneSnapshotArchivalRecoveryError,
+    archival_url_relevance_score,
+    build_wayback_replay_url,
+    extract_archival_provenance_candidates,
+    original_host_is_authoritative,
+    parse_cdx_json,
+    rank_archival_captures,
+    recover_stable_x_urls,
+    select_diverse_archival_captures,
+    source_role_for_original_url,
+    summarize_archival_recovery,
+)
 from .snapshot_provenance import (
     CONTRACT_VERSION as XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION,
     XoneSnapshotProvenanceError,
@@ -87,6 +101,18 @@ from .scraper import (
 )
 
 __all__ = [
+    "XONE_SNAPSHOT_ARCHIVAL_RECOVERY_CONTRACT_VERSION",
+    "XoneSnapshotArchivalRecoveryError",
+    "archival_url_relevance_score",
+    "build_wayback_replay_url",
+    "extract_archival_provenance_candidates",
+    "original_host_is_authoritative",
+    "parse_cdx_json",
+    "rank_archival_captures",
+    "recover_stable_x_urls",
+    "select_diverse_archival_captures",
+    "source_role_for_original_url",
+    "summarize_archival_recovery",
     "XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION",
     "XoneSnapshotProvenanceError",
     "discover_repository_path_candidates",
