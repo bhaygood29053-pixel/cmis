@@ -1,0 +1,129 @@
+name: FortiBlox Ramp Availability Semantic Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/fortiblox-ramp-semantics-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prove-ramp-availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out CMIS
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Probe public read-only route
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import urllib.request
+
+          URL = "https://app.fortiblox.com/api/ramp/availability"
+          MAX_BYTES = 4096
+          SENSITIVE = {
+              "access_token","api_key","apikey","auth","auth_token",
+              "authorization","bearer","client_secret","credential","jwt",
+              "password","payment_signature","private_key","secret","seed",
+              "session","token"
+          }
+
+          req = urllib.request.Request(
+              URL,
+              headers={"Accept":"application/json","User-Agent":"CMIS-Semantic-Evidence/1"},
+              method="GET",
+          )
+          with urllib.request.urlopen(req, timeout=15) as resp:
+              status = resp.status
+              content_type = (resp.headers.get("content-type") or "").split(";",1)[0].strip().lower()
+              body = resp.read(MAX_BYTES + 1)
+
+          assert status == 200, status
+          assert content_type in {"application/json","text/json"}, content_type
+          assert len(body) <= MAX_BYTES, "response exceeds bounded semantic probe"
+          payload = json.loads(body)
+          assert isinstance(payload, dict), "response must be a JSON object"
+
+          def reject_sensitive(value):
+              if isinstance(value, dict):
+                  for k,v in value.items():
+                      assert str(k).casefold() not in SENSITIVE, f"sensitive-like key: {k}"
+                      reject_sensitive(v)
+              elif isinstance(value, list):
+                  for item in value:
+                      reject_sensitive(item)
+
+          def schema(value):
+              if isinstance(value, dict):
+                  return {
+                      "type":"object",
+                      "keys":{
+                          str(k): schema(v)
+                          for k,v in sorted(value.items(), key=lambda kv:str(kv[0]))
+                      },
+                  }
+              if isinstance(value, list):
+                  variants=[]
+                  seen=set()
+                  for item in value:
+                      shape=schema(item)
+                      sig=json.dumps(shape,sort_keys=True,separators=(",",":"))
+                      if sig not in seen:
+                          seen.add(sig); variants.append(shape)
+                  return {"type":"array","length":len(value),"item_shapes":variants}
+              if isinstance(value, bool): return {"type":"boolean"}
+              if value is None: return {"type":"null"}
+              if isinstance(value, int): return {"type":"integer"}
+              if isinstance(value, float): return {"type":"number"}
+              if isinstance(value, str): return {"type":"string","length":len(value)}
+              return {"type":type(value).__name__}
+
+          reject_sensitive(payload)
+          encoded=json.dumps(payload,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+          evidence={
+              "contract":"fortiblox_ramp_availability_semantic_evidence/v1",
+              "url":URL,
+              "http_status":status,
+              "content_type":content_type,
+              "response_size_bytes":len(body),
+              "response_sha256":hashlib.sha256(body).hexdigest(),
+              "canonical_json_sha256":hashlib.sha256(encoded).hexdigest(),
+              "schema":schema(payload),
+              "public_response":payload,
+              "authentication_used":False,
+              "payment_used":False,
+              "wallet_interaction":False,
+              "request_replay_authorized":False,
+              "execution_authorized":False,
+              "cmis_verified":False,
+          }
+
+          Path("evidence").mkdir(exist_ok=True)
+          out=Path("evidence/fortiblox-ramp-availability-semantics.json")
+          out.write_text(json.dumps(evidence,indent=2,sort_keys=True)+"\n")
+
+          print(json.dumps(evidence,indent=2,sort_keys=True))
+          PY
+
+      - name: Upload bounded semantic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortiblox-ramp-availability-semantics
+          path: evidence/fortiblox-ramp-availability-semantics.json
+          if-no-files-found: error
+          retention-days: 30

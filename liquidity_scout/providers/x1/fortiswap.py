@@ -3,7 +3,7 @@
 FortiSwap is a third-party execution/router provider.  This module only:
 - captures its free x402 discovery catalogue;
 - enforces an explicit read-only observation allowlist; and
-- normalizes already-obtained token, volume, and quote responses.
+- normalizes already-obtained token, volume, quote, and ramp-availability responses.
 
 It does not implement x402 payment, API-key management, transaction building,
 signing, broadcasting, custody, swaps, or bridge execution.  FortiSwap trust,
@@ -35,6 +35,7 @@ READ_ONLY_ROUTE_TEMPLATES = frozenset(
         ("GET", "/api/tokens"),
         ("GET", "/api/token/:mint"),
         ("GET", "/api/router/volume"),
+        ("GET", "/api/ramp/availability"),
         ("POST", "/api/quote"),
     }
 )
@@ -132,6 +133,8 @@ def _route_template_from_url(url: str | None) -> str | None:
     if path == "/api/tokens":
         return path
     if path == "/api/router/volume":
+        return path
+    if path == "/api/ramp/availability":
         return path
     if path == "/api/quote":
         return path
@@ -426,6 +429,84 @@ def normalize_router_volume_response(payload: Any) -> dict[str, Any]:
     }
 
 
+def normalize_ramp_availability_response(payload: Any) -> dict[str, Any]:
+    """Normalize FortiBlox's provider-reported ramp availability response.
+
+    Live semantic evidence for Issue #559 proves only a country field, buy/sell
+    availability booleans, provider-name lists, and an optional reason. The
+    route exposes no asset/network scope, quote, price, limit, timestamp, or
+    freshness semantics, so those boundaries remain explicitly unverified.
+    """
+
+    payload = _require_object(payload, "FortiBlox ramp availability response")
+
+    country = _text(payload.get("country"))
+    if country is None or len(country) != 2 or not country.isalpha():
+        raise FortiSwapAPIError(
+            "FortiBlox ramp availability country must be a two-letter provider code."
+        )
+
+    def normalize_direction(name: str) -> dict[str, Any]:
+        record = _require_object(
+            payload.get(name),
+            f"FortiBlox ramp availability {name}",
+        )
+        available = record.get("available")
+        if not isinstance(available, bool):
+            raise FortiSwapAPIError(
+                f"FortiBlox ramp availability {name}.available must be boolean."
+            )
+        providers_raw = _require_list(
+            record.get("providers"),
+            f"FortiBlox ramp availability {name}.providers",
+        )
+        providers: list[str] = []
+        for item in providers_raw:
+            provider = _text(item)
+            if provider is None:
+                raise FortiSwapAPIError(
+                    f"FortiBlox ramp availability {name}.providers must contain non-empty strings."
+                )
+            providers.append(provider)
+        return {
+            "provider_available_claim": available,
+            "provider_names": providers,
+        }
+
+    reason_value = payload.get("reason")
+    if reason_value is not None and not isinstance(reason_value, str):
+        raise FortiSwapAPIError(
+            "FortiBlox ramp availability reason must be a string or null."
+        )
+
+    return {
+        "chain": CHAIN,
+        "network": NETWORK,
+        "source": FORTISWAP_SOURCE,
+        "scope": "fortiblox_ramp_availability_observation",
+        "provider_country_code": country.upper(),
+        "provider_country_code_semantics_verified": False,
+        "buy": normalize_direction("buy"),
+        "sell": normalize_direction("sell"),
+        "provider_reason_claim": _text(reason_value),
+        "provider_availability_schema_verified": True,
+        "asset_scope_verified": False,
+        "network_scope_verified": False,
+        "quote_semantics_verified": False,
+        "price_semantics_verified": False,
+        "limit_semantics_verified": False,
+        "freshness_available": False,
+        "provider_timestamp": None,
+        "cmis_verified": False,
+        "source_independence_verified": False,
+        "public_service_promoted": False,
+        "scout_reliance_promoted": False,
+        "execution_authorized": False,
+        "analysis_only": True,
+        "raw": dict(payload),
+    }
+
+
 def normalize_quote_response(payload: Any) -> dict[str, Any]:
     payload = _require_object(payload, "FortiSwap quote response")
     input_mint = _text(payload.get("inputMint"))
@@ -580,6 +661,10 @@ class FortiSwapReadOnlyProvider:
         return normalize_router_volume_response(payload)
 
     @staticmethod
+    def normalize_ramp_availability(payload: Any) -> dict[str, Any]:
+        return normalize_ramp_availability_response(payload)
+
+    @staticmethod
     def normalize_quote(payload: Any) -> dict[str, Any]:
         return normalize_quote_response(payload)
 
@@ -601,6 +686,7 @@ __all__ = [
     "normalize_tokens_response",
     "normalize_token_detail_response",
     "normalize_router_volume_response",
+    "normalize_ramp_availability_response",
     "normalize_quote_response",
     "fetch_discovery",
 ]
