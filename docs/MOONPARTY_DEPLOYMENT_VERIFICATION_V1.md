@@ -1,6 +1,6 @@
 # MoonParty Deployment Verification v1
 
-Status: **IMPLEMENTATION FOR ISSUE #601 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE DEPLOYMENT-DISCOVERY GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL BOUNDED FOUNDATION** via Issue #601 / PR #602. MoonParty Deployment Verification run #2 passed deterministic and live discovery jobs at head `b6396af0052a68f4bfe5db1dea099df2e333b000`, Liquidity Scout Tests run #1786 passed, and PR #602 merged as `2b73ec07c775eebe7ea86ff54155e29b866d0d9a`.
 
 Contract:
 
@@ -44,6 +44,26 @@ moonparty_deployment_verified = false
 
 It is not proof that MoonParty was never deployed.
 
+## Accepted live result
+
+The bounded live gate retrieved all 4/4 pinned FairCrypto sources, all 6/6 current `xen.network` / `preview.xen.network` frontend targets, and 26/28 bounded same-host JavaScript chunks. Across 35 inspected documents, it found **0 exact MoonParty deployment-address candidates**.
+
+The evidence artifact digest is `sha256:56198255749d41ddba7d5bb7f65eac874b4eddd3191737fd8adebd4888fc9a68`.
+
+The accepted interpretation is strictly scoped:
+
+```text
+deployment_candidate_count = 0
+zero_candidates_are_scoped_corpus_evidence_only = true
+zero_candidates_do_not_prove_non_deployment = true
+moonparty_deployment_verified = false
+moonparty_deployment_chain_verified = false
+moonparty_runtime_compatible = false
+moonparty_xone_binding_verified = false
+```
+
+This means the current pinned/public frontend corpus does not expose the deployment address needed for direct-RPC qualification. It does **not** establish that MoonParty was never deployed.
+
 ## Direct-chain qualification
 
 An exact candidate must independently pass Ethereum mainnet direct-RPC checks:
@@ -82,8 +102,8 @@ execution_authorized = false
 
 A positive `totalAllocatedXNTCredits` value would still be a MoonParty accounting fact, not proof that native XNT was issued or is transferable.
 
-## Next gate after acceptance
+## Next gate
 
-If a deployment is verified, the next task is to establish the exact semantics and provenance of `allocateXNTCredits`: whether and how those credits map into native X1 XNT allocation/claim/vesting state.
+Because this accepted run found zero exact deployment candidates, the next task is **MoonParty deployment provenance expansion**: search additional authoritative FairCrypto/XEN release history, archived frontend/config material, package/deployment artifacts, verified explorer source, and provenance-qualified deployer history for an exact address. Any newly discovered candidate must pass this contract's direct-chain and two-RPC corroboration gate before deployment identity can be promoted.
 
-If no deployment candidate is found, the next task remains authoritative deployment-address discovery through additional provenance-qualified FairCrypto/XEN frontend, release, archive, explorer, or deployment records. The absence of an address in this bounded corpus must not be promoted into non-deployment.
+Only after a deployment is verified should CMIS establish the exact semantics and provenance of `allocateXNTCredits` and test whether those credits map into native X1 XNT allocation/claim/vesting state.
