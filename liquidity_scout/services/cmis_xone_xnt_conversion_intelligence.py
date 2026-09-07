@@ -23,6 +23,7 @@ from liquidity_scout.providers.xone_xnt import (
     SCRAPER_CONTRACT,
     X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
     XONE_XNT_X1_BINDING_CONTRACT_VERSION,
+    XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
     discover_x1_binding_candidates,
     discover_xnt_distribution_candidates,
     extract_xnt_mechanism_claims,
@@ -34,6 +35,7 @@ from liquidity_scout.providers.xone_xnt import (
     qualify_x1_binding_candidate,
     qualify_xnt_distribution_candidate,
     source_catalog,
+    verify_moonparty_source_semantics,
 )
 
 
@@ -58,6 +60,10 @@ def _truth_state() -> dict[str, Any]:
         "x1_binding_candidate_discovery_verified": False,
         "x1_binding_candidate_history_verified": False,
         "x1_binding_identified": False,
+        "moonparty_authoritative_source_semantics_verified": False,
+        "moonparty_deployment_verified": False,
+        "xone_to_xnt_credit_design_link_verified": False,
+        "xnt_credit_to_native_xnt_equivalence_verified": False,
         "xnt_distribution_mechanism_identified": False,
         "migration_sink_identified": False,
         "lock_or_migration_verified": False,
@@ -579,6 +585,37 @@ class CMISXoneXntConversionIntelligenceService:
                 "x1_binding_candidate_discovery_verified": True,
                 "x1_binding_candidate_history_verified":
                     qualification.get("bounded_history_verified") is True,
+            },
+        }
+
+    def verify_xone_xnt_moonparty_source_semantics(
+        self,
+        documents: Mapping[str, str],
+        *,
+        provenance: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Verify pinned FairCrypto MoonParty/XONE source semantics only."""
+
+        proof = verify_moonparty_source_semantics(
+            documents,
+            provenance=provenance,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "moonparty_source_semantics_contract":
+                XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
+            "state": STATE,
+            "moonparty_source_semantics": proof,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "moonparty_authoritative_source_semantics_verified":
+                    proof["authoritative_source_semantics_verified"],
+                "xone_to_xnt_credit_design_link_verified":
+                    proof["xone_to_xnt_credit_design_link_verified"],
             },
         }
 
