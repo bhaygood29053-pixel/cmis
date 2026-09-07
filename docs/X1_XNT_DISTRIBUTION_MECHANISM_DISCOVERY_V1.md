@@ -1,6 +1,6 @@
 # X1 XNT Distribution / Vesting Mechanism Discovery v1
 
-Status: **IMPLEMENTATION FOR ISSUE #592 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE OFFICIAL-SOURCE GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #592 / PR #593. X1 XNT Distribution Mechanism Discovery run #1 passed deterministic and live official-source jobs at head `34b3e7ac9d9d9370b38575c3a47883e351c2c5e9`, Liquidity Scout Tests run #1770 passed, and PR #593 merged as `afb752f2f1ea4084836921abc8505243b858abb5`.
 
 Contract:
 
@@ -94,15 +94,25 @@ xone_xnt_conversion_verified = false
 cross_chain_correlation_verified = false
 ```
 
-## Zero-candidate result
+## Accepted live result
 
-A live source can legitimately contain XNT reward/vesting rules but no exact 32-byte X1 pubkey.
+The official X1 incentivized-testnet-rewards page was available as `text/markdown` and the accepted parser produced **17 bounded XNT mechanism claims**.
+
+The live source contained the currently documented validator-reward mechanics, including:
+
+- `50,000 Credits = 1 XNT` / `50,000 credits = 1 XNT`;
+- `10%`;
+- `90%`;
+- `365 Days` / `365 days`;
+- validator reward, allocation, distribution, lockup, vesting, claim, genesis, stake, and unlock contexts.
+
+The bounded official page contained **0 exact 32-byte X1/SVM pubkey candidates**, so no X1 account/program was qualified in this run. The evidence artifact digest is `sha256:bba687ec9235fee723c8fc945fe46f5f02e71a816418371f30630699c4c9957d`.
 
 That is a valid scoped result:
 
 `zero_candidates_mean_only_no_exact_pubkeys_in_supplied_claims=true`
 
-It is **not** evidence that no XNT distribution/vesting/claim account or program exists.
+It means only that this official page did not name an exact account/program candidate. It is **not** evidence that no XNT distribution/vesting/claim account or program exists.
 
 ## Authority boundary
 
@@ -115,6 +125,6 @@ execution_authorized = false
 
 The contract is read-only. It does not create, sign, claim, vest, unlock, stake, transfer or burn anything.
 
-## Next slice after acceptance
+## Next slice
 
-Use the official-rule result to separate known XNT validator reward mechanics from the still-unproven XONE→XNT mechanism. Then search primary X1/XONE sources and direct X1 history for an exact account/program binding that explicitly connects an Ethereum XONE conversion/burn event to XNT allocation, claim, vesting or distribution.
+Use the accepted official-rule result to separate known validator-reward mechanics from the still-unproven XONE→XNT mechanism. The next gate should search primary X1/XONE sources and bounded X1 history for an **exact account/program binding** that explicitly connects an Ethereum XONE conversion/burn event to XNT allocation, claim, vesting or distribution.
