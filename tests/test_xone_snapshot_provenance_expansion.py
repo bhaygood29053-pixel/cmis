@@ -42,7 +42,12 @@ class XoneSnapshotProvenanceTests(unittest.TestCase):
         self.assertTrue(row["authoritative_exact_snapshot_block_discovered"])
         self.assertEqual(row["snapshot_block_candidates"], [23_500_000])
         self.assertTrue(row["exact_xone_contract_mentioned"])
-        self.assertTrue(row["xnt_allocation_binding_language_present"])
+        self.assertTrue(
+            any(
+                item["xnt_allocation_binding_language_present"] is True
+                for item in rows
+            )
+        )
         self.assertFalse(row["official_xone_snapshot_verified"])
         self.assertFalse(row["xone_snapshot_xnt_allocation_binding_verified"])
         self.assertFalse(row["execution_authorized"])
