@@ -144,15 +144,98 @@ def _supports_interface_calldata(interface_id: str = IBURN_REDEEMABLE_INTERFACE_
     return SUPPORTS_INTERFACE_SELECTOR + interface_id[2:] + ("0" * 56)
 
 
-def _artifact_runtime(artifact: Mapping[str, Any]) -> bytes:
+def _artifact_runtime_and_masks(
+    artifact: Mapping[str, Any],
+) -> tuple[bytes, list[tuple[int, int]]]:
+    """Decode an unlinked Hardhat artifact while preserving deployment masks."""
+
     if not isinstance(artifact, Mapping):
         raise MoonPartyDeploymentVerificationError("artifact must be a mapping")
     if _text(artifact.get("contractName")) != "MoonParty":
         raise MoonPartyDeploymentVerificationError("artifact contractName is not MoonParty")
-    return _hex_bytes(
-        artifact.get("deployedBytecode"),
-        field="MoonParty artifact deployedBytecode",
-    )
+
+    raw = _text(artifact.get("deployedBytecode"))
+    if not raw.startswith("0x"):
+        raise MoonPartyDeploymentVerificationError(
+            "MoonParty artifact deployedBytecode is not 0x-prefixed"
+        )
+    payload = raw[2:]
+    if len(payload) % 2:
+        raise MoonPartyDeploymentVerificationError(
+            "MoonParty artifact deployedBytecode has odd length"
+        )
+
+    masks: list[tuple[int, int]] = []
+    references = artifact.get("deployedLinkReferences") or {}
+    if not isinstance(references, Mapping):
+        raise MoonPartyDeploymentVerificationError(
+            "deployedLinkReferences must be an object"
+        )
+    chars = list(payload)
+    for libraries in references.values():
+        if not isinstance(libraries, Mapping):
+            raise MoonPartyDeploymentVerificationError(
+                "deployedLinkReferences library group must be an object"
+            )
+        for rows in libraries.values():
+            if not isinstance(rows, Sequence) or isinstance(
+                rows, (str, bytes, bytearray)
+            ):
+                raise MoonPartyDeploymentVerificationError(
+                    "deployedLinkReferences rows must be a sequence"
+                )
+            for row in rows:
+                if not isinstance(row, Mapping):
+                    raise MoonPartyDeploymentVerificationError(
+                        "deployedLinkReferences row must be an object"
+                    )
+                start = row.get("start")
+                length = row.get("length")
+                if (
+                    isinstance(start, bool)
+                    or isinstance(length, bool)
+                    or not isinstance(start, int)
+                    or not isinstance(length, int)
+                    or start < 0
+                    or length <= 0
+                    or start + length > len(payload) // 2
+                ):
+                    raise MoonPartyDeploymentVerificationError(
+                        "invalid deployedLinkReferences range"
+                    )
+                masks.append((start, start + length))
+                for index in range(start * 2, (start + length) * 2):
+                    chars[index] = "0"
+
+    # Hardhat artifacts may leave constructor immutable slots as zero-filled
+    # 32-byte words while the deployed runtime contains the constructor values.
+    # Treat only full zero words as deployment-specific masks. Candidate identity
+    # still requires exact length/metadata, all required selectors, successful
+    # direct ABI calls, exact XONE binding, and multi-RPC corroboration.
+    normalized = "".join(chars)
+    try:
+        decoded = bytes.fromhex(normalized)
+    except ValueError as exc:
+        raise MoonPartyDeploymentVerificationError(
+            "MoonParty artifact contains unresolved bytes outside declared link references"
+        ) from exc
+
+    zero_word = b"\x00" * 32
+    cursor = 0
+    while True:
+        position = decoded.find(zero_word, cursor)
+        if position < 0:
+            break
+        masks.append((position, position + 32))
+        cursor = position + 32
+
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(masks):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return decoded, merged
 
 
 def _metadata_trailer(code: bytes) -> bytes:
@@ -168,6 +251,7 @@ def _metadata_trailer(code: bytes) -> bytes:
 def _runtime_compatibility(
     runtime_code: bytes,
     artifact_runtime: bytes,
+    deployment_masks: Sequence[tuple[int, int]],
 ) -> dict[str, Any]:
     if not runtime_code:
         raise MoonPartyDeploymentVerificationError("candidate has no runtime bytecode")
@@ -182,6 +266,22 @@ def _runtime_compatibility(
     }
     selectors_present = all(selector_presence.values())
 
+    masked_match = False
+    compared_bytes = 0
+    if exact_length:
+        masked = bytearray(len(runtime_code))
+        for start, end in deployment_masks:
+            for index in range(start, min(end, len(masked))):
+                masked[index] = 1
+        masked_match = True
+        for index, (actual, expected) in enumerate(zip(runtime_code, artifact_runtime)):
+            if masked[index]:
+                continue
+            compared_bytes += 1
+            if actual != expected:
+                masked_match = False
+                break
+
     return {
         "candidate_runtime_bytes": len(runtime_code),
         "artifact_runtime_bytes": len(artifact_runtime),
@@ -189,12 +289,19 @@ def _runtime_compatibility(
         "compiler_metadata_trailer_matches": metadata_matches,
         "required_runtime_selector_presence": selector_presence,
         "required_runtime_selectors_present": selectors_present,
+        "masked_runtime_matches_pinned_artifact": masked_match,
+        "deployment_specific_mask_count": len(deployment_masks),
+        "compared_nonmasked_runtime_bytes": compared_bytes,
         "runtime_code_sha256": sha256(runtime_code).hexdigest(),
         "artifact_runtime_sha256_unlinked": sha256(artifact_runtime).hexdigest(),
         "runtime_bytecode_exact_equality_required": False,
-        "artifact_has_deployment_specific_link_or_immutable_regions": True,
+        "artifact_has_deployment_specific_link_or_immutable_regions":
+            bool(deployment_masks),
         "moonparty_runtime_compatible": (
-            exact_length and metadata_matches and selectors_present
+            exact_length
+            and metadata_matches
+            and selectors_present
+            and masked_match
         ),
     }
 
@@ -333,8 +440,12 @@ def verify_moonparty_deployment_candidate(
         field="candidate runtime bytecode",
         allow_empty=True,
     )
-    artifact_runtime = _artifact_runtime(artifact)
-    runtime = _runtime_compatibility(runtime_code, artifact_runtime)
+    artifact_runtime, deployment_masks = _artifact_runtime_and_masks(artifact)
+    runtime = _runtime_compatibility(
+        runtime_code,
+        artifact_runtime,
+        deployment_masks,
+    )
     if not runtime["moonparty_runtime_compatible"]:
         raise MoonPartyDeploymentVerificationError(
             "candidate runtime is not compatible with pinned MoonParty artifact"
