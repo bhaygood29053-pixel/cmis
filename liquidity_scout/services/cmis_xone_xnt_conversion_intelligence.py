@@ -7,7 +7,10 @@ from typing import Any, Optional
 
 from liquidity_scout.providers.ethereum import (
     CONTRACT_VERSION as ETHEREUM_XONE_IDENTITY_CONTRACT,
+    XONE_EVENT_OBSERVER_CONTRACT_VERSION,
+    corroborate_xone_event_observations,
     corroborate_xone_identity_proofs,
+    observe_xone_transfer_events,
     verify_xone_identity,
 )
 from liquidity_scout.providers.xone_xnt import (
@@ -29,7 +32,10 @@ def _truth_state() -> dict[str, Any]:
         "discovery_only": True,
         "web_claim_verified": False,
         "ethereum_xone_identity_verified": False,
+        "ethereum_event_window_verified": False,
         "ethereum_event_verified": False,
+        "xone_burn_verified": False,
+        "lock_or_migration_verified": False,
         "x1_event_verified": False,
         "cross_chain_correlation_verified": False,
         "freshness_verified": False,
@@ -176,6 +182,75 @@ class CMISXoneXntConversionIntelligenceService:
             **{
                 **_truth_state(),
                 "ethereum_xone_identity_verified": True,
+            },
+        }
+
+    def observe_ethereum_xone_events(
+        self,
+        *,
+        rpc_call: Any,
+        from_block: int | str,
+        to_block: int | str,
+        source_url: str | None = None,
+        max_blocks: int = 5000,
+        max_events: int = 2000,
+        enrich_recipient_code: bool = False,
+    ) -> dict[str, Any]:
+        """Verify exact XONE identity, then observe one bounded Transfer-log window."""
+
+        identity = verify_xone_identity(rpc_call=rpc_call, source_url=source_url)
+        observation = observe_xone_transfer_events(
+            rpc_call=rpc_call,
+            from_block=from_block,
+            to_block=to_block,
+            source_url=source_url,
+            max_blocks=max_blocks,
+            max_events=max_events,
+            enrich_recipient_code=enrich_recipient_code,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_identity_contract": ETHEREUM_XONE_IDENTITY_CONTRACT,
+            "ethereum_event_observer_contract": XONE_EVENT_OBSERVER_CONTRACT_VERSION,
+            "state": STATE,
+            "ethereum_identity": identity,
+            "ethereum_event_observation": observation,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
+                "ethereum_event_window_verified": True,
+                "ethereum_event_verified": observation["ethereum_event_verified"],
+                "xone_burn_verified": observation["xone_burn_verified"],
+            },
+        }
+
+    def corroborate_ethereum_xone_events(
+        self,
+        observations: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Corroborate one exact bounded XONE event window across RPC transports."""
+
+        corroboration = corroborate_xone_event_observations(observations)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_identity_contract": ETHEREUM_XONE_IDENTITY_CONTRACT,
+            "ethereum_event_observer_contract": XONE_EVENT_OBSERVER_CONTRACT_VERSION,
+            "state": STATE,
+            "ethereum_event_observation": corroboration,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
+                "ethereum_event_window_verified": True,
+                "ethereum_event_verified": corroboration["ethereum_event_verified"],
+                "xone_burn_verified": corroboration["xone_burn_verified"],
             },
         }
 
