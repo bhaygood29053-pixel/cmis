@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 12:01 America/New_York**.
+Current reconciliation: **2026-09-07 12:12 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,21 @@ Current reconciliation: **2026-09-07 12:01 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), #598 / PR #599 (MoonParty source semantics), and #601 / PR #602 (`moonparty_deployment_verification/v1`). The MoonParty source design directly links XONE participation/redemption to XNT-credit allocation accounting, but the bounded deployment run found 0 exact deployment-address candidates across 35 inspected pinned/current frontend documents. That is scoped corpus evidence only, not proof of non-deployment. MoonParty deployment identity/runtime/XONE binding, native-XNT equivalence, issuance/vesting, XONE-specific unlock applicability, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), and now #604 / PR #605 (`ethereum_xone_snapshot_registry/v1`). The **current primary target is the Ethereum XONE holder snapshot/registry**, not MoonParty. Snapshot Registry run #1 found 0 explicit XONE snapshot claims / 0 official candidates / 0 authoritative exact snapshot blocks across the accepted bounded public corpus. That does not disprove a private/unpublished snapshot. CMIS can now reconstruct and multi-RPC corroborate the full XONE holder ledger immediately once an authoritative exact block is identified. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### MoonParty Deployment Verification v1
+### Ethereum XONE Snapshot / Registry v1
+
+**ACCEPTED INTERNAL FOUNDATION.** Ethereum XONE Snapshot Registry run #1 passed deterministic and live bounded-source jobs at PR #605 head `d8dbb8bf8bc225517bd1637ceed98b00073107c6`; Liquidity Scout Tests run #1790 also passed. The live corpus had 8 available FairCrypto source/history targets, 4 available official X1 targets, and 13 available ranked X1 Report pages. It produced **0 explicit XONE snapshot/registry claims, 0 official snapshot candidates, and 0 authoritative exact snapshot-block candidates**. The evidence artifact digest is `sha256:49dcea6f8ce5d412a3e09fe59ef8e2f55591c05b72c29e515812a0bad2f5cc36`.
+
+Because no authoritative exact block was found, no live holder-ledger reconstruction was triggered. That is the correct fail-closed result: CMIS did not invent a snapshot date or use X1 launch/October 6/MoonParty/validator rules as a substitute. The accepted contract is ready to reconstruct canonical XONE balances from creation block `18,609,736` through a future authoritative snapshot block, cross-check historical `totalSupply()`, verify deterministic `balanceOf()` samples, compute a canonical registry SHA-256, and require two distinct Ethereum RPC transports to agree before official snapshot promotion.
+
+The live architecture analogue also confirmed that public `x1-labs/xenblocks-airdrop` contains ETH-address-keyed native-XNT airdrop machinery but **no XONE reference**, so it remains architecture evidence only and is not the XONE registry. `official_xone_snapshot_verified=false`, `official_registry_artifact_verified=false`, `xone_snapshot_eligibility_verified=false`, `xone_snapshot_xnt_allocation_binding_verified=false`, `xnt_issuance_verified=false`, `xnt_vesting_or_unlock_verified=false`, `october_6_unlock_applies_to_xone_verified=false`, `xone_xnt_conversion_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`. PR #605 merged as `ef6b52cb54c058bece72a8e04fb726997e9c1c00`; Issue #604 closed completed.
+
+**Current next gate:** snapshot provenance expansion — direct Jack/X1 historical posts or archives, XONE/X1 release artifacts, registry/CSV/JSON/IPFS references, Merkle roots, archived holder files and X1 allocation lists keyed by Ethereum addresses. MoonParty is not the current XONE/XNT priority.
+
+### Previous accepted live gate — MoonParty Deployment Verification v1
 
 **ACCEPTED BOUNDED FOUNDATION.** MoonParty Deployment Verification run #2 passed deterministic and live jobs at PR #602 head `b6396af0052a68f4bfe5db1dea099df2e333b000`; Liquidity Scout Tests run #1786 also passed. The live source gate retrieved 4/4 pinned FairCrypto sources, 6/6 current `xen.network` / `preview.xen.network` frontend targets, and 26/28 same-host JavaScript chunks. Across 35 inspected documents, the exact MoonParty candidate extractor produced 0 deployment-address candidates. The evidence artifact digest is `sha256:56198255749d41ddba7d5bb7f65eac874b4eddd3191737fd8adebd4888fc9a68`.
 
