@@ -51,6 +51,12 @@ from .x1_agents_radio import (
     X1AgentsRadioDiscoveryProvider,
     validate_x1_agents_radio_public_url,
 )
+from .x1_agents_radio_structured import (
+    STRUCTURED_CONTRACT as X1_AGENTS_RADIO_STRUCTURED_CONTRACT,
+    X1AgentsRadioStructuredDiscoveryError,
+    normalize_x1_agents_radio_payload,
+    parse_x1_agents_radio_url,
+)
 from .x1_docs import X1_DOCS_SOURCE, X1DocsDiscoveryProvider
 from .x1_explorer import X1_EXPLORER_SOURCE, X1ExplorerDiscoveryProvider
 from .x1_explorer_browser_capture import (
@@ -178,7 +184,11 @@ __all__ = [
     "X1_AGENTS_RADIO_LEGACY_HOST",
     "X1_AGENTS_RADIO_PUBLIC_DISCOVERY_PATHS",
     "X1_AGENTS_RADIO_SOURCE",
+    "X1_AGENTS_RADIO_STRUCTURED_CONTRACT",
     "X1AgentsRadioDiscoveryProvider",
+    "X1AgentsRadioStructuredDiscoveryError",
+    "normalize_x1_agents_radio_payload",
+    "parse_x1_agents_radio_url",
     "validate_x1_agents_radio_public_url",
     "X1_DOCS_SOURCE",
     "X1_EXPLORER_SOURCE",
