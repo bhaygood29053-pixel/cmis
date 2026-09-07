@@ -65,6 +65,18 @@ The provider module hashes:
 
 A newly discovered route is retained as evidence but remains `unqualified` until explicitly accepted. Discovery cannot silently expand CMIS authority.
 
+## Cross-source reconciliation
+
+Issue #563 adds the internal `fortiblox_cross_source_reconciliation/v1` contract.
+
+It can compare one normalized FortiBlox token row against exact-mint XDEX, X1.Ninja, and accepted CMIS reference observations. Price agreement uses the accepted 0.5% current-price tolerance family, but FortiBlox `updatedAt` is not treated as exact per-field fact time. Exact 24h volume comparison remains disabled unless separate evidence proves FortiBlox's rolling-window and scope semantics.
+
+The reconciler preserves provider overlap. In particular, when a FortiBlox token row lists XDEX in its own `sources`, FortiBlox↔XDEX agreement is not source-independence evidence.
+
+Material disagreement is returned explicitly; values are never averaged and a provider winner is never inferred. An already verified CMIS reference remains authoritative without transferring that authority to FortiBlox.
+
+See `docs/FORTIBLOX_CROSS_SOURCE_RECONCILIATION_V1.md`.
+
 ## Explicit execution block
 
 The following remain blocked by policy:

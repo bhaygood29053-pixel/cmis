@@ -17,6 +17,17 @@ from .agents_radio import (
 from .canonical_pool_vault_coupling import prove_canonical_pool_vault_coupling
 from .cross_pool_trusted_semantics import qualify_cross_pool_trusted_semantics
 from .exact_pool_leg_semantics_v14104 import prove_exact_pool_leg_semantics
+from .fortiblox_cross_source_reconciliation import (
+    AGREE as FORTIBLOX_RECONCILIATION_AGREE,
+    CONTRACT_VERSION as FORTIBLOX_CROSS_SOURCE_RECONCILIATION_CONTRACT,
+    DISAGREE as FORTIBLOX_RECONCILIATION_DISAGREE,
+    EVIDENCE_INCOMPLETE as FORTIBLOX_RECONCILIATION_EVIDENCE_INCOMPLETE,
+    NOT_COMPARABLE as FORTIBLOX_RECONCILIATION_NOT_COMPARABLE,
+    SCOPE_MISMATCH as FORTIBLOX_RECONCILIATION_SCOPE_MISMATCH,
+    FortiBloxCrossSourceReconciliationError,
+    accepted_fortiblox_token_field_evidence,
+    reconcile_fortiblox_cross_source,
+)
 from .fortiswap import (
     FORTISWAP_BASE_URL,
     FORTISWAP_DISCOVERY_PATH,
@@ -211,6 +222,15 @@ from .xdex import (
 )
 
 __all__ = [
+    "FORTIBLOX_CROSS_SOURCE_RECONCILIATION_CONTRACT",
+    "FORTIBLOX_RECONCILIATION_AGREE",
+    "FORTIBLOX_RECONCILIATION_DISAGREE",
+    "FORTIBLOX_RECONCILIATION_EVIDENCE_INCOMPLETE",
+    "FORTIBLOX_RECONCILIATION_NOT_COMPARABLE",
+    "FORTIBLOX_RECONCILIATION_SCOPE_MISMATCH",
+    "FortiBloxCrossSourceReconciliationError",
+    "accepted_fortiblox_token_field_evidence",
+    "reconcile_fortiblox_cross_source",
     "X1_AGENTS_RADIO_BASE_URL",
     "X1_AGENTS_RADIO_SOURCE",
     "X1AgentsRadioAPIError",
