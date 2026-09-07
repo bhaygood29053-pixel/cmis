@@ -1,6 +1,6 @@
 # Ethereum XONE Event Observer v1
 
-Status: **IMPLEMENTATION FOR ISSUE #583 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE MULTI-RPC GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #583 / PR #584. Ethereum XONE Event Observer run #1 passed deterministic and live multi-RPC jobs at head `742d83edee9986765e51a42fd285d23452b4bccb`, Liquidity Scout Tests run #1757 passed, and PR #584 merged as `3d344acd3964df77e3161abab6c1415659a50b4c`. The live creation-block window contained one canonical XONE mint event and no burn event.
 
 Contract:
 
@@ -88,7 +88,7 @@ Larger histories must be paginated. A zero-event result means only that no match
 
 ## Multi-RPC corroboration
 
-Live acceptance requires at least two distinct public Ethereum RPC transport hosts to agree on:
+Accepted live run #1 satisfied the required quorum with matching direct Ethereum observations. The acceptance rule requires at least two distinct public Ethereum RPC transport hosts to agree on:
 
 - exact block window;
 - event identities;
@@ -113,6 +113,19 @@ The handoff may elevate:
 
 It may not elevate any X1-side or cross-chain conclusion.
 
-## Next slice after acceptance
+## Accepted live creation event
 
-After this observer is accepted, the next XONE/XNT slice is to identify and verify any exact Ethereum recipient contract/address that is actually documented or on-chain-proven to be a XONE lock/migration/conversion sink. Only then may CMIS distinguish an ordinary contract transfer from an actual migration deposit.
+The creation-block window at block `18,609,736` (`0x11bf648`) produced one canonical `mint` event:
+
+- transaction: `0x6d2f0492d54b56044f03a3de5ad1889b6fe115914e9bcfc58e28950ddda6eea5`;
+- from: zero address;
+- to: `0xc73fc08c931efe3fce850c09278472e8a81c2e05`;
+- amount: `500,000,000 XONE`;
+- block timestamp: `1700443835` (2023-11-20 01:30:35 UTC);
+- burn count in that exact one-block window: `0`.
+
+This proves that exact creation event only. It does not prove lifetime supply, current circulating supply, any later burn total, or any XONE→XNT conversion rule.
+
+## Next slice
+
+The next XONE/XNT slice is to identify and verify any exact Ethereum recipient contract/address that is actually documented or on-chain-proven to be a XONE lock/migration/conversion sink. Only then may CMIS distinguish an ordinary contract transfer from an actual migration deposit.
