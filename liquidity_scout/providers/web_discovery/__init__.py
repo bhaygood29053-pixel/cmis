@@ -16,6 +16,20 @@ from .base import (
     WebDiscoverySource,
 )
 from .fortiblox import FORTIBLOX_APP_SOURCE, FortiBloxAppWebDiscoveryProvider
+from .fortiblox_browser_capture import (
+    BROWSER_CAPTURE_CONTRACT as FORTIBLOX_BROWSER_CAPTURE_CONTRACT,
+    DEFAULT_DWELL_SECONDS as FORTIBLOX_BROWSER_DEFAULT_DWELL_SECONDS,
+    DEFAULT_MAX_NETWORK_EVENTS as FORTIBLOX_BROWSER_DEFAULT_MAX_NETWORK_EVENTS,
+    DEFAULT_NAVIGATION_TIMEOUT_MS as FORTIBLOX_BROWSER_DEFAULT_NAVIGATION_TIMEOUT_MS,
+    capture_fortiblox_page_network,
+)
+from .fortiblox_network import (
+    ALLOWED_TARGET_HOSTS as FORTIBLOX_NETWORK_ALLOWED_TARGET_HOSTS,
+    NETWORK_OBSERVATION_CONTRACT as FORTIBLOX_NETWORK_OBSERVATION_CONTRACT,
+    PUBLIC_DISCOVERY_ROUTES as FORTIBLOX_PUBLIC_DISCOVERY_ROUTES,
+    classify_fortiblox_network_route,
+    list_fortiblox_network_observations,
+)
 from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider
 from .registry import build_provider, provider_catalog, provider_ids
 from .x1_docs import X1_DOCS_SOURCE, X1DocsDiscoveryProvider
@@ -114,7 +128,17 @@ __all__ = [
     "CONTRACT",
     "DISCOVERED",
     "FORTIBLOX_APP_SOURCE",
+    "FORTIBLOX_BROWSER_CAPTURE_CONTRACT",
+    "FORTIBLOX_BROWSER_DEFAULT_DWELL_SECONDS",
+    "FORTIBLOX_BROWSER_DEFAULT_MAX_NETWORK_EVENTS",
+    "FORTIBLOX_BROWSER_DEFAULT_NAVIGATION_TIMEOUT_MS",
+    "FORTIBLOX_NETWORK_ALLOWED_TARGET_HOSTS",
+    "FORTIBLOX_NETWORK_OBSERVATION_CONTRACT",
+    "FORTIBLOX_PUBLIC_DISCOVERY_ROUTES",
     "FortiBloxAppWebDiscoveryProvider",
+    "capture_fortiblox_page_network",
+    "classify_fortiblox_network_route",
+    "list_fortiblox_network_observations",
     "GITHUB_WEB_SOURCE",
     "GitHubWebDiscoveryProvider",
     "SourceBoundaryError",
