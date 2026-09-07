@@ -1,6 +1,6 @@
 # XONE/XNT X1 Binding Discovery v1
 
-Status: **IMPLEMENTATION FOR ISSUE #595 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE BOUNDED-CORPUS GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #595 / PR #596. XONE XNT X1 Binding Discovery run #4 passed deterministic and live bounded-corpus jobs at head `e84299c709da2ab3fbae27304eb039c0ef8e1813`, Liquidity Scout Tests run #1777 passed, and PR #596 merged as `e85a944b21aaf45cfceb428641ad5cbeb32b7e5e`.
 
 Contract:
 
@@ -59,13 +59,28 @@ The acceptance workflow inspects a bounded corpus containing:
 
 At least two official X1 pages, including the rewards page, and at least one X1 Report ranked page must be available for the live source gate.
 
-## Valid zero-candidate result
+## Accepted live result
 
-A live PASS may legitimately return:
+Run #4 completed the bounded corpus with:
+
+- **4/4 official X1 targets available**: X1 official site, X1 Docs root, the incentivized-testnet-rewards page, and the X1 developer surface;
+- **13/13 ranked X1 Report pages available**;
+- **0 bounded explicit XONE/XNT conversion claims** produced by the dedicated extractor;
+- therefore **0 exact X1/SVM binding candidates** and **0 history qualifications**.
+
+The evidence artifact digest is `sha256:9fda946ffc0155dcf64f399a4dffc26fb35662493935e00f83c81f4e838e751b`.
+
+The accepted result is:
 
 ```text
 candidate_count = 0
+x1_binding_candidate_discovery_verified = true
 x1_binding_identified = false
+xnt_issuance_verified = false
+xnt_vesting_or_unlock_verified = false
+xone_xnt_conversion_verified = false
+cross_chain_correlation_verified = false
+execution_authorized = false
 ```
 
 This means only that the **bounded inspected corpus** did not expose an exact X1/SVM account or program inside an explicit XONE/XNT binding statement.
@@ -92,6 +107,6 @@ execution_authorized = false
 
 A later contract must bind an exact candidate to authoritative XONE→XNT semantics before any of those fields can change.
 
-## Next slice after acceptance
+## Next slice
 
-If this bounded corpus yields no exact X1 binding, broaden only to additional authoritative/public XONE sources that can be provenance-qualified, plus exact X1 chain-history pivots derived from a verified candidate. Do not scan arbitrary X1 addresses or promote wallet activity by pattern matching alone.
+Broaden only to additional authoritative/public XONE sources that can be provenance-qualified, especially original XONE project specifications, migration notices, founder/operator publications, and source-linked contract/program references. Exact X1 history may be pivoted only from identifiers discovered in those sources. Do not scan arbitrary X1 addresses or promote wallet activity by pattern matching alone.

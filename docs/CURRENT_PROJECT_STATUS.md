@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 10:54 America/New_York**.
+Current reconciliation: **2026-09-07 11:19 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,17 @@ Current reconciliation: **2026-09-07 10:54 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), and #592 / PR #593 (`x1_xnt_distribution_mechanism_discovery/v1`). The latest X1-side live gate parsed 17 bounded official XNT mechanism claims, confirmed the source's current 50,000 credits = 1 XNT / 10% / 90% / 365-day reward-lock wording, and found 0 exact X1 pubkey candidates on that page. Exact XONE→XNT account/program role binding, XNT issuance provenance, XONE-specific vesting/claim events, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), and #595 / PR #596 (`xone_xnt_x1_binding_discovery/v1`). Binding Discovery run #4 had 4/4 official X1 targets and 13/13 ranked X1 Report pages available but produced 0 explicit XONE/XNT conversion claims / 0 exact X1 binding candidates. That is scoped corpus evidence only, not proof of converter absence. Exact XONE→XNT account/program role binding, XNT issuance provenance, XONE-specific vesting/claim events, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### X1 XNT Distribution / Vesting Mechanism Discovery v1
+### XONE/XNT X1 Binding Discovery v1
+
+**ACCEPTED.** XONE XNT X1 Binding Discovery run #4 passed deterministic and live bounded-corpus jobs at PR #596 head `e84299c709da2ab3fbae27304eb039c0ef8e1813`; Liquidity Scout Tests run #1777 also passed. The live source gate had 4/4 official X1 targets available — X1 official, X1 Docs root, incentivized-testnet-rewards, and the X1 developer surface — plus 13/13 ranked X1 Report pages. The dedicated extractor produced 0 bounded explicit XONE/XNT conversion claims and therefore 0 exact X1/SVM binding candidates. The evidence artifact digest is `sha256:9fda946ffc0155dcf64f399a4dffc26fb35662493935e00f83c81f4e838e751b`.
+
+The accepted interpretation is strictly scoped: this corpus did not expose an exact X1 account/program inside an explicit XONE/XNT binding statement. It does not prove no converter, claim program, allocation account, vesting account, or migration mechanism exists elsewhere. `x1_binding_identified=false`, `xnt_distribution_mechanism_identified=false`, `xnt_issuance_verified=false`, `xnt_vesting_or_unlock_verified=false`, `xone_xnt_conversion_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`. PR #596 merged as `e85a944b21aaf45cfceb428641ad5cbeb32b7e5e`; Issue #595 closed completed.
+
+### Previous accepted live gate — X1 XNT Distribution / Vesting Mechanism Discovery v1
 
 **ACCEPTED.** X1 XNT Distribution Mechanism Discovery run #1 passed deterministic and live official-source jobs at PR #593 head `34b3e7ac9d9d9370b38575c3a47883e351c2c5e9`; Liquidity Scout Tests run #1770 also passed. The official X1 incentivized-testnet-rewards page was retrieved as `text/markdown` and produced 17 bounded XNT mechanism claims. The live gate confirmed the current source wording around `50,000 credits = 1 XNT`, `10%`, `90%`, and `365 days` and found 0 exact 32-byte X1/SVM pubkey candidates. The evidence artifact digest is `sha256:bba687ec9235fee723c8fc945fe46f5f02e71a816418371f30630699c4c9957d`.
 
