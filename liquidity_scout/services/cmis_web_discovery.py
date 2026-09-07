@@ -31,6 +31,8 @@ from liquidity_scout.providers.web_discovery import (
     parse_x1_ninja_url,
     x1_ninja_network_api_gap_inventory,
     x1_ninja_semantic_coverage_reconciliation,
+    normalize_x1_agents_radio_payload,
+    parse_x1_agents_radio_url,
 )
 
 
@@ -242,6 +244,38 @@ class CMISWebDiscoveryService:
             "request_replay_authorized": False,
             "background_monitoring_authorized": False,
             "payment_authorized": False,
+            **_service_truth_state(),
+        }
+
+    def discover_x1_agents_radio_structured(
+        self,
+        url: str,
+        *,
+        payload: Any | None = None,
+        max_records: int = 100,
+    ) -> dict[str, Any]:
+        endpoint = parse_x1_agents_radio_url(url)
+        structured_payload = (
+            None
+            if payload is None
+            else normalize_x1_agents_radio_payload(
+                url,
+                payload,
+                max_records=max_records,
+            )
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "state": STATE,
+            "source_id": "x1_agents_radio",
+            "structured_endpoint": endpoint,
+            "structured_payload": structured_payload,
+            "read_only": True,
+            "authentication_authorized": False,
+            "subscription_authorized": False,
+            "webhook_registration_authorized": False,
+            "request_signing_authorized": False,
             **_service_truth_state(),
         }
 
