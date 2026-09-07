@@ -19,10 +19,13 @@ from liquidity_scout.providers.ethereum import (
     verify_xone_identity,
 )
 from liquidity_scout.providers.xone_xnt import (
+    CANDIDATE_DISCOVERY_CONTRACT_VERSION,
     SCRAPER_CONTRACT,
+    discover_conversion_candidates,
     XoneXntConversionScraper,
     extract_xone_xnt_claims,
     group_claims_for_review,
+    qualify_conversion_candidate,
     source_catalog,
 )
 
@@ -42,8 +45,12 @@ def _truth_state() -> dict[str, Any]:
         "xone_burn_verified": False,
         "xone_burn_accounting_surface_verified": False,
         "burn_redeemer_interface_verified": False,
+        "conversion_candidate_discovery_verified": False,
         "migration_sink_identified": False,
         "lock_or_migration_verified": False,
+        "xone_xnt_conversion_verified": False,
+        "xnt_issuance_verified": False,
+        "xnt_vesting_or_unlock_verified": False,
         "x1_event_verified": False,
         "cross_chain_correlation_verified": False,
         "freshness_verified": False,
@@ -352,6 +359,66 @@ class CMISXoneXntConversionIntelligenceService:
                 **_truth_state(),
                 "ethereum_xone_identity_verified": True,
                 "xone_burn_accounting_surface_verified": True,
+            },
+        }
+
+    def discover_xone_xnt_conversion_candidates(
+        self,
+        claims: Sequence[Mapping[str, Any]],
+        *,
+        max_candidates: int = 50,
+    ) -> dict[str, Any]:
+        """Create exact-address review candidates from bounded XONE/XNT claims."""
+
+        discovery = discover_conversion_candidates(
+            claims,
+            max_candidates=max_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "candidate_discovery_contract":
+                CANDIDATE_DISCOVERY_CONTRACT_VERSION,
+            "state": STATE,
+            "candidate_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "conversion_candidate_discovery_verified": True,
+            },
+        }
+
+    def qualify_xone_xnt_conversion_candidate(
+        self,
+        candidate: Mapping[str, Any],
+        *,
+        rpc_call: Any,
+        source_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Qualify one discovered Ethereum address without migration promotion."""
+
+        qualification = qualify_conversion_candidate(
+            candidate,
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "candidate_discovery_contract":
+                CANDIDATE_DISCOVERY_CONTRACT_VERSION,
+            "state": STATE,
+            "candidate_qualification": qualification,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "conversion_candidate_discovery_verified": True,
+                "burn_redeemer_interface_verified":
+                    qualification.get("burn_redeemer_interface_verified") is True,
             },
         }
 

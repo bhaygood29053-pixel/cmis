@@ -1,0 +1,133 @@
+name: XONE XNT Conversion Candidate Discovery
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/providers/ethereum/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_xnt_conversion_candidate_discovery.py'
+      - 'scripts/discover_xone_xnt_conversion_candidates.py'
+      - 'docs/XONE_XNT_CONVERSION_CANDIDATE_DISCOVERY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-xnt-conversion-candidate-discovery.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/providers/ethereum/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_xnt_conversion_candidate_discovery.py'
+      - 'scripts/discover_xone_xnt_conversion_candidates.py'
+      - 'docs/XONE_XNT_CONVERSION_CANDIDATE_DISCOVERY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-xnt-conversion-candidate-discovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test XONE/XNT conversion candidate discovery
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_conversion_candidate_discovery.py
+      - name: Re-run dedicated XONE/XNT scraper boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_conversion_scraper.py
+      - name: Re-run XONE migration semantics boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_migration_sink_semantics.py
+      - name: Re-run XONE event observer boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_event_observer.py
+
+  live-candidate-discovery:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Discover and qualify bounded live XONE/XNT candidates
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/discover_xone_xnt_conversion_candidates.py \
+            --source-id x1report \
+            --max-urls 30 \
+            --max-claims-per-url 25 \
+            --max-candidates 10 \
+            --rpc https://gateway.tenderly.co/public/mainnet \
+            --rpc https://eth-mainnet.public.blastapi.io \
+            --rpc https://eth.drpc.org \
+            --rpc https://public.1rpc.io/eth \
+            | tee evidence/xone-xnt-conversion-candidate-discovery.json
+
+          python - <<'PY'
+          import json
+
+          data = json.load(open("evidence/xone-xnt-conversion-candidate-discovery.json"))
+          assert data["status"] == "PASS"
+          assert data["contract_version"] == "xone_xnt_conversion_candidate_discovery/v1"
+          discovery = data["candidate_discovery"]
+          assert discovery["contract_version"] == data["contract_version"]
+          assert discovery["candidate_count"] <= 10
+          assert data["technical_disagreements"] == []
+          assert data["migration_sink_identified"] is False
+          assert data["xone_xnt_conversion_verified"] is False
+          assert data["xnt_issuance_verified"] is False
+          assert data["cross_chain_correlation_verified"] is False
+          assert data["public_service_promoted"] is False
+          assert data["scout_reliance_promoted"] is False
+          assert data["execution_authorized"] is False
+
+          for candidate in discovery["candidates"]:
+              assert candidate["candidate_role_verified"] is False
+              assert candidate["migration_sink_identified"] is False
+              assert candidate["xone_xnt_conversion_verified"] is False
+              assert candidate["execution_authorized"] is False
+
+          for qualified in data["candidate_qualifications"]:
+              assert qualified["migration_sink_identified"] is False
+              assert qualified["xone_xnt_conversion_verified"] is False
+              assert qualified["execution_authorized"] is False
+
+          print(
+              "XONE_XNT_CONVERSION_CANDIDATE_DISCOVERY=PASS "
+              f"claims={data['candidate_claim_count']} "
+              f"candidates={discovery['candidate_count']}"
+          )
+          print("MIGRATION_SINK_IDENTIFIED=FALSE")
+          print("XONE_XNT_CONVERSION_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xone-xnt-conversion-candidate-discovery-evidence
+          path: evidence/xone-xnt-conversion-candidate-discovery.json
+          if-no-files-found: error
