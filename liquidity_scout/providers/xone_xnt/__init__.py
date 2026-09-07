@@ -1,5 +1,15 @@
 """Dedicated XONE/XNT conversion evidence providers."""
 
+from .allocation_source_provenance import (
+    CONTRACT_VERSION as XONE_XNT_ALLOCATION_SOURCE_PROVENANCE_CONTRACT_VERSION,
+    SOURCE_CLASSES as XONE_XNT_ALLOCATION_SOURCE_CLASSES,
+    XONE_CONTRACT as XONE_XNT_ALLOCATION_SOURCE_XONE_CONTRACT,
+    XoneXntAllocationSourceProvenanceError,
+    extract_allocation_source_provenance,
+    normalize_source_url as normalize_allocation_source_url,
+    provenance_path_score,
+    summarize_allocation_source_provenance,
+)
 from .candidate_discovery import (
     CONTRACT_VERSION as CANDIDATE_DISCOVERY_CONTRACT_VERSION,
     DISCOVERED as CANDIDATE_DISCOVERED,
@@ -123,6 +133,14 @@ from .scraper import (
 )
 
 __all__ = [
+    "XONE_XNT_ALLOCATION_SOURCE_PROVENANCE_CONTRACT_VERSION",
+    "XONE_XNT_ALLOCATION_SOURCE_CLASSES",
+    "XONE_XNT_ALLOCATION_SOURCE_XONE_CONTRACT",
+    "XoneXntAllocationSourceProvenanceError",
+    "extract_allocation_source_provenance",
+    "normalize_allocation_source_url",
+    "provenance_path_score",
+    "summarize_allocation_source_provenance",
     "XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_CONTRACT_VERSION",
     "XONE_SNAPSHOT_ARCHIVED_ASSET_GRAPH_MAX_DEPTH",
     "TRAVERSABLE_ASSET_KINDS",
