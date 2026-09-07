@@ -21,7 +21,7 @@ Contracts:
 
 X1 Report also has a registered bounded sitemap entrypoint at `https://x1report.com/sitemap.xml`. Sitemap ranking prioritizes XONE explicitly, then XNT, conversion, migration, vesting, unlock, lockup, investor, snapshot, claim, burn, Jack Levin and October 6 references.
 
-The source registry remains intentionally narrow. The exact Ethereum mainnet XONE identity is accepted separately under `ethereum_xone_identity/v1` as `0x4DCDa2274899d9BbA3Bb6f5A852C107Dd6E4fE1c`, and bounded canonical ERC-20 event observation is accepted under `ethereum_xone_event_observer/v1`. These direct Ethereum proofs do not turn web conversion statements into verified migration facts.
+The source registry remains intentionally narrow. The exact Ethereum mainnet XONE identity is accepted under `ethereum_xone_identity/v1`, bounded canonical ERC-20 event observation is accepted under `ethereum_xone_event_observer/v1`, and the XONE burn/redeemer mechanism foundation is accepted under `ethereum_xone_migration_sink_semantics/v1`. The burn semantics proof establishes that a future converter may use an `IBurnRedeemable` callback model and that a simple transfer sink is not required by the verified burn design. None of these Ethereum-side proofs turns web conversion statements into verified XONE→XNT migration facts.
 
 ## Candidate topics
 
@@ -106,8 +106,9 @@ PYTHONPATH=. python scripts/scrape_xone_xnt_conversion.py \
 
 1. **COMPLETE:** exact Ethereum XONE ERC-20 identity accepted under `ethereum_xone_identity/v1` via #580 / PR #581;
 2. **COMPLETE:** bounded canonical Ethereum XONE event observer accepted under `ethereum_xone_event_observer/v1` via #583 / PR #584;
-3. identify and verify any exact Ethereum XONE lock/migration/conversion sink address or contract semantics;
-4. identify any X1-side XNT migration/distribution/vesting program or accounts;
-5. add deterministic Ethereum -> X1 correlation only after both exact sides are verified;
-6. add persistent claim-ledger storage and supersession metadata;
-7. only then consider any public CMIS or X1 Scout promotion.
+3. **COMPLETE:** XONE burn/redeemer and migration-sink semantic foundation accepted under `ethereum_xone_migration_sink_semantics/v1` via #586 / PR #587; burn accounting is verified, but no migration sink is identified;
+4. discover exact Ethereum candidate contract/address references associated with XONE→XNT conversion language, then test each candidate for code, `IBurnRedeemable` compatibility, and direct XONE relationship without promotion;
+5. identify and verify the exact X1-side XNT migration/distribution/vesting/claim program or accounts;
+6. add deterministic Ethereum -> X1 correlation only after both exact sides are independently verified;
+7. add persistent claim-ledger storage and supersession metadata;
+8. only then consider any public CMIS or X1 Scout promotion.
