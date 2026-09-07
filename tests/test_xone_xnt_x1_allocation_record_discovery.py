@@ -89,6 +89,48 @@ class X1AllocationRecordDiscoveryTests(unittest.TestCase):
         self.assertFalse(row["xnt_issuance_verified"])
         self.assertFalse(row["execution_authorized"])
 
+    def test_xone_contract_address_is_identity_metadata_not_holder_key(self):
+        text = (
+            f"XONE XNT allocation registry contract "
+            f"{XONE_XNT_X1_ALLOCATION_RECORD_XONE_CONTRACT}; "
+            f"holder {ETH} maps to X1 {X1}; amount 100 XNT."
+        )
+        records = extract_x1_allocation_records(
+            text,
+            source_id="x1_official_xone_allocation",
+            source_role="official_x1_web",
+            url="https://x1.xyz/xone-allocation",
+            observed_at=100.0,
+        )
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["ethereum_address"], ETH)
+        self.assertNotEqual(
+            records[0]["ethereum_address"],
+            XONE_XNT_X1_ALLOCATION_RECORD_XONE_CONTRACT.casefold(),
+        )
+
+    def test_equivalent_text_and_structured_amounts_do_not_conflict(self):
+        payload = {
+            "type": "XONE allocation",
+            "contract": XONE_XNT_X1_ALLOCATION_RECORD_XONE_CONTRACT,
+            "ethereumAddress": ETH,
+            "x1Pubkey": X1,
+            "allocationAmount": "100",
+            "note": "100 XNT",
+        }
+        records = extract_x1_allocation_records(
+            json.dumps(payload),
+            source_id="faircrypto_x1_app_file",
+            source_role="faircrypto_x1_app_primary",
+            url=URL,
+            observed_at=100.0,
+            path="data/xone-allocations.json",
+        )
+        summary = summarize_x1_allocation_records(records)
+        self.assertEqual(summary["candidate_count"], 1)
+        self.assertEqual(summary["amount_conflict_candidate_count"], 0)
+        self.assertFalse(summary["candidates"][0]["amount_conflict"])
+
     def test_rejects_generic_cross_chain_address_pair_without_xone(self):
         payload = {
             "type": "generic allocation registry",
