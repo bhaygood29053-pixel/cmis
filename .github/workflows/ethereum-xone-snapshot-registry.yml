@@ -1,0 +1,165 @@
+name: Ethereum XONE Snapshot Registry
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/ethereum/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_ethereum_xone_snapshot_registry.py'
+      - 'scripts/discover_ethereum_xone_snapshot_registry.py'
+      - 'docs/ETHEREUM_XONE_SNAPSHOT_REGISTRY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/ethereum-xone-snapshot-registry.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'liquidity_scout/providers/ethereum/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_ethereum_xone_snapshot_registry.py'
+      - 'scripts/discover_ethereum_xone_snapshot_registry.py'
+      - 'docs/ETHEREUM_XONE_SNAPSHOT_REGISTRY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/ethereum-xone-snapshot-registry.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test Ethereum XONE snapshot registry contract
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_snapshot_registry.py
+      - name: Re-run exact XONE identity boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_identity.py
+      - name: Re-run canonical XONE event boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_event_observer.py
+      - name: Re-run XONE/XNT scraper boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_conversion_scraper.py
+
+  live-snapshot-discovery:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Discover authoritative XONE snapshot / registry evidence
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/discover_ethereum_xone_snapshot_registry.py             --x1report-max-urls 30             --log-chunk-blocks 50000             --balance-sample-size 25             | tee evidence/ethereum-xone-snapshot-registry.json
+
+          python - <<'PY'
+          import json
+
+          path = "evidence/ethereum-xone-snapshot-registry.json"
+          data = json.load(open(path))
+
+          assert data["status"] == "PASS"
+          assert data["contract_version"] == "ethereum_xone_snapshot_registry/v1"
+          assert data["source_gate_passed"] is True
+          assert data["source_corpus"]["faircrypto_available_count"] >= 4
+          assert data["source_corpus"]["official_x1_available_count"] >= 2
+          assert data["source_corpus"]["x1report"]["available"] is True
+          assert data["source_corpus"]["x1report"]["pages_available"] > 0
+
+          analogue = data["architecture_analogue"]
+          assert analogue["available_count"] >= 2
+          assert analogue["architectural_analogue_only"] is True
+          assert analogue["xone_snapshot_or_registry_binding_verified"] is False
+          assert analogue["xone_reference_present"] is False
+          assert analogue["ethereum_address_keying_present"] is True
+          assert analogue["native_xnt_airdrop_present"] is True
+
+          discovery = data["snapshot_discovery"]
+          assert discovery["official_xone_snapshot_verified"] is False
+          assert discovery["official_registry_artifact_verified"] is False
+          assert discovery["xone_snapshot_xnt_allocation_binding_verified"] is False
+          assert discovery["zero_candidates_do_not_prove_no_private_snapshot"] is True
+
+          blocks = discovery["authoritative_exact_block_candidates"]
+          if blocks:
+              assert data[
+                  "reconstruction_required_by_authoritative_exact_block"
+              ] is True
+              assert data["reconstruction_gate_passed"] is True
+              assert len(blocks) == 1
+              assert discovery["authoritative_block_conflict"] is False
+              reconstruction = data["reconstruction"]
+              assert reconstruction["attempted"] is True
+              assert reconstruction["official_snapshot"] is not None
+              assert reconstruction["corroboration"]["multi_rpc_corroborated"] is True
+              assert data["official_xone_snapshot_verified"] is True
+          else:
+              assert data[
+                  "reconstruction_required_by_authoritative_exact_block"
+              ] is False
+              assert data["reconstruction_gate_passed"] is True
+              assert data["official_xone_snapshot_verified"] is False
+              if discovery["official_snapshot_candidate_count"] == 0:
+                  assert data[
+                      "zero_official_candidates_are_scoped_corpus_evidence_only"
+                  ] is True
+
+          assert data["official_registry_artifact_verified"] is False
+          assert data["xone_snapshot_eligibility_verified"] is False
+          assert data["xone_snapshot_xnt_allocation_binding_verified"] is False
+          assert data["xnt_issuance_verified"] is False
+          assert data["xnt_vesting_or_unlock_verified"] is False
+          assert data["october_6_unlock_applies_to_xone_verified"] is False
+          assert data["xone_xnt_conversion_verified"] is False
+          assert data["cross_chain_correlation_verified"] is False
+          assert data["private_or_unpublished_snapshot_absence_proven"] is False
+          assert data["public_service_promoted"] is False
+          assert data["scout_reliance_promoted"] is False
+          assert data["execution_authorized"] is False
+
+          print(f"SNAPSHOT_CLAIMS={data['snapshot_claim_count']}")
+          print(
+              "OFFICIAL_SNAPSHOT_CANDIDATES="
+              f"{discovery['official_snapshot_candidate_count']}"
+          )
+          print(
+              "AUTHORITATIVE_EXACT_BLOCK_CANDIDATES="
+              f"{len(discovery['authoritative_exact_block_candidates'])}"
+          )
+          print(
+              "OFFICIAL_XONE_SNAPSHOT_VERIFIED="
+              f"{str(data['official_xone_snapshot_verified']).upper()}"
+          )
+          print("XONE_SNAPSHOT_XNT_ALLOCATION_BINDING_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ethereum-xone-snapshot-registry-evidence
+          path: evidence/ethereum-xone-snapshot-registry.json
+          if-no-files-found: error

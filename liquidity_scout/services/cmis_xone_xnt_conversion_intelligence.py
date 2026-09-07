@@ -9,11 +9,17 @@ from liquidity_scout.providers.ethereum import (
     CONTRACT_VERSION as ETHEREUM_XONE_IDENTITY_CONTRACT,
     XONE_EVENT_OBSERVER_CONTRACT_VERSION,
     XONE_MIGRATION_SINK_SEMANTICS_CONTRACT_VERSION,
+    XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
     classify_migration_candidate,
     corroborate_xone_burn_surface,
     corroborate_xone_event_observations,
     corroborate_xone_identity_proofs,
     observe_xone_transfer_events,
+    corroborate_xone_registry_proofs,
+    discover_official_snapshot_candidates,
+    extract_xone_snapshot_claims,
+    fetch_and_verify_xone_registry,
+    promote_official_snapshot,
     verify_burn_redeemer_candidate,
     verify_xone_burn_surface,
     verify_xone_identity,
@@ -57,6 +63,12 @@ def _truth_state() -> dict[str, Any]:
         "ethereum_event_verified": False,
         "xone_burn_verified": False,
         "xone_burn_accounting_surface_verified": False,
+        "xone_snapshot_source_discovery_verified": False,
+        "reconstructed_xone_registry_verified": False,
+        "official_xone_snapshot_verified": False,
+        "official_registry_artifact_verified": False,
+        "xone_snapshot_eligibility_verified": False,
+        "xone_snapshot_xnt_allocation_binding_verified": False,
         "burn_redeemer_interface_verified": False,
         "conversion_candidate_discovery_verified": False,
         "x1_xnt_mechanism_discovery_verified": False,
@@ -709,6 +721,155 @@ class CMISXoneXntConversionIntelligenceService:
                 "moonparty_deployment_chain_verified": True,
                 "moonparty_runtime_compatible": True,
                 "moonparty_xone_binding_verified": True,
+            },
+        }
+
+    def discover_ethereum_xone_snapshot_candidates(
+        self,
+        documents: Sequence[Mapping[str, Any]],
+        *,
+        observed_at: float,
+        max_claims_per_document: int = 50,
+    ) -> dict[str, Any]:
+        """Extract explicit XONE snapshot/registry claims without promotion."""
+
+        if not documents:
+            raise ValueError("documents must not be empty")
+        claims: list[dict[str, Any]] = []
+        for document in documents:
+            source_id = str(document.get("source_id") or "").strip()
+            source_role = str(document.get("source_role") or "").strip()
+            url = str(document.get("url") or "").strip()
+            text_value = document.get("text")
+            if not source_id or not source_role or not url or not isinstance(text_value, str):
+                raise ValueError(
+                    "each document requires source_id, source_role, url, and text"
+                )
+            claims.extend(
+                extract_xone_snapshot_claims(
+                    text_value,
+                    source_id=source_id,
+                    source_role=source_role,
+                    url=url,
+                    observed_at=observed_at,
+                    max_claims=max_claims_per_document,
+                )
+            )
+
+        discovery = discover_official_snapshot_candidates(claims)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "xone_snapshot_registry_contract":
+                XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
+            "state": STATE,
+            "snapshot_claims": claims,
+            "snapshot_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "xone_snapshot_source_discovery_verified": True,
+            },
+        }
+
+    def reconstruct_ethereum_xone_registry(
+        self,
+        *,
+        rpc_call: Any,
+        snapshot_block: int,
+        source_url: str | None = None,
+        log_chunk_blocks: int = 50_000,
+        balance_sample_size: int = 25,
+    ) -> dict[str, Any]:
+        """Reconstruct and verify XONE balances at one explicit Ethereum block."""
+
+        identity = verify_xone_identity(
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        registry = fetch_and_verify_xone_registry(
+            rpc_call=rpc_call,
+            snapshot_block=snapshot_block,
+            source_url=source_url,
+            log_chunk_blocks=log_chunk_blocks,
+            balance_sample_size=balance_sample_size,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "ethereum_identity_contract": ETHEREUM_XONE_IDENTITY_CONTRACT,
+            "xone_snapshot_registry_contract":
+                XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
+            "state": STATE,
+            "ethereum_identity": identity,
+            "xone_registry": registry,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "ethereum_xone_identity_verified": True,
+                "reconstructed_xone_registry_verified": True,
+            },
+        }
+
+    def corroborate_ethereum_xone_registry(
+        self,
+        proofs: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Require matching reconstructed XONE registries from distinct RPC hosts."""
+
+        corroboration = corroborate_xone_registry_proofs(proofs)
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "xone_snapshot_registry_contract":
+                XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
+            "state": STATE,
+            "xone_registry": corroboration,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "reconstructed_xone_registry_verified": True,
+            },
+        }
+
+    def promote_official_ethereum_xone_snapshot(
+        self,
+        *,
+        source_candidate: Mapping[str, Any],
+        registry_proof: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Bind one authoritative exact-block snapshot claim to direct Ethereum state."""
+
+        proof = promote_official_snapshot(
+            source_candidate=source_candidate,
+            registry_proof=registry_proof,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "xone_snapshot_registry_contract":
+                XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
+            "state": STATE,
+            "official_snapshot": proof,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "reconstructed_xone_registry_verified": True,
+                "official_xone_snapshot_verified": True,
+                "official_registry_artifact_verified":
+                    proof["official_registry_artifact_verified"],
+                "xone_snapshot_eligibility_verified":
+                    proof["xone_snapshot_eligibility_verified"],
+                "xone_snapshot_xnt_allocation_binding_verified":
+                    proof["xone_snapshot_xnt_allocation_binding_verified"],
             },
         }
 
