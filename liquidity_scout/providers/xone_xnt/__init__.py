@@ -7,6 +7,15 @@ from .candidate_discovery import (
     discover_conversion_candidates,
     qualify_conversion_candidate,
 )
+from .x1_allocation_record_discovery import (
+    CONTRACT_VERSION as XONE_XNT_X1_ALLOCATION_RECORD_CONTRACT_VERSION,
+    XONE_CONTRACT as XONE_XNT_X1_ALLOCATION_RECORD_XONE_CONTRACT,
+    XoneXntX1AllocationRecordDiscoveryError,
+    extract_x1_allocation_records,
+    normalize_ethereum_address,
+    qualify_x1_allocation_candidate,
+    summarize_x1_allocation_records,
+)
 from .x1_binding_discovery import (
     CHAIN as XONE_XNT_X1_BINDING_CHAIN,
     CONTRACT_VERSION as XONE_XNT_X1_BINDING_CONTRACT_VERSION,
@@ -162,6 +171,13 @@ __all__ = [
     "XONE_SOURCE_PATH",
     "XoneXntMoonPartySourceSemanticsError",
     "verify_moonparty_source_semantics",
+    "XONE_XNT_X1_ALLOCATION_RECORD_CONTRACT_VERSION",
+    "XONE_XNT_X1_ALLOCATION_RECORD_XONE_CONTRACT",
+    "XoneXntX1AllocationRecordDiscoveryError",
+    "extract_x1_allocation_records",
+    "normalize_ethereum_address",
+    "qualify_x1_allocation_candidate",
+    "summarize_x1_allocation_records",
     "XONE_XNT_X1_BINDING_CHAIN",
     "XONE_XNT_X1_BINDING_CONTRACT_VERSION",
     "XONE_XNT_X1_BINDING_DEFAULT_HISTORY_LIMIT",

@@ -1,0 +1,160 @@
+name: XONE XNT X1 Allocation Record Discovery
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_xnt_x1_allocation_record_discovery.py'
+      - 'scripts/discover_xone_xnt_x1_allocation_records.py'
+      - 'docs/XONE_XNT_X1_ALLOCATION_RECORD_DISCOVERY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-xnt-x1-allocation-record-discovery.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_xnt_x1_allocation_record_discovery.py'
+      - 'scripts/discover_xone_xnt_x1_allocation_records.py'
+      - 'docs/XONE_XNT_X1_ALLOCATION_RECORD_DISCOVERY_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-xnt-x1-allocation-record-discovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test X1 allocation record discovery
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_x1_allocation_record_discovery.py
+      - name: Re-run exact X1 binding boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_x1_binding_discovery.py
+      - name: Re-run XNT mechanism boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_x1_xnt_distribution_mechanism_discovery.py
+      - name: Re-run snapshot asset-graph boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_snapshot_archived_asset_graph.py
+
+  live-allocation-records:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Discover bounded X1-side XONE allocation records
+        env:
+          PYTHONPATH: .
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/discover_xone_xnt_x1_allocation_records.py             --max-files-per-repo 30             --max-records-per-file 50             --max-candidates 50             --max-qualifications 10             | tee evidence/xone-xnt-x1-allocation-record-discovery.json
+
+          python - <<'PY'
+          import json
+
+          path = "evidence/xone-xnt-x1-allocation-record-discovery.json"
+          data = json.load(open(path))
+
+          assert data["status"] == "PASS"
+          assert (
+              data["contract_version"]
+              == "xone_xnt_x1_allocation_record_discovery/v1"
+          )
+          assert data["source_gate_passed"] is True
+          assert data["candidate_qualification_gate_passed"] is True
+          assert data["sources"]["repository_available_count"] >= 2
+          assert data["sources"]["repository_files_available_count"] >= 1
+          assert data["sources"]["official_available_count"] >= 1
+
+          discovery = data["allocation_record_discovery"]
+          assert discovery["allocation_record_discovery_verified"] is True
+          assert (
+              discovery[
+                  "private_or_unpublished_allocation_registry_absence_proven"
+              ]
+              is False
+          )
+
+          for candidate in discovery["candidates"]:
+              assert candidate["ethereum_address_verified"] is True
+              assert candidate["x1_pubkey_verified"] is True
+              assert candidate["allocation_semantics_verified"] is False
+              assert candidate["snapshot_eligibility_verified"] is False
+              assert (
+                  candidate["snapshot_xnt_allocation_binding_verified"]
+                  is False
+              )
+              assert candidate["xnt_issuance_verified"] is False
+              assert candidate["execution_authorized"] is False
+
+          assert data["official_xone_snapshot_verified"] is False
+          assert data["official_registry_artifact_verified"] is False
+          assert data["xone_snapshot_eligibility_verified"] is False
+          assert data["xone_snapshot_xnt_allocation_binding_verified"] is False
+          assert data["allocation_semantics_verified"] is False
+          assert data["claim_state_verified"] is False
+          assert data["vesting_or_unlock_state_verified"] is False
+          assert data["xnt_issuance_verified"] is False
+          assert data["xnt_vesting_or_unlock_verified"] is False
+          assert data["october_6_unlock_applies_to_xone_verified"] is False
+          assert data["xone_xnt_conversion_verified"] is False
+          assert data["cross_chain_correlation_verified"] is False
+          assert data["public_service_promoted"] is False
+          assert data["scout_reliance_promoted"] is False
+          assert data["execution_authorized"] is False
+
+          print(f"RECORDS={data['record_count']}")
+          print(f"CANDIDATES={discovery['candidate_count']}")
+          print(
+              "XONE_SPECIFIC_CANDIDATES="
+              f"{discovery['xone_specific_candidate_count']}"
+          )
+          print(
+              "EXACT_XONE_IDENTITY_BOUND_CANDIDATES="
+              f"{discovery['exact_xone_identity_bound_candidate_count']}"
+          )
+          print(
+              "XNT_AMOUNT_CANDIDATES="
+              f"{discovery['xnt_amount_candidate_count']}"
+          )
+          print(
+              "AMOUNT_CONFLICT_CANDIDATES="
+              f"{discovery['amount_conflict_candidate_count']}"
+          )
+          print("SNAPSHOT_XNT_ALLOCATION_BINDING_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xone-xnt-x1-allocation-record-evidence
+          path: evidence/xone-xnt-x1-allocation-record-discovery.json
+          if-no-files-found: error
