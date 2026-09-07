@@ -21,7 +21,7 @@ Contracts:
 
 X1 Report also has a registered bounded sitemap entrypoint at `https://x1report.com/sitemap.xml`. Sitemap ranking prioritizes XONE explicitly, then XNT, conversion, migration, vesting, unlock, lockup, investor, snapshot, claim, burn, Jack Levin and October 6 references.
 
-The source registry remains intentionally narrow. The exact Ethereum mainnet XONE identity is accepted under `ethereum_xone_identity/v1`, bounded canonical ERC-20 event observation under `ethereum_xone_event_observer/v1`, burn/redeemer semantics under `ethereum_xone_migration_sink_semantics/v1`, exact-address Ethereum candidate extraction under `xone_xnt_conversion_candidate_discovery/v1`, and the first independent X1-side rule/account discovery slice under `x1_xnt_distribution_mechanism_discovery/v1`. The X1-side live gate parsed 17 official XNT mechanism claims from X1 Docs and found 0 exact X1 account/program pubkeys on that page. That verifies bounded official-rule discovery only; it does not identify an XONE→XNT mechanism.
+The source registry remains intentionally narrow. The exact Ethereum mainnet XONE identity is accepted under `ethereum_xone_identity/v1`, bounded canonical ERC-20 event observation under `ethereum_xone_event_observer/v1`, burn/redeemer semantics under `ethereum_xone_migration_sink_semantics/v1`, exact-address Ethereum candidate extraction under `xone_xnt_conversion_candidate_discovery/v1`, independent X1-side XNT rule/account discovery under `x1_xnt_distribution_mechanism_discovery/v1`, and exact X1-side binding discovery under `xone_xnt_x1_binding_discovery/v1`. The latest bounded binding run had 4/4 official X1 targets and 13/13 ranked X1 Report pages available but produced 0 explicit XONE/XNT conversion claims and therefore 0 exact X1 binding candidates. That is scoped corpus evidence only; it does not identify or disprove an XONE→XNT mechanism.
 
 ## Candidate topics
 
@@ -109,8 +109,9 @@ PYTHONPATH=. python scripts/scrape_xone_xnt_conversion.py \
 3. **COMPLETE:** XONE burn/redeemer and migration-sink semantic foundation accepted under `ethereum_xone_migration_sink_semantics/v1` via #586 / PR #587; burn accounting is verified, but no migration sink is identified;
 4. **COMPLETE:** exact-address conversion-candidate discovery/qualification accepted under `xone_xnt_conversion_candidate_discovery/v1` via #589 / PR #590; the first bounded X1 Report live corpus yielded 0 candidate claims / 0 exact address candidates, with no global-absence inference;
 5. **COMPLETE FOUNDATION:** independent X1-side XNT reward/distribution/vesting rule discovery accepted under `x1_xnt_distribution_mechanism_discovery/v1` via #592 / PR #593; the official X1 rewards page yielded 17 bounded rule claims and 0 exact X1 pubkey candidates, with no global-absence inference;
-6. identify an **exact X1 account/program binding** for XONE→XNT allocation, claim, vesting or distribution using primary X1/XONE sources plus bounded direct X1 history;
-7. broaden Ethereum candidate-source coverage only where authoritative/public XONE→XNT sources justify it;
-8. add deterministic Ethereum -> X1 correlation only after both exact sides are independently verified;
-9. add persistent claim-ledger storage and supersession metadata;
-10. only then consider any public CMIS or X1 Scout promotion.
+6. **COMPLETE BOUNDED FOUNDATION:** exact X1-side binding discovery accepted under `xone_xnt_x1_binding_discovery/v1` via #595 / PR #596; run #4 inspected 4/4 official X1 targets plus 13/13 ranked X1 Report pages and found 0 explicit XONE/XNT conversion claims / 0 exact X1 binding candidates, with no global-absence inference;
+7. broaden authoritative/public **XONE-specific** source coverage and provenance qualification to find an exact converter, migration, claim, allocation, vesting, or X1 program/account reference;
+8. qualify any newly discovered exact Ethereum or X1 identifier directly on-chain before semantic role binding;
+9. add deterministic Ethereum -> X1 correlation only after both exact sides are independently verified;
+10. add persistent claim-ledger storage and supersession metadata;
+11. only then consider any public CMIS or X1 Scout promotion.
