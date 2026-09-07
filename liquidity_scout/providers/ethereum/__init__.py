@@ -25,6 +25,20 @@ from .xone_migration_sink_semantics import (
     verify_burn_redeemer_candidate,
     verify_xone_burn_surface,
 )
+from .xone_snapshot_registry import (
+    BALANCE_OF_SELECTOR as XONE_SNAPSHOT_BALANCE_OF_SELECTOR,
+    CONTRACT_VERSION as XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION,
+    DEFAULT_BALANCE_SAMPLE_SIZE as XONE_SNAPSHOT_DEFAULT_BALANCE_SAMPLE_SIZE,
+    DEFAULT_LOG_CHUNK_BLOCKS as XONE_SNAPSHOT_DEFAULT_LOG_CHUNK_BLOCKS,
+    EthereumXoneSnapshotRegistryError,
+    TOTAL_SUPPLY_SELECTOR as XONE_SNAPSHOT_TOTAL_SUPPLY_SELECTOR,
+    XONE_CREATION_BLOCK,
+    discover_official_snapshot_candidates,
+    extract_xone_snapshot_claims,
+    fetch_and_verify_xone_registry,
+    promote_official_snapshot,
+    reconstruct_xone_registry,
+)
 from .xone_identity import (
     CHAIN,
     CHAIN_ID,
@@ -44,6 +58,18 @@ from .xone_identity import (
 )
 
 __all__ = [
+    "EthereumXoneSnapshotRegistryError",
+    "XONE_CREATION_BLOCK",
+    "XONE_SNAPSHOT_BALANCE_OF_SELECTOR",
+    "XONE_SNAPSHOT_DEFAULT_BALANCE_SAMPLE_SIZE",
+    "XONE_SNAPSHOT_DEFAULT_LOG_CHUNK_BLOCKS",
+    "XONE_SNAPSHOT_REGISTRY_CONTRACT_VERSION",
+    "XONE_SNAPSHOT_TOTAL_SUPPLY_SELECTOR",
+    "discover_official_snapshot_candidates",
+    "extract_xone_snapshot_claims",
+    "fetch_and_verify_xone_registry",
+    "promote_official_snapshot",
+    "reconstruct_xone_registry",
     "EthereumXoneMigrationSemanticsError",
     "ON_TOKEN_BURNED_INTERFACE_ID",
     "SUPPORTS_INTERFACE_SELECTOR",
