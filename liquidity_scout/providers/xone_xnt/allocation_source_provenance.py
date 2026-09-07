@@ -227,12 +227,14 @@ def _semantic_flags(
     source_id: str,
     release_name: Optional[str],
 ) -> dict[str, bool]:
+    # source_id is provenance metadata, not evidence text.  Including a
+    # source id such as "xenblocks_airdrop_file" would incorrectly make every
+    # unrelated file look like it contains allocation language.
     lowered = " ".join(
         item.casefold()
         for item in (
             _text(text),
             _text(path),
-            _text(source_id),
             _text(release_name),
         )
         if item
@@ -346,16 +348,32 @@ def _api_urls(
     if not semantic.get("api_language_present"):
         return []
     rows: list[str] = []
+    provenance_url_terms = (
+        "xone",
+        "xnt",
+        "allocation",
+        "allocations",
+        "claim",
+        "claims",
+        "holder",
+        "holders",
+        "snapshot",
+        "registry",
+        "eligibility",
+        "airdrop",
+    )
     for url in _url_candidates(text):
         parsed = urlparse(url)
         marker = " ".join(
             [
+                (parsed.hostname or "").casefold(),
                 parsed.path.casefold(),
                 parsed.query.casefold(),
-                _text(text).casefold(),
             ]
         )
-        if not any(term in marker for term in API_CONTEXT_TERMS):
+        # Generic RPC/package/analytics endpoints are not allocation-source
+        # provenance merely because the surrounding file discusses an airdrop.
+        if not any(term in marker for term in provenance_url_terms):
             continue
         if url not in rows:
             rows.append(url)
@@ -401,8 +419,8 @@ def _path_source_classes(
             for term in (
                 "account_schema",
                 "account-schema",
-                "/pda.",
-                "/pda/",
+                "onchain/types",
+                "pda",
                 "programs/",
             )
         )
@@ -427,12 +445,47 @@ def _candidate_source_classes(
     program_ids = _x1_program_ids(text)
 
     classes = _path_source_classes(path, semantic=semantic)
-    if structured_files and semantic.get("allocation_language_present"):
+
+    allocation_file_terms = (
+        "xone",
+        "xnt",
+        "allocation",
+        "allocations",
+        "holder",
+        "holders",
+        "snapshot",
+        "claim",
+        "claims",
+        "registry",
+        "airdrop",
+        "distribution",
+        "eligibility",
+    )
+    relevant_structured_files = [
+        name
+        for name in structured_files
+        if any(term in name.casefold() for term in allocation_file_terms)
+    ]
+    if relevant_structured_files and semantic.get("allocation_language_present"):
         classes.append(SOURCE_CLASS_STRUCTURED_FILE)
-    if semantic.get("source_language_present") and any(
-        term in _text(text).casefold()
-        for term in ("registry", "export", "dataset", "holder export")
-    ):
+
+    lowered_text = _text(text).casefold()
+    explicit_registry_export = (
+        "allocation registry" in lowered_text
+        or "holder registry" in lowered_text
+        or "snapshot registry" in lowered_text
+        or "claim registry" in lowered_text
+        or "allocation export" in lowered_text
+        or "holder export" in lowered_text
+        or "snapshot export" in lowered_text
+        or "export file" in lowered_text
+        or "export artifact" in lowered_text
+        or (
+            "download" in lowered_text
+            and semantic.get("allocation_language_present")
+        )
+    )
+    if explicit_registry_export:
         classes.append(SOURCE_CLASS_REGISTRY_EXPORT)
     if api_urls:
         classes.append(SOURCE_CLASS_API)
