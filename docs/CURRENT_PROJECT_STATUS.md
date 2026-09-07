@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 13:34 America/New_York**.
+Current reconciliation: **2026-09-07 14:26 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,23 @@ Current reconciliation: **2026-09-07 13:34 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), #604 / PR #605 (`ethereum_xone_snapshot_registry/v1`), and #607 / PR #608 (`xone_snapshot_provenance_expansion/v1`). The **current primary target remains the Ethereum XONE holder snapshot/registry**, not MoonParty. Provenance Expansion run #6 found 0 provenance candidates / 0 artifact candidates / 0 authoritative exact snapshot blocks across both FairCrypto repos, x1-labs/xenblocks-airdrop, 4 official X1 targets, 13 available X1 Report pages and 1 available indexed Jack-history surface after false-positive filtering. That does not disprove a private/unpublished snapshot. CMIS can reconstruct and multi-RPC corroborate the full XONE holder ledger immediately once an authoritative exact block is identified. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), #604 / PR #605 (`ethereum_xone_snapshot_registry/v1`), #607 / PR #608 (`xone_snapshot_provenance_expansion/v1`), and #610 / PR #611 (`xone_snapshot_archival_source_recovery/v1`). The **current primary target remains the Ethereum XONE holder snapshot/registry**, not MoonParty. Archival Recovery run #4 had 9/9 CDX queries available, discovered 93 captures, successfully replayed 11 bounded host/time-diversified captures, and produced 0 stable primary URLs / 0 archival provenance candidates / 0 authoritative exact snapshot blocks. Replay/index availability failures remain explicit and this does not disprove a private/unpublished/deleted-unarchived snapshot. CMIS can reconstruct and multi-RPC corroborate the full XONE holder ledger immediately once an authoritative exact block is identified. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### XONE Snapshot Provenance Expansion v1
+### XONE Snapshot Archival Source Recovery v1
+
+**ACCEPTED INTERNAL FOUNDATION.** XONE Snapshot Archival Source Recovery run #4 passed deterministic and live jobs at PR #611 head `105f7e9dd55c372afc7756a911ef79b9ab548ef9`; Liquidity Scout Tests run #1806 also passed. PR #611 merged as `aa216ee6e49cc28ed969e990fd637577214a432c`; Issue #610 closed completed.
+
+The live archive gate had **9/9 CDX queries available**, discovered **93 distinct captures**, and successfully replayed **11** bounded captures after the replay selector was hardened to distribute its budget across original hosts and historical time rather than spending it on one root site. CDX coverage included `xen.network`, `x1.xyz`, `next.x1.xyz`, and `docs.x1.xyz`. The XspaceGPT Jack Levin index was available with XONE historical context but no explicit snapshot term; TwStalker returned HTTP 403. Several selected Wayback replays, including XEN captures, encountered transient connection-refused failures; these are preserved as availability limitations and are not interpreted as negative content evidence.
+
+The accepted result was **0 stable primary URLs, 0 archival provenance candidates, 0 direct primary archival candidates, and 0 authoritative exact snapshot blocks**. Evidence artifact id: `10029502671`; digest: `sha256:136d96e7aba8d5f50b4d694add915537cf171d9d6ab7efa9f0f55fd0b22db69d`.
+
+No holder-ledger reconstruction was triggered because no authoritative exact block emerged. The correct interpretation remains fail-closed: `private_or_unpublished_snapshot_absence_proven=false`, `official_xone_snapshot_verified=false`, `official_registry_artifact_verified=false`, `xone_snapshot_eligibility_verified=false`, `xone_snapshot_xnt_allocation_binding_verified=false`, `xnt_issuance_verified=false`, `xnt_vesting_or_unlock_verified=false`, `october_6_unlock_applies_to_xone_verified=false`, `xone_xnt_conversion_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`.
+
+**Current next gate:** archived asset-graph / primary-source resolution — enumerate historical XEN/X1 page outlinks, JavaScript bundles, manifests, JSON/static assets and stable X/X Spaces identifiers, then search those preserved assets for XONE/snapshot/holder/registry/allocation/XNT semantics.
+
+### Previous accepted live gate — XONE Snapshot Provenance Expansion v1
 
 **ACCEPTED INTERNAL FOUNDATION.** XONE Snapshot Provenance Expansion run #6 passed deterministic and live jobs at PR #608 head `beedae86c92d4919abccdc975f84094a3ebc9de0`; Liquidity Scout Tests run #1799 also passed. The accepted live corpus covered both FairCrypto repositories, `x1-labs/xenblocks-airdrop`, 4 available official X1 targets, 13 available ranked X1 Report pages and 1 available indexed Jack Levin historical surface.
 
