@@ -67,12 +67,13 @@ class CMISWebDiscoveryTests(unittest.TestCase):
                 "x1_ninja",
                 "x1report",
                 "fortiblox_app",
+                "x1_agents_radio",
                 "x1_docs",
                 "github",
             ),
         )
         catalog = provider_catalog()
-        self.assertEqual(len(catalog), 7)
+        self.assertEqual(len(catalog), 8)
         self.assertTrue(all(row["read_only"] for row in catalog))
         self.assertTrue(all(row["discovery_only"] for row in catalog))
         self.assertTrue(all(row["cmis_verified"] is False for row in catalog))
@@ -267,7 +268,7 @@ class CMISWebDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(result["service_contract"], "cmis_web_discovery/v1")
         self.assertEqual(result["state"], "internal_foundation")
-        self.assertEqual(len(result["sources"]), 7)
+        self.assertEqual(len(result["sources"]), 8)
         self.assertTrue(result["read_only"])
         self.assertFalse(result["public_service_promoted"])
         self.assertFalse(result["scout_reliance_promoted"])
