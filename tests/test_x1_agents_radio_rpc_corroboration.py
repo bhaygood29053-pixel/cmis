@@ -18,6 +18,7 @@ PROGRAM_ID = "sEsYH97wqmfnkzHedjNcw3zyJdPvUmsa9AixhS4b4fN"
 RADIO_PROGRAM_ID = "4Ai4Ps8YsrLfshU9xvkf9pobiVhewELdbXEZA7zaZ8E3"
 OWNER = "BPFLoaderUpgradeab1e11111111111111111111111"
 SIGNATURE = "5" * 88
+_DEFAULT = object()
 
 
 def direct_candidate(**overrides):
@@ -113,11 +114,17 @@ def transaction_result(*, slot=500, err=None, program_id=PROGRAM_ID):
 
 
 class FakeRPC:
-    def __init__(self, *, account=None, history=None, transaction=None):
-        self.account = account_result() if account is None else account
-        self.history = history_result() if history is None else history
+    def __init__(
+        self,
+        *,
+        account=_DEFAULT,
+        history=_DEFAULT,
+        transaction=_DEFAULT,
+    ):
+        self.account = account_result() if account is _DEFAULT else account
+        self.history = history_result() if history is _DEFAULT else history
         self.transaction = (
-            transaction_result() if transaction is None else transaction
+            transaction_result() if transaction is _DEFAULT else transaction
         )
         self.calls = []
 
@@ -255,6 +262,40 @@ class X1AgentsRadioRPCCorroborationTests(unittest.TestCase):
                 "getSignaturesForAddress",
                 "getTransaction",
             ],
+        )
+
+
+    def test_explicit_radio_transaction_signature_can_be_corroborated_directly(self):
+        candidate = structured_deployment_candidate(
+            provider_deployment={
+                "event_type": "upgrade",
+                "upgrade_slot": 500,
+                "transaction_signature": SIGNATURE,
+            }
+        )
+        rpc = FakeRPC(history=[])
+        result = corroborate_agents_radio_with_x1_rpc(
+            candidate,
+            rpc_call=rpc,
+        )
+
+        self.assertEqual(result["reported_transaction_signature"], SIGNATURE)
+        self.assertTrue(
+            result["reported_transaction_signature_syntax_valid"]
+        )
+        self.assertTrue(result["reported_slot_activity_verified"])
+        self.assertTrue(result["reported_slot_transaction_corroborated"])
+        self.assertEqual(
+            [method for method, _params in rpc.calls],
+            [
+                "getAccountInfo",
+                "getSignaturesForAddress",
+                "getTransaction",
+            ],
+        )
+        self.assertEqual(rpc.calls[2][1][0], SIGNATURE)
+        self.assertFalse(
+            result["provider_claim_verification"]["upgrade_semantics_verified"]
         )
 
     def test_reported_slot_not_in_bounded_history_is_not_negative_deployment_proof(self):
