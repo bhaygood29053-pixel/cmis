@@ -386,6 +386,7 @@ def corroborate_xone_burn_surface(
         "rpc_backend_source_independence_verified": False,
         "same_chain_consensus_is_not_cross_source_semantic_independence": True,
         "simple_transfer_sink_required_by_this_proof": False,
+        "xone_burn_accounting_surface_verified": True,
         "migration_sink_identified": False,
         "lock_or_migration_verified": False,
         "xone_xnt_conversion_verified": False,
