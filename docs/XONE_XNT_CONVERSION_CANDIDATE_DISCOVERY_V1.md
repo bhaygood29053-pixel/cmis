@@ -1,6 +1,6 @@
 # XONE/XNT Conversion Candidate Discovery v1
 
-Status: **IMPLEMENTATION FOR ISSUE #589 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #589 / PR #590. XONE XNT Conversion Candidate Discovery run #2 passed deterministic and live jobs at head `72b341c823af861e85b43cb12912efe148850f35`, Liquidity Scout Tests run #1766 passed, and PR #590 merged as `d34e83076b3a1cfd4dd5709c6c790aa89034bf6f`.
 
 Contract:
 
@@ -91,7 +91,21 @@ It means only:
 
 It does not mean no conversion contract exists.
 
-## Live gate
+## Accepted live gate
+
+Run #2 executed the acceptance workflow against the bounded X1 Report sitemap corpus. It inspected 13 ranked pages, produced 0 XONE/XNT candidate claims and therefore 0 exact Ethereum address candidates. All inspected pages were available in that run. The evidence artifact digest is `sha256:68f9eb35c2bb2f77ba68f2f2c65bf7f4905e1cbbba5f9b764a88f68659d4477d`.
+
+The accepted interpretation is deliberately narrow:
+
+```text
+bounded_pages_attempted = 13
+candidate_claim_count = 0
+candidate_count = 0
+migration_sink_identified = false
+xone_xnt_conversion_verified = false
+```
+
+This does **not** prove that no XONE→XNT conversion contract exists. It proves only that the exact-address candidate extractor found none in the 13 ranked X1 Report pages inspected by that live run.
 
 The acceptance workflow:
 
@@ -119,6 +133,6 @@ scout_reliance_promoted = false
 execution_authorized = false
 ```
 
-## Next slice after acceptance
+## Next slice
 
-Use any exact qualified candidates plus authoritative X1/XONE documentation to search for the corresponding X1-side XNT allocation, issuance, vesting or claim mechanism. Conversion cannot be verified until the exact Ethereum candidate role and exact X1-side mechanism are independently bound by accepted evidence.
+Independently identify and verify the X1-side XNT allocation, issuance, vesting or claim mechanism that could service XONE holders. This can proceed even though the bounded X1 Report corpus produced no Ethereum contract candidate. Conversion still cannot be verified until the exact Ethereum-side role and exact X1-side mechanism are independently bound by accepted evidence.
