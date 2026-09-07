@@ -1,6 +1,6 @@
 # CMIS Web Discovery v1
 
-Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472. Follow-on X1 Explorer/XDEX layers through PR #489 and X1.Ninja route coverage through PR #495 are merged. Issue #496 is the active X1.Ninja semantic-coverage reconciliation gate. The entire stack remains discovery-only, non-promoted, and `execution_authorized=false`.
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472, with accepted source-specific layers for X1 Explorer, XDEX, X1.Ninja, FortiBlox, and X1 Agents Radio. Radio source discovery is accepted via #564 / PR #566 and `x1_agents_radio_structured_discovery/v1` via #568 / PR #569. The entire Web Discovery stack remains subordinate to CMIS verification, non-promoted as truth, and `execution_authorized=false`.
 
 ## Purpose
 

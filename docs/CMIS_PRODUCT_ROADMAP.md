@@ -1,10 +1,10 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-09-06 (America/New_York)
+Last reconciled: 2026-09-07 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
 
-## Live checkpoint — 2026-09-06
+## Live checkpoint — 2026-09-07
 
 - **Current accepted CMIS capability contract: `1.27.0`.**
 - **Universal response freshness: ACCEPTED TARGET.** Every public CMIS response carries `cmis_response_freshness/v1`; missing service-specific freshness fails closed instead of disappearing from the response.
@@ -15,7 +15,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - **GENIUS Act Regulatory Evidence: ACCEPTED at CMIS.** Public PR #537 established the bounded foundation; PR #540 promoted freshness-aware `regulatory_evidence/v1` in CMIS 1.26; protected `cmis-core` PR #43 wires the protected runtime; PR #541 reconciled the completed promotion. This is regulatory evidence, not an asset-compliance or legal-advice conclusion.
 - **Cross-chain / Warp promotion: COMPLETE.** #482 Bridge-to-XDEX promotion and #491 cross-chain asset provenance promotion are accepted through their public/protected paths and remain scope-bounded.
 - **X1.Ninja USD-liquidity semantics and rolling freshness work: COMPLETE through the accepted later scan/freshness stack.** Historical #461/#459 blockers are no longer the current flagship gate.
-- **CMIS Web Discovery v1-v11: COMPLETE internally through PR #497.** Discovery remains subordinate to CMIS verification and never creates market truth by itself.
+- **CMIS Web Discovery: COMPLETE internally through the accepted source-specific stack, including X1 Agents Radio.** Radio source discovery is accepted via #564 / PR #566, and `x1_agents_radio_structured_discovery/v1` is accepted via #568 / PR #569. Radio program names, categories, instructions, activity, deployment/upgrade labels, and health remain provider-reported candidates until exact X1 RPC / CMIS verification; no public-service or Scout-reliance promotion is implied.
 - Controlled Execution remains locked: `execution_authorized=false`.
 - **Programmable Market Intelligence foundation (#552): IMPLEMENTED ON THIS WORKSTREAM / NON-PROMOTED.** Adds deterministic `uniswap_v4_hook_intelligence/v1`, `reflection_flow_intelligence/v1`, `yield_provenance/v1`, and an additive Robinhood→X1 companion over accepted `cross_chain_asset_provenance/v1`. Discovery remains subordinate to verification; hook permission bits do not prove business logic; missing incentives are never zero-filled; Robinhood custody/backing/route state remain unverified without separate accepted evidence; the public CMIS 1.27 capability manifest is unchanged and `execution_authorized=false` remains mandatory.
 
