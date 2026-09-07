@@ -163,11 +163,6 @@ def _x1_pubkeys(text: str) -> list[str]:
     rows: list[str] = []
     for match in _BASE58_RE.finditer(_text(text)):
         value = match.group(0)
-        # Long EVM bytecode / hashes can contain Base58-valid substrings.
-        # A pure hexadecimal token is ambiguous here and is not accepted as an
-        # X1 allocation key without a separate stronger typed source.
-        if re.fullmatch(r"[0-9A-Fa-f]{32,44}", value):
-            continue
         try:
             pubkey = normalize_x1_pubkey(value)
         except X1XntMechanismDiscoveryError:
