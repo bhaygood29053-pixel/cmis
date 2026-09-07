@@ -22,6 +22,8 @@ from liquidity_scout.providers.xone_xnt import (
     CANDIDATE_DISCOVERY_CONTRACT_VERSION,
     SCRAPER_CONTRACT,
     X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
+    XONE_XNT_X1_BINDING_CONTRACT_VERSION,
+    discover_x1_binding_candidates,
     discover_xnt_distribution_candidates,
     extract_xnt_mechanism_claims,
     discover_conversion_candidates,
@@ -29,6 +31,7 @@ from liquidity_scout.providers.xone_xnt import (
     extract_xone_xnt_claims,
     group_claims_for_review,
     qualify_conversion_candidate,
+    qualify_x1_binding_candidate,
     qualify_xnt_distribution_candidate,
     source_catalog,
 )
@@ -52,6 +55,9 @@ def _truth_state() -> dict[str, Any]:
         "conversion_candidate_discovery_verified": False,
         "x1_xnt_mechanism_discovery_verified": False,
         "x1_xnt_candidate_account_state_verified": False,
+        "x1_binding_candidate_discovery_verified": False,
+        "x1_binding_candidate_history_verified": False,
+        "x1_binding_identified": False,
         "xnt_distribution_mechanism_identified": False,
         "migration_sink_identified": False,
         "lock_or_migration_verified": False,
@@ -509,6 +515,70 @@ class CMISXoneXntConversionIntelligenceService:
                 "x1_xnt_mechanism_discovery_verified": True,
                 "x1_xnt_candidate_account_state_verified":
                     qualification.get("account_state_verified") is True,
+            },
+        }
+
+    def discover_xone_xnt_x1_binding_candidates(
+        self,
+        claims: Sequence[Mapping[str, Any]],
+        *,
+        max_candidates: int = 50,
+    ) -> dict[str, Any]:
+        """Discover exact X1 pubkeys inside bounded explicit XONE/XNT claims."""
+
+        discovery = discover_x1_binding_candidates(
+            claims,
+            max_candidates=max_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "x1_binding_discovery_contract":
+                XONE_XNT_X1_BINDING_CONTRACT_VERSION,
+            "state": STATE,
+            "x1_binding_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "x1_binding_candidate_discovery_verified": True,
+            },
+        }
+
+    def qualify_xone_xnt_x1_binding_candidate(
+        self,
+        candidate: Mapping[str, Any],
+        *,
+        rpc_call: Any,
+        source_url: str | None = None,
+        history_limit: int = 25,
+        transaction_limit: int = 10,
+    ) -> dict[str, Any]:
+        """Qualify exact X1 account/history evidence without role promotion."""
+
+        qualification = qualify_x1_binding_candidate(
+            candidate,
+            rpc_call=rpc_call,
+            source_url=source_url,
+            history_limit=history_limit,
+            transaction_limit=transaction_limit,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "x1_binding_discovery_contract":
+                XONE_XNT_X1_BINDING_CONTRACT_VERSION,
+            "state": STATE,
+            "x1_binding_qualification": qualification,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "x1_binding_candidate_discovery_verified": True,
+                "x1_binding_candidate_history_verified":
+                    qualification.get("bounded_history_verified") is True,
             },
         }
 
