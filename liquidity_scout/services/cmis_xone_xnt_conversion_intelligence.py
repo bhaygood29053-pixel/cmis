@@ -29,6 +29,7 @@ from liquidity_scout.providers.xone_xnt import (
     SCRAPER_CONTRACT,
     X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
     XONE_XNT_ALLOCATION_SOURCE_PROVENANCE_CONTRACT_VERSION,
+    XONE_XNT_PRIMARY_ALLOCATION_ARTIFACT_RESOLUTION_CONTRACT_VERSION,
     XONE_XNT_X1_ALLOCATION_RECORD_CONTRACT_VERSION,
     XONE_XNT_X1_BINDING_CONTRACT_VERSION,
     XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
@@ -39,6 +40,8 @@ from liquidity_scout.providers.xone_xnt import (
     annotate_retrieved_asset_capture,
     extract_allocation_source_provenance,
     summarize_allocation_source_provenance,
+    no_lead_resolution,
+    resolve_primary_allocation_artifact,
     build_asset_graph_edges,
     extract_archived_asset_references,
     extract_asset_provenance_candidates,
@@ -108,6 +111,9 @@ def _truth_state() -> dict[str, Any]:
         "conversion_candidate_discovery_verified": False,
         "x1_xnt_mechanism_discovery_verified": False,
         "x1_xnt_candidate_account_state_verified": False,
+        "primary_allocation_artifact_resolution_available": False,
+        "primary_allocation_artifact_candidate_discovered": False,
+        "primary_allocation_artifact_resolved_for_handoff": False,
         "allocation_source_provenance_discovery_verified": False,
         "allocation_source_candidate_discovered": False,
         "allocation_source_provenance_verified": False,
@@ -696,6 +702,43 @@ class CMISXoneXntConversionIntelligenceService:
                 "conversion_candidate_discovery_verified": True,
                 "burn_redeemer_interface_verified":
                     qualification.get("burn_redeemer_interface_verified") is True,
+            },
+        }
+
+    def resolve_xone_xnt_primary_allocation_artifact(
+        self,
+        lead: Optional[Mapping[str, Any]] = None,
+        *,
+        observed_at: Optional[float] = None,
+    ) -> dict[str, Any]:
+        """Resolve one explicit primary lead or return the intentional NO_LEAD state."""
+
+        if lead is None:
+            if observed_at is None:
+                raise ValueError("observed_at is required when no lead is supplied")
+            resolution = no_lead_resolution(observed_at=observed_at)
+        else:
+            resolution = resolve_primary_allocation_artifact(lead)
+
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "primary_allocation_artifact_resolution_contract":
+                XONE_XNT_PRIMARY_ALLOCATION_ARTIFACT_RESOLUTION_CONTRACT_VERSION,
+            "state": STATE,
+            "primary_allocation_artifact_resolution": resolution,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "primary_allocation_artifact_resolution_available": True,
+                "primary_allocation_artifact_candidate_discovered":
+                    resolution.get("primary_artifact_candidate_discovered")
+                    is True,
+                "primary_allocation_artifact_resolved_for_handoff":
+                    resolution.get("primary_artifact_resolved_for_handoff")
+                    is True,
             },
         }
 
