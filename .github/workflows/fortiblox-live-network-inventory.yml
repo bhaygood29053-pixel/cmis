@@ -1,0 +1,113 @@
+name: FortiBlox Live Browser Network Inventory
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/fortiblox-live-network-inventory.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  live-fortiblox-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out CMIS
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime and browser
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Run passive FortiBlox capture
+        env:
+          PYTHONPATH: .
+        run: |
+          mkdir -p evidence
+          python scripts/capture_fortiblox_network.py             "https://app.fortiblox.com/"             --dwell-seconds 8             --max-network-events 200             > evidence/fortiblox-live-network.json
+
+      - name: Validate and summarize sanitized evidence
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          path = Path("evidence/fortiblox-live-network.json")
+          data = json.loads(path.read_text())
+
+          assert data["contract"] == "fortiblox_browser_capture/v1"
+          assert data["source_id"] == "fortiblox_app"
+          assert data["raw_har_retained"] is False
+          assert data["raw_network_records_retained"] is False
+          assert data["raw_request_bodies_retained"] is False
+          assert data["raw_response_bodies_retained"] is False
+          assert data["request_replay_authorized"] is False
+          assert data["payment_performed"] is False
+          assert data["execution_authorized"] is False
+
+          observations = data.get("observations", [])
+          counts = Counter(
+              item.get("route", {}).get("qualification", "unknown")
+              for item in observations
+          )
+          candidates = [
+              item for item in observations
+              if item.get("route", {}).get("qualification") == "unqualified_get_candidate"
+          ]
+
+          summary = {
+              "contract": data["contract"],
+              "requested_page_url": data["requested_page_url"],
+              "network_events_seen": data["network_events_seen"],
+              "observation_count": data["observation_count"],
+              "qualification_counts": dict(sorted(counts.items())),
+              "unqualified_get_candidates": [
+                  {
+                      "source_url": item.get("source_url"),
+                      "status_code": item.get("status_code"),
+                      "content_type": item.get("content_type"),
+                      "response_sha256": item.get("response_sha256"),
+                  }
+                  for item in candidates
+              ],
+              "execution_authorized": False,
+              "payment_authorized": False,
+              "promotion_authorized": False,
+          }
+          Path("evidence/fortiblox-live-network-summary.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + "\n"
+          )
+
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          with open(Path(__import__("os").environ["GITHUB_STEP_SUMMARY"]), "a") as fh:
+              fh.write("## FortiBlox live browser/network inventory\n\n")
+              fh.write(f"- Network events seen: {data['network_events_seen']}\n")
+              fh.write(f"- Sanitized observations: {data['observation_count']}\n")
+              fh.write(f"- Route qualifications: {dict(sorted(counts.items()))}\n")
+              fh.write(f"- Unqualified GET candidates: {len(candidates)}\n")
+              fh.write("- Execution authorized: false\n")
+              fh.write("- Payment authorized: false\n")
+          PY
+
+      - name: Upload sanitized evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortiblox-live-network-inventory
+          path: |
+            evidence/fortiblox-live-network.json
+            evidence/fortiblox-live-network-summary.json
+          if-no-files-found: error
+          retention-days: 30
