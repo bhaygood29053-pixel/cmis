@@ -14,6 +14,11 @@ from .agents_radio import (
     parse_deployments as parse_agents_radio_deployments,
     parse_health as parse_agents_radio_health,
 )
+from .agents_radio_rpc_corroboration import (
+    CONTRACT_VERSION as X1_AGENTS_RADIO_RPC_CORROBORATION_CONTRACT,
+    X1AgentsRadioRPCCorroborationError,
+    corroborate_agents_radio_with_x1_rpc,
+)
 from .canonical_pool_vault_coupling import prove_canonical_pool_vault_coupling
 from .cross_pool_trusted_semantics import qualify_cross_pool_trusted_semantics
 from .exact_pool_leg_semantics_v14104 import prove_exact_pool_leg_semantics
@@ -235,6 +240,9 @@ __all__ = [
     "X1_AGENTS_RADIO_SOURCE",
     "X1AgentsRadioAPIError",
     "X1AgentsRadioProvider",
+    "X1_AGENTS_RADIO_RPC_CORROBORATION_CONTRACT",
+    "X1AgentsRadioRPCCorroborationError",
+    "corroborate_agents_radio_with_x1_rpc",
     "fetch_agents_radio_bootstrap",
     "fetch_agents_radio_catalog",
     "fetch_agents_radio_deployments",
