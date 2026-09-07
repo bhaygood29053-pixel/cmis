@@ -1,0 +1,96 @@
+name: XONE XNT MoonParty Source Semantics
+
+on:
+  pull_request:
+    paths:
+      - 'liquidity_scout/providers/xone_xnt/**'
+      - 'liquidity_scout/services/cmis_xone_xnt_conversion_intelligence.py'
+      - 'tests/test_xone_xnt_moonparty_source_semantics.py'
+      - 'scripts/verify_xone_xnt_moonparty_source_semantics.py'
+      - 'docs/XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_V1.md'
+      - 'docs/XONE_XNT_CONVERSION_INTELLIGENCE_V1.md'
+      - '.github/workflows/xone-xnt-moonparty-source-semantics.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Test MoonParty source semantics
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_moonparty_source_semantics.py
+      - name: Re-run XONE/XNT binding boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_xone_xnt_x1_binding_discovery.py
+      - name: Re-run XONE burn semantics boundary
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_ethereum_xone_migration_sink_semantics.py
+
+  live-pinned-source:
+    needs: deterministic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify pinned FairCrypto source semantics
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python scripts/verify_xone_xnt_moonparty_source_semantics.py             | tee evidence/xone-xnt-moonparty-source-semantics.json
+          python - <<'PY'
+          import json
+          p="evidence/xone-xnt-moonparty-source-semantics.json"
+          data=json.load(open(p))
+          assert data["status"]=="PASS"
+          assert data["contract_version"]=="xone_xnt_moonparty_source_semantics/v1"
+          assert data["authoritative_source_semantics_verified"] is True
+          assert data["xone_to_xnt_credit_design_link_verified"] is True
+          proof=data["proof"]
+          assert proof["abi_semantics"]["constructor_accepts_xone_address"] is True
+          assert proof["abi_semantics"]["required_function_signatures_verified"] is True
+          assert proof["source_checks"]["state_xone_participation_row_present"] is True
+          assert proof["source_checks"]["global_xnt_distribution_label_present"] is True
+          assert proof["source_checks"]["global_burn_points_allocated_label_present"] is True
+          assert proof["source_checks"]["xone_burn_calls_redeemer_callback"] is True
+          assert data["moonparty_deployment_verified"] is False
+          assert data["xnt_credit_to_native_xnt_equivalence_verified"] is False
+          assert data["xnt_issuance_verified"] is False
+          assert data["xone_xnt_conversion_verified"] is False
+          assert data["cross_chain_correlation_verified"] is False
+          assert data["execution_authorized"] is False
+          print("MOONPARTY_SOURCE_SEMANTICS=VERIFIED")
+          print("XONE_TO_XNT_CREDIT_DESIGN_LINK=VERIFIED_SOURCE_ONLY")
+          print("MOONPARTY_DEPLOYMENT_VERIFIED=FALSE")
+          print("NATIVE_XNT_EQUIVALENCE_VERIFIED=FALSE")
+          print("EXECUTION_AUTHORIZED=FALSE")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xone-xnt-moonparty-source-semantics-evidence
+          path: evidence/xone-xnt-moonparty-source-semantics.json
+          if-no-files-found: error
