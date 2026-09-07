@@ -31,6 +31,10 @@ from liquidity_scout.providers.xone_xnt import (
     XONE_XNT_X1_BINDING_CONTRACT_VERSION,
     XONE_XNT_MOONPARTY_SOURCE_SEMANTICS_CONTRACT_VERSION,
     MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION,
+    XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION,
+    discover_repository_path_candidates,
+    extract_provenance_candidates,
+    rank_provenance_candidates,
     discover_x1_binding_candidates,
     discover_xnt_distribution_candidates,
     extract_xnt_mechanism_claims,
@@ -64,6 +68,11 @@ def _truth_state() -> dict[str, Any]:
         "xone_burn_verified": False,
         "xone_burn_accounting_surface_verified": False,
         "xone_snapshot_source_discovery_verified": False,
+        "xone_snapshot_provenance_expansion_verified": False,
+        "provenance_candidate_discovered": False,
+        "direct_primary_source_recovered": False,
+        "snapshot_artifact_candidate_discovered": False,
+        "authoritative_exact_snapshot_block_discovered": False,
         "reconstructed_xone_registry_verified": False,
         "official_xone_snapshot_verified": False,
         "official_registry_artifact_verified": False,
@@ -721,6 +730,115 @@ class CMISXoneXntConversionIntelligenceService:
                 "moonparty_deployment_chain_verified": True,
                 "moonparty_runtime_compatible": True,
                 "moonparty_xone_binding_verified": True,
+            },
+        }
+
+    def expand_xone_snapshot_provenance(
+        self,
+        documents: Sequence[Mapping[str, Any]],
+        *,
+        observed_at: float,
+        max_candidates_per_document: int = 50,
+        max_ranked_candidates: int = 100,
+    ) -> dict[str, Any]:
+        """Rank bounded historical provenance leads without snapshot promotion."""
+
+        if not documents:
+            raise ValueError("documents must not be empty")
+        candidates: list[dict[str, Any]] = []
+        for document in documents:
+            source_id = str(document.get("source_id") or "").strip()
+            source_role = str(document.get("source_role") or "").strip()
+            url = str(document.get("url") or "").strip()
+            text_value = document.get("text")
+            path = document.get("path")
+            revision = document.get("revision")
+            if not source_id or not source_role or not url or not isinstance(text_value, str):
+                raise ValueError(
+                    "each document requires source_id, source_role, url, and text"
+                )
+            candidates.extend(
+                extract_provenance_candidates(
+                    text_value,
+                    source_id=source_id,
+                    source_role=source_role,
+                    url=url,
+                    observed_at=observed_at,
+                    path=str(path) if path is not None else None,
+                    revision=str(revision) if revision is not None else None,
+                    max_candidates=max_candidates_per_document,
+                )
+            )
+
+        discovery = rank_provenance_candidates(
+            candidates,
+            max_candidates=max_ranked_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "snapshot_provenance_contract":
+                XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION,
+            "state": STATE,
+            "provenance_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "xone_snapshot_provenance_expansion_verified": True,
+                "provenance_candidate_discovered":
+                    discovery["candidate_count"] > 0,
+                "direct_primary_source_recovered":
+                    discovery["direct_primary_source_candidate_count"] > 0,
+                "snapshot_artifact_candidate_discovered":
+                    discovery["snapshot_artifact_candidate_count"] > 0,
+                "authoritative_exact_snapshot_block_discovered":
+                    discovery["authoritative_exact_snapshot_block_discovered"],
+            },
+        }
+
+    def discover_xone_snapshot_repository_paths(
+        self,
+        entries: Sequence[Mapping[str, Any]],
+        *,
+        source_id: str,
+        source_role: str,
+        repository_url: str,
+        revision: str,
+        observed_at: float,
+        max_candidates: int = 100,
+    ) -> dict[str, Any]:
+        """Classify bounded repository tree paths as provenance leads only."""
+
+        candidates = discover_repository_path_candidates(
+            entries,
+            source_id=source_id,
+            source_role=source_role,
+            repository_url=repository_url,
+            revision=revision,
+            observed_at=observed_at,
+            max_candidates=max_candidates,
+        )
+        discovery = rank_provenance_candidates(
+            candidates,
+            max_candidates=max_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "snapshot_provenance_contract":
+                XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION,
+            "state": STATE,
+            "repository_path_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "xone_snapshot_provenance_expansion_verified": True,
+                "provenance_candidate_discovered":
+                    discovery["candidate_count"] > 0,
             },
         }
 

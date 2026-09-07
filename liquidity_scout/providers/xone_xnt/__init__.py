@@ -56,6 +56,14 @@ from .moonparty_source_semantics import (
     XoneXntMoonPartySourceSemanticsError,
     verify_moonparty_source_semantics,
 )
+from .snapshot_provenance import (
+    CONTRACT_VERSION as XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION,
+    XoneSnapshotProvenanceError,
+    discover_repository_path_candidates,
+    extract_provenance_candidates,
+    rank_provenance_candidates,
+    validate_provenance_url,
+)
 from .scraper import (
     DEFAULT_MAX_BYTES,
     DEFAULT_MAX_CLAIMS,
@@ -79,6 +87,12 @@ from .scraper import (
 )
 
 __all__ = [
+    "XONE_SNAPSHOT_PROVENANCE_CONTRACT_VERSION",
+    "XoneSnapshotProvenanceError",
+    "discover_repository_path_candidates",
+    "extract_provenance_candidates",
+    "rank_provenance_candidates",
+    "validate_provenance_url",
     "MOONPARTY_DEPLOYMENT_VERIFICATION_CONTRACT_VERSION",
     "MoonPartyDeploymentVerificationError",
     "corroborate_moonparty_deployment",
