@@ -21,7 +21,7 @@ Contracts:
 
 X1 Report also has a registered bounded sitemap entrypoint at `https://x1report.com/sitemap.xml`. Sitemap ranking prioritizes XONE explicitly, then XNT, conversion, migration, vesting, unlock, lockup, investor, snapshot, claim, burn, Jack Levin and October 6 references.
 
-The source registry is intentionally narrow. Ethereum contract/explorer sources are not added until the exact XONE contract identity is separately verified; this prevents a ticker/name match from becoming a false token identity claim.
+The source registry remains intentionally narrow. The exact Ethereum mainnet XONE identity is now accepted separately under `ethereum_xone_identity/v1` as `0x4DCDa2274899d9BbA3Bb6f5A852C107Dd6E4fE1c`. That identity proof does not turn web conversion statements into verified migration facts.
 
 ## Candidate topics
 
@@ -104,9 +104,9 @@ PYTHONPATH=. python scripts/scrape_xone_xnt_conversion.py \
 
 ## Next acceptance slices
 
-1. verify the exact Ethereum XONE ERC-20 contract identity from primary/on-chain evidence;
-2. add an Ethereum XONE observer for burns/locks/migration deposits;
+1. **COMPLETE:** exact Ethereum XONE ERC-20 identity accepted under `ethereum_xone_identity/v1` via #580 / PR #581;
+2. add a bounded Ethereum XONE observer for burns/transfers/locks/migration deposits;
 3. identify any X1-side XNT migration/distribution/vesting program or accounts;
-4. add deterministic Ethereum -> X1 correlation only after both identities are verified;
+4. add deterministic Ethereum -> X1 correlation only after the exact X1-side mechanism is verified;
 5. add persistent claim-ledger storage and supersession metadata;
 6. only then consider any public CMIS or X1 Scout promotion.
