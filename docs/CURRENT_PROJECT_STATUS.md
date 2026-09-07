@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 12:12 America/New_York**.
+Current reconciliation: **2026-09-07 13:34 America/New_York**.
 
 ## Accepted platform
 
@@ -13,11 +13,21 @@ Current reconciliation: **2026-09-07 12:12 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), and now #604 / PR #605 (`ethereum_xone_snapshot_registry/v1`). The **current primary target is the Ethereum XONE holder snapshot/registry**, not MoonParty. Snapshot Registry run #1 found 0 explicit XONE snapshot claims / 0 official candidates / 0 authoritative exact snapshot blocks across the accepted bounded public corpus. That does not disprove a private/unpublished snapshot. CMIS can now reconstruct and multi-RPC corroborate the full XONE holder ledger immediately once an authoritative exact block is identified. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #575 / PR #578 (web discovery), #580 / PR #581 (exact Ethereum identity), #583 / PR #584 (bounded canonical events), #586 / PR #587 (burn/redeemer semantics), #589 / PR #590 (exact Ethereum candidate discovery), #592 / PR #593 (X1 XNT rule/account discovery), #595 / PR #596 (exact X1 binding discovery), #604 / PR #605 (`ethereum_xone_snapshot_registry/v1`), and #607 / PR #608 (`xone_snapshot_provenance_expansion/v1`). The **current primary target remains the Ethereum XONE holder snapshot/registry**, not MoonParty. Provenance Expansion run #6 found 0 provenance candidates / 0 artifact candidates / 0 authoritative exact snapshot blocks across both FairCrypto repos, x1-labs/xenblocks-airdrop, 4 official X1 targets, 13 available X1 Report pages and 1 available indexed Jack-history surface after false-positive filtering. That does not disprove a private/unpublished snapshot. CMIS can reconstruct and multi-RPC corroborate the full XONE holder ledger immediately once an authoritative exact block is identified. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
-### Ethereum XONE Snapshot / Registry v1
+### XONE Snapshot Provenance Expansion v1
+
+**ACCEPTED INTERNAL FOUNDATION.** XONE Snapshot Provenance Expansion run #6 passed deterministic and live jobs at PR #608 head `beedae86c92d4919abccdc975f84094a3ebc9de0`; Liquidity Scout Tests run #1799 also passed. The accepted live corpus covered both FairCrypto repositories, `x1-labs/xenblocks-airdrop`, 4 available official X1 targets, 13 available ranked X1 Report pages and 1 available indexed Jack Levin historical surface.
+
+The refined extractor intentionally rejected ordinary XONE ABI/config JSON as snapshot provenance. The accepted result was **0 provenance candidates, 0 direct primary snapshot-source candidates, 0 snapshot-artifact candidates, 0 indexed-mirror candidates and 0 authoritative exact snapshot blocks**. The evidence artifact id is `10028368038` with digest `sha256:bd3db1a9804a070e1a8017fd660db4bad3eb0802ad114d3de0ebc5d54fa1af88`.
+
+The one available indexed Jack surface contained XONE historical material but no explicit snapshot term. No direct-chain reconstruction was triggered because no authoritative exact block existed. This remains a scoped public-provenance miss only; `private_or_unpublished_snapshot_absence_proven=false`. `official_xone_snapshot_verified=false`, `official_registry_artifact_verified=false`, `xone_snapshot_eligibility_verified=false`, `xone_snapshot_xnt_allocation_binding_verified=false`, `xnt_issuance_verified=false`, `xnt_vesting_or_unlock_verified=false`, `october_6_unlock_applies_to_xone_verified=false`, `xone_xnt_conversion_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`. PR #608 merged as `ff0648a3768ce1f4f1307dc66e24baa8c920746a`; Issue #607 closed completed.
+
+**Current next gate:** deeper primary-source/archival snapshot recovery — direct/stable Jack historical source links or archives, archived X1/FairCrypto/XEN pages, registry/CSV/JSON/IPFS/Arweave references, Merkle roots, holder-export artifacts and X1 allocation records keyed by Ethereum addresses.
+
+### Previous accepted live gate — Ethereum XONE Snapshot / Registry v1
 
 **ACCEPTED INTERNAL FOUNDATION.** Ethereum XONE Snapshot Registry run #1 passed deterministic and live bounded-source jobs at PR #605 head `d8dbb8bf8bc225517bd1637ceed98b00073107c6`; Liquidity Scout Tests run #1790 also passed. The live corpus had 8 available FairCrypto source/history targets, 4 available official X1 targets, and 13 available ranked X1 Report pages. It produced **0 explicit XONE snapshot/registry claims, 0 official snapshot candidates, and 0 authoritative exact snapshot-block candidates**. The evidence artifact digest is `sha256:49dcea6f8ce5d412a3e09fe59ef8e2f55591c05b72c29e515812a0bad2f5cc36`.
 
