@@ -1,6 +1,6 @@
 # Current CMIS Project Status
 
-Current reconciliation: **2026-09-07 08:49 America/New_York**.
+Current reconciliation: **2026-09-07 08:56 America/New_York**.
 
 ## Accepted platform
 
@@ -13,6 +13,7 @@ Current reconciliation: **2026-09-07 08:49 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
+- Dedicated XONE/XNT Conversion Intelligence is accepted internally via #575 / PR #578 under `xone_xnt_conversion_scraper/v1` and `xone_xnt_conversion_intelligence/v1`. It is XONE-focused candidate discovery only; exact Ethereum XONE identity, Ethereum events, X1 issuance/vesting events, and cross-chain correlation remain unverified, with no public/Scout promotion and `execution_authorized=false`.
 
 ## Latest accepted live gate
 
