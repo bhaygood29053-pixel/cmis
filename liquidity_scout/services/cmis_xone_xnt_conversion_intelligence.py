@@ -21,11 +21,15 @@ from liquidity_scout.providers.ethereum import (
 from liquidity_scout.providers.xone_xnt import (
     CANDIDATE_DISCOVERY_CONTRACT_VERSION,
     SCRAPER_CONTRACT,
+    X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
+    discover_xnt_distribution_candidates,
+    extract_xnt_mechanism_claims,
     discover_conversion_candidates,
     XoneXntConversionScraper,
     extract_xone_xnt_claims,
     group_claims_for_review,
     qualify_conversion_candidate,
+    qualify_xnt_distribution_candidate,
     source_catalog,
 )
 
@@ -46,6 +50,9 @@ def _truth_state() -> dict[str, Any]:
         "xone_burn_accounting_surface_verified": False,
         "burn_redeemer_interface_verified": False,
         "conversion_candidate_discovery_verified": False,
+        "x1_xnt_mechanism_discovery_verified": False,
+        "x1_xnt_candidate_account_state_verified": False,
+        "xnt_distribution_mechanism_identified": False,
         "migration_sink_identified": False,
         "lock_or_migration_verified": False,
         "xone_xnt_conversion_verified": False,
@@ -419,6 +426,89 @@ class CMISXoneXntConversionIntelligenceService:
                 "conversion_candidate_discovery_verified": True,
                 "burn_redeemer_interface_verified":
                     qualification.get("burn_redeemer_interface_verified") is True,
+            },
+        }
+
+    def discover_x1_xnt_distribution_mechanism(
+        self,
+        documents: Sequence[Mapping[str, Any]],
+        *,
+        observed_at: float,
+        max_claims_per_document: int = 100,
+        max_candidates: int = 50,
+    ) -> dict[str, Any]:
+        """Extract XNT-side mechanism rules and exact X1 pubkey candidates."""
+
+        if not documents:
+            raise ValueError("documents must not be empty")
+        claims: list[dict[str, Any]] = []
+        for document in documents:
+            source_id = str(document.get("source_id") or "").strip()
+            url = str(document.get("url") or "").strip()
+            text_value = document.get("text")
+            if not source_id or not url or not isinstance(text_value, str):
+                raise ValueError("each document requires source_id, url, and text")
+            claims.extend(
+                extract_xnt_mechanism_claims(
+                    text_value,
+                    source_id=source_id,
+                    url=url,
+                    observed_at=observed_at,
+                    max_claims=max_claims_per_document,
+                )
+            )
+
+        discovery = discover_xnt_distribution_candidates(
+            claims,
+            max_candidates=max_candidates,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "x1_xnt_distribution_mechanism_contract":
+                X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
+            "state": STATE,
+            "xnt_mechanism_claim_count": len(claims),
+            "xnt_mechanism_claims": claims,
+            "xnt_mechanism_discovery": discovery,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "x1_xnt_mechanism_discovery_verified": True,
+            },
+        }
+
+    def qualify_x1_xnt_distribution_candidate(
+        self,
+        candidate: Mapping[str, Any],
+        *,
+        rpc_call: Any,
+        source_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Qualify one exact X1 candidate account without semantic promotion."""
+
+        qualification = qualify_xnt_distribution_candidate(
+            candidate,
+            rpc_call=rpc_call,
+            source_url=source_url,
+        )
+        return {
+            "service": SERVICE,
+            "service_contract": SERVICE_CONTRACT,
+            "scraper_contract": SCRAPER_CONTRACT,
+            "x1_xnt_distribution_mechanism_contract":
+                X1_XNT_DISTRIBUTION_MECHANISM_CONTRACT_VERSION,
+            "state": STATE,
+            "xnt_candidate_qualification": qualification,
+            "read_only": True,
+            "xone_xnt_only": True,
+            **{
+                **_truth_state(),
+                "x1_xnt_mechanism_discovery_verified": True,
+                "x1_xnt_candidate_account_state_verified":
+                    qualification.get("account_state_verified") is True,
             },
         }
 
