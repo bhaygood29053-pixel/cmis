@@ -13,6 +13,7 @@ from typing import Any, Optional
 from liquidity_scout.providers.x1.agents_radio_rpc_corroboration import (
     corroborate_agents_radio_with_x1_rpc,
 )
+from liquidity_scout.providers.x1.rpc import rpc_request
 from liquidity_scout.providers.web_discovery import (
     CONTRACT as PROVIDER_CONTRACT,
     WebDiscoveryError,
@@ -286,7 +287,7 @@ class CMISWebDiscoveryService:
         self,
         candidate: Mapping[str, Any],
         *,
-        rpc_call: Any,
+        rpc_call: Any = rpc_request,
         history_limit: int = 25,
         inspect_reported_slot_transaction: bool = True,
     ) -> dict[str, Any]:
