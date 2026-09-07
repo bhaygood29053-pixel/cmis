@@ -36,7 +36,9 @@ SYMBOL_SELECTOR = "0x95d89b41"
 DECIMALS_SELECTOR = "0x313ce567"
 
 DEFAULT_RPC_URLS = (
-    "https://ethereum-rpc.publicnode.com",
+    "https://gateway.tenderly.co/public/mainnet",
+    "https://eth-mainnet.public.blastapi.io",
+    "https://eth.merkle.io",
     "https://eth.drpc.org",
     "https://public.1rpc.io/eth",
 )
@@ -127,7 +129,7 @@ def ethereum_rpc_request(
     *,
     rpc_url: str,
     timeout: int = 20,
-    retries: int = 5,
+    retries: int = 3,
     post=requests.post,
     sleep=time.sleep,
 ) -> Any:
