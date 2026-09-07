@@ -99,6 +99,18 @@ class XoneSnapshotProvenanceTests(unittest.TestCase):
         self.assertFalse(row["direct_primary_source_recovered"])
         self.assertFalse(row["authoritative_exact_snapshot_block_discovered"])
 
+    def test_plain_xone_abi_json_is_not_snapshot_provenance(self):
+        rows = extract_provenance_candidates(
+            '{"contractName":"XONE","type":"function","name":"transfer"}',
+            source_id="faircrypto_x1_app_file",
+            source_role="faircrypto_x1_app_primary",
+            url="https://raw.githubusercontent.com/FairCrypto/x1-app/abc/public/abi/XONE.json",
+            path="public/abi/XONE.json",
+            revision="abc",
+            observed_at=1.0,
+        )
+        self.assertEqual(rows, [])
+
     def test_generic_xnt_airdrop_without_xone_is_rejected(self):
         rows = extract_provenance_candidates(
             "ETH-address keyed wallets can receive a one-time native XNT airdrop.",
