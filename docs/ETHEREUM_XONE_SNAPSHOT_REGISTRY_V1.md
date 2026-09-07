@@ -1,6 +1,6 @@
 # Ethereum XONE Snapshot / Registry v1
 
-Status: **IMPLEMENTATION FOR ISSUE #604 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE BOUNDED-SOURCE GATES + FULL TESTS PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #604 / PR #605. Ethereum XONE Snapshot Registry run #1 passed deterministic and live bounded-source jobs at head `d8dbb8bf8bc225517bd1637ceed98b00073107c6`, Liquidity Scout Tests run #1790 passed, and PR #605 merged as `ef6b52cb54c058bece72a8e04fb726997e9c1c00`.
 
 Contract:
 
@@ -120,9 +120,26 @@ xone_snapshot_or_registry_binding_verified = false
 
 It must never be substituted for the XONE snapshot or used to claim that an Ethereum XONE holder received XNT.
 
+## Accepted live result
+
+Run #1 searched the current bounded public corpus and found:
+
+- **8** available FairCrypto source/history targets;
+- **4** available official X1 web/docs targets;
+- **13** available ranked X1 Report pages;
+- **0** explicit XONE snapshot/registry claims;
+- **0** official snapshot candidates;
+- **0** authoritative exact Ethereum snapshot-block candidates.
+
+The evidence artifact digest is `sha256:49dcea6f8ce5d412a3e09fe59ef8e2f55591c05b72c29e515812a0bad2f5cc36`.
+
+Because no authoritative exact block was discovered, the live gate did **not** invent a block and did **not** run a historical holder-ledger reconstruction. The reconstruction and multi-RPC contracts are accepted by deterministic regression and are ready to run once an authoritative exact block is found.
+
+The bounded `x1-labs/xenblocks-airdrop` analogue independently satisfied only the architecture checks: ETH-address keying was present, native-XNT airdrop support was present, and XONE was absent. It remains non-XONE evidence.
+
 ## Valid zero-result
 
-A live PASS may find zero exact official snapshot candidates.
+The accepted live PASS found zero exact official snapshot candidates.
 
 That means only:
 
@@ -152,8 +169,10 @@ scout_reliance_promoted = false
 execution_authorized = false
 ```
 
-## Next slice after acceptance
+## Next slice
 
-If the bounded gate finds no exact public snapshot block, the next work should be **snapshot provenance expansion**, not MoonParty deployment research: direct Jack/X1 historical posts or archives, XONE/X1 release artifacts, private/public registry references, Merkle roots, archived holder files, and any X1-side allocation list that contains Ethereum XONE addresses.
+The current priority is **XONE snapshot provenance expansion**: direct Jack/X1 historical posts or archives, XONE/X1 release artifacts, private/public registry references, Merkle roots, archived holder files, and any X1-side allocation list containing Ethereum XONE addresses.
 
-If an exact snapshot block is discovered, this contract is already capable of reconstructing and cryptographically digesting the complete XONE holder ledger at that block. The following gate is then the explicit **snapshot → XNT allocation binding**.
+MoonParty deployment research is not the current XONE/XNT priority.
+
+Once an authoritative exact snapshot block is discovered, this accepted contract can reconstruct and multi-RPC corroborate the complete XONE holder ledger at that block. The following gate is then the explicit **snapshot → XNT allocation binding**, followed separately by XNT issuance/vesting/unlock proof.
