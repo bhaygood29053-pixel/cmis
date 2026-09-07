@@ -1,6 +1,6 @@
 # XONE Snapshot Archived Asset Graph Resolution v1
 
-Status: **IMPLEMENTATION FOR ISSUE #613 — NOT ACCEPTED UNTIL DETERMINISTIC + LIVE ASSET-GRAPH + FULL TEST GATES PASS AND PR MERGES**
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #613 / PR #614. XONE Snapshot Archived Asset Graph run #4 passed deterministic and live jobs at head `41506c866badadebb2a1c767ce573b7b0abeee60`; Liquidity Scout Tests run #1813 passed; PR #614 merged as `2cedaf6431093262495ad713c60b199cc7164dc0`.
 
 Contract:
 
@@ -124,9 +124,30 @@ Only then may `official_xone_snapshot_verified=true`.
 
 Snapshot eligibility and snapshot→XNT allocation remain separate contracts even after that.
 
+## Accepted live result
+
+Run #4 successfully traversed preserved historical application assets behind the selected XEN/X1 surfaces:
+
+- **41** root captures were discovered;
+- **6** root captures were successfully replayed;
+- **237** asset-graph edges were extracted;
+- **136** edges were same-origin and eligible for bounded Wayback asset resolution;
+- **4** archived application assets were successfully retrieved and content-hashed;
+- **0** semantic XONE snapshot candidates were found;
+- **0** stable primary X/X Spaces URLs were recovered;
+- **0** IPFS/Arweave content-addressed pointers were recovered;
+- **0** authoritative exact Ethereum snapshot blocks were recovered.
+
+Evidence artifact:
+
+- artifact id: `10031024146`
+- digest: `sha256:83369e886049a393cc9042ba4d0faf6f62fd148712a45e39028119d35ef88e3e`
+
+No holder-ledger reconstruction was triggered because no authoritative exact block emerged. The accepted result therefore proves bounded archived-asset traversal and negative findings only inside that inspected graph. It does **not** prove that no private, unpublished, deleted-unarchived, non-indexed or unpreserved snapshot source exists.
+
 ## Valid zero result
 
-A successful bounded traversal may find zero semantic snapshot candidates.
+The accepted bounded traversal found zero semantic snapshot candidates.
 
 That means only:
 
@@ -156,8 +177,21 @@ scout_reliance_promoted = false
 execution_authorized = false
 ```
 
-## Next gate after acceptance
+## Next gate
 
-If the graph recovers a stable X/X Spaces URL, content-addressed artifact pointer, exact snapshot block or holder/export artifact, resolve that exact lead next.
+The current-public pages, public GitHub provenance, archived page text, and bounded archived application asset graph have now all failed to expose an authoritative XONE snapshot block or registry artifact.
 
-If the public archived asset graph also yields no primary snapshot lead, narrow the evidence class further to **X1-side allocation-record discovery keyed by Ethereum XONE addresses** plus any non-indexed/publicly supplied snapshot artifact, rather than repeating generic web searches.
+The next exact investigation is therefore **X1-side XONE→XNT allocation-record discovery keyed by Ethereum XONE addresses**. Search for exact records that can bind:
+
+- an Ethereum address;
+- an X1 address/pubkey;
+- an XNT allocation amount;
+- an allocation/claim identifier;
+- a Merkle leaf/root or registry row when present;
+- claim state;
+- vesting/unlock state;
+- the source artifact/account/program that owns the record.
+
+A discovered allocation record is not automatically proof of snapshot eligibility or issuance. Exact artifact/account identity, semantics and XONE provenance must be verified separately.
+
+Any non-indexed snapshot artifact supplied later can still be handed directly to the accepted snapshot-registry verifier.
