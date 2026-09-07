@@ -19,6 +19,12 @@ from .agents_radio_rpc_corroboration import (
     X1AgentsRadioRPCCorroborationError,
     corroborate_agents_radio_with_x1_rpc,
 )
+from .program_upgrade_semantics import (
+    CONTRACT_VERSION as X1_PROGRAM_UPGRADE_SEMANTIC_VERIFICATION_CONTRACT,
+    X1ProgramUpgradeSemanticVerificationError,
+    decode_upgradeable_loader_state,
+    verify_program_upgrade_semantics,
+)
 from .canonical_pool_vault_coupling import prove_canonical_pool_vault_coupling
 from .cross_pool_trusted_semantics import qualify_cross_pool_trusted_semantics
 from .exact_pool_leg_semantics_v14104 import prove_exact_pool_leg_semantics
@@ -243,6 +249,10 @@ __all__ = [
     "X1_AGENTS_RADIO_RPC_CORROBORATION_CONTRACT",
     "X1AgentsRadioRPCCorroborationError",
     "corroborate_agents_radio_with_x1_rpc",
+    "X1_PROGRAM_UPGRADE_SEMANTIC_VERIFICATION_CONTRACT",
+    "X1ProgramUpgradeSemanticVerificationError",
+    "decode_upgradeable_loader_state",
+    "verify_program_upgrade_semantics",
     "fetch_agents_radio_bootstrap",
     "fetch_agents_radio_catalog",
     "fetch_agents_radio_deployments",
