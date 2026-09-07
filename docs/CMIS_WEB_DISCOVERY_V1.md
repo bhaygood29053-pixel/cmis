@@ -1,6 +1,6 @@
 # CMIS Web Discovery v1
 
-Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472, with accepted source-specific layers for X1 Explorer, XDEX, X1.Ninja, FortiBlox, and X1 Agents Radio. Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, and `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572. The entire Web Discovery stack remains subordinate to CMIS verification, non-promoted as truth, and `execution_authorized=false`.
+Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #471 / PR #472, with accepted source-specific layers for X1 Explorer, XDEX, X1.Ninja, FortiBlox, and X1 Agents Radio. Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. The entire Web Discovery stack remains subordinate to CMIS verification, non-promoted as truth, and `execution_authorized=false`.
 
 ## Purpose
 
@@ -63,7 +63,7 @@ semantics. RPC agreement is not treated as source-independence proof.
 
 #### X1 Program/Upgrade Semantic Verification v1
 
-Issue #574 adds `x1_program_upgrade_semantic_verification/v1` above accepted
+Issue #574 / PR #576 accepts `x1_program_upgrade_semantic_verification/v1` above accepted
 Radio -> X1 RPC corroboration. It decodes the exact BPF Upgradeable Loader
 Program -> ProgramData linkage, current ProgramData last-modified slot and
 upgrade-authority state, and the exact DeployWithMaxDataLen/Upgrade loader

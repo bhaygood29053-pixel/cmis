@@ -1,6 +1,6 @@
 # X1 Program/Upgrade Semantic Verification v1
 
-Status: **IMPLEMENTATION FOR ISSUE #574 — NOT ACCEPTED UNTIL PR/CI MERGE**
+Status: **ACCEPTED INTERNAL CONTRACT** via Issue #574 / PR #576. Exact-head Liquidity Scout Tests run #1739 passed before merge. The contract verifies loader-level Program/ProgramData and deploy/upgrade semantics only, remains non-promoted as a public/Scout capability, and preserves `execution_authorized=false`.
 
 Contract:
 
