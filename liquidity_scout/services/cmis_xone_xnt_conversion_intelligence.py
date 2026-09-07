@@ -819,16 +819,12 @@ class CMISXoneXntConversionIntelligenceService:
         *,
         source_candidate: Mapping[str, Any],
         registry_proof: Mapping[str, Any],
-        official_registry_artifact_verified: bool = False,
-        xnt_allocation_binding_verified: bool = False,
     ) -> dict[str, Any]:
         """Bind one authoritative exact-block snapshot claim to direct Ethereum state."""
 
         proof = promote_official_snapshot(
             source_candidate=source_candidate,
             registry_proof=registry_proof,
-            official_registry_artifact_verified=official_registry_artifact_verified,
-            xnt_allocation_binding_verified=xnt_allocation_binding_verified,
         )
         return {
             "service": SERVICE,
@@ -846,7 +842,8 @@ class CMISXoneXntConversionIntelligenceService:
                 "official_xone_snapshot_verified": True,
                 "official_registry_artifact_verified":
                     proof["official_registry_artifact_verified"],
-                "xone_snapshot_eligibility_verified": True,
+                "xone_snapshot_eligibility_verified":
+                    proof["xone_snapshot_eligibility_verified"],
                 "xone_snapshot_xnt_allocation_binding_verified":
                     proof["xone_snapshot_xnt_allocation_binding_verified"],
             },
