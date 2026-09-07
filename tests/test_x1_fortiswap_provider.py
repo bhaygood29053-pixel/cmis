@@ -8,6 +8,7 @@ from liquidity_scout.providers.x1.fortiswap import (
     fetch_discovery,
     normalize_discovery_catalog,
     normalize_quote_response,
+    normalize_ramp_availability_response,
     normalize_router_volume_response,
     normalize_token_detail_response,
     normalize_tokens_response,
@@ -61,6 +62,10 @@ class FortiSwapReadOnlyProviderTests(unittest.TestCase):
         )
         self.assertEqual(
             classify_route("GET", "/api/router/volume")["status"],
+            "allowed_read_only",
+        )
+        self.assertEqual(
+            classify_route("GET", "/api/ramp/availability")["status"],
             "allowed_read_only",
         )
         self.assertEqual(
@@ -271,6 +276,81 @@ class FortiSwapReadOnlyProviderTests(unittest.TestCase):
         self.assertIn("FortiBlox", result["provider_scope_note"])
         self.assertFalse(result["cmis_verified"])
         self.assertFalse(result["execution_authorized"])
+
+    def test_ramp_availability_normalization_is_narrow_provider_claim(self):
+        result = normalize_ramp_availability_response(
+            {
+                "buy": {
+                    "available": True,
+                    "providers": ["coinbase", "stripe", "transak", "moonpay"],
+                },
+                "country": "US",
+                "reason": None,
+                "sell": {
+                    "available": True,
+                    "providers": ["coinbase", "transak", "moonpay"],
+                },
+            }
+        )
+
+        self.assertEqual(result["scope"], "fortiblox_ramp_availability_observation")
+        self.assertEqual(result["provider_country_code"], "US")
+        self.assertTrue(result["buy"]["provider_available_claim"])
+        self.assertEqual(
+            result["buy"]["provider_names"],
+            ["coinbase", "stripe", "transak", "moonpay"],
+        )
+        self.assertTrue(result["sell"]["provider_available_claim"])
+        self.assertEqual(
+            result["sell"]["provider_names"],
+            ["coinbase", "transak", "moonpay"],
+        )
+        self.assertIsNone(result["provider_reason_claim"])
+        self.assertTrue(result["provider_availability_schema_verified"])
+        self.assertFalse(result["provider_country_code_semantics_verified"])
+        self.assertFalse(result["asset_scope_verified"])
+        self.assertFalse(result["network_scope_verified"])
+        self.assertFalse(result["quote_semantics_verified"])
+        self.assertFalse(result["price_semantics_verified"])
+        self.assertFalse(result["limit_semantics_verified"])
+        self.assertFalse(result["freshness_available"])
+        self.assertFalse(result["cmis_verified"])
+        self.assertFalse(result["source_independence_verified"])
+        self.assertFalse(result["public_service_promoted"])
+        self.assertFalse(result["scout_reliance_promoted"])
+        self.assertFalse(result["execution_authorized"])
+
+    def test_ramp_availability_rejects_invalid_schema(self):
+        invalid_payloads = [
+            {
+                "country": "USA",
+                "buy": {"available": True, "providers": []},
+                "sell": {"available": True, "providers": []},
+                "reason": None,
+            },
+            {
+                "country": "US",
+                "buy": {"available": "yes", "providers": []},
+                "sell": {"available": True, "providers": []},
+                "reason": None,
+            },
+            {
+                "country": "US",
+                "buy": {"available": True, "providers": [None]},
+                "sell": {"available": True, "providers": []},
+                "reason": None,
+            },
+            {
+                "country": "US",
+                "buy": {"available": True, "providers": []},
+                "sell": {"available": True, "providers": []},
+                "reason": {"code": "blocked"},
+            },
+        ]
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                with self.assertRaises(FortiSwapAPIError):
+                    normalize_ramp_availability_response(payload)
 
     def test_quote_normalization_preserves_provider_assertions(self):
         result = normalize_quote_response(
