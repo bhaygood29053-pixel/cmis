@@ -223,7 +223,7 @@ With no `--lead-json`, it emits `NO_LEAD`.
 
 With `--lead-json`, it resolves exactly one local artifact object.
 
-The runner performs no discovery. Post-acceptance Issue #625 hardens the package import boundary so the NO_LEAD path also avoids transitive HTTP/network-client imports.
+The runner performs no discovery. Issue #625 / PR #626 hardened the package import boundary so the NO_LEAD path avoids transitive HTTP/network-client imports.
 
 ## Authority boundary
 
@@ -306,6 +306,6 @@ Broad generic scraping is not automatically resumed.
 
 ## Post-acceptance runtime import hardening
 
-Issue #625 corrects a review defect found after PR #624. Run #3's AST check proved only that the runner had no **direct** network-client imports; the eager `liquidity_scout.providers.xone_xnt` package initializer could still transitively load `requests`.
+Issue #625 / PR #626 corrected the review defect found after PR #624. Run #3's AST check proved only that the runner had no **direct** network-client imports; the eager `liquidity_scout.providers.xone_xnt` package initializer could still transitively load `requests`.
 
-The hardening changes the package export surface to lazy loading and strengthens CI so network-client imports are actively blocked while the NO_LEAD runner executes. Acceptance of this hardening requires `TRANSITIVE_NETWORK_CLIENT_IMPORTS=0` together with the existing `network_discovery_performed=false`, `network_request_count=0`, and `execution_authorized=false` boundaries.
+The accepted hardening changes the package export surface to lazy loading and strengthens CI so network-client imports are actively blocked while the NO_LEAD runner executes. Resolver workflow run #34232399772 passed both deterministic and `no-lead-operational` jobs; Liquidity Scout Tests run #34232399665 passed; PR #626 merged as `33a1ae763abcf7677cc12d251834791158dbabe0`. The accepted runtime boundary is `TRANSITIVE_NETWORK_CLIENT_IMPORTS=0` together with `network_discovery_performed=false`, `network_request_count=0`, and `execution_authorized=false`.
