@@ -13,9 +13,9 @@ Current reconciliation: **2026-09-08 09:34 America/New_York**.
 - `large_trade_discovery/v1` is promoted through public PRs #532/#533 + protected `cmis-core` #35;
 - GENIUS Act `regulatory_evidence/v1` is promoted under CMIS 1.26 through public PR #540 + protected `cmis-core` #43;
 - CMIS Web Discovery remains accepted as bounded discovery below the verification boundary; X1 Agents Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. CMIS can now distinguish ordinary program activity from exact BPF Upgradeable Loader deploy/upgrade semantics and verify current ProgramData slot/authority state, while application identity/IDL semantics remain unverified and no public/Scout promotion is implied.
-- Dedicated XONE/XNT Conversion Intelligence is accepted internally through #622 / PR #623 `xone_xnt_primary_allocation_artifact_resolution/v1`, following the prior identity/event/burn/candidate/X1-binding/snapshot/provenance/archive/asset-graph/allocation-record/allocation-source gates. The new resolver is deliberately **lead-driven**. Accepted run #3 passed deterministic and `NO_LEAD` operational jobs; Liquidity Scout Tests #1838 passed. The operational proof has **zero direct network-client imports, `network_discovery_performed=false`, `network_request_count=0`, no lead, and no handoffs**. No XONE primary allocation artifact has been resolved yet. CMIS is now ready to ingest one already-retrieved exact registry/export/holder file/API/Merkle/content-addressed/X1-program artifact, verify hash/provenance/exact XONE binding, and expose only an authorized verification *handoff route* while keeping every allocation/issuance/vesting truth flag false. Broad public discovery stays paused. Snapshot→XNT allocation binding, XNT issuance/vesting/unlock, October 6 applicability and cross-chain correlation remain unverified; `execution_authorized=false`.
+- XONE/XNT Conversion Intelligence is **RETIRED / HISTORICAL** by Issue #628. Existing accepted contracts, tests, and evidence remain preserved for auditability, but there is no active XONE/XNT next gate, no further lead recovery, and no planned public-service or X1 Scout promotion. Retirement does not prove or disprove XONE→XNT conversion semantics. `execution_authorized=false` remains unchanged.
 
-## Latest accepted live gate
+## Retired historical XONE/XNT gate
 
 ### XONE → XNT Primary Allocation Artifact Resolution v1
 
@@ -33,7 +33,7 @@ Evidence artifact id: `10034667373`; digest: `sha256:c77ce4033a4421e9bb5b33bc636
 
 No actual XONE primary allocation artifact has yet been resolved. `allocation_source_provenance_verified=false`, `authoritative_allocation_source_verified=false`, `official_xone_snapshot_verified=false`, `official_registry_artifact_verified=false`, `xone_snapshot_eligibility_verified=false`, `xone_snapshot_xnt_allocation_binding_verified=false`, `allocation_semantics_verified=false`, `claim_state_verified=false`, `vesting_or_unlock_state_verified=false`, `xnt_issuance_verified=false`, `xnt_vesting_or_unlock_verified=false`, `october_6_unlock_applies_to_xone_verified=false`, `xone_xnt_conversion_verified=false`, `cross_chain_correlation_verified=false`, and `execution_authorized=false`.
 
-**Current next gate:** remain in `NO_LEAD` until a new exact primary artifact is surfaced or supplied. Resolve that artifact first; only `RESOLVED_FOR_HANDOFF` may trigger the appropriate stronger verifier. Do not automatically resume broad generic scraping.
+**Retirement state:** no further XONE/XNT lead intake, artifact resolution, or stronger-verifier handoff is planned under the active CMIS roadmap.
 
 ### Previous accepted live gate — XONE → XNT Allocation Source Provenance v1
 

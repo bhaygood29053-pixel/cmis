@@ -1,6 +1,6 @@
 # XONE → XNT Primary Allocation Artifact Resolution v1
 
-Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #622 / PR #623. Dedicated resolver run #3 passed deterministic and NO_LEAD operational jobs at head `21be1b27f10ffd1be4ab5d91ec6b1554b60f64c9`; Liquidity Scout Tests #1838 passed; PR #623 merged as `e288ed4bf4620654f64b57615a963efbe64e7700`.
+Status: **RETIRED / HISTORICAL** by Issue #628. This accepted resolver remains preserved as read-only evidence tooling, but no new XONE/XNT leads will be pursued or promoted under the active roadmap.
 
 Contract:
 
@@ -296,13 +296,9 @@ Evidence artifact:
 
 No real XONE allocation artifact was supplied during acceptance, so no candidate or handoff is claimed.
 
-## Next gate
+## Retirement
 
-This resolver should remain idle in `NO_LEAD` until a new exact primary artifact appears.
-
-When one appears, resolve it here first. Only a `RESOLVED_FOR_HANDOFF` artifact becomes eligible for the appropriate stronger verification contract.
-
-Broad generic scraping is not automatically resumed.
+Issue #628 ends the active XONE/XNT workstream. There is no next gate. The resolver remains preserved for auditability, but CMIS will not pursue new lead discovery, lead intake, downstream handoffs, or public/Scout promotion for this contract.
 
 ## Post-acceptance runtime import hardening
 
