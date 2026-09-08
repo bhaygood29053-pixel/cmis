@@ -188,6 +188,6 @@ ROBERTA regulatory adoption is accepted end to end through public PR #368, prote
 
 ## Parallel work
 
-Provider-gap research, X1Scroll fallback qualification, delayed-departure research, Theo transport work, and historical provider investigations remain parallel unless a separately accepted roadmap gate promotes them.
+Provider-gap research, delayed-departure research, Theo transport work, FortiBlox fact-time qualification, and historical provider investigations remain parallel unless a separately accepted roadmap gate promotes them. X1Scroll fallback #458 / draft PR #549 is explicitly **ON HOLD** while the required X1Scroll API key is unavailable; do not merge or promote it until the exact live archival acceptance gate can run and pass.
 
 `execution_authorized=false`
