@@ -1,5 +1,7 @@
 # XONE/XNT Conversion Intelligence v1
 
+Status: **RETIRED / HISTORICAL** by Issue #628. The implementation, tests, and evidence are preserved for auditability, but this workstream is no longer under active development and has no promotion path.
+
 Status: **ACCEPTED INTERNAL FOUNDATION** via Issue #575 / PR #578. Dedicated XONE/XNT Scraper run #2 and Liquidity Scout Tests run #1744 passed before merge. This capability remains deliberately separate from the generic `cmis_web_discovery/v1` provider registry, non-promoted for public/Scout reliance, and `execution_authorized=false`.
 
 ## Purpose
@@ -102,7 +104,7 @@ PYTHONPATH=. python scripts/scrape_xone_xnt_conversion.py \
   --max-urls 20
 ```
 
-## Next acceptance slices
+## Historical acceptance slices
 
 1. **COMPLETE:** exact Ethereum XONE ERC-20 identity accepted under `ethereum_xone_identity/v1` via #580 / PR #581;
 2. **COMPLETE:** bounded canonical Ethereum XONE event observer accepted under `ethereum_xone_event_observer/v1` via #583 / PR #584;
@@ -118,10 +120,4 @@ PYTHONPATH=. python scripts/scrape_xone_xnt_conversion.py \
 12. **COMPLETE BOUNDED X1 ALLOCATION-RECORD DISCOVERY:** `xone_xnt_x1_allocation_record_discovery/v1` accepted via #616 / PR #617. Run #7 covered 3/3 repositories, 15 ranked repository files and 3/3 official X1 targets and found 0 qualifying records / 0 candidates / 0 exact-XONE-bound candidates / 0 XNT-amount candidates. Earlier ABI/bytecode false positives were rejected before acceptance and converted to permanent regressions. No private/global absence inference is allowed;
 13. **COMPLETE BOUNDED ALLOCATION-SOURCE PROVENANCE:** `xone_xnt_allocation_source_provenance/v1` accepted via #619 / PR #620. Final run #6 covered 3/3 repositories, 41 provenance-shaped files, 3/3 release queries and 3/3 official X1 targets. It retained 10 clean non-XONE `x1_program_schema` architecture analogues and found 0 qualifying XONE allocation-source candidates / 0 exact-XONE-bound sources. Earlier false-positive classes were rejected and converted into permanent regressions. No private/global absence inference is allowed;
 14. **COMPLETE LEAD-DRIVEN PRIMARY ARTIFACT RESOLUTION:** `xone_xnt_primary_allocation_artifact_resolution/v1` accepted via #622 / PR #623. Run #3 proves the intentional `NO_LEAD` idle state with zero direct network-client imports / zero discovery requests; deterministic prior-boundary regressions and Liquidity Scout Tests #1838 passed. CMIS can classify an already-retrieved artifact as NO_LEAD / REJECTED / CANDIDATE / RESOLVED_FOR_HANDOFF and route only reproducible exact-XONE evidence into a stronger verifier;
-15. **WAIT FOR AN EXACT PRIMARY LEAD:** registry/export, holder CSV/JSON, authoritative API/Merkle pointer, content-addressed artifact, exact deployed X1 program/account schema explicitly tied to XONE, or externally supplied primary evidence. Do not restart the exhausted broad corpus automatically;
-16. when an authoritative exact snapshot block is resolved, run the accepted full Ethereum ledger reconstruction from XONE creation through that block, require historical `totalSupply()` and deterministic `balanceOf()` checks, and require two-RPC registry-digest agreement;
-17. separately prove the **snapshot → XNT allocation binding**: ratio/formula, exclusions/minimums, Ethereum→X1 wallet mapping, claim/allocation record, and whether the allocation is already fixed;
-18. separately prove XNT issuance/vesting/unlock semantics for **XONE-derived** allocations, including whether October 6 applies;
-19. add deterministic Ethereum -> X1 correlation only after both exact sides are independently verified;
-20. add persistent claim-ledger storage and supersession metadata;
-21. only then consider any public CMIS or X1 Scout promotion.
+15. **RETIRED:** Issue #628 ends the active XONE/XNT roadmap. No further primary-lead recovery, snapshot→XNT binding, issuance/vesting/unlock proof, Ethereum→X1 correlation, claim-ledger work, public CMIS promotion, or X1 Scout promotion is planned.
