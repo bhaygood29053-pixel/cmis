@@ -62,25 +62,51 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Prove runner imports no network client
+      - name: Prove NO_LEAD runtime import graph is network-client-free
+        env:
+          PYTHONPATH: .
         run: |
           python - <<'PY'
-          import ast
-          from pathlib import Path
+          import importlib.abc
+          import runpy
+          import sys
 
-          path = Path("scripts/resolve_xone_xnt_primary_allocation_artifact.py")
-          tree = ast.parse(path.read_text(encoding="utf-8"))
-          forbidden = {"requests", "httpx", "aiohttp", "urllib", "socket"}
+          forbidden_roots = {"requests", "httpx", "aiohttp"}
+          forbidden_exact = {"urllib.request", "socket"}
 
-          imports = set()
-          for node in ast.walk(tree):
-              if isinstance(node, ast.Import):
-                  imports.update(alias.name.split(".")[0] for alias in node.names)
-              elif isinstance(node, ast.ImportFrom) and node.module:
-                  imports.add(node.module.split(".")[0])
+          class BlockNetworkClients(importlib.abc.MetaPathFinder):
+              def find_spec(self, fullname, path=None, target=None):
+                  root = fullname.split(".", 1)[0]
+                  if root in forbidden_roots or fullname in forbidden_exact:
+                      raise ImportError(
+                          f"network client import blocked during NO_LEAD proof: {fullname}"
+                      )
+                  return None
 
-          assert not (imports & forbidden), imports & forbidden
-          print("NETWORK_CLIENT_IMPORTS=0")
+          sys.meta_path.insert(0, BlockNetworkClients())
+          sys.argv = [
+              "scripts/resolve_xone_xnt_primary_allocation_artifact.py",
+              "--observed-at",
+              "1",
+          ]
+
+          try:
+              runpy.run_path(
+                  "scripts/resolve_xone_xnt_primary_allocation_artifact.py",
+                  run_name="__main__",
+              )
+          except SystemExit as exc:
+              assert exc.code == 0, exc.code
+
+          loaded = set(sys.modules)
+          leaked = sorted(
+              name
+              for name in loaded
+              if name.split(".", 1)[0] in forbidden_roots
+              or name in forbidden_exact
+          )
+          assert leaked == [], leaked
+          print("TRANSITIVE_NETWORK_CLIENT_IMPORTS=0")
           PY
       - name: Prove intentional NO_LEAD state
         env:
