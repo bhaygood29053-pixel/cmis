@@ -223,7 +223,7 @@ With no `--lead-json`, it emits `NO_LEAD`.
 
 With `--lead-json`, it resolves exactly one local artifact object.
 
-The script intentionally imports no HTTP/network client and performs no discovery.
+The runner performs no discovery. Post-acceptance Issue #625 hardens the package import boundary so the NO_LEAD path also avoids transitive HTTP/network-client imports.
 
 ## Authority boundary
 
@@ -276,7 +276,7 @@ Acceptance requires:
 Final accepted run #3 proves the intended idle state:
 
 - `resolution_state=NO_LEAD`
-- `NETWORK_CLIENT_IMPORTS=0`
+- `DIRECT_NETWORK_CLIENT_IMPORTS=0`
 - `network_discovery_performed=false`
 - `network_request_count=0`
 - `lead_supplied=false`
@@ -303,3 +303,9 @@ This resolver should remain idle in `NO_LEAD` until a new exact primary artifact
 When one appears, resolve it here first. Only a `RESOLVED_FOR_HANDOFF` artifact becomes eligible for the appropriate stronger verification contract.
 
 Broad generic scraping is not automatically resumed.
+
+## Post-acceptance runtime import hardening
+
+Issue #625 corrects a review defect found after PR #624. Run #3's AST check proved only that the runner had no **direct** network-client imports; the eager `liquidity_scout.providers.xone_xnt` package initializer could still transitively load `requests`.
+
+The hardening changes the package export surface to lazy loading and strengthens CI so network-client imports are actively blocked while the NO_LEAD runner executes. Acceptance of this hardening requires `TRANSITIVE_NETWORK_CLIENT_IMPORTS=0` together with the existing `network_discovery_performed=false`, `network_request_count=0`, and `execution_authorized=false` boundaries.
