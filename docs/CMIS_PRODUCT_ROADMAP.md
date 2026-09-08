@@ -1,10 +1,10 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-09-07 (America/New_York)
+Last reconciled: 2026-09-08 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
 
-## Live checkpoint — 2026-09-07
+## Live checkpoint — 2026-09-08
 
 - **Current accepted CMIS capability contract: `1.27.0`.**
 - **Universal response freshness: ACCEPTED TARGET.** Every public CMIS response carries `cmis_response_freshness/v1`; missing service-specific freshness fails closed instead of disappearing from the response.
@@ -17,6 +17,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - **X1.Ninja USD-liquidity semantics and rolling freshness work: COMPLETE through the accepted later scan/freshness stack.** Historical #461/#459 blockers are no longer the current flagship gate.
 - **CMIS Web Discovery: COMPLETE internally through the accepted source-specific stack, including X1 Agents Radio.** Radio source discovery is accepted via #564 / PR #566, `x1_agents_radio_structured_discovery/v1` via #568 / PR #569, direct-chain `x1_agents_radio_rpc_corroboration/v1` via #571 / PR #572, and `x1_program_upgrade_semantic_verification/v1` via #574 / PR #576. Canonical finalized X1 RPC now verifies exact upgradeable-loader Program→ProgramData linkage, current ProgramData last-modified slot/upgrade authority, and exact DeployWithMaxDataLen vs Upgrade transaction semantics. Radio application names/categories/frameworks and application IDL/business semantics remain unverified; no public-service or Scout-reliance promotion is implied.
 - **XONE/XNT Conversion Intelligence: RETIRED / HISTORICAL.** Active development ended by Issue #628. The accepted XONE/XNT contracts, tests, and evidence remain in the repository for auditability, but CMIS will not pursue further lead recovery, snapshot/allocation binding, issuance/vesting/unlock proof, public-service promotion, or X1 Scout reliance on this workstream. No negative factual inference about XONE→XNT conversion follows from retirement. `execution_authorized=false` remains unchanged.
+- **X1Scroll historical fallback: ON HOLD.** Issue #458 / draft PR #549 must not merge or promote while the required X1Scroll API key is unavailable. Resume only when the key exists and the exact live archival `getTransaction` acceptance gate can run and pass; deterministic CI alone is not a substitute.
 - Controlled Execution remains locked: `execution_authorized=false`.
 - **Programmable Market Intelligence foundation (#552): IMPLEMENTED ON THIS WORKSTREAM / NON-PROMOTED.** Adds deterministic `uniswap_v4_hook_intelligence/v1`, `reflection_flow_intelligence/v1`, `yield_provenance/v1`, and an additive Robinhood→X1 companion over accepted `cross_chain_asset_provenance/v1`. Discovery remains subordinate to verification; hook permission bits do not prove business logic; missing incentives are never zero-filled; Robinhood custody/backing/route state remain unverified without separate accepted evidence; the public CMIS 1.27 capability manifest is unchanged and `execution_authorized=false` remains mandatory.
 
