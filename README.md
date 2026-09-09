@@ -46,82 +46,35 @@ Chain Provider -> CMIS -> Chain Scout -> Roberta
 
 CMIS owns deterministic facts and evidence. Chain Scouts own chain-specific investigation/interpretation. Roberta owns user intent, policy, coordination, learning-workflow coordination, and final synthesis. Neither Roberta nor a Scout should recreate CMIS/provider calculations to manufacture a second market fact.
 
-## Current roadmap position — reconciled 2026-09-06
+## Current roadmap position — reconciled 2026-09-08
 
 Accepted on `main`:
 
-- **CMIS Phase 10 — Solana read-only provider foundation:** complete.
-- **Evidence Receipts + Proof Score:** complete.
-- **X1 evidence-capability boundary:** complete and fail-closed.
-- **Deterministic pre-trade trade-size analysis:** complete.
-- **CMIS Phase 11 — read-only Verified Intelligence foundation:** complete.
-- **CMIS Phase 12 — first narrow X1 public-service / Scout-reliance promotion:** complete for `concentration_change_intelligence/v1`.
-- **Deterministic descriptive intelligence classification:** complete, internal/read-only/non-promoted.
-- **Deterministic direct wallet-relationship evidence:** complete, internal/read-only/non-promoted, explicit non-ownership semantics.
-- **Deterministic concentration-threshold alert evidence (#263/#264):** complete, internal/read-only/non-promoted.
-- **Repository-authoritative deterministic engineering workflow / three-axis review:** adopted.
-- **CMIS capability contract:** `1.21.0`.
-- **Instant X1 Scan `instant_x1_scan/v4`:** bounded X1-only read-only composition preserving accepted v3/v2 identity/history/risk semantics while accepting field-scoped `x1_current_market_freshness/v2`. Price, liquidity, rolling 24h volume, and rolling transaction freshness may be verified only when their exact accepted evidence gates pass; provider fact-time and source independence remain separate.
-- **X1 Burn Intelligence `burn_intelligence/v1`:** first-class bounded X1-only read-only service over the accepted deterministic burn foundation. It exposes cumulative verified observed burn, 1h/24h/7d/30d windows, event counts, 24h/7d/30d period-over-period changes, issuance context, circulating-supply context, and burn-time valuation without recomputation.
-- **X1 Discovery Intelligence `discovery_intelligence/v1`:** first-class bounded X1-only read-only projection over the CMIS-owned Discovery Ledger. It exposes first and most-recent verified observations, verified count, sparse evidence bounds, and elapsed observed history. First observation is explicitly not token launch time.
-- **X1 Concentration Warning Intelligence `concentration_warning_intelligence/v1`:** first-class bounded X1-only pull-only service over the accepted persistent concentration warning foundation. It exposes deterministic WATCH/CLEAR state with exact two-observation persistence and Evidence Receipt / Proof Score lineage. WATCH/CLEAR are not risk severity; push delivery is not authorized.
-- **Oracle V2 read-only evidence:** deployed contract shape and Unix-ms timestamp semantics are verified; the explicit freshness policy is selected and applied, while current-price authority remains unpromoted because the latest live slots are stale.
-- **Roberta adoption/readiness of the promoted X1 concentration-change service:** complete through X1 Scout.
-- **Paired Roberta PR #226 / CMIS PR #269 source-of-truth reconciliation:** merged on both projects.
-- **Roberta autonomous Learning Plane dependency:** accepted on Roberta `main`; operator-local MB4E source mastery is complete at 14/14 required stages plus the final capstone, with authoritative read-only autonomous-training telemetry accepted.
-- **Six-phase public-shell/private-core migration:** complete. Protected CMIS implementation is removed from active public branch/tag history and public package boundaries fail closed without the required private core.
-- **Warp Bridge Supply + Flow Intelligence (#409):** complete under the accepted bounded route/retention/supply/current+prior-window evidence stack.
-- **Bridge-to-XDEX Utilization Intelligence (#410): COMPLETE.** PR #469 merged the final bounded 24h XDEX activity proof, comparable wSOL.X USD value basis, and final utilization composition. Issue #482 is now the separate public-service / Scout-reliance promotion gate.
-- **Current USDC.X/USD equivalence (PRs #466/#468):** accepted as a bounded current proof; PR #470 remains the final X1.Ninja five-pool USD-liquidity semantic gate.
-- **CMIS Web Discovery v1-v5:** complete internally through PR #481, adding structured XDEX endpoint discovery to the bounded six-source/X1 Explorer discovery stack. **Issue #483 is active for Web Discovery v6 / XDEX network-gap registry.** All results remain `DISCOVERED` and non-promoted.
+- **CMIS capability contract: `1.27.0`.**
+- **Instant X1 Scan: complete through `instant_x1_scan/v6`.**
+- **Universal response freshness: accepted through `cmis_response_freshness/v1`.**
+- **Burn, Discovery, historical comparison, exact-mint identity, deterministic risk, and bounded pre-trade analysis:** accepted under their versioned contracts.
+- **Concentration Warning / Early Warning:** accepted through public CMIS promotion and pull-only ROBERTA adoption; push delivery remains a separate future gate.
+- **Bridge-to-XDEX and cross-chain asset provenance:** accepted through public/protected promotion paths.
+- **Trade Price-Impact Intelligence and provider-scoped Large-Trade Discovery:** accepted, including the protected Large-Trade -> #498 live handoff.
+- **GENIUS Act Regulatory Evidence:** accepted as freshness-aware regulatory evidence; it does not create legal/compliance conclusions.
+- **CMIS Web Discovery:** accepted internally through source-specific discovery, X1 Agents Radio structured discovery, direct X1 RPC corroboration, and program/upgrade semantic verification.
+- **Six-phase public-shell/private-core migration:** complete.
+- **XONE/XNT Conversion Intelligence:** retired/historical; accepted evidence remains auditable but there is no active promotion path.
+- **Controlled Execution:** locked; `execution_authorized=false`.
 
-Not accepted/promoted:
+Current active ordering:
 
-- no push/subscription alert delivery service;
-- no Scout-reliance promotion for the internal classification/relationship/alert foundations;
-- no Solana promotion of `concentration_change_intelligence/v1`;
-- no behavioral/ownership/intent/fraud/manipulation inference from the internal foundations;
-- no Ethereum provider milestone without a separate accepted gate;
-- no Controlled Execution or value movement.
+1. **X1 provider-gap umbrella #30** remains the active read-only provider-verification track.
+2. **FortiBlox price fact-time freshness #567** is the primary concrete provider gate.
+3. Remaining X1.Ninja semantic/delayed-departure work is parallel research, not a blanket flagship blocker.
+4. Warp retention #437 and Theo transport #422 remain parallel research.
+5. **X1Scroll #458 / draft PR #549 is ON HOLD** until the required API key exists and the exact live archival gate passes.
+6. Older open issues whose targets have been superseded by later accepted contracts are issue-hygiene work, not evidence that the core CMIS 1.27 surface is unfinished.
 
-### Strategic product focus — 2026-08-28
+The independent ROBERTA Evaluation Laboratory is currently **paused by owner**. Its preserved `live-smoke-004` baseline is 20/20 runtime OK, 8 PASS, 12 EVIDENCE_REQUIRED, 0 FAIL. Protected ROBERTA #89 / PR #90 remains open/unaccepted historical remediation and does not create CMIS remediation.
 
-CMIS now prioritizes the verified X1 services needed for Roberta's flagship product: Instant X1 Scan fields, fresh validation of the documented X1.Ninja developer API as a candidate provider, explicit holder/wallet intelligence promotion, an immutable Discovery Ledger, Early Warning service contracts, deterministic Compare support, bounded X1 ecosystem/network brief inputs, and a later developer intelligence API. Solana remains maintained for accepted read-only capability and portability testing, but Solana product expansion and release work are deferred to a future phase. This is a roadmap reprioritization only and does not promote internal services, verify a new provider, change the capability contract, or authorize execution.
-
-Current live ordering is narrower: #482 promotes the already-accepted #410 Bridge-to-XDEX contract for public CMIS service/X1 Scout reliance; PR #470 finalizes #461 X1.Ninja USD-liquidity semantics; #459 remains the later field-scoped freshness promotion gate. ROBERTA #314 follows #482. CMIS Web Discovery v1-v5 is complete internally through PR #481; Issue #483 is the active v6 XDEX network-gap registry. Issue #483 is the active v6 XDEX network-gap registry. PR #363 delayed-vault/X1.Ninja evidence research remains parallel and is not the flagship blocker.
-
-
-
-The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current status snapshot is [`docs/CURRENT_PROJECT_STATUS.md`](./docs/CURRENT_PROJECT_STATUS.md), with the four-repository checkpoint in [`docs/CHECKPOINT_2026-09-05_FOUR_REPOS.md`](./docs/CHECKPOINT_2026-09-05_FOUR_REPOS.md).
-
-## Active provider-gap work — not accepted capability
-
-Issue #30 remains the parallel read-only/fail-closed X1 provider-gap track.
-
-Current provider-gap state:
-
-- **Issue #456 — X1Scroll archival RPC reconsideration:** bounded provider foundation is being reintroduced for the provider-documented known-signature `getTransaction` contract. Canonical X1 RPC remains the discovery/current-state path. X1Scroll address-history discovery, archive completeness, source independence, and production fallback remain unverified until a credentialed bounded live gate passes.
-- **PR #242 — Warp Bridge proof-origin binding:** closed as not currently verifiable because no exact X1-owned machine-readable read contract was established. No guessed bridge endpoint is accepted.
-- **PR #227 — FortiBlox provider contract research:** closed/archive candidate research. Exact provider-owned Explorer/Nexus endpoint and response contracts remain unverified; no FortiBlox adapter is accepted.
-- **Issue #272 — Oracle V2 read-only X1 price evidence:** structural identity/layout and Unix-ms timestamp semantics are verified, and the explicit current-price freshness policy is now selected/applied. The latest live policy run classified all 30 relay slots stale, so current price use, price correctness, source independence, CMIS-provider promotion, public-service promotion, and Scout reliance remain false. Relay count is not independent-source count.
-- **Issue #301 — self-hosted X1 read-only node history/streaming redundancy:** deterministic contract/probes remain available on `main` via PR #302, but live self-hosted deployment verification is deferred because the selected production path uses the Official X1 RPC. No RPC redundancy or independent market-source claim is inferred.
-
-Closed research branches and failed verification attempts do not create provider capability on `main`.
-
-Other current X1 provider-gap observations remain non-promotional:
-
-- the tested X1.Ninja SSE credential returned HTTP 403 / access denied;
-- **Issue #304 — holder semantics correction: complete via PR #305.** X1.Ninja holder-looking values, official X1 RPC token-account counts, and unique token-account-authority counts remain distinct evidence classes; raw provider `holders` values do not become verified asset-wide holder counts without counted-entity and coverage proof;
-- those observations do not establish holder totals, wallet identity, beneficial ownership, provider completeness, or stream semantics;
-- Warp Bridge machine-readable operational state remains unavailable until an exact provenance-approved read contract is accepted.
-
-Current Solana field-maturity work:
-- **Issue #306 — observed-pair liquidity/volume aggregation: complete via PR #307.** CMIS deterministically totals only eligible unique DEX Screener pairs returned for the verified mint. The result remains explicitly observed-pair scoped; pair-universe completeness, Solana-wide liquidity/volume verification, and market-source independence remain false.
-- **Issue #308 — Solana market observation freshness semantics: complete via PR #310.** Jupiter `blockId` is accepted as the provider-documented Solana block reference for the computed price and may be mapped through canonical `getBlockTime`; CMIS collection time remains separate. Jupiter token `createdAt` and DEX Screener `pairCreatedAt` are not price-observation timestamps.
-- **Issue #311 — Solana Jupiter current-price freshness policy: complete via PR #312.** CMIS applies an explicit 60-second max-age and 5-second future-skew operator policy to verified Jupiter block-time evidence.
-- **Issue #313 — timestamped secondary Solana price evidence: complete via PR #314.** CMIS reads one exact USDC/USD Pyth Core sponsored push-feed fixture through canonical Solana RPC, verifies account/feed/full-verification/price/exponent/confidence/`publish_time`, applies a separate Pyth 60-second/5-second source policy, and can compare Jupiter/Pyth numerical prices plus exact fact-time delta.
-- **Issue #315 — Jupiter–Pyth cross-source time identity: implemented in PR #316.** CMIS defines a separate five-second same-time operator window. Both source-specific freshness gates must be FRESH; a fact-time delta <=5 seconds may set `cross_source_time_identity_verified=true`. Source independence, price-construction equivalence, current-price promotion, and execution authority remain false.
-- **Issue #317 — Jupiter/Pyth independence and methodology compatibility: deferred with the Solana product track.** The issue remains useful future evidence work, but it is not the active implementation priority while CMIS productizes X1 first.
+The authoritative roadmap is [`docs/CMIS_PRODUCT_ROADMAP.md`](./docs/CMIS_PRODUCT_ROADMAP.md). The repository-authoritative engineering process is [`docs/CMIS_ENGINEERING_WORKFLOW.md`](./docs/CMIS_ENGINEERING_WORKFLOW.md). The accepted Roberta-facing trust baseline is [`ROBERTA_CMIS_ACCEPTED_BASELINE.md`](./ROBERTA_CMIS_ACCEPTED_BASELINE.md). The compact paired cross-project baseline is [`ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md`](./ROBERTA_CMIS_SOURCE_SYNC_BASELINE.md). The current status snapshot is [`docs/CURRENT_PROJECT_STATUS.md`](./docs/CURRENT_PROJECT_STATUS.md).
 
 ## Roberta-facing service surface
 
