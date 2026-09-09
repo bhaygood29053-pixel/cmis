@@ -302,6 +302,23 @@ def test_truth_boundary_upgrades_fail_closed():
         build(component_responses=bad)
 
 
+def test_error_component_remains_explicit_without_fabricating_item():
+    values = components()
+    values[0]["status"] = "error"
+    values[0]["errors"] = [{"code": "upstream_error"}]
+
+    result = build(component_responses=values)
+
+    assert "discovery_intelligence" in result["coverage"][
+        "error_or_ambiguous_service_classes"
+    ]
+    assert all(
+        item["source_service"] != "discovery_intelligence"
+        for item in result["items"]
+    )
+    assert result["complete_x1_ecosystem_coverage_verified"] is False
+
+
 def test_replay_is_deterministic():
     first = build()
     second = build()
