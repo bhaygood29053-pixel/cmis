@@ -166,7 +166,13 @@ def _services(value: Any) -> list[str]:
 
 def _response_subject(response: Mapping[str, Any]) -> str:
     asset = _mapping("component.asset", response.get("asset"))
-    subject = asset.get("mint") or asset.get("canonical_id")
+    mint = asset.get("mint")
+    canonical_id = asset.get("canonical_id")
+    if mint is not None and canonical_id is not None and mint != canonical_id:
+        raise X1IntelligenceBriefInputsError(
+            "component asset mint and canonical_id disagree"
+        )
+    subject = mint or canonical_id
     subject = _text("component asset mint", subject)
     if not is_exact_x1_public_key(subject):
         raise X1IntelligenceBriefInputsError(
@@ -297,6 +303,8 @@ def _discovery_items(
     *,
     subject: str,
 ) -> list[dict[str, Any]]:
+    if response.get("status") in {"error", "ambiguous"}:
+        return []
     if response.get("status") not in {"partial", "unavailable"}:
         raise X1IntelligenceBriefInputsError(
             "discovery_intelligence brief input expects partial or unavailable status"
@@ -559,9 +567,13 @@ def build_x1_intelligence_brief_inputs(
     start = _canonical_utc("window_start", window_start)
     end = _canonical_utc("window_end", window_end)
     duration = (end - start).total_seconds()
-    if duration <= 0 or duration > MAX_WINDOW_SECONDS:
+    if (
+        duration <= 0
+        or duration > MAX_WINDOW_SECONDS
+        or not float(duration).is_integer()
+    ):
         raise X1IntelligenceBriefInputsError(
-            f"brief window must be >0 and <= {MAX_WINDOW_SECONDS} seconds"
+            f"brief window must be whole seconds, >0 and <= {MAX_WINDOW_SECONDS} seconds"
         )
 
     matrix, duplicate_components = _component_matrix(
