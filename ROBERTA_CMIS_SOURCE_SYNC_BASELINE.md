@@ -1,6 +1,6 @@
 # ROBERTA ↔ CMIS Source Sync Baseline
 
-Last reconciled: 2026-09-08 22:33 America/New_York
+Last reconciled: 2026-09-08 23:15 America/New_York
 
 This is the CMIS-side mirror of the four-repository roadmap/status checkpoint. The independent `roberta-eval` repository is tracked as an evaluation consumer outside the production authority chain.
 
@@ -18,11 +18,11 @@ This is the CMIS-side mirror of the four-repository roadmap/status checkpoint. T
 ## Observed heads before this documentation reconciliation
 
 ```text
-ROBERTA public      b023bce04b0426ff71d66a8c1023cf428a86e60b
-ROBERTA protected   f6fdab139b3573939b66ef4a934bb4b59bd362ee
-CMIS public         4778da694a3a735c946908fef08bec3664c36107
-CMIS protected      9cf490f55eeee12e109343b50b1642a1f15854ff
-ROBERTA eval        9fb6cc488b169e00a9654f8a70bdf1b2a520e3dd
+ROBERTA public      83aaf290c665f268fb7966e91f3d8177e4c111fd
+ROBERTA protected   91617f8091e7f69094f511956df3481d47f8f66c
+CMIS public         1c791eca48b3e9687daac4f5a22db8061e4ced88
+CMIS protected      d79b684981bd431f1add5a40fc529cc5d6487720
+ROBERTA eval        be1e37267081b8daa5b17c41a4d4575661517622
 ```
 
 These SHAs were observed immediately before this reconciliation write; documentation commits created by the reconciliation advance the affected `main` branches afterward.
@@ -55,8 +55,8 @@ The required X1Scroll API key is unavailable. Do not merge or promote the histor
 
 ## Current parallel work
 
-- provider-gap track #30;
-- FortiBlox token-price fact-time freshness #567;
+- provider-gap track #30 (**active umbrella**);
+- FortiBlox token-price fact-time freshness #567 (**primary concrete provider gate**);
 - Warp historical-retention/message-counter work where still open;
 - delayed-departure / X1.Ninja research;
 - Theo machine-transport work;
@@ -69,7 +69,7 @@ All remain fail closed until separately accepted.
 - ROBERTA consumes the accepted CMIS 1.27 surface through X1 Scout under existing authority boundaries.
 - Public ROBERTA #401 + protected `roberta-core` #86 restore stateless/threaded bridge compatibility.
 - `roberta-eval` LAB #21 and LAB #22 are accepted.
-- `live-smoke-004` is complete: 20/20 runtime OK, 8 PASS, 12 EVIDENCE_REQUIRED, 0 FAIL. The 12 blocked cases are localized to protected ROBERTA current-X1 evidence delegation, not to CMIS. Protected `roberta-core` #89 / PR #90 is the active remediation; after deterministic acceptance and five-repo runtime sync, the next evaluation proof is `live-smoke-005` on the same 20-case plan.
+- `live-smoke-004` is preserved: 20/20 runtime OK, 8 PASS, 12 EVIDENCE_REQUIRED, 0 FAIL. The Evaluation Laboratory is now **PAUSED BY OWNER**. Protected `roberta-core` #89 / PR #90 remains OPEN / UNACCEPTED historical remediation and is not an active product blocker; no `live-smoke-005` or eval-driven merge work should proceed until explicitly resumed.
 
 ## Protected cores
 
