@@ -1,6 +1,6 @@
 # ROBERTA ↔ CMIS Source Sync Baseline
 
-Last reconciled: 2026-09-08 (America/New_York)
+Last reconciled: 2026-09-08 22:33 America/New_York
 
 This is the CMIS-side mirror of the four-repository roadmap/status checkpoint. The independent `roberta-eval` repository is tracked as an evaluation consumer outside the production authority chain.
 
@@ -18,11 +18,11 @@ This is the CMIS-side mirror of the four-repository roadmap/status checkpoint. T
 ## Repository heads at this reconciliation
 
 ```text
-ROBERTA public      4c872b4ac9fb25dda0994632e9e2f7dc4cc8cdfc
-ROBERTA protected   18c6d82377876c0627edb741e5c36f1f339dbbdc
-CMIS public         e2a53c94f481ecec4a4f9e1e7051684203e32299
+ROBERTA public      b023bce04b0426ff71d66a8c1023cf428a86e60b
+ROBERTA protected   f6fdab139b3573939b66ef4a934bb4b59bd362ee
+CMIS public         4778da694a3a735c946908fef08bec3664c36107
 CMIS protected      9cf490f55eeee12e109343b50b1642a1f15854ff
-ROBERTA eval        ee624173a1af899a3290b456fb4056ef2e5e35bb
+ROBERTA eval        9fb6cc488b169e00a9654f8a70bdf1b2a520e3dd
 ```
 
 Documentation reconciliation commits may advance these heads after this checkpoint.
@@ -69,7 +69,7 @@ All remain fail closed until separately accepted.
 - ROBERTA consumes the accepted CMIS 1.27 surface through X1 Scout under existing authority boundaries.
 - Public ROBERTA #401 + protected `roberta-core` #86 restore stateless/threaded bridge compatibility.
 - `roberta-eval` LAB #21 and LAB #22 are accepted.
-- The next evaluation proof is a 20-case repaired-runtime live rerun followed by LAB #22 diagnostics; no live-quality PASS is assumed before those results exist.
+- `live-smoke-004` is complete: 20/20 runtime OK, 8 PASS, 12 EVIDENCE_REQUIRED, 0 FAIL. The 12 blocked cases are localized to protected ROBERTA current-X1 evidence delegation, not to CMIS. Protected `roberta-core` #89 / PR #90 is the active remediation; after deterministic acceptance and five-repo runtime sync, the next evaluation proof is `live-smoke-005` on the same 20-case plan.
 
 ## Protected cores
 
