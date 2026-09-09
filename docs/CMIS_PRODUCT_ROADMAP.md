@@ -1,12 +1,13 @@
 # CMIS Product & Premium Service Roadmap
 
-Last reconciled: 2026-09-08 (America/New_York)
+Last reconciled: 2026-09-09 (America/New_York)
 
 This is the authoritative living CMIS roadmap. Open branches and provider investigations are not accepted capability until their contract, CI, review, and merge gates pass.
 
-## Live checkpoint — 2026-09-08
+## Live checkpoint — 2026-09-09
 
 - **Current accepted CMIS capability contract: `1.27.0`.**
+- **X1 direct wallet-relationship productization: ACTIVE under #631.** The historical deterministic direct-transfer relationship contract remains accepted as an internal/non-promoted foundation, but its old implementation paths are not present on current public `main`. #631 is therefore a source-of-truth reconciliation gate first and a public-service/Scout-reliance promotion gate second. No stale historical branch is treated as current authority; `execution_authorized=false`.
 - **Universal response freshness: ACCEPTED TARGET.** Every public CMIS response carries `cmis_response_freshness/v1`; missing service-specific freshness fails closed instead of disappearing from the response.
 - **Instant X1 Scan v6: ACCEPTED.** The current flagship scan preserves exact identity, field-scoped live market freshness, Gate B distribution/concentration evidence, and Gate C bounded history adequacy/completeness semantics. Older scan contracts remain compatibility history, not the current product target.
 - **Trade Price-Impact Intelligence: ACCEPTED.** CMIS #498 / public PR #530 plus protected `cmis-core` PR #33 establish read-only `trade_price_impact_intelligence/v1` with exact transaction/pool/time/value-basis and pool-local reserve/price-impact boundaries.
@@ -21,7 +22,7 @@ This is the authoritative living CMIS roadmap. Open branches and provider invest
 - Controlled Execution remains locked: `execution_authorized=false`.
 - **Programmable Market Intelligence foundation (#552): IMPLEMENTED ON THIS WORKSTREAM / NON-PROMOTED.** Adds deterministic `uniswap_v4_hook_intelligence/v1`, `reflection_flow_intelligence/v1`, `yield_provenance/v1`, and an additive Robinhood→X1 companion over accepted `cross_chain_asset_provenance/v1`. Discovery remains subordinate to verification; hook permission bits do not prove business logic; missing incentives are never zero-filled; Robinhood custody/backing/route state remain unverified without separate accepted evidence; the public CMIS 1.27 capability manifest is unchanged and `execution_authorized=false` remains mandatory.
 
-## Active execution order — 2026-09-08
+## Active execution order — 2026-09-09
 
 The accepted CMIS 1.27 flagship surface has no unresolved release blocker. Open issues now split into **active evidence work**, **parallel research**, **holds**, and **stale/superseded cleanup** rather than one undifferentiated backlog.
 
@@ -32,7 +33,7 @@ The accepted CMIS 1.27 flagship surface has no unresolved release blocker. Open 
 5. **Warp retention (#437), delayed-departure (#381), Theo transport (#422), and related provider investigations: PARALLEL RESEARCH.** They do not block the accepted flagship scan, wallet/trade, cross-chain, regulatory, or warning surfaces.
 6. **X1Scroll #458 / draft PR #549: ON HOLD.** No merge or promotion without the unavailable API key and the exact live archival acceptance proof.
 7. **Issue hygiene: ACTIVE.** Older open tickets whose targets are already superseded by later accepted contracts (for example the original Instant Scan freshness #385) must be reconciled/closed or rewritten before open-issue count is used as a measure of remaining roadmap work.
-8. **Next new product capability after provider evidence cleanup:** choose explicitly between holder/wallet intelligence promotion and bounded X1 ecosystem/network-brief inputs; no roadmap item is promoted by implication.
+8. **Direct wallet-relationship intelligence promotion (#631): ACTIVE NEXT PRODUCT CAPABILITY.** Reconcile the accepted historical `cmis_wallet_relationship_evidence.v1` foundation against the current public/private split first; only then may a bounded X1 `wallet_relationship_intelligence/v1` service be promoted for X1 Scout reliance. Exact observed transfers are not ownership, beneficial ownership, insider/whale/bot status, coordination, manipulation, intent, causality, or risk. Bounded X1 ecosystem/network-brief inputs follow as a separate product slice.
 
 
 ## Product naming invariant
