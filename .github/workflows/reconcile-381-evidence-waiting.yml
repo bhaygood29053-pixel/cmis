@@ -1,0 +1,41 @@
+name: Reconcile #381 Evidence Waiting
+on:
+  push:
+    branches: [docs/reconcile-ninja-longitudinal-381]
+permissions:
+  contents: write
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/reconcile-ninja-longitudinal-381
+      - name: Reconcile roadmap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('docs/CMIS_PRODUCT_ROADMAP.md')
+          s=p.read_text()
+          old='5. **Warp retention (#437), delayed-departure (#381), Theo transport (#422), and related provider investigations: PARALLEL RESEARCH.** They do not block the accepted flagship scan, wallet/trade, cross-chain, regulatory, or warning surfaces.'
+          new='5. **Warp retention (#437), Theo transport (#422), and related provider investigations: PARALLEL RESEARCH. Delayed-departure longitudinal verification (#381): EVIDENCE-WAITING.** #381 is not an active software/productization blocker: current bounded delayed-departure, routed-ambiguity, and route-topology code deliberately keeps `departure_pattern_verified=false`, and semantic coverage still marks longitudinal verification unverified. Resume only when the append-only evidence ledger contains enough independent runs/pools to justify a predeclared deterministic replication rule; do not cherry-pick observations or retroactively tune thresholds. These investigations do not block the accepted flagship scan, wallet/trade, cross-chain, regulatory, or warning surfaces.'
+          if old not in s:
+              raise SystemExit('target roadmap line not found')
+          s=s.replace(old,new,1)
+          old2='7. **Issue hygiene: ACTIVE / #385, #333, #335, #349, #350, #352, #354 RESOLVED.**'
+          new2='7. **Issue hygiene: ACTIVE / #385, #333, #335, #349, #350, #352, #354, #356, #358, #360, #367, #374 RESOLVED; #381 RECLASSIFIED EVIDENCE-WAITING.**'
+          if old2 not in s:
+              raise SystemExit('issue-hygiene line not found')
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/CMIS_PRODUCT_ROADMAP.md
+          git commit -m 'docs: classify delayed-departure #381 as evidence-waiting'
+          git push
+      - name: Remove one-shot workflow
+        run: |
+          git rm .github/workflows/reconcile-381-evidence-waiting.yml
+          git commit -m 'chore: remove one-shot #381 roadmap reconciliation workflow'
+          git push
