@@ -23,6 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python -m pip install -q pytest requests beautifulsoup4
           python - <<'PY'
           from pathlib import Path
 
