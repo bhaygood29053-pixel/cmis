@@ -1,10 +1,9 @@
 """Bounded tokenized-equity market activity contract for CMIS.
 
-This module binds market observations to accepted tokenized-equity provenance
-and keeps liquidity, trade volume, trades, transfers, holders, prices, and
-bridge flows semantically separate. It validates structure and bounded source
-provenance; it does not promote deployment, adoption, risk, manipulation, or
-investment conclusions.
+Binds market observations to accepted tokenized-equity provenance while keeping
+liquidity, trade volume, trades, transfers, holders, price, and bridge flows
+semantically separate. Structure/source/fact-time are validated; deployment,
+adoption, risk, manipulation, legal effect, and execution are not promoted.
 """
 
 from __future__ import annotations
@@ -23,12 +22,15 @@ from liquidity_scout.services.cmis_tokenized_equity_provenance import (
 
 TOKENIZED_EQUITY_MARKET_ACTIVITY_CONTRACT = "tokenized_equity_market_activity/v1"
 DEFAULT_EXECUTION_AUTHORIZED = False
-
 OBSERVATION_STATES = frozenset({"OBSERVED", "UNKNOWN", "NOT_APPLICABLE"})
 SCOPE_KINDS = frozenset({"asset", "venue", "pool"})
 DISALLOWED_ID_KINDS = frozenset({"symbol", "ticker", "name", "label"})
-SOURCE_CLASSES = frozenset({"onchain_rpc", "indexer", "venue_api", "bridge_api", "registry_api", "other"})
-PRICE_SEMANTICS = frozenset({"executed_trade_price", "quoted_price", "reference_price", "derived_price"})
+SOURCE_CLASSES = frozenset(
+    {"onchain_rpc", "indexer", "venue_api", "bridge_api", "registry_api", "other"}
+)
+PRICE_SEMANTICS = frozenset(
+    {"executed_trade_price", "quoted_price", "reference_price", "derived_price"}
+)
 REQUIRED_METRICS = (
     "liquidity_usd",
     "trade_volume_usd",
@@ -39,14 +41,15 @@ REQUIRED_METRICS = (
     "bridge_inflow_units",
     "bridge_outflow_units",
 )
-WINDOW_METRICS = frozenset({
-    "trade_volume_usd",
-    "trade_count",
-    "transfer_count",
-    "bridge_inflow_units",
-    "bridge_outflow_units",
-})
-SNAPSHOT_METRICS = frozenset({"liquidity_usd", "holder_count", "price_usd"})
+WINDOW_METRICS = frozenset(
+    {
+        "trade_volume_usd",
+        "trade_count",
+        "transfer_count",
+        "bridge_inflow_units",
+        "bridge_outflow_units",
+    }
+)
 METRIC_UNITS = {
     "liquidity_usd": "usd",
     "trade_volume_usd": "usd",
@@ -56,6 +59,15 @@ METRIC_UNITS = {
     "price_usd": "usd_per_token",
     "bridge_inflow_units": "token_units",
     "bridge_outflow_units": "token_units",
+}
+METRIC_SEMANTICS = {
+    "liquidity_usd": "liquidity_snapshot",
+    "trade_volume_usd": "executed_trade_volume",
+    "trade_count": "executed_trade_count",
+    "transfer_count": "token_transfer_count",
+    "holder_count": "holder_snapshot",
+    "bridge_inflow_units": "bridge_inflow",
+    "bridge_outflow_units": "bridge_outflow",
 }
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -114,26 +126,29 @@ def _token_endpoint(value: Any, field: str) -> dict[str, str]:
         raise ValueError(f"{field} must be a mapping")
     chain = _required_text(value.get("chain"), f"{field}.chain").casefold()
     asset_id = _required_text(value.get("asset_id"), f"{field}.asset_id")
-    asset_id_kind = _required_text(value.get("asset_id_kind"), f"{field}.asset_id_kind").casefold()
-    if asset_id_kind in DISALLOWED_ID_KINDS:
+    kind = _required_text(value.get("asset_id_kind"), f"{field}.asset_id_kind").casefold()
+    if kind in DISALLOWED_ID_KINDS:
         raise ValueError(f"{field}.asset_id_kind cannot use label identity")
-    return {"chain": chain, "asset_id": asset_id, "asset_id_kind": asset_id_kind}
+    return {"chain": chain, "asset_id": asset_id, "asset_id_kind": kind}
 
 
 def _bind_provenance(value: Any) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError("tokenized_equity_provenance must be a mapping")
     if value.get("contract") != TOKENIZED_EQUITY_PROVENANCE_CONTRACT:
-        raise ValueError("tokenized_equity_provenance must use accepted tokenized_equity_provenance/v1")
+        raise ValueError(
+            "tokenized_equity_provenance must use accepted tokenized_equity_provenance/v1"
+        )
     if value.get("execution_authorized") is not False:
         raise ValueError("tokenized_equity_provenance must preserve execution_authorized=false")
     verification = value.get("verification")
-    if not isinstance(verification, Mapping) or verification.get("exact_token_identity_structurally_bound") is not True:
+    if not isinstance(verification, Mapping) or verification.get(
+        "exact_token_identity_structurally_bound"
+    ) is not True:
         raise ValueError("accepted tokenized-equity token identity must be structurally bound")
-    token = _token_endpoint(value.get("token"), "tokenized_equity_provenance.token")
     return {
         "contract": TOKENIZED_EQUITY_PROVENANCE_CONTRACT,
-        "token": token,
+        "token": _token_endpoint(value.get("token"), "tokenized_equity_provenance.token"),
         "underlying_security": deepcopy(value.get("underlying_security")),
         "representation": deepcopy(value.get("representation")),
     }
@@ -148,19 +163,18 @@ def _scope(value: Any, *, token: Mapping[str, str]) -> dict[str, Any]:
     chain = _required_text(value.get("chain"), "scope.chain").casefold()
     if chain != token["chain"]:
         raise ValueError("scope.chain must equal tokenized-equity token chain")
-    scope_id = _required_text(value.get("scope_id"), "scope.scope_id")
     scope_id_kind = _required_text(value.get("scope_id_kind"), "scope.scope_id_kind").casefold()
     if scope_id_kind in DISALLOWED_ID_KINDS:
         raise ValueError("scope.scope_id_kind cannot use label identity")
-    program_id = value.get("program_id")
-    if kind in {"venue", "pool"} and not str(program_id or "").strip():
+    program_id = str(value.get("program_id") or "").strip() or None
+    if kind in {"venue", "pool"} and program_id is None:
         raise ValueError("venue/pool scope requires exact program_id")
     return {
         "scope_kind": kind,
         "chain": chain,
-        "scope_id": scope_id,
+        "scope_id": _required_text(value.get("scope_id"), "scope.scope_id"),
         "scope_id_kind": scope_id_kind,
-        "program_id": str(program_id).strip() if program_id is not None else None,
+        "program_id": program_id,
         "coverage_complete_for_scope": value.get("coverage_complete_for_scope") is True,
         "coverage_basis": _required_text(value.get("coverage_basis"), "scope.coverage_basis"),
     }
@@ -172,34 +186,43 @@ def _source(value: Any, field: str) -> dict[str, Any]:
     source_class = _required_text(value.get("source_class"), f"{field}.source_class").casefold()
     if source_class not in SOURCE_CLASSES:
         raise ValueError(f"{field}.source_class is not accepted")
-    url = _required_text(value.get("source_url"), f"{field}.source_url")
-    parsed = urlparse(url)
+    source_url = _required_text(value.get("source_url"), f"{field}.source_url")
+    parsed = urlparse(source_url)
     if parsed.scheme != "https" or not parsed.netloc:
         raise ValueError(f"{field}.source_url must be an absolute https URL")
     digest = _required_text(value.get("content_sha256"), f"{field}.content_sha256").casefold()
     if not _HASH_RE.fullmatch(digest):
         raise ValueError(f"{field}.content_sha256 must be 64 lowercase hex characters")
-    txid = str(value.get("transaction_id") or "").strip() or None
     return {
         "provider_id": _required_text(value.get("provider_id"), f"{field}.provider_id"),
         "source_class": source_class,
-        "source_url": url,
+        "source_url": source_url,
         "observation_id": _required_text(value.get("observation_id"), f"{field}.observation_id"),
         "retrieved_at": _timestamp_text(value.get("retrieved_at"), f"{field}.retrieved_at"),
         "content_sha256": digest,
-        "transaction_id": txid,
+        "transaction_id": str(value.get("transaction_id") or "").strip() or None,
     }
 
 
-def _metric(value: Any, *, name: str, scope: Mapping[str, Any], evaluated_at: datetime, max_age_seconds: int) -> dict[str, Any]:
+def _metric(
+    value: Any,
+    *,
+    name: str,
+    scope: Mapping[str, Any],
+    evaluated_at: datetime,
+    max_age_seconds: int,
+) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"metrics.{name} must be a mapping")
     state = _required_text(value.get("state"), f"metrics.{name}.state").upper()
     if state not in OBSERVATION_STATES:
         raise ValueError(f"metrics.{name}.state is not accepted")
     semantic = _required_text(value.get("semantic"), f"metrics.{name}.semantic").casefold()
-    if name == "price_usd" and semantic not in PRICE_SEMANTICS:
-        raise ValueError("metrics.price_usd.semantic is not accepted")
+    if name == "price_usd":
+        if semantic not in PRICE_SEMANTICS:
+            raise ValueError("metrics.price_usd.semantic is not accepted")
+    elif semantic != METRIC_SEMANTICS[name]:
+        raise ValueError(f"metrics.{name}.semantic must be {METRIC_SEMANTICS[name]}")
 
     if state != "OBSERVED":
         if value.get("value") is not None or value.get("sources"):
@@ -213,35 +236,49 @@ def _metric(value: Any, *, name: str, scope: Mapping[str, Any], evaluated_at: da
             "fact_time": None,
             "window": None,
             "sources": [],
-            "freshness": {"state": "UNKNOWN", "age_seconds": None, "max_age_seconds": max_age_seconds},
+            "freshness": {
+                "state": "UNKNOWN",
+                "age_seconds": None,
+                "max_age_seconds": max_age_seconds,
+            },
             "bounded_zero_observed": False,
         }
 
+    metric_value: Any
     if name in {"trade_count", "transfer_count", "holder_count"}:
-        metric_value: Any = _nonnegative_int(value.get("value"), f"metrics.{name}.value")
+        metric_value = _nonnegative_int(value.get("value"), f"metrics.{name}.value")
     else:
         metric_value = _nonnegative_decimal(value.get("value"), f"metrics.{name}.value")
 
     raw_sources = value.get("sources")
-    if not isinstance(raw_sources, Sequence) or isinstance(raw_sources, (str, bytes)) or not raw_sources:
+    if (
+        not isinstance(raw_sources, Sequence)
+        or isinstance(raw_sources, (str, bytes))
+        or not raw_sources
+    ):
         raise ValueError(f"metrics.{name}.sources must be a non-empty sequence")
-    sources = [_source(item, f"metrics.{name}.sources[{index}]") for index, item in enumerate(raw_sources)]
+    sources = [
+        _source(item, f"metrics.{name}.sources[{index}]")
+        for index, item in enumerate(raw_sources)
+    ]
 
-    fact_time = None
-    window = None
     if name in WINDOW_METRICS:
         start_text = _timestamp_text(value.get("window_start"), f"metrics.{name}.window_start")
         end_text = _timestamp_text(value.get("window_end"), f"metrics.{name}.window_end")
         start = _timestamp(start_text, f"metrics.{name}.window_start")
-        end = _timestamp(end_text, f"metrics.{name}.window_end")
-        if start >= end:
+        fact_dt = _timestamp(end_text, f"metrics.{name}.window_end")
+        if start >= fact_dt:
             raise ValueError(f"metrics.{name} window_start must be before window_end")
-        fact_dt = end
         fact_time = end_text
-        window = {"start": start_text, "end": end_text, "seconds": int((end - start).total_seconds())}
+        window = {
+            "start": start_text,
+            "end": end_text,
+            "seconds": int((fact_dt - start).total_seconds()),
+        }
     else:
         fact_time = _timestamp_text(value.get("fact_time"), f"metrics.{name}.fact_time")
         fact_dt = _timestamp(fact_time, f"metrics.{name}.fact_time")
+        window = None
 
     if fact_dt > evaluated_at:
         raise ValueError(f"metrics.{name} fact time cannot be in the future")
@@ -249,11 +286,16 @@ def _metric(value: Any, *, name: str, scope: Mapping[str, Any], evaluated_at: da
     freshness_state = "FRESH" if age <= max_age_seconds else "STALE"
 
     if name == "price_usd" and semantic == "executed_trade_price":
-        if not any(source["transaction_id"] and source["source_class"] in {"onchain_rpc", "indexer"} for source in sources):
-            raise ValueError("executed_trade_price requires transaction-bound on-chain/indexer evidence")
+        if not any(
+            source["transaction_id"]
+            and source["source_class"] in {"onchain_rpc", "indexer"}
+            for source in sources
+        ):
+            raise ValueError(
+                "executed_trade_price requires transaction-bound on-chain/indexer evidence"
+            )
 
     is_zero = Decimal(str(metric_value)) == 0
-    bounded_zero = bool(is_zero and scope["coverage_complete_for_scope"])
     return {
         "metric": name,
         "state": state,
@@ -263,8 +305,14 @@ def _metric(value: Any, *, name: str, scope: Mapping[str, Any], evaluated_at: da
         "fact_time": fact_time,
         "window": window,
         "sources": sources,
-        "freshness": {"state": freshness_state, "age_seconds": age, "max_age_seconds": max_age_seconds},
-        "bounded_zero_observed": bounded_zero,
+        "freshness": {
+            "state": freshness_state,
+            "age_seconds": age,
+            "max_age_seconds": max_age_seconds,
+        },
+        "bounded_zero_observed": bool(
+            is_zero and scope["coverage_complete_for_scope"]
+        ),
     }
 
 
@@ -286,17 +334,21 @@ def build_tokenized_equity_market_activity(
         raise ValueError("max_age_seconds must be greater than zero")
     if not isinstance(metrics, Mapping):
         raise ValueError("metrics must be a mapping")
-    supplied = set(metrics.keys())
-    required = set(REQUIRED_METRICS)
-    missing = sorted(required - supplied)
-    extra = sorted(supplied - required)
+    supplied, required = set(metrics.keys()), set(REQUIRED_METRICS)
+    missing, extra = sorted(required - supplied), sorted(supplied - required)
     if missing:
         raise ValueError(f"metrics missing required entries: {', '.join(missing)}")
     if extra:
         raise ValueError(f"metrics contains unsupported entries: {', '.join(extra)}")
 
     observations = {
-        name: _metric(metrics[name], name=name, scope=exact_scope, evaluated_at=evaluated, max_age_seconds=max_age)
+        name: _metric(
+            metrics[name],
+            name=name,
+            scope=exact_scope,
+            evaluated_at=evaluated,
+            max_age_seconds=max_age,
+        )
         for name in REQUIRED_METRICS
     }
     observed_count = sum(item["state"] == "OBSERVED" for item in observations.values())
@@ -316,7 +368,8 @@ def build_tokenized_equity_market_activity(
             "accepted_tokenized_equity_provenance_bound": True,
             "exact_scope_identity_bound": True,
             "metric_semantics_kept_separate": True,
-            "global_market_coverage_verified": exact_scope["scope_kind"] == "asset" and exact_scope["coverage_complete_for_scope"],
+            "scope_coverage_declared_complete": exact_scope["coverage_complete_for_scope"],
+            "global_market_coverage_verified": False,
             "live_x1_equity_deployment_verified": False,
             "live_robinhood_x1_route_verified": False,
         },
@@ -343,6 +396,7 @@ def build_tokenized_equity_market_activity(
 
 __all__ = [
     "DEFAULT_EXECUTION_AUTHORIZED",
+    "METRIC_SEMANTICS",
     "METRIC_UNITS",
     "OBSERVATION_STATES",
     "PRICE_SEMANTICS",
