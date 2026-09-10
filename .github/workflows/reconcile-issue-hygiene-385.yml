@@ -1,0 +1,47 @@
+name: Reconcile Issue Hygiene 385
+
+on:
+  push:
+    branches:
+      - docs/close-stale-freshness-385
+    paths:
+      - ".github/workflows/reconcile-issue-hygiene-385.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: docs/close-stale-freshness-385
+
+      - name: Reconcile roadmap issue-hygiene status
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/CMIS_PRODUCT_ROADMAP.md")
+          text = path.read_text(encoding="utf-8")
+
+          old = "7. **Issue hygiene: ACTIVE.** Older open tickets whose targets are already superseded by later accepted contracts (for example the original Instant Scan freshness #385) must be reconciled/closed or rewritten before open-issue count is used as a measure of remaining roadmap work."
+          new = "7. **Issue hygiene: ACTIVE / #385 RESOLVED.** The original Instant X1 Scan freshness umbrella #385 is closed as superseded by the accepted field-scoped freshness chain beginning with CMIS 1.17 / PR #386 and later current-market/Instant Scan versions. Continue auditing older open tickets against accepted later contracts before treating open-issue count as remaining roadmap work; preserve historical tickets rather than silently rewriting authority."
+
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f"expected exactly one issue-hygiene line, found {count}")
+          text = text.replace(old, new)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit roadmap reconciliation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/CMIS_PRODUCT_ROADMAP.md
+          git diff --cached --check
+          git commit -m "docs: close stale Instant Scan freshness issue 385"
+          git push origin HEAD:docs/close-stale-freshness-385
