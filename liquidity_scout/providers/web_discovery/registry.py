@@ -8,6 +8,7 @@ from typing import Any
 from .base import CMISWebDiscoveryProvider
 from .fortiblox import FortiBloxAppWebDiscoveryProvider
 from .github import GitHubWebDiscoveryProvider
+from .robinhood_chain import RobinhoodChainWebDiscoveryProvider
 from .x1_agents_radio import X1AgentsRadioDiscoveryProvider
 from .x1_docs import X1DocsDiscoveryProvider
 from .x1_explorer import X1ExplorerDiscoveryProvider
@@ -25,6 +26,7 @@ _PROVIDER_TYPES: dict[str, type[CMISWebDiscoveryProvider]] = {
     "x1_agents_radio": X1AgentsRadioDiscoveryProvider,
     "x1_docs": X1DocsDiscoveryProvider,
     "github": GitHubWebDiscoveryProvider,
+    "robinhood_chain": RobinhoodChainWebDiscoveryProvider,
 }
 
 

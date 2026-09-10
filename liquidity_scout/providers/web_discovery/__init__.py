@@ -42,6 +42,10 @@ from .fortiblox_network import (
     list_fortiblox_network_observations,
 )
 from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider
+from .robinhood_chain import (
+    ROBINHOOD_CHAIN_SOURCE,
+    RobinhoodChainWebDiscoveryProvider,
+)
 from .registry import build_provider, provider_catalog, provider_ids
 from .x1_agents_radio import (
     CURRENT_HOST as X1_AGENTS_RADIO_CURRENT_HOST,
@@ -175,6 +179,8 @@ __all__ = [
     "list_fortiblox_network_observations",
     "GITHUB_WEB_SOURCE",
     "GitHubWebDiscoveryProvider",
+    "ROBINHOOD_CHAIN_SOURCE",
+    "RobinhoodChainWebDiscoveryProvider",
     "SourceBoundaryError",
     "WebDiscoveryContentError",
     "WebDiscoveryError",
