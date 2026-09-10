@@ -1,0 +1,80 @@
+name: Reconcile Robinhood Chain Discovery
+
+on:
+  push:
+    branches:
+      - feat/663-robinhood-chain-discovery
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/663-robinhood-chain-discovery
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Patch registry exports and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          init = Path('liquidity_scout/providers/web_discovery/__init__.py')
+          text = init.read_text()
+          anchor = 'from .github import GITHUB_WEB_SOURCE, GitHubWebDiscoveryProvider\n'
+          insert = anchor + 'from .robinhood_chain import (\n    ROBINHOOD_CHAIN_SOURCE,\n    RobinhoodChainWebDiscoveryProvider,\n)\n'
+          if 'ROBINHOOD_CHAIN_SOURCE' not in text:
+              if anchor not in text:
+                  raise SystemExit('missing __init__ import anchor')
+              text = text.replace(anchor, insert, 1)
+          all_anchor = '    "GitHubWebDiscoveryProvider",\n'
+          all_insert = all_anchor + '    "ROBINHOOD_CHAIN_SOURCE",\n    "RobinhoodChainWebDiscoveryProvider",\n'
+          if '    "ROBINHOOD_CHAIN_SOURCE",' not in text:
+              if all_anchor not in text:
+                  raise SystemExit('missing __all__ anchor')
+              text = text.replace(all_anchor, all_insert, 1)
+          init.write_text(text)
+
+          tests = Path('tests/test_cmis_web_discovery.py')
+          text = tests.read_text()
+          import_anchor = '    GitHubWebDiscoveryProvider,\n'
+          import_insert = import_anchor + '    RobinhoodChainWebDiscoveryProvider,\n'
+          if 'RobinhoodChainWebDiscoveryProvider' not in text:
+              if import_anchor not in text:
+                  raise SystemExit('missing test import anchor')
+              text = text.replace(import_anchor, import_insert, 1)
+          tuple_anchor = '                "github",\n            ),\n'
+          tuple_insert = '                "github",\n                "robinhood_chain",\n            ),\n'
+          if '                "robinhood_chain",' not in text:
+              if tuple_anchor not in text:
+                  raise SystemExit('missing provider tuple anchor')
+              text = text.replace(tuple_anchor, tuple_insert, 1)
+          text = text.replace('self.assertEqual(len(catalog), 8)', 'self.assertEqual(len(catalog), 9)', 1)
+          text = text.replace('self.assertEqual(len(result["sources"]), 8)', 'self.assertEqual(len(result["sources"]), 9)', 1)
+
+          anchor = '    def test_fortiblox_app_root_and_machine_discovery_are_bounded(self):\n'
+          new_test = '''    def test_robinhood_chain_discovery_is_official_source_bounded_and_unpromoted(self):\n        docs = "https://docs.robinhood.com/chain/"\n        provider = RobinhoodChainWebDiscoveryProvider(\n            session=FakeSession(\n                FakeResponse(\n                    "<html><title>Robinhood Chain</title><body>Chain ID 4663</body></html>",\n                    url=docs,\n                )\n            ),\n            observed_at_fn=lambda: 789.0,\n        )\n\n        result = provider.discover_url(docs, query="Chain ID 4663")\n\n        self.assertEqual(result["source"]["id"], "robinhood_chain")\n        self.assertEqual(result["retrieval"]["observed_at"], 789.0)\n        self.assertTrue(result["query"]["matched"])\n        self.assertFalse(result["truth_state"]["cmis_verified"])\n        self.assertFalse(result["cmis_promotable"])\n        self.assertFalse(result["execution_authorized"])\n\n        with self.assertRaises(SourceBoundaryError):\n            provider.discover_url("https://example.com/robinhood-chain")\n\n'''
+          if 'def test_robinhood_chain_discovery_is_official_source_bounded_and_unpromoted' not in text:
+              if anchor not in text:
+                  raise SystemExit('missing Robinhood test insertion anchor')
+              text = text.replace(anchor, new_test + anchor, 1)
+          tests.write_text(text)
+
+          docs = Path('docs/ROBINHOOD_CHAIN_DISCOVERY_V1.md')
+          docs.write_text('''# Robinhood Chain Discovery v1\n\nThis CMIS Web Discovery source is a **discovery-only** boundary for official\nRobinhood Chain documentation and the Robinhood Chain Blockscout explorer.\n\nIt may surface candidate evidence about contracts, transfers, holders, bridges,\noracles, pools, liquidity, and volume. Discovery does not make those claims\nverified CMIS facts. RPC / chain-state corroboration is required before any\nfact is promoted for Scout reliance.\n\nCurrent source boundary:\n\n- `https://docs.robinhood.com/chain/`\n- `https://robinhoodchain.blockscout.com/`\n\nRobinhood Chain availability does not establish a Robinhood Chain -> X1 bridge,\nWarp support, tokenized-equity deployment on X1, shareholder ownership, voting\nrights, dividend rights, redemption rights, legal/economic equivalence, or\nadoption.\n\nPromotion remains locked:\n\n- `read_only=true`\n- `discovery_only=true`\n- `cmis_verified=false`\n- `public_service_promoted=false`\n- `scout_reliance_promoted=false`\n- `execution_authorized=false`\n''')
+          PY
+
+          python -m pytest -q tests/test_cmis_web_discovery.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add liquidity_scout/providers/web_discovery/__init__.py tests/test_cmis_web_discovery.py docs/ROBINHOOD_CHAIN_DISCOVERY_V1.md
+          git commit -m 'CMIS #663 — prove bounded Robinhood Chain discovery'
+          git push origin HEAD:feat/663-robinhood-chain-discovery
