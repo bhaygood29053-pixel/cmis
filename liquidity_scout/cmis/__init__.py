@@ -37,6 +37,7 @@ SUPPORTED_SERVICES = (
     "bridge_to_xdex_utilization",
     "cross_chain_asset_provenance",
     "regulatory_evidence",
+    "wallet_relationship_intelligence",
 )
 SUPPORTED_CHAINS = ("x1",)
 KNOWN_CHAINS = ("x1", "solana")
