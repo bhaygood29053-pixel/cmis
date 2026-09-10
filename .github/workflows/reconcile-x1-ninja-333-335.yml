@@ -1,0 +1,46 @@
+name: Reconcile X1.Ninja Issues 333 335
+
+on:
+  push:
+    branches:
+      - docs/reconcile-x1-ninja-333-335
+    paths:
+      - ".github/workflows/reconcile-x1-ninja-333-335.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/reconcile-x1-ninja-333-335
+
+      - name: Reconcile authoritative roadmap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('docs/CMIS_PRODUCT_ROADMAP.md')
+          text = p.read_text(encoding='utf-8')
+          old3 = "3. **X1.Ninja follow-on semantics: PARALLEL / NOT THE DEFAULT NEXT BLOCKER.** The original developer-API transport/identity program has produced accepted downstream foundations; remaining open semantic/research issues should advance only when they close a current product gap."
+          new3 = "3. **X1.Ninja provider-validation foundation: COMPLETE / FOLLOW-ON SEMANTICS PARALLEL.** Historical transport #333 is closed completed through merged PR #334 (`394a4c90ca5cd65dae75ca3cec88f3660fe6aebd`). Exact X1.Ninja ↔ XDEX ↔ X1 RPC pool identity #335 is closed completed beginning with merged PR #336 and the accepted #337/#338, #339/#340, #341/#342, and #343/#344 follow-ons. Later accepted liquidity/freshness/rolling-window contracts supersede the original checklist. Remaining semantic/research issues should advance only when they close a current product gap; no universal fact-time, source-independence, or execution claim follows from this cleanup."
+          old7 = "7. **Issue hygiene: ACTIVE / #385 RESOLVED.** The original Instant X1 Scan freshness umbrella #385 is closed as superseded by the accepted field-scoped freshness chain beginning with CMIS 1.17 / PR #386 and later current-market/Instant Scan versions. Continue auditing older open tickets against accepted later contracts before treating open-issue count as remaining roadmap work; preserve historical tickets rather than silently rewriting authority."
+          new7 = "7. **Issue hygiene: ACTIVE / #385, #333, #335 RESOLVED.** The original Instant X1 Scan freshness umbrella #385 and the early X1.Ninja transport/identity umbrellas #333/#335 are now reconciled against accepted later contracts and closed completed. Continue auditing older open tickets before treating open-issue count as remaining roadmap work; preserve historical evidence boundaries rather than silently widening authority."
+          if text.count(old3) != 1:
+              raise SystemExit(f'expected one X1.Ninja line, found {text.count(old3)}')
+          if text.count(old7) != 1:
+              raise SystemExit(f'expected one hygiene line, found {text.count(old7)}')
+          text = text.replace(old3, new3).replace(old7, new7)
+          p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit reconciliation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/CMIS_PRODUCT_ROADMAP.md
+          git diff --cached --check
+          git commit -m "docs: reconcile completed X1.Ninja foundations 333 335"
+          git push origin HEAD:docs/reconcile-x1-ninja-333-335
