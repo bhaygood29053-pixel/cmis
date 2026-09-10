@@ -24,6 +24,13 @@ from liquidity_scout.services.cmis_regulatory_evidence import (
     CONTRACT_VERSION as REGULATORY_EVIDENCE_CONTRACT_VERSION,
     SERVICE as REGULATORY_EVIDENCE_SERVICE,
 )
+from liquidity_scout.services.cmis_wallet_relationship_intelligence import (
+    CONTRACT_VERSION as WALLET_RELATIONSHIP_CONTRACT_VERSION,
+    SERVICE as WALLET_RELATIONSHIP_SERVICE,
+)
+from liquidity_scout.services.cmis_wallet_relationship_request import (
+    REQUEST_CONTRACT_VERSION as WALLET_RELATIONSHIP_REQUEST_CONTRACT_VERSION,
+)
 from liquidity_scout.services.cmis_trade_price_impact_intelligence import (
     CONTRACT_VERSION as TRADE_PRICE_IMPACT_CONTRACT_VERSION,
     SERVICE as TRADE_PRICE_IMPACT_SERVICE,
@@ -61,7 +68,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.27.0"
+CMIS_CONTRACT_VERSION = "1.28.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -92,6 +99,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "bridge_to_xdex_utilization",
     "cross_chain_asset_provenance",
     "regulatory_evidence",
+    "wallet_relationship_intelligence",
 )
 PUBLIC_SUPPORTED_CHAINS = ("x1",)
 PUBLIC_KNOWN_CHAINS = ("x1", "solana")
@@ -520,6 +528,89 @@ def _concentration_warning_capability(*, available: bool) -> dict[str, Any]:
     }
 
 
+def _wallet_relationship_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": WALLET_RELATIONSHIP_CONTRACT_VERSION,
+            "request_contract_version": WALLET_RELATIONSHIP_REQUEST_CONTRACT_VERSION,
+            "materialization_contract_version": "x1_direct_wallet_transfer_materialization/v1",
+            "requirements": [],
+            "limitations": ["wallet_relationship_intelligence_not_available_for_chain"],
+            "observed_relationships_only": True,
+            "ownership_inference_authorized": False,
+            "beneficial_ownership_inference_authorized": False,
+            "behavior_or_intent_inference_authorized": False,
+            "risk_inference_authorized": False,
+            "complete_history_claim_authorized": False,
+            "complete_graph_coverage_claim_authorized": False,
+            "evidence_receipt_binding_available": False,
+            "proof_score_binding_available": False,
+            "proof_score_separate_from_risk": True,
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": WALLET_RELATIONSHIP_CONTRACT_VERSION,
+        "request_contract_version": WALLET_RELATIONSHIP_REQUEST_CONTRACT_VERSION,
+        "materialization_contract_version": "x1_direct_wallet_transfer_materialization/v1",
+        "requirements": [
+            "exact_x1_transaction_signature",
+            "exact_x1_asset_mint_identity",
+            "exact_sender_wallet_identity",
+            "exact_recipient_wallet_identity",
+            "cmis_owned_finalized_x1_transaction_resolution",
+            "verified_direct_spl_token_transfer",
+            "exact_token_account_owner_binding",
+            "exact_transfer_direction",
+            "exact_raw_amount_and_decimals",
+            "canonical_transaction_fact_time",
+            "content_addressed_wallet_activity_observation",
+            "content_addressed_direct_relationship_evidence",
+            "caller_fact_evidence_provider_injection_rejected",
+        ],
+        "limitations": [
+            "observed_direct_interaction_only",
+            "relationship_is_transaction_scoped_not_complete_history",
+            "transfer_does_not_prove_common_ownership",
+            "transfer_does_not_prove_beneficial_ownership",
+            "wallet_address_is_not_real_world_identity",
+            "transfer_does_not_prove_insider_whale_bot_or_market_maker",
+            "behavior_or_intent_not_inferred",
+            "coordination_manipulation_or_fraud_not_inferred",
+            "sequence_or_transfer_does_not_establish_causality",
+            "risk_severity_not_inferred",
+            "evidence_receipt_binding_unavailable_in_v1",
+            "proof_score_binding_unavailable_in_v1",
+            "proof_score_separate_from_risk",
+            "complete_wallet_history_not_proven",
+            "complete_relationship_graph_not_proven",
+            "missing_evidence_is_unknown_not_zero",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "observed_relationships_only": True,
+        "ownership_inference_authorized": False,
+        "beneficial_ownership_inference_authorized": False,
+        "behavior_or_intent_inference_authorized": False,
+        "risk_inference_authorized": False,
+        "complete_history_claim_authorized": False,
+        "complete_graph_coverage_claim_authorized": False,
+        "evidence_receipt_binding_available": False,
+        "proof_score_binding_available": False,
+        "proof_score_separate_from_risk": True,
+        "execution_authorized": False,
+    }
+
+
 def _promoted_concentration_intelligence_capability(*, available: bool) -> dict[str, Any]:
     if not available:
         return {
@@ -711,6 +802,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         REGULATORY_EVIDENCE_SERVICE: _regulatory_evidence_capability(
             available=True
         ),
+        WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=True),
     },
     "solana": {
         "asset_lookup": _capability(
@@ -823,6 +915,7 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         REGULATORY_EVIDENCE_SERVICE: _regulatory_evidence_capability(
             available=False
         ),
+        WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=False),
     },
 }
 
