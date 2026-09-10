@@ -1,0 +1,64 @@
+name: Tokenized Equity Market Activity v1
+
+on:
+  pull_request:
+    paths:
+      - "liquidity_scout/services/cmis_tokenized_equity_market_activity.py"
+      - "liquidity_scout/services/cmis_tokenized_equity_provenance.py"
+      - "liquidity_scout/services/cmis_tokenized_equity_rights.py"
+      - "liquidity_scout/services/cmis_cross_chain_equity_provenance.py"
+      - "tests/test_cmis_tokenized_equity_market_activity.py"
+      - "tests/test_cmis_tokenized_equity_provenance.py"
+      - "tests/test_cmis_tokenized_equity_rights.py"
+      - "tests/test_cmis_cross_chain_equity_provenance.py"
+      - "docs/TOKENIZED_EQUITY_MARKET_ACTIVITY_V1.md"
+      - ".github/workflows/tokenized-equity-market-activity-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "liquidity_scout/services/cmis_tokenized_equity_market_activity.py"
+      - "liquidity_scout/services/cmis_tokenized_equity_provenance.py"
+      - "liquidity_scout/services/cmis_tokenized_equity_rights.py"
+      - "liquidity_scout/services/cmis_cross_chain_equity_provenance.py"
+      - "tests/test_cmis_tokenized_equity_market_activity.py"
+      - "tests/test_cmis_tokenized_equity_provenance.py"
+      - "tests/test_cmis_tokenized_equity_rights.py"
+      - "tests/test_cmis_cross_chain_equity_provenance.py"
+      - "docs/TOKENIZED_EQUITY_MARKET_ACTIVITY_V1.md"
+      - ".github/workflows/tokenized-equity-market-activity-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: python -m pip install -q -r requirements.txt pytest beautifulsoup4
+
+      - name: Tokenized-equity market activity acceptance
+        run: |
+          python -m pytest -q \
+            tests/test_cmis_tokenized_equity_market_activity.py \
+            tests/test_cmis_tokenized_equity_provenance.py \
+            tests/test_cmis_tokenized_equity_rights.py \
+            tests/test_cmis_cross_chain_equity_provenance.py
+
+      - name: Diff hygiene
+        run: git diff --check
