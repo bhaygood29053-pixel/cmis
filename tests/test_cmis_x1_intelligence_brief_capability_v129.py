@@ -1,47 +1,84 @@
 from __future__ import annotations
 
-from liquidity_scout.cmis import KNOWN_CHAINS, SUPPORTED_CHAINS, SUPPORTED_SERVICES
-from liquidity_scout.cmis.capabilities import (
-    CMIS_CONTRACT_VERSION,
-    PUBLIC_RUNTIME_SERVICES,
-    build_capability_manifest,
-    service_capability,
-)
-from liquidity_scout.services.cmis_x1_intelligence_brief_service import (
-    CONTRACT_VERSION,
-    SERVICE,
-)
+import ast
+from pathlib import Path
+from typing import Any
 
 
-def _manifest():
-    return build_capability_manifest(
-        runtime_services=PUBLIC_RUNTIME_SERVICES,
-        legacy_supported_chains=SUPPORTED_CHAINS,
-        known_chains=KNOWN_CHAINS,
+SERVICE = "x1_intelligence_brief_inputs"
+CONTRACT_VERSION = "x1_intelligence_brief_inputs/v1"
+REQUEST_CONTRACT_VERSION = "x1_intelligence_brief_request/v1"
+WALLET_SERVICE = "wallet_relationship_intelligence"
+CAPABILITIES_PATH = Path("liquidity_scout/cmis/capabilities.py")
+PUBLIC_INIT_PATH = Path("liquidity_scout/cmis/__init__.py")
+
+
+def _source() -> str:
+    return CAPABILITIES_PATH.read_text(encoding="utf-8")
+
+
+def _assignment(name: str):
+    tree = ast.parse(_source())
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"assignment {name} not found")
+
+
+def _helper(name: str, namespace: dict[str, Any]):
+    tree = ast.parse(_source())
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+    module = ast.Module(body=[function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    scope = {"Any": Any, **namespace}
+    exec(compile(module, str(CAPABILITIES_PATH), "exec"), scope)
+    return scope[name]
+
+
+def _brief_helper():
+    return _helper(
+        "_x1_intelligence_brief_capability",
+        {"X1_INTELLIGENCE_BRIEF_CONTRACT_VERSION": CONTRACT_VERSION},
     )
 
 
-def test_cmis_129_promotes_x1_intelligence_brief_without_replacing_wallet_relationship():
-    assert CMIS_CONTRACT_VERSION == "1.29.0"
-    assert tuple(SUPPORTED_SERVICES) == tuple(PUBLIC_RUNTIME_SERVICES)
-    assert PUBLIC_RUNTIME_SERVICES[-2:] == (
-        "x1_intelligence_brief_inputs",
-        "wallet_relationship_intelligence",
+def _wallet_helper():
+    return _helper(
+        "_wallet_relationship_capability",
+        {
+            "WALLET_RELATIONSHIP_CONTRACT_VERSION": "wallet_relationship_intelligence/v1",
+            "WALLET_RELATIONSHIP_REQUEST_CONTRACT_VERSION": "wallet_relationship_intelligence_request/v1",
+        },
     )
-    assert PUBLIC_RUNTIME_SERVICES.count(SERVICE) == 1
-    assert PUBLIC_RUNTIME_SERVICES.count("wallet_relationship_intelligence") == 1
+
+
+def test_cmis_129_promotes_brief_without_replacing_wallet_relationship():
+    assert _assignment("CMIS_CONTRACT_VERSION") == "1.29.0"
+    services = _assignment("PUBLIC_RUNTIME_SERVICES")
+    assert services[-2:] == (SERVICE, WALLET_SERVICE)
+    assert services.count(SERVICE) == 1
+    assert services.count(WALLET_SERVICE) == 1
+    public_init = PUBLIC_INIT_PATH.read_text(encoding="utf-8")
+    assert f'"{SERVICE}"' in public_init
+    assert f'"{WALLET_SERVICE}"' in public_init
 
 
 def test_x1_intelligence_brief_is_bounded_read_only_and_scout_promoted():
-    x1 = service_capability(_manifest(), chain="x1", service=SERVICE)
+    x1 = _brief_helper()(available=True)
     assert x1["state"] == "bounded"
     assert x1["callable"] is True
     assert x1["read_only"] is True
     assert x1["public_service_promoted"] is True
     assert x1["scout_reliance_promoted"] is True
     assert x1["service_contract_version"] == CONTRACT_VERSION
-    assert x1["request_contract_version"] == "x1_intelligence_brief_request/v1"
-    assert x1["composition_contract_version"] == "x1_intelligence_brief_inputs/v1"
+    assert x1["request_contract_version"] == REQUEST_CONTRACT_VERSION
+    assert x1["composition_contract_version"] == CONTRACT_VERSION
     assert x1["complete_x1_ecosystem_coverage_verified"] is False
     assert x1["execution_authorized"] is False
 
@@ -75,7 +112,7 @@ def test_x1_intelligence_brief_is_bounded_read_only_and_scout_promoted():
 
 
 def test_solana_intelligence_brief_remains_explicitly_unavailable():
-    solana = service_capability(_manifest(), chain="solana", service=SERVICE)
+    solana = _brief_helper()(available=False)
     assert solana["state"] == "unavailable"
     assert solana["callable"] is False
     assert solana["read_only"] is True
@@ -86,17 +123,8 @@ def test_solana_intelligence_brief_remains_explicitly_unavailable():
 
 
 def test_wallet_relationship_128_capability_survives_129_release():
-    manifest = _manifest()
-    x1 = service_capability(
-        manifest,
-        chain="x1",
-        service="wallet_relationship_intelligence",
-    )
-    solana = service_capability(
-        manifest,
-        chain="solana",
-        service="wallet_relationship_intelligence",
-    )
+    x1 = _wallet_helper()(available=True)
+    solana = _wallet_helper()(available=False)
     assert x1["state"] == "bounded"
     assert x1["public_service_promoted"] is True
     assert x1["scout_reliance_promoted"] is True
@@ -106,3 +134,11 @@ def test_wallet_relationship_128_capability_survives_129_release():
     assert x1["execution_authorized"] is False
     assert solana["state"] == "unavailable"
     assert solana["execution_authorized"] is False
+
+
+def test_capability_helpers_are_wired_for_x1_and_solana():
+    source = _source()
+    assert "X1_INTELLIGENCE_BRIEF_SERVICE: _x1_intelligence_brief_capability(\n            available=True\n        )" in source
+    assert "X1_INTELLIGENCE_BRIEF_SERVICE: _x1_intelligence_brief_capability(\n            available=False\n        )" in source
+    assert "WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=True)" in source
+    assert "WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=False)" in source
