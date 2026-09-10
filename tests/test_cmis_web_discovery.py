@@ -7,6 +7,7 @@ from liquidity_scout.providers.web_discovery import (
     DISCOVERED,
     FortiBloxAppWebDiscoveryProvider,
     GitHubWebDiscoveryProvider,
+    RobinhoodChainWebDiscoveryProvider,
     SourceBoundaryError,
     WebDiscoveryContentError,
     X1ExplorerDiscoveryProvider,
@@ -70,16 +71,41 @@ class CMISWebDiscoveryTests(unittest.TestCase):
                 "x1_agents_radio",
                 "x1_docs",
                 "github",
+                "robinhood_chain",
             ),
         )
         catalog = provider_catalog()
-        self.assertEqual(len(catalog), 8)
+        self.assertEqual(len(catalog), 9)
         self.assertTrue(all(row["read_only"] for row in catalog))
         self.assertTrue(all(row["discovery_only"] for row in catalog))
         self.assertTrue(all(row["cmis_verified"] is False for row in catalog))
         self.assertTrue(
             all(row["execution_authorized"] is False for row in catalog)
         )
+
+    def test_robinhood_chain_discovery_is_official_source_bounded_and_unpromoted(self):
+        docs = "https://docs.robinhood.com/chain/"
+        provider = RobinhoodChainWebDiscoveryProvider(
+            session=FakeSession(
+                FakeResponse(
+                    "<html><title>Robinhood Chain</title><body>Chain ID 4663</body></html>",
+                    url=docs,
+                )
+            ),
+            observed_at_fn=lambda: 789.0,
+        )
+
+        result = provider.discover_url(docs, query="Chain ID 4663")
+
+        self.assertEqual(result["source"]["id"], "robinhood_chain")
+        self.assertEqual(result["retrieval"]["observed_at"], 789.0)
+        self.assertTrue(result["query"]["matched"])
+        self.assertFalse(result["truth_state"]["cmis_verified"])
+        self.assertFalse(result["cmis_promotable"])
+        self.assertFalse(result["execution_authorized"])
+
+        with self.assertRaises(SourceBoundaryError):
+            provider.discover_url("https://example.com/robinhood-chain")
 
     def test_fortiblox_app_root_and_machine_discovery_are_bounded(self):
         root = "https://app.fortiblox.com/"
@@ -268,7 +294,7 @@ class CMISWebDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(result["service_contract"], "cmis_web_discovery/v1")
         self.assertEqual(result["state"], "internal_foundation")
-        self.assertEqual(len(result["sources"]), 8)
+        self.assertEqual(len(result["sources"]), 9)
         self.assertTrue(result["read_only"])
         self.assertFalse(result["public_service_promoted"])
         self.assertFalse(result["scout_reliance_promoted"])
