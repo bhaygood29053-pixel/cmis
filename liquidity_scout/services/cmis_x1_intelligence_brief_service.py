@@ -2,10 +2,13 @@
 
 This module wraps one already-validated/non-promoted
 `x1_intelligence_brief_inputs/v1` composition inside the standard CMIS
-service envelope. It does not register the service, advertise a capability,
-authorize X1 Scout reliance, or change execution policy.
+service envelope.
 
-CMIS #637 owns later runtime/capability promotion.
+The nested composition contract remains a factual foundation and therefore
+keeps its own promotion flags false. The outer service envelope carries the
+candidate runtime/service promotion state for CMIS 1.28. This separation avoids
+silently mutating the accepted `x1_intelligence_brief_inputs/v1` payload while
+still exposing an explicit promoted service boundary after protected acceptance.
 """
 
 from __future__ import annotations
@@ -222,6 +225,11 @@ def build_x1_intelligence_brief_service_response(
         warnings=warnings,
         errors=[],
     )
+    response["read_only"] = True
+    response["public_service_promoted"] = True
+    response["scout_reliance_promoted"] = True
+    response["runtime_capability_promoted"] = True
+    response["complete_x1_ecosystem_coverage_verified"] = False
     response["execution_authorized"] = False
     return response
 

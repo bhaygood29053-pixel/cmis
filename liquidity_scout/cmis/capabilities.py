@@ -24,6 +24,10 @@ from liquidity_scout.services.cmis_regulatory_evidence import (
     CONTRACT_VERSION as REGULATORY_EVIDENCE_CONTRACT_VERSION,
     SERVICE as REGULATORY_EVIDENCE_SERVICE,
 )
+from liquidity_scout.services.cmis_x1_intelligence_brief_service import (
+    CONTRACT_VERSION as X1_INTELLIGENCE_BRIEF_CONTRACT_VERSION,
+    SERVICE as X1_INTELLIGENCE_BRIEF_SERVICE,
+)
 from liquidity_scout.services.cmis_wallet_relationship_intelligence import (
     CONTRACT_VERSION as WALLET_RELATIONSHIP_CONTRACT_VERSION,
     SERVICE as WALLET_RELATIONSHIP_SERVICE,
@@ -68,7 +72,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.28.0"
+CMIS_CONTRACT_VERSION = "1.29.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -99,6 +103,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "bridge_to_xdex_utilization",
     "cross_chain_asset_provenance",
     "regulatory_evidence",
+    "x1_intelligence_brief_inputs",
     "wallet_relationship_intelligence",
 )
 PUBLIC_SUPPORTED_CHAINS = ("x1",)
@@ -385,6 +390,63 @@ def _regulatory_evidence_capability(*, available: bool) -> dict[str, Any]:
             "x1_only_initial_scope",
         ],
         "compliance_conclusion_authorized": False,
+        "execution_authorized": False,
+    }
+
+
+def _x1_intelligence_brief_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": X1_INTELLIGENCE_BRIEF_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": [
+                "x1_intelligence_brief_inputs_not_available_for_chain",
+            ],
+            "complete_x1_ecosystem_coverage_verified": False,
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": X1_INTELLIGENCE_BRIEF_CONTRACT_VERSION,
+        "request_contract_version": "x1_intelligence_brief_request/v1",
+        "composition_contract_version": "x1_intelligence_brief_inputs/v1",
+        "requirements": [
+            "exact_x1_mint_subjects",
+            "canonical_utc_bounded_window_max_86400_seconds",
+            "explicit_accepted_component_service_selection",
+            "complete_subject_service_response_matrix",
+            "cmis_internal_component_invocation_only",
+            "caller_fact_evidence_provider_injection_rejected",
+            "service_specific_fact_time",
+            "explicit_partial_unavailable_error_ambiguous_component_state",
+            "deterministic_priority_separate_from_risk",
+            "proof_score_separate_from_risk",
+        ],
+        "limitations": [
+            "exact_requested_scope_is_not_complete_x1_ecosystem_coverage",
+            "empty_bounded_brief_is_not_global_no_activity",
+            "concentration_warning_requires_cmis_owned_policy_and_evidence_selector",
+            "warning_level_is_not_risk_severity",
+            "wallet_address_is_not_real_world_identity",
+            "large_trade_is_not_whale_insider_owner_or_manipulator",
+            "sequence_or_activity_is_not_causality",
+            "first_verified_observation_is_not_token_launch_time",
+            "top_level_freshness_not_inferred_from_item_fact_time",
+            "missing_evidence_is_unknown_not_zero",
+            "no_trade_recommendation",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "complete_x1_ecosystem_coverage_verified": False,
         "execution_authorized": False,
     }
 
@@ -802,6 +864,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         REGULATORY_EVIDENCE_SERVICE: _regulatory_evidence_capability(
             available=True
         ),
+        X1_INTELLIGENCE_BRIEF_SERVICE: _x1_intelligence_brief_capability(
+            available=True
+        ),
         WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=True),
     },
     "solana": {
@@ -913,6 +978,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             available=False
         ),
         REGULATORY_EVIDENCE_SERVICE: _regulatory_evidence_capability(
+            available=False
+        ),
+        X1_INTELLIGENCE_BRIEF_SERVICE: _x1_intelligence_brief_capability(
             available=False
         ),
         WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=False),
