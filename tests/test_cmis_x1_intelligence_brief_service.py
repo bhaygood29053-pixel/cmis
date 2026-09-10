@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import ast
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
-
-from liquidity_scout.cmis.capabilities import PUBLIC_RUNTIME_SERVICES
 from liquidity_scout.services.cmis_x1_intelligence_brief_service import (
     SERVICE,
     X1IntelligenceBriefServiceContractError,
@@ -177,4 +177,19 @@ def test_incomplete_component_matrix_fails_closed():
 
 
 def test_service_module_does_not_register_public_runtime_capability():
-    assert SERVICE not in PUBLIC_RUNTIME_SERVICES
+    tree = ast.parse(
+        Path("liquidity_scout/cmis/capabilities.py").read_text(encoding="utf-8")
+    )
+    runtime_services = None
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(
+            isinstance(target, ast.Name)
+            and target.id == "PUBLIC_RUNTIME_SERVICES"
+            for target in node.targets
+        ):
+            runtime_services = ast.literal_eval(node.value)
+            break
+    assert runtime_services is not None
+    assert SERVICE not in runtime_services
