@@ -68,7 +68,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["contract_version"], CMIS_CONTRACT_VERSION)
-        self.assertEqual(CMIS_CONTRACT_VERSION, "1.28.0")
+        self.assertEqual(CMIS_CONTRACT_VERSION, "1.29.0")
         self.assertEqual(set(manifest["chains"]), {"x1", "solana"})
         freshness = manifest["response_freshness"]
         self.assertEqual(freshness["contract_version"], "cmis_response_freshness/v1")
@@ -87,6 +87,7 @@ class CMISCapabilityContractTests(unittest.TestCase):
         self.assertIn(TRADE_PRICE_IMPACT_SERVICE, SUPPORTED_SERVICES)
         self.assertIn(LARGE_TRADE_DISCOVERY_SERVICE, SUPPORTED_SERVICES)
         self.assertIn(REGULATORY_EVIDENCE_SERVICE, SUPPORTED_SERVICES)
+        self.assertIn("x1_intelligence_brief_inputs", SUPPORTED_SERVICES)
         self.assertIn("wallet_relationship_intelligence", SUPPORTED_SERVICES)
         self.assertIn("evidence_capabilities", manifest["chains"]["x1"])
         self.assertNotIn("evidence_capabilities", manifest["chains"]["solana"])

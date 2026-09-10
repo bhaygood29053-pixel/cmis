@@ -76,7 +76,7 @@ def brief():
     }
 
 
-def test_wraps_brief_in_standard_cmis_envelope_without_promotion():
+def test_wraps_non_promoted_brief_in_promoted_read_only_service_envelope():
     source = brief()
     before = deepcopy(source)
 
@@ -96,7 +96,14 @@ def test_wraps_brief_in_standard_cmis_envelope_without_promotion():
     assert response["freshness"]["state"] == "UNKNOWN"
     assert response["freshness"]["freshness_verified"] is None
     assert response["observed_at"] is None
+    assert response["read_only"] is True
+    assert response["public_service_promoted"] is True
+    assert response["scout_reliance_promoted"] is True
+    assert response["runtime_capability_promoted"] is True
+    assert response["complete_x1_ecosystem_coverage_verified"] is False
     assert response["execution_authorized"] is False
+    assert response["data"]["public_service_promoted"] is False
+    assert response["data"]["scout_reliance_promoted"] is False
     assert source == before
 
 
@@ -176,7 +183,7 @@ def test_incomplete_component_matrix_fails_closed():
         build_x1_intelligence_brief_service_response(source)
 
 
-def test_service_module_does_not_register_public_runtime_capability():
+def test_promotion_branch_registers_public_runtime_capability_candidate():
     tree = ast.parse(
         Path("liquidity_scout/cmis/capabilities.py").read_text(encoding="utf-8")
     )
@@ -192,4 +199,4 @@ def test_service_module_does_not_register_public_runtime_capability():
             runtime_services = ast.literal_eval(node.value)
             break
     assert runtime_services is not None
-    assert SERVICE not in runtime_services
+    assert SERVICE in runtime_services

@@ -101,17 +101,18 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.28.0")
+        self.assertEqual(response["contract_version"], "1.29.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
         self.assertEqual(response["response_freshness"]["contract_version"], "cmis_response_freshness/v1")
         self.assertTrue(response["response_freshness"]["required_on_every_public_response"])
         self.assertTrue(response["response_freshness"]["observation_time_alone_never_proves_provider_fact_freshness"])
-        self.assertEqual(len(response["supported_services"]), 21)
+        self.assertEqual(len(response["supported_services"]), 22)
         self.assertIn("burn_intelligence", response["supported_services"])
         self.assertIn("concentration_warning_intelligence", response["supported_services"])
         self.assertIn("bridge_to_xdex_utilization", response["supported_services"])
         self.assertIn("cross_chain_asset_provenance", response["supported_services"])
         self.assertIn("regulatory_evidence", response["supported_services"])
+        self.assertIn("x1_intelligence_brief_inputs", response["supported_services"])
         self.assertIn("wallet_relationship_intelligence", response["supported_services"])
         self.assertIn("discovery_intelligence", response["supported_services"])
         self.assertIn("verification_evidence", response["supported_services"])
@@ -235,6 +236,18 @@ class CMISHTTPGatewayTests(unittest.TestCase):
             ["top_account_concentration_change"],
         )
         self.assertFalse(promoted["execution_authorized"])
+
+        x1_brief = x1["x1_intelligence_brief_inputs"]
+        self.assertEqual(x1_brief["state"], "bounded")
+        self.assertTrue(x1_brief["callable"])
+        self.assertTrue(x1_brief["read_only"])
+        self.assertTrue(x1_brief["public_service_promoted"])
+        self.assertTrue(x1_brief["scout_reliance_promoted"])
+        self.assertFalse(x1_brief["complete_x1_ecosystem_coverage_verified"])
+        self.assertFalse(x1_brief["execution_authorized"])
+        self.assertEqual(solana["x1_intelligence_brief_inputs"]["state"], "unavailable")
+        self.assertFalse(solana["x1_intelligence_brief_inputs"]["callable"])
+        self.assertFalse(solana["x1_intelligence_brief_inputs"]["execution_authorized"])
 
         wallet_relationship = x1["wallet_relationship_intelligence"]
         self.assertEqual(wallet_relationship["state"], "bounded")

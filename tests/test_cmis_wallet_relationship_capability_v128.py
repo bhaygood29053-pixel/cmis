@@ -46,11 +46,12 @@ def _helper():
     return namespace["_wallet_relationship_capability"]
 
 
-def test_promotion_bumps_contract_and_public_service_surface():
-    assert _assignment("CMIS_CONTRACT_VERSION") == "1.28.0"
+def test_wallet_relationship_128_promotion_survives_later_contract_release():
+    assert _assignment("CMIS_CONTRACT_VERSION") == "1.29.0"
     services = _assignment("PUBLIC_RUNTIME_SERVICES")
     assert services[-1] == SERVICE
     assert services.count(SERVICE) == 1
+    assert "x1_intelligence_brief_inputs" in services
     public_init = PUBLIC_INIT_PATH.read_text(encoding="utf-8")
     assert f'"{SERVICE}"' in public_init
 
