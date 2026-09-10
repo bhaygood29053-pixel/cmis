@@ -1,0 +1,172 @@
+name: FortiBlox Price Fact-Time Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "liquidity_scout/providers/x1/fortiblox_price_fact_time.py"
+      - "tests/test_fortiblox_price_fact_time.py"
+      - "docs/FORTIBLOX_PRICE_FACT_TIME_PROBE_V1.md"
+      - ".github/workflows/fortiblox-price-fact-time-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - name: Test deterministic fact-time probe
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_fortiblox_price_fact_time.py
+
+  live-public-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect bounded no-auth no-payment observations
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          from liquidity_scout.providers.x1.fortiblox_price_fact_time import (
+              EVIDENCE_INCOMPLETE,
+              analyze_fortiblox_price_fact_time,
+          )
+
+          URL = "https://app.fortiblox.com/api/tokens"
+          MAX_BYTES = 2_000_000
+          SAMPLE_COUNT = 6
+          INTERVAL_SECONDS = 3
+          MAX_TOKENS = 200
+
+          observations = []
+          attempts = []
+          for index in range(SAMPLE_COUNT):
+              collected_at_ms = int(time.time() * 1000)
+              request = urllib.request.Request(
+                  URL,
+                  headers={
+                      "Accept": "application/json",
+                      "User-Agent": "CMIS-FortiBlox-Fact-Time-Probe/1",
+                  },
+                  method="GET",
+              )
+              status = None
+              content_type = None
+              body = b""
+              error = None
+              try:
+                  with urllib.request.urlopen(request, timeout=15) as response:
+                      status = response.status
+                      content_type = (response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+                      body = response.read(MAX_BYTES + 1)
+              except urllib.error.HTTPError as exc:
+                  status = exc.code
+                  content_type = (exc.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+                  error = f"HTTP {exc.code}"
+              except Exception as exc:
+                  error = type(exc).__name__
+
+              attempt = {
+                  "sample_index": index,
+                  "collected_at_ms": collected_at_ms,
+                  "http_status": status,
+                  "content_type": content_type,
+                  "error": error,
+              }
+              attempts.append(attempt)
+
+              if status == 200 and len(body) <= MAX_BYTES:
+                  try:
+                      payload = json.loads(body)
+                  except Exception:
+                      payload = None
+                  if isinstance(payload, dict) and isinstance(payload.get("tokens"), list):
+                      updated_at = payload.get("updatedAt")
+                      if isinstance(updated_at, int) and not isinstance(updated_at, bool) and updated_at >= 0:
+                          selected = []
+                          for item in payload["tokens"][:MAX_TOKENS]:
+                              if not isinstance(item, dict):
+                                  continue
+                              mint = item.get("mint")
+                              if not isinstance(mint, str) or not mint.strip():
+                                  continue
+                              selected.append({
+                                  "mint": mint.strip(),
+                                  "price_usd": item.get("priceUsd"),
+                              })
+                          if selected:
+                              observations.append({
+                                  "collected_at_ms": collected_at_ms,
+                                  "provider_updated_at_ms": updated_at,
+                                  "tokens": selected,
+                              })
+              if index + 1 < SAMPLE_COUNT:
+                  time.sleep(INTERVAL_SECONDS)
+
+          if len(observations) >= 2:
+              result = analyze_fortiblox_price_fact_time(observations)
+          else:
+              result = {
+                  "contract_version": "fortiblox_price_fact_time_probe/v1",
+                  "conclusion": EVIDENCE_INCOMPLETE,
+                  "reason": "Fewer than two usable unauthenticated public /api/tokens observations were available.",
+                  "snapshot_count": len(observations),
+                  "timestamp_unit_verified": False,
+                  "clock_semantics_verified": False,
+                  "price_field_timestamp_semantics_verified": False,
+                  "current_fact_corroboration_authorized": False,
+                  "source_independence_verified": False,
+                  "volume_freshness_verified": False,
+                  "cmis_verified": False,
+                  "public_service_promoted": False,
+                  "scout_reliance_promoted": False,
+                  "execution_authorized": False,
+              }
+
+          evidence = {
+              "contract_version": "fortiblox_price_fact_time_live_evidence/v1",
+              "source_url": URL,
+              "attempt_count": len(attempts),
+              "usable_snapshot_count": len(observations),
+              "attempts": attempts,
+              "snapshots": observations,
+              "analysis": result,
+              "authentication_used": False,
+              "payment_used": False,
+              "wallet_interaction": False,
+              "raw_response_bodies_retained": False,
+              "execution_authorized": False,
+          }
+          Path("evidence").mkdir(exist_ok=True)
+          Path("evidence/fortiblox-price-fact-time.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+          PY
+      - name: Upload bounded evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortiblox-price-fact-time-evidence
+          path: evidence/fortiblox-price-fact-time.json
+          if-no-files-found: error
+          retention-days: 30
