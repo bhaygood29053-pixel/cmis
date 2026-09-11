@@ -123,6 +123,72 @@ def _native_xnt_history_adequacy(
     }
 
 
+def _preserve_native_xnt_distribution_diagnostic(
+    *,
+    identity: Mapping[str, Any],
+    sections: dict[str, Any],
+    native_distribution: Mapping[str, Any] | None,
+) -> None:
+    """Preserve bounded native-XNT concentration collection failure semantics.
+
+    The protected runtime can distinguish a normal unverified concentration from
+    an actual collection failure. Earlier public scan versions collapsed both to
+    one generic reason. v6 keeps holder-count applicability unchanged and carries
+    only bounded failure metadata; exception messages and provider internals are
+    never promoted.
+    """
+
+    source = _mapping(native_distribution)
+    if not (
+        identity.get("identity_key") == "native:xnt"
+        and str(identity.get("symbol") or "").strip().upper() == "XNT"
+        and source.get("native_account_concentration_verified") is not True
+    ):
+        return
+
+    failure_code = str(source.get("collection_failure_code") or "").strip()
+    if not failure_code:
+        return
+
+    holder = sections.get("holder_concentration")
+    if not isinstance(holder, dict):
+        return
+
+    # Holder count remains structurally N/A regardless of collection outcome.
+    holder["holders"] = None
+    holder["holders_verified"] = False
+    holder["holders_state"] = "not_applicable"
+    holder["holders_reason"] = "xnt_is_native_currency_not_spl_holder_population"
+
+    top = holder.get("top_account_concentration")
+    if isinstance(top, dict):
+        top["value"] = None
+        top["verified"] = False
+        top["state"] = "unavailable"
+        top["reason"] = failure_code
+        top["basis"] = "top_20_native_xnt_accounts_percent_of_circulating_xnt"
+        top["counted_entity"] = "native_xnt_account_address"
+
+    native = holder.get("native_account_concentration")
+    if not isinstance(native, dict):
+        native = {}
+        holder["native_account_concentration"] = native
+    native.update(
+        {
+            "verified": False,
+            "counted_entity": "native_xnt_account_address",
+            "holder_count_state": "not_applicable",
+            "collection_state": str(source.get("collection_state") or "failed"),
+            "collection_failure_code": failure_code,
+            "collection_failure_type": str(
+                source.get("collection_failure_type") or ""
+            ).strip()
+            or None,
+            "execution_authorized": False,
+        }
+    )
+
+
 def build_instant_x1_scan_v6_response(
     identity_envelope: Mapping[str, Any],
     market_envelope: Mapping[str, Any],
@@ -156,6 +222,12 @@ def build_instant_x1_scan_v6_response(
     history = sections.get("history")
     if not isinstance(identity, dict) or not isinstance(history, dict):
         raise ValueError("Instant X1 Scan v5 identity/history sections are missing")
+
+    _preserve_native_xnt_distribution_diagnostic(
+        identity=identity,
+        sections=sections,
+        native_distribution=native_distribution,
+    )
 
     adequacy = _native_xnt_history_adequacy(
         identity=identity,
