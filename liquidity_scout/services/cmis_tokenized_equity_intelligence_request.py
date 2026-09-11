@@ -150,26 +150,27 @@ def validate_tokenized_equity_intelligence_request(value: Any) -> dict[str, Any]
         raise TokenizedEquityIntelligenceRequestError(
             "requested_components must be a non-empty list"
         )
-    components = []
+    selected: set[str] = set()
     for index, raw in enumerate(raw_components):
         component = _text(raw, f"requested_components[{index}]").casefold()
         if component not in SUPPORTED_COMPONENTS:
             raise TokenizedEquityIntelligenceRequestError(
                 f"unsupported requested component: {component}"
             )
-        if component in components:
+        if component in selected:
             raise TokenizedEquityIntelligenceRequestError(
                 "requested_components must be unique"
             )
-        components.append(component)
-    if not components:
+        selected.add(component)
+    if not selected:
         raise TokenizedEquityIntelligenceRequestError(
             "requested_components must not be empty"
         )
-    if "provenance" not in components:
+    if "provenance" not in selected:
         raise TokenizedEquityIntelligenceRequestError(
             "requested_components must include provenance as the identity foundation"
         )
+    components = [name for name in SUPPORTED_COMPONENTS if name in selected]
 
     return {
         "contract_version": REQUEST_CONTRACT_VERSION,
