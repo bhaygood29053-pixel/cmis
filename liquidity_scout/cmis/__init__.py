@@ -8,6 +8,14 @@ or eagerly imports protected implementation.
 
 from __future__ import annotations
 
+from pkgutil import extend_path
+
+# Public CMIS and cmis-private-core intentionally contribute modules beneath the
+# same package path. Extend this package path so protected implementation can be
+# loaded from the installed private wheel while the public shell remains on the
+# checked-out repository source tree.
+__path__ = extend_path(__path__, __name__)
+
 from liquidity_scout.cmis_private_core import (
     PrivateCoreUnavailable,
     load_runtime_contract,
