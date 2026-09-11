@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install public dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
       - name: Apply deterministic public promotion migration
         run: python scripts/apply_cmis_130_tokenized_promotion.py
       - name: Static promotion sanity
