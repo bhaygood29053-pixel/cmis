@@ -166,6 +166,10 @@ def validate_tokenized_equity_intelligence_request(value: Any) -> dict[str, Any]
         raise TokenizedEquityIntelligenceRequestError(
             "requested_components must not be empty"
         )
+    if "provenance" not in components:
+        raise TokenizedEquityIntelligenceRequestError(
+            "requested_components must include provenance as the identity foundation"
+        )
 
     return {
         "contract_version": REQUEST_CONTRACT_VERSION,
