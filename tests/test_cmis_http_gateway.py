@@ -101,7 +101,7 @@ class CMISHTTPGatewayTests(unittest.TestCase):
 
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["schema_version"], 1)
-        self.assertEqual(response["contract_version"], "1.29.0")
+        self.assertEqual(response["contract_version"], "1.30.0")
         self.assertEqual(response["request_path"], "/v1/cmis")
         self.assertEqual(response["response_freshness"]["contract_version"], "cmis_response_freshness/v1")
         self.assertTrue(response["response_freshness"]["required_on_every_public_response"])

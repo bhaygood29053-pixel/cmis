@@ -47,7 +47,7 @@ def _helper():
 
 
 def test_wallet_relationship_128_promotion_survives_later_contract_release():
-    assert _assignment("CMIS_CONTRACT_VERSION") == "1.29.0"
+    assert _assignment("CMIS_CONTRACT_VERSION") == "1.30.0"
     services = _assignment("PUBLIC_RUNTIME_SERVICES")
     assert services[-1] == SERVICE
     assert services.count(SERVICE) == 1

@@ -38,6 +38,7 @@ SUPPORTED_SERVICES = (
     "cross_chain_asset_provenance",
     "regulatory_evidence",
     "x1_intelligence_brief_inputs",
+    "tokenized_equity_intelligence",
     "wallet_relationship_intelligence",
 )
 SUPPORTED_CHAINS = ("x1",)

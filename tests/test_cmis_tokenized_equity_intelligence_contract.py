@@ -162,8 +162,8 @@ def test_unresolved_subject_is_safe_partial_not_deployment_claim():
     assert response["data"]["contract_version"] == CONTRACT_VERSION
     assert response["data"]["resolved_subject"] is None
     assert response["data"]["live_x1_equity_deployment_verified"] is False
-    assert response["public_service_promoted"] is False
-    assert response["scout_reliance_promoted"] is False
+    assert response["public_service_promoted"] is True
+    assert response["scout_reliance_promoted"] is True
     assert response["execution_authorized"] is False
 
 
@@ -177,7 +177,7 @@ def test_resolved_provenance_only_recomputes_evidence_quality_and_is_candidate_o
     assert response["data"]["component_states"] == {"provenance": "AVAILABLE"}
     assert response["data"]["proof_score_separate_from_risk"] is True
     assert response["confidence"]["proof_score_owned_by_protected_runtime"] is True
-    assert response["runtime_capability_promoted"] is False
+    assert response["runtime_capability_promoted"] is True
     assert response["execution_authorized"] is False
 
 
