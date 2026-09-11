@@ -1,15 +1,15 @@
 """Deterministic current-market freshness assessment for X1 Instant X1 Scan.
 
 Collection recency and provider fact-time are separate proof dimensions. The
-assessment may promote current price freshness only when the current price is
-bound to a recent timestamped provider-backed close under the accepted policy.
-Liquidity, rolling volume, and rolling transaction count remain unverified for
-fact-time freshness until field-specific timestamp contracts exist.
+assessment may promote current price freshness either from a recent timestamped
+provider-backed close or, in v3, from an independently reproduced fresh X1-chain
+USD valuation for the exact primary pool. Liquidity and rolling activity retain
+their field-specific verification contracts.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import math
 from typing import Any
 
@@ -22,6 +22,8 @@ FIELDS = ("price_usd", "liquidity_usd", "volume_24h_usd", "transactions_24h")
 V1_CONTRACT = "x1_current_market_freshness/v1"
 V2_CONTRACT = "x1_current_market_freshness/v2"
 V3_CONTRACT = "x1_current_market_freshness/v3"
+_SPLIT_LIQUIDITY_CONTRACT = "x1_ninja_liquidity_freshness/v2"
+_LIQUIDITY_UNIT_CONTRACT = "x1_ninja_liquidity_unit_semantics/v1"
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
@@ -36,6 +38,11 @@ def _finite(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
 
 
 def _age(
@@ -334,6 +341,100 @@ def evaluate_current_market_freshness_v2(
     return result
 
 
+def _independent_primary_pool_price(
+    market_envelope: Mapping[str, Any],
+    split_liquidity: Mapping[str, Any],
+    *,
+    relative_tolerance: float,
+) -> dict[str, Any]:
+    """Reproduce the current provider pool price from fresh X1 chain state.
+
+    The split-liquidity v2 contract already binds exact pool identity and fresh
+    RPC reserves to a verified current XNT/USDC.X + USDC/USD valuation. Reusing
+    its per-pool independent_asset_usd value gives price a second, independent
+    freshness route without pretending the provider's lastUpdated field is a
+    verified fact-time timestamp.
+    """
+
+    data = _mapping(market_envelope.get("data"))
+    completeness = _mapping(data.get("completeness"))
+    primary = _mapping(data.get("primary_pool"))
+    primary_address = _text(primary.get("address"))
+    current_price = _finite(data.get("price_usd"))
+
+    base = {
+        "verified": False,
+        "primary_pool_address": primary_address,
+        "current_price_value": current_price,
+        "independent_current_usd_value": None,
+        "value_link_verified": False,
+        "reason": "independent_current_price_usd_proof_incomplete",
+    }
+
+    if not (
+        split_liquidity.get("contract_version") == _SPLIT_LIQUIDITY_CONTRACT
+        and split_liquidity.get("execution_authorized") is False
+        and split_liquidity.get("source_independence_verified") is False
+        and primary_address
+        and completeness.get("price") is True
+        and current_price is not None
+        and current_price > 0
+    ):
+        return base
+
+    rows = split_liquidity.get("pool_results")
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
+        return base
+
+    matches = [
+        row
+        for row in rows
+        if isinstance(row, Mapping)
+        and _text(row.get("pool_address")) == primary_address
+    ]
+    if len(matches) != 1:
+        return base
+
+    row = matches[0]
+    if not (
+        row.get("reserve_mapping_verified") is True
+        and row.get("independent_liquidity_usd_freshness_verified") is True
+    ):
+        return base
+
+    semantics = _mapping(row.get("unit_semantics"))
+    independent = _mapping(semantics.get("independent_current_usd"))
+    independent_price = _finite(independent.get("independent_asset_usd"))
+    if not (
+        semantics.get("contract_version") == _LIQUIDITY_UNIT_CONTRACT
+        and semantics.get("execution_authorized") is False
+        and independent.get("independent_usd_valuation_verified") is True
+        and independent_price is not None
+        and independent_price > 0
+    ):
+        return base
+
+    value_link_verified = math.isclose(
+        current_price,
+        independent_price,
+        rel_tol=float(relative_tolerance),
+        abs_tol=1e-12,
+    )
+    base.update(
+        {
+            "independent_current_usd_value": independent_price,
+            "value_link_verified": value_link_verified,
+            "verified": value_link_verified,
+            "reason": (
+                "current_market_price_matches_independent_fresh_chain_state_valuation"
+                if value_link_verified
+                else "provider_price_does_not_match_independent_fresh_chain_state_valuation"
+            ),
+            "evidence_contract": split_liquidity.get("contract_version"),
+            "valuation_contract": semantics.get("contract_version"),
+        }
+    )
+    return base
 
 
 def evaluate_current_market_freshness_v3(
@@ -347,11 +448,13 @@ def evaluate_current_market_freshness_v3(
     liquidity_freshness_evidence_v2: Mapping[str, Any] | None = None,
     rolling_activity_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Extend v2 with explicit provider-nominal and independent-USD liquidity.
+    """Extend v2 with split liquidity and independent current-price verification.
 
-    The legacy liquidity_usd field keeps the exact v2 meaning. The new fields
-    may be promoted only from x1_ninja_liquidity_freshness/v2 and do not imply
-    provider fact-time or source independence.
+    The legacy liquidity_usd field keeps the exact v2 meaning. The split
+    liquidity contract may additionally prove provider-nominal liquidity,
+    independently valued current USD liquidity, and the current primary-pool
+    USD price when that independently derived price matches the X1.Ninja market
+    reading under the accepted price tolerance.
     """
 
     base = evaluate_current_market_freshness_v2(
@@ -371,7 +474,7 @@ def evaluate_current_market_freshness_v3(
 
     split = _mapping(liquidity_freshness_evidence_v2)
     split_contract_ok = bool(
-        split.get("contract_version") == "x1_ninja_liquidity_freshness/v2"
+        split.get("contract_version") == _SPLIT_LIQUIDITY_CONTRACT
         and split.get("execution_authorized") is False
         and split.get("provider_fact_time_verified") is False
         and split.get("source_independence_verified") is False
@@ -420,6 +523,37 @@ def evaluate_current_market_freshness_v3(
         "evidence_contract": split.get("contract_version"),
     }
 
+    normalized_policy = _mapping(base.get("policy"))
+    tolerance = _finite(normalized_policy.get("price_relative_tolerance"))
+    if tolerance is None:
+        tolerance = 0.0
+    chain_price = _independent_primary_pool_price(
+        market_envelope,
+        split,
+        relative_tolerance=tolerance,
+    )
+    independent_price_verified = chain_price.get("verified") is True
+    timestamped_price_already_verified = (
+        _mapping(fields.get("price_usd")).get("freshness_verified") is True
+    )
+
+    if independent_price_verified and not timestamped_price_already_verified:
+        fields["price_usd"] = {
+            "freshness_verified": True,
+            "reason": chain_price.get("reason"),
+            "provider_fact_time_verified": False,
+            "current_value_reproduced_from_fresh_chain_state": True,
+            "current_price_value": chain_price.get("current_price_value"),
+            "independent_current_usd_value": chain_price.get(
+                "independent_current_usd_value"
+            ),
+            "value_link_verified": True,
+            "primary_pool_address": chain_price.get("primary_pool_address"),
+            "evidence_contract": chain_price.get("evidence_contract"),
+            "valuation_contract": chain_price.get("valuation_contract"),
+            "source_independence_verified": False,
+        }
+
     verified_field_count = sum(
         1 for row in fields.values() if row.get("freshness_verified") is True
     )
@@ -431,6 +565,14 @@ def evaluate_current_market_freshness_v3(
     )
 
     limitations = list(base.get("limitations") or [])
+    if independent_price_verified:
+        limitations = [
+            item
+            for item in limitations
+            if item != "price_freshness_requires_timestamped_provider_price_match"
+        ]
+    elif not timestamped_price_already_verified:
+        limitations.append("independent_current_price_usd_proof_incomplete")
     if not provider_nominal_verified:
         limitations.append(
             "provider_nominal_liquidity_current_chain_proof_incomplete"
@@ -441,6 +583,7 @@ def evaluate_current_market_freshness_v3(
         )
     limitations.extend(
         [
+            "provider_price_fact_time_not_implied_by_independent_chain_price_reproduction",
             "provider_nominal_liquidity_is_not_independent_external_usd",
             "legacy_liquidity_usd_freshness_semantics_preserved_from_v2",
         ]
@@ -464,6 +607,10 @@ def evaluate_current_market_freshness_v3(
             "independent_liquidity_usd_freshness_verified": (
                 independent_usd_verified
             ),
+            "independent_current_price_usd_freshness_verified": (
+                independent_price_verified
+            ),
+            "independent_current_price_usd_evidence": dict(chain_price),
             "limitations": list(dict.fromkeys(limitations)),
             "execution_authorized": False,
         }
