@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  apply-promotion:
+  migrate-release-workflow:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,57 +21,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install public dependencies
+      - name: Apply broad release-workflow migration
+        run: python scripts/apply_cmis_130_tests_workflow.py
+      - name: Validate workflow migration
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pytest
-      - name: Apply deterministic public promotion migration
-        run: python scripts/apply_cmis_130_tokenized_promotion.py
-      - name: Static promotion sanity
-        run: |
-          python -m compileall -q liquidity_scout/cmis liquidity_scout/services
           python - <<'PY'
-          import ast
           from pathlib import Path
-
-          def assignment(path, name):
-              tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-              for node in tree.body:
-                  if not isinstance(node, ast.Assign):
-                      continue
-                  if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
-                      return ast.literal_eval(node.value)
-              raise AssertionError(f"{path}: assignment {name} not found")
-
-          version = assignment("liquidity_scout/cmis/capabilities.py", "CMIS_CONTRACT_VERSION")
-          public_runtime = assignment("liquidity_scout/cmis/capabilities.py", "PUBLIC_RUNTIME_SERVICES")
-          public_init = assignment("liquidity_scout/cmis/__init__.py", "SUPPORTED_SERVICES")
-          promoted = assignment("liquidity_scout/services/cmis_tokenized_equity_intelligence.py", "PROMOTED")
-
-          assert version == "1.30.0"
-          assert tuple(public_init) == tuple(public_runtime)
-          assert len(public_runtime) == 23
-          assert public_runtime[-3:] == (
-              "x1_intelligence_brief_inputs",
-              "tokenized_equity_intelligence",
-              "wallet_relationship_intelligence",
-          )
-          assert promoted is True
-          print("CMIS_130_SOURCE_BOUNDARY_SANITY=PASS")
+          text = Path(".github/workflows/tests.yml").read_text(encoding="utf-8")
+          assert 'Validate CMIS 1.30 capability' in text
+          assert 'CMIS_CONTRACT_VERSION = "1.30.0"' in text
+          assert '"tokenized_equity_intelligence"' in text
+          assert 'test_cmis_tokenized_equity_capability_v130.py' in text
+          assert 'CMIS_130_REGRESSION_EXPECTATIONS=PASS' in text
           PY
           git diff --check
-      - name: Commit and push migration
+      - name: Commit broad workflow migration
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            liquidity_scout/cmis/capabilities.py \
-            liquidity_scout/cmis/__init__.py \
-            liquidity_scout/services/cmis_tokenized_equity_intelligence.py \
-            tests/test_cmis_capabilities.py \
-            tests/test_cmis_http_gateway.py \
-            tests/test_cmis_wallet_relationship_capability_v128.py \
-            tests/test_cmis_x1_intelligence_brief_capability_v129.py \
-            tests/test_cmis_tokenized_equity_intelligence_contract.py
-          git commit -m "feat: promote Tokenized Equity Intelligence in CMIS 1.30"
+          git add .github/workflows/tests.yml
+          git commit -m "ci: align broad regression with CMIS 1.30"
           git push origin HEAD:feat/674-cmis-130-tokenized-equity-promotion
