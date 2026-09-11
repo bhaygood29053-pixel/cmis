@@ -23,7 +23,6 @@ from liquidity_scout.services.cmis_tokenized_equity_evidence_quality import (
 from liquidity_scout.services.cmis_tokenized_equity_intelligence_request import (
     REQUEST_CONTRACT_VERSION,
     SUPPORTED_CHAIN,
-    SUPPORTED_COMPONENTS,
     validate_tokenized_equity_intelligence_request,
 )
 from liquidity_scout.services.cmis_tokenized_equity_provenance import (
@@ -53,6 +52,27 @@ COMPONENT_CONTRACTS = {
 }
 PROMOTED = False
 _ID_RE = re.compile(r"^tei_[0-9a-f]{64}$")
+_MATERIALIZATION_KEYS = frozenset(
+    {
+        "materialization_id",
+        "contract_version",
+        "chain",
+        "request",
+        "subject_resolution_state",
+        "resolved_subject",
+        "component_states",
+        "components",
+        "evidence_quality",
+        "read_only",
+        "public_service_promoted",
+        "scout_reliance_promoted",
+        "caller_fact_evidence_provider_material_accepted",
+        "caller_proof_score_risk_legal_material_accepted",
+        "live_x1_equity_deployment_verified",
+        "live_robinhood_x1_route_verified",
+        "execution_authorized",
+    }
+)
 
 
 class TokenizedEquityIntelligenceContractError(ValueError):
@@ -83,6 +103,19 @@ def _canonical_json(value: Any) -> str:
 def _materialization_id(value: Mapping[str, Any]) -> str:
     digest = hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
     return f"{MATERIALIZATION_ID_PREFIX}{digest}"
+
+
+def content_address_tokenized_equity_intelligence_materialization(
+    value: Any,
+) -> dict[str, Any]:
+    """Content-address protected material without accepting caller identity."""
+
+    material = deepcopy(dict(_mapping(value, "materialization")))
+    if "materialization_id" in material:
+        raise TokenizedEquityIntelligenceContractError(
+            "materialization must not contain caller/precomputed materialization_id"
+        )
+    return {**material, "materialization_id": _materialization_id(material)}
 
 
 def _subject_from_provenance(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -133,8 +166,20 @@ def _validate_resolved_subject(
 
 
 def validate_tokenized_equity_intelligence_materialization(value: Any) -> dict[str, Any]:
-    supplied = deepcopy(dict(_mapping(value, "materialization")))
-    supplied_id = supplied.pop("materialization_id", None)
+    original = deepcopy(dict(_mapping(value, "materialization")))
+    missing = sorted(_MATERIALIZATION_KEYS - set(original))
+    unknown = sorted(set(original) - _MATERIALIZATION_KEYS)
+    if missing:
+        raise TokenizedEquityIntelligenceContractError(
+            "materialization missing required fields: " + ", ".join(missing)
+        )
+    if unknown:
+        raise TokenizedEquityIntelligenceContractError(
+            "materialization contains unsupported fields: " + ", ".join(unknown)
+        )
+
+    supplied = deepcopy(original)
+    supplied_id = supplied.pop("materialization_id")
     if not isinstance(supplied_id, str) or not _ID_RE.fullmatch(supplied_id):
         raise TokenizedEquityIntelligenceContractError(
             "materialization_id must be canonical tei_ SHA-256 identity"
@@ -256,6 +301,10 @@ def validate_tokenized_equity_intelligence_materialization(value: Any) -> dict[s
         )
     except ValueError as exc:
         raise TokenizedEquityIntelligenceContractError(str(exc)) from exc
+    if expected_quality.get("contract") != TOKENIZED_EQUITY_EVIDENCE_QUALITY_CONTRACT:
+        raise TokenizedEquityIntelligenceContractError(
+            "evidence quality contract mismatch"
+        )
     if supplied.get("evidence_quality") != expected_quality:
         raise TokenizedEquityIntelligenceContractError(
             "evidence_quality must exactly equal deterministic accepted reconstruction"
@@ -274,7 +323,7 @@ def validate_tokenized_equity_intelligence_materialization(value: Any) -> dict[s
 
 def build_tokenized_equity_intelligence_response(materialization: Any) -> dict[str, Any]:
     safe = validate_tokenized_equity_intelligence_materialization(materialization)
-    request = safe["request"]
+    request = validate_tokenized_equity_intelligence_request(safe["request"])
     states = safe["component_states"]
     complete = safe["subject_resolution_state"] == "RESOLVED" and all(
         states[name] == "AVAILABLE" for name in request["requested_components"]
@@ -363,5 +412,6 @@ __all__ = [
     "SUBJECT_STATES",
     "TokenizedEquityIntelligenceContractError",
     "build_tokenized_equity_intelligence_response",
+    "content_address_tokenized_equity_intelligence_materialization",
     "validate_tokenized_equity_intelligence_materialization",
 ]
