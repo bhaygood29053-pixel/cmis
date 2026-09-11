@@ -35,6 +35,14 @@ from liquidity_scout.services.cmis_wallet_relationship_intelligence import (
 from liquidity_scout.services.cmis_wallet_relationship_request import (
     REQUEST_CONTRACT_VERSION as WALLET_RELATIONSHIP_REQUEST_CONTRACT_VERSION,
 )
+from liquidity_scout.services.cmis_tokenized_equity_intelligence import (
+    CONTRACT_VERSION as TOKENIZED_EQUITY_INTELLIGENCE_CONTRACT_VERSION,
+    MATERIALIZATION_CONTRACT_VERSION as TOKENIZED_EQUITY_INTELLIGENCE_MATERIALIZATION_CONTRACT_VERSION,
+    SERVICE as TOKENIZED_EQUITY_INTELLIGENCE_SERVICE,
+)
+from liquidity_scout.services.cmis_tokenized_equity_intelligence_request import (
+    REQUEST_CONTRACT_VERSION as TOKENIZED_EQUITY_INTELLIGENCE_REQUEST_CONTRACT_VERSION,
+)
 from liquidity_scout.services.cmis_trade_price_impact_intelligence import (
     CONTRACT_VERSION as TRADE_PRICE_IMPACT_CONTRACT_VERSION,
     SERVICE as TRADE_PRICE_IMPACT_SERVICE,
@@ -72,7 +80,7 @@ from liquidity_scout.services.cmis_verified_intelligence import (
 
 
 CAPABILITY_SCHEMA_VERSION = 1
-CMIS_CONTRACT_VERSION = "1.29.0"
+CMIS_CONTRACT_VERSION = "1.30.0"
 EVIDENCE_RECEIPT_SCHEMA_VERSION = 1
 PROOF_SCORE_SCHEMA_VERSION = 1
 INTELLIGENCE_FOUNDATION_SCHEMA_VERSION = 1
@@ -104,6 +112,7 @@ PUBLIC_RUNTIME_SERVICES = (
     "cross_chain_asset_provenance",
     "regulatory_evidence",
     "x1_intelligence_brief_inputs",
+    "tokenized_equity_intelligence",
     "wallet_relationship_intelligence",
 )
 PUBLIC_SUPPORTED_CHAINS = ("x1",)
@@ -590,6 +599,69 @@ def _concentration_warning_capability(*, available: bool) -> dict[str, Any]:
     }
 
 
+def _tokenized_equity_intelligence_capability(*, available: bool) -> dict[str, Any]:
+    if not available:
+        return {
+            "state": "unavailable",
+            "callable": False,
+            "read_only": True,
+            "public_service_promoted": False,
+            "scout_reliance_promoted": False,
+            "service_contract_version": TOKENIZED_EQUITY_INTELLIGENCE_CONTRACT_VERSION,
+            "request_contract_version": TOKENIZED_EQUITY_INTELLIGENCE_REQUEST_CONTRACT_VERSION,
+            "materialization_contract_version": TOKENIZED_EQUITY_INTELLIGENCE_MATERIALIZATION_CONTRACT_VERSION,
+            "requirements": [],
+            "limitations": ["tokenized_equity_intelligence_not_available_for_chain"],
+            "live_x1_equity_deployment_verified": False,
+            "live_robinhood_x1_route_verified": False,
+            "proof_score_separate_from_risk": True,
+            "execution_authorized": False,
+        }
+    return {
+        "state": "bounded",
+        "callable": True,
+        "read_only": True,
+        "public_service_promoted": True,
+        "scout_reliance_promoted": True,
+        "service_contract_version": TOKENIZED_EQUITY_INTELLIGENCE_CONTRACT_VERSION,
+        "request_contract_version": TOKENIZED_EQUITY_INTELLIGENCE_REQUEST_CONTRACT_VERSION,
+        "materialization_contract_version": TOKENIZED_EQUITY_INTELLIGENCE_MATERIALIZATION_CONTRACT_VERSION,
+        "requirements": [
+            "exact_x1_asset_mint_identity",
+            "optional_exact_underlying_security_selector",
+            "cmis_owned_tokenized_equity_record_resolver",
+            "accepted_tokenized_equity_provenance_v1",
+            "accepted_cross_chain_equity_provenance_v1",
+            "accepted_tokenized_equity_rights_v1",
+            "accepted_tokenized_equity_market_activity_v1",
+            "accepted_tokenized_equity_evidence_quality_v1",
+            "caller_fact_evidence_provider_injection_rejected",
+            "protected_evidence_receipt_and_proof_score_attachment",
+        ],
+        "limitations": [
+            "service_availability_does_not_prove_x1_tokenized_equity_deployment",
+            "missing_subject_or_component_is_evidence_required_not_zero",
+            "ticker_or_name_is_not_security_or_token_identity",
+            "robinhood_chain_to_x1_route_unverified_without_direct_accepted_evidence",
+            "rights_evidence_is_not_legal_adjudication",
+            "token_transfer_is_not_securities_ownership_transfer_without_legal_structure",
+            "wrapped_representation_is_not_underlying_equity",
+            "liquidity_is_not_volume",
+            "transfer_is_not_trade",
+            "bridge_flow_is_not_adoption",
+            "reference_price_is_not_executed_price",
+            "proof_score_is_not_risk",
+            "no_automatic_legal_compliance_risk_or_investment_conclusion",
+            "no_execution_authorization",
+            "x1_only_initial_scope",
+        ],
+        "live_x1_equity_deployment_verified": False,
+        "live_robinhood_x1_route_verified": False,
+        "proof_score_separate_from_risk": True,
+        "execution_authorized": False,
+    }
+
+
 def _wallet_relationship_capability(*, available: bool) -> dict[str, Any]:
     if not available:
         return {
@@ -867,6 +939,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
         X1_INTELLIGENCE_BRIEF_SERVICE: _x1_intelligence_brief_capability(
             available=True
         ),
+        TOKENIZED_EQUITY_INTELLIGENCE_SERVICE: _tokenized_equity_intelligence_capability(
+            available=True
+        ),
         WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=True),
     },
     "solana": {
@@ -981,6 +1056,9 @@ _CHAIN_SERVICE_CAPABILITIES: dict[str, dict[str, dict[str, Any]]] = {
             available=False
         ),
         X1_INTELLIGENCE_BRIEF_SERVICE: _x1_intelligence_brief_capability(
+            available=False
+        ),
+        TOKENIZED_EQUITY_INTELLIGENCE_SERVICE: _tokenized_equity_intelligence_capability(
             available=False
         ),
         WALLET_RELATIONSHIP_SERVICE: _wallet_relationship_capability(available=False),

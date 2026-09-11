@@ -50,7 +50,7 @@ COMPONENT_CONTRACTS = {
     "rights": TOKENIZED_EQUITY_RIGHTS_CONTRACT,
     "market_activity": TOKENIZED_EQUITY_MARKET_ACTIVITY_CONTRACT,
 }
-PROMOTED = False
+PROMOTED = True
 _ID_RE = re.compile(r"^tei_[0-9a-f]{64}$")
 _MATERIALIZATION_KEYS = frozenset(
     {

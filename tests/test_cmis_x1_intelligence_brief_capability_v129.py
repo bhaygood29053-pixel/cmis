@@ -59,9 +59,10 @@ def _wallet_helper():
 
 
 def test_cmis_129_promotes_brief_without_replacing_wallet_relationship():
-    assert _assignment("CMIS_CONTRACT_VERSION") == "1.29.0"
+    assert _assignment("CMIS_CONTRACT_VERSION") == "1.30.0"
     services = _assignment("PUBLIC_RUNTIME_SERVICES")
-    assert services[-2:] == (SERVICE, WALLET_SERVICE)
+    assert services[-3] == SERVICE
+    assert services[-1] == WALLET_SERVICE
     assert services.count(SERVICE) == 1
     assert services.count(WALLET_SERVICE) == 1
     public_init = PUBLIC_INIT_PATH.read_text(encoding="utf-8")
