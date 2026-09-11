@@ -31,17 +31,33 @@ jobs:
         run: |
           python -m compileall -q liquidity_scout/cmis liquidity_scout/services
           python - <<'PY'
-          from liquidity_scout import cmis
-          from liquidity_scout.cmis.capabilities import CMIS_CONTRACT_VERSION, PUBLIC_RUNTIME_SERVICES
-          from liquidity_scout.services.cmis_tokenized_equity_intelligence import PROMOTED
-          assert CMIS_CONTRACT_VERSION == "1.30.0"
-          assert tuple(cmis.SUPPORTED_SERVICES) == tuple(PUBLIC_RUNTIME_SERVICES)
-          assert PUBLIC_RUNTIME_SERVICES[-3:] == (
+          import ast
+          from pathlib import Path
+
+          def assignment(path, name):
+              tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+              for node in tree.body:
+                  if not isinstance(node, ast.Assign):
+                      continue
+                  if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+                      return ast.literal_eval(node.value)
+              raise AssertionError(f"{path}: assignment {name} not found")
+
+          version = assignment("liquidity_scout/cmis/capabilities.py", "CMIS_CONTRACT_VERSION")
+          public_runtime = assignment("liquidity_scout/cmis/capabilities.py", "PUBLIC_RUNTIME_SERVICES")
+          public_init = assignment("liquidity_scout/cmis/__init__.py", "SUPPORTED_SERVICES")
+          promoted = assignment("liquidity_scout/services/cmis_tokenized_equity_intelligence.py", "PROMOTED")
+
+          assert version == "1.30.0"
+          assert tuple(public_init) == tuple(public_runtime)
+          assert len(public_runtime) == 23
+          assert public_runtime[-3:] == (
               "x1_intelligence_brief_inputs",
               "tokenized_equity_intelligence",
               "wallet_relationship_intelligence",
           )
-          assert PROMOTED is True
+          assert promoted is True
+          print("CMIS_130_SOURCE_BOUNDARY_SANITY=PASS")
           PY
           git diff --check
       - name: Commit and push migration
