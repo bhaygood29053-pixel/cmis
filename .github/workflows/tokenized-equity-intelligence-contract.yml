@@ -49,15 +49,29 @@ jobs:
       - name: Confirm CMIS 1.30 promotion flags
         run: |
           python - <<'PY'
-          from liquidity_scout.cmis.capabilities import CMIS_CONTRACT_VERSION, PUBLIC_RUNTIME_SERVICES
-          from liquidity_scout.services.cmis_tokenized_equity_intelligence import PROMOTED
-          assert CMIS_CONTRACT_VERSION == "1.30.0"
-          assert PUBLIC_RUNTIME_SERVICES[-3:] == (
+          import ast
+          from pathlib import Path
+
+          def assignment(path, name):
+              tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+              for node in tree.body:
+                  if not isinstance(node, ast.Assign):
+                      continue
+                  if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+                      return ast.literal_eval(node.value)
+              raise AssertionError(f"{path}: assignment {name} not found")
+
+          version = assignment("liquidity_scout/cmis/capabilities.py", "CMIS_CONTRACT_VERSION")
+          services = assignment("liquidity_scout/cmis/capabilities.py", "PUBLIC_RUNTIME_SERVICES")
+          promoted = assignment("liquidity_scout/services/cmis_tokenized_equity_intelligence.py", "PROMOTED")
+          assert version == "1.30.0"
+          assert services[-3:] == (
               "x1_intelligence_brief_inputs",
               "tokenized_equity_intelligence",
               "wallet_relationship_intelligence",
           )
-          assert PROMOTED is True
+          assert promoted is True
+          print("CMIS_130_PROMOTION_SOURCE_BOUNDARY=PASS")
           PY
       - name: Diff hygiene
         run: git diff --check
