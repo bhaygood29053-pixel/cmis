@@ -16,6 +16,8 @@ RUN_HOME="$HOME"
 PYTHON="$REPO_ROOT/.venv/bin/python"
 ENV_FILE="$REPO_ROOT/.env"
 UNIT_FILE="/etc/systemd/system/cmis-gateway.service"
+OVERRIDE_DIR="/etc/systemd/system/cmis-gateway.service.d"
+OVERRIDE_FILE="$OVERRIDE_DIR/zz-repository-runtime.conf"
 HEALTH_URL="http://127.0.0.1:8765/healthz"
 
 [[ -x "$PYTHON" ]] || fail "Liquidity Scout virtualenv Python was not found at $PYTHON"
@@ -40,7 +42,8 @@ if ! sudo systemctl is-active --quiet cmis-gateway.service 2>/dev/null; then
 fi
 
 unit_tmp="$(mktemp)"
-trap 'rm -f "$unit_tmp"' EXIT
+override_tmp="$(mktemp)"
+trap 'rm -f "$unit_tmp" "$override_tmp"' EXIT
 cat > "$unit_tmp" <<EOF
 [Unit]
 Description=Liquidity Scout CMIS Gateway
@@ -64,7 +67,23 @@ NoNewPrivileges=true
 WantedBy=multi-user.target
 EOF
 
+# Historical CMIS deployments may still have versioned drop-ins that replace
+# ExecStart with an older assembled runtime. Keep those files intact for audit,
+# but install one repository-owned highest-precedence override so the accepted
+# checkout + current private wheel always win effective systemd composition.
+cat > "$override_tmp" <<EOF
+[Service]
+WorkingDirectory=$REPO_ROOT
+Environment=HOME=$RUN_HOME
+Environment=PYTHONPATH=$REPO_ROOT
+Environment=PYTHONUNBUFFERED=1
+ExecStart=
+ExecStart=$PYTHON -m liquidity_scout.cmis.http --host 127.0.0.1 --port 8765
+EOF
+
 sudo install -m 0644 "$unit_tmp" "$UNIT_FILE"
+sudo install -d -m 0755 "$OVERRIDE_DIR"
+sudo install -m 0644 "$override_tmp" "$OVERRIDE_FILE"
 sudo systemctl daemon-reload
 sudo systemctl enable cmis-gateway.service >/dev/null
 sudo systemctl restart cmis-gateway.service
@@ -86,6 +105,24 @@ if [[ "$healthy" -ne 1 ]]; then
   sudo journalctl -u cmis-gateway.service -n 40 --no-pager >&2 || true
   fail "CMIS did not become healthy on 127.0.0.1:8765 within 30 seconds."
 fi
+
+# Validate the *effective* systemd properties after all historical drop-ins have
+# been applied. This is stronger than grepping `systemctl cat`, which can show
+# both stale and current settings without revealing which ExecStart actually wins.
+effective_exec="$(systemctl show -p ExecStart --value cmis-gateway.service)"
+effective_workdir="$(systemctl show -p WorkingDirectory --value cmis-gateway.service)"
+effective_env="$(systemctl show -p Environment --value cmis-gateway.service)"
+[[ "$effective_exec" == *"$PYTHON"* ]] \
+  || fail "Effective CMIS ExecStart is not using the repository virtualenv: $effective_exec"
+[[ "$effective_workdir" == "$REPO_ROOT" ]] \
+  || fail "Effective CMIS WorkingDirectory is not the repository root: $effective_workdir"
+[[ "$effective_env" == *"PYTHONPATH=$REPO_ROOT"* ]] \
+  || fail "Effective CMIS environment is missing repository PYTHONPATH."
+
+printf '\n=== CMIS EFFECTIVE RUNTIME ===\n'
+printf 'ExecStart: %s\n' "$effective_exec"
+printf 'WorkingDirectory: %s\n' "$effective_workdir"
+printf 'Repository override: %s\n' "$OVERRIDE_FILE"
 
 printf '\n=== CMIS GATEWAY SERVICE ===\n'
 sudo systemctl --no-pager --full status cmis-gateway.service | sed -n '1,18p'
