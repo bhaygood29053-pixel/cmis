@@ -43,11 +43,7 @@ class XDEXMultiHopProviderTests(unittest.TestCase):
         }
         session = FakeSession(body)
         result = collect_multi_hop_quote_observation(
-            "MINT_A",
-            "MINT_C",
-            "1.25",
-            session=session,
-            timeout=9,
+            "MINT_A", "MINT_C", "1.25", session=session, timeout=9
         )
 
         self.assertEqual(result["schema"], OBSERVATION_SCHEMA)
@@ -56,6 +52,7 @@ class XDEXMultiHopProviderTests(unittest.TestCase):
         self.assertTrue(result["read_only"])
         self.assertFalse(result["prepare_called"])
         self.assertFalse(result["execution_authorized"])
+        self.assertNotIn("prepare", result["endpoint"])
 
         call = session.calls[0]
         self.assertEqual(call["url"], MULTI_HOP_QUOTE_URL)
