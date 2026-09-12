@@ -5,8 +5,10 @@ on:
     paths:
       - "scripts/probe_xdex_multi_hop_quote.py"
       - "liquidity_scout/providers/x1/xdex_multi_hop.py"
+      - "liquidity_scout/providers/x1/xdex_multi_hop_onchain.py"
       - "liquidity_scout/services/cmis_xdex_multi_hop_route_intelligence.py"
       - "tests/test_xdex_multi_hop_provider.py"
+      - "tests/test_xdex_multi_hop_onchain.py"
       - "tests/test_cmis_xdex_multi_hop_route_intelligence.py"
       - "tests/test_xdex_verified_native_pair_live.py"
       - ".github/workflows/xdex-multi-hop-live-probe.yml"
@@ -39,16 +41,17 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_xdex_multi_hop_provider.py \
+            tests/test_xdex_multi_hop_onchain.py \
             tests/test_cmis_xdex_multi_hop_route_intelligence.py
 
-      - name: Discover and quote one current indirect XDEX route
+      - name: Discover, quote, and independently verify one current indirect XDEX route
         id: probe
         continue-on-error: true
         env:
           PYTHONPATH: .
         run: python scripts/probe_xdex_multi_hop_quote.py
 
-      - name: Upload exact public quote evidence
+      - name: Upload exact public quote and X1-RPC evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -57,7 +60,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Require a successful live multi-hop route
+      - name: Require successful independent live verification
         if: always()
         run: |
           python - <<'PY'
@@ -67,7 +70,16 @@ jobs:
           if not path.exists():
               raise SystemExit("probe artifact missing")
           data = json.loads(path.read_text(encoding="utf-8"))
-          if data.get("selected") is None:
+          verification = data.get("onchain_verification")
+          required = (
+              "route_structure_verified",
+              "pool_identity_verified",
+              "pool_state_verified",
+              "fee_math_verified",
+              "reserve_math_verified",
+              "current_state_alignment_verified",
+          )
+          if not isinstance(verification, dict) or not all(verification.get(key) is True for key in required):
               print(json.dumps({
                   "status": "EVIDENCE_REQUIRED",
                   "failure_stage": data.get("failure_stage"),
@@ -78,7 +90,12 @@ jobs:
                   "attempt_count": data.get("attempt_count"),
                   "rpc_slot_before": data.get("rpc_slot_before"),
                   "rpc_slot_after": data.get("rpc_slot_after"),
+                  "onchain_verification": verification,
               }, sort_keys=True))
               raise SystemExit(2)
-          print("CMIS #681 live multi-hop route evidence: PASS")
+          if verification.get("route_optimality_verified") is not False:
+              raise SystemExit("route optimality must remain unverified")
+          if verification.get("execution_authorized") is not False:
+              raise SystemExit("execution authority widened")
+          print("CMIS #681 independently verified live multi-hop route: PASS")
           PY
