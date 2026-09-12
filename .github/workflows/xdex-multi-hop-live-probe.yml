@@ -8,6 +8,7 @@ on:
       - "liquidity_scout/services/cmis_xdex_multi_hop_route_intelligence.py"
       - "tests/test_xdex_multi_hop_provider.py"
       - "tests/test_cmis_xdex_multi_hop_route_intelligence.py"
+      - "tests/test_xdex_verified_native_pair_live.py"
       - ".github/workflows/xdex-multi-hop-live-probe.yml"
   workflow_dispatch:
 
@@ -24,13 +25,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
-      - name: Install probe dependency
-        run: python -m pip install requests
+      - name: Install CMIS dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run deterministic multi-hop contract tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            tests/test_xdex_multi_hop_provider.py \
+            tests/test_cmis_xdex_multi_hop_route_intelligence.py
 
       - name: Discover and quote one current indirect XDEX route
         id: probe
         continue-on-error: true
+        env:
+          PYTHONPATH: .
         run: python scripts/probe_xdex_multi_hop_quote.py
 
       - name: Upload exact public quote evidence
@@ -61,6 +76,8 @@ jobs:
                   "token_count": data.get("token_count"),
                   "candidate_count": data.get("candidate_count"),
                   "attempt_count": data.get("attempt_count"),
+                  "rpc_slot_before": data.get("rpc_slot_before"),
+                  "rpc_slot_after": data.get("rpc_slot_after"),
               }, sort_keys=True))
               raise SystemExit(2)
           print("CMIS #681 live multi-hop route evidence: PASS")
