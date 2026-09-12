@@ -1,0 +1,67 @@
+name: XDEX Multi-Hop Live Probe
+
+on:
+  pull_request:
+    paths:
+      - "scripts/probe_xdex_multi_hop_quote.py"
+      - "liquidity_scout/providers/x1/xdex_multi_hop.py"
+      - "liquidity_scout/services/cmis_xdex_multi_hop_route_intelligence.py"
+      - "tests/test_xdex_multi_hop_provider.py"
+      - "tests/test_cmis_xdex_multi_hop_route_intelligence.py"
+      - ".github/workflows/xdex-multi-hop-live-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-read-only-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out CMIS
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install probe dependency
+        run: python -m pip install requests
+
+      - name: Discover and quote one current indirect XDEX route
+        id: probe
+        continue-on-error: true
+        run: python scripts/probe_xdex_multi_hop_quote.py
+
+      - name: Upload exact public quote evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdex-multi-hop-live-probe
+          path: artifacts/xdex_multi_hop_probe.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require a successful live multi-hop route
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("artifacts/xdex_multi_hop_probe.json")
+          if not path.exists():
+              raise SystemExit("probe artifact missing")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          if data.get("selected") is None:
+              print(json.dumps({
+                  "status": "EVIDENCE_REQUIRED",
+                  "failure_stage": data.get("failure_stage"),
+                  "fatal_error": data.get("fatal_error"),
+                  "pool_count": data.get("pool_count"),
+                  "token_count": data.get("token_count"),
+                  "candidate_count": data.get("candidate_count"),
+                  "attempt_count": data.get("attempt_count"),
+              }, sort_keys=True))
+              raise SystemExit(2)
+          print("CMIS #681 live multi-hop route evidence: PASS")
+          PY
