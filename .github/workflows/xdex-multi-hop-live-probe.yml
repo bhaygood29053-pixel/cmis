@@ -4,12 +4,15 @@ on:
   pull_request:
     paths:
       - "scripts/probe_xdex_multi_hop_quote.py"
+      - "scripts/probe_xdex_multi_hop_route_snapshot.py"
       - "liquidity_scout/providers/x1/xdex_multi_hop.py"
       - "liquidity_scout/providers/x1/xdex_multi_hop_onchain.py"
       - "liquidity_scout/services/cmis_xdex_multi_hop_route_intelligence.py"
+      - "liquidity_scout/services/cmis_xdex_multi_hop_route_snapshot.py"
       - "tests/test_xdex_multi_hop_provider.py"
       - "tests/test_xdex_multi_hop_onchain.py"
       - "tests/test_cmis_xdex_multi_hop_route_intelligence.py"
+      - "tests/test_cmis_xdex_multi_hop_route_snapshot.py"
       - "tests/test_xdex_verified_native_pair_live.py"
       - ".github/workflows/xdex-multi-hop-live-probe.yml"
   workflow_dispatch:
@@ -42,16 +45,17 @@ jobs:
           python -m pytest -q \
             tests/test_xdex_multi_hop_provider.py \
             tests/test_xdex_multi_hop_onchain.py \
-            tests/test_cmis_xdex_multi_hop_route_intelligence.py
+            tests/test_cmis_xdex_multi_hop_route_intelligence.py \
+            tests/test_cmis_xdex_multi_hop_route_snapshot.py
 
-      - name: Discover, quote, and independently verify one current indirect XDEX route
+      - name: Discover, verify, and snapshot one current indirect XDEX route
         id: probe
         continue-on-error: true
         env:
           PYTHONPATH: .
-        run: python scripts/probe_xdex_multi_hop_quote.py
+        run: python scripts/probe_xdex_multi_hop_route_snapshot.py
 
-      - name: Upload exact public quote and X1-RPC evidence
+      - name: Upload exact public quote, X1-RPC, and route-snapshot evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -60,7 +64,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Require successful independent live verification
+      - name: Require successful independent live snapshot
         if: always()
         run: |
           python - <<'PY'
@@ -71,6 +75,7 @@ jobs:
               raise SystemExit("probe artifact missing")
           data = json.loads(path.read_text(encoding="utf-8"))
           verification = data.get("onchain_verification")
+          snapshot = data.get("route_snapshot")
           required = (
               "route_structure_verified",
               "pool_identity_verified",
@@ -80,22 +85,23 @@ jobs:
               "current_state_alignment_verified",
           )
           if not isinstance(verification, dict) or not all(verification.get(key) is True for key in required):
-              print(json.dumps({
-                  "status": "EVIDENCE_REQUIRED",
-                  "failure_stage": data.get("failure_stage"),
-                  "fatal_error": data.get("fatal_error"),
-                  "pool_count": data.get("pool_count"),
-                  "token_count": data.get("token_count"),
-                  "candidate_count": data.get("candidate_count"),
-                  "attempt_count": data.get("attempt_count"),
-                  "rpc_slot_before": data.get("rpc_slot_before"),
-                  "rpc_slot_after": data.get("rpc_slot_after"),
-                  "onchain_verification": verification,
-              }, sort_keys=True))
-              raise SystemExit(2)
-          if verification.get("route_optimality_verified") is not False:
+              raise SystemExit("independent X1-RPC route verification incomplete")
+          if not isinstance(snapshot, dict) or snapshot.get("contract_version") != "xdex_multi_hop_route_snapshot/v1":
+              raise SystemExit("Phase-2 route snapshot missing or wrong version")
+          if snapshot.get("route_output", {}).get("aggregate_hop_output_verified") is not True:
+              raise SystemExit("aggregate route output is not independently verified")
+          if snapshot.get("provider_routing_fee_transform", {}).get("arithmetic_transform_verified") is not True:
+              raise SystemExit("provider routing-fee arithmetic transform is not verified")
+          if snapshot.get("provider_routing_fee_transform", {}).get("business_semantics_verified") is not False:
+              raise SystemExit("provider routing-fee business semantics widened")
+          for field in ("price_impact", "minimum_received", "network_fee"):
+              if snapshot.get(field, {}).get("status") != "EVIDENCE_REQUIRED":
+                  raise SystemExit(f"unsupported {field} semantics were promoted")
+          if snapshot.get("provider_raw_json_exposed") is not False:
+              raise SystemExit("raw provider JSON leaked across snapshot boundary")
+          if snapshot.get("route_optimality_verified") is not False:
               raise SystemExit("route optimality must remain unverified")
-          if verification.get("execution_authorized") is not False:
+          if snapshot.get("execution_authorized") is not False:
               raise SystemExit("execution authority widened")
-          print("CMIS #681 independently verified live multi-hop route: PASS")
+          print("CMIS #684 independently verified live route snapshot: PASS")
           PY
