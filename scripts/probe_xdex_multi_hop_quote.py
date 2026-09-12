@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Read-only live probe for XDEX multi-hop quote semantics.
+"""Read-only live probe for XDEX multi-hop quote semantics and X1-RPC verification.
 
-Candidate paths are discovered from X1 mainnet XDEX program state rather than
-the public XDEX pool catalog, which is known to be legitimately empty while
-quote endpoints remain available. The probe calls only the public quote route;
-it never calls prepare, signs, broadcasts, or moves value.
+Candidate endpoints are discovered from X1 mainnet XDEX program state. XDEX then
+selects the actual quote route. CMIS parses the returned provider route and
+independently verifies every XDEX hop against current X1 pool/config/vault state.
+The probe never calls prepare, signs, broadcasts, or moves value.
 """
 from __future__ import annotations
 
@@ -24,6 +24,12 @@ import requests
 
 from liquidity_scout.providers.x1.candidate_pool_role import encode_base58_pubkey
 from liquidity_scout.providers.x1.rpc import rpc_request
+from liquidity_scout.providers.x1.xdex_multi_hop import (
+    OBSERVATION_SCHEMA,
+    SOURCE as XDEX_MULTI_HOP_SOURCE,
+    parse_multi_hop_quote_observation,
+)
+from liquidity_scout.providers.x1.xdex_multi_hop_onchain import verify_multi_hop_quote_onchain
 
 MULTI_HOP_QUOTE_URL = "https://api.xdex.xyz/api/xdex/swap/multi-hop/quote"
 TRADE_NETWORK = "X1 Mainnet"
@@ -183,6 +189,8 @@ def main():
         "rpc_slot_before": None,
         "rpc_slot_after": None,
         "selected": None,
+        "parsed_quote": None,
+        "onchain_verification": None,
         "attempt_count": 0,
         "attempt_summaries": [],
         "failure_stage": None,
@@ -245,9 +253,29 @@ def main():
             if selected is not None:
                 break
         artifact["selected"] = selected
-        artifact["failure_stage"] = None if selected is not None else "multi_hop_quote"
         if selected is None:
             raise RuntimeError("XDEX multi-hop quote endpoint returned no successful route for bounded on-chain candidate search")
+
+        artifact["failure_stage"] = "provider_quote_parse"
+        observation = {
+            "schema": OBSERVATION_SCHEMA,
+            "chain": "x1",
+            "source": XDEX_MULTI_HOP_SOURCE,
+            "endpoint": MULTI_HOP_QUOTE_URL,
+            "request": dict(selected["request"]),
+            "raw_response": dict(selected["response"]),
+            "provider_semantics_promoted": False,
+            "prepare_called": False,
+            "read_only": True,
+            "execution_authorized": False,
+        }
+        parsed_quote = parse_multi_hop_quote_observation(observation)
+        artifact["parsed_quote"] = parsed_quote
+
+        artifact["failure_stage"] = "independent_x1_rpc_verification"
+        verification = verify_multi_hop_quote_onchain(parsed_quote)
+        artifact["onchain_verification"] = verification
+        artifact["failure_stage"] = None
     except Exception as exc:
         artifact["fatal_error"] = {"type": type(exc).__name__, "message": str(exc)[:1000]}
     finally:
@@ -266,7 +294,8 @@ def main():
         ]
         _write(artifact)
 
-    if artifact["selected"] is None:
+    verification = artifact.get("onchain_verification")
+    if artifact["selected"] is None or not isinstance(verification, dict):
         print(json.dumps({
             "status": "EVIDENCE_REQUIRED",
             "failure_stage": artifact["failure_stage"],
@@ -284,10 +313,16 @@ def main():
     print(json.dumps({
         "status": "PASS",
         "request": selected["request"],
-        "graph_hops": len(selected["graph_path"]) - 1,
-        "response_keys": selected["response_keys"],
-        "rpc_slot_before": artifact["rpc_slot_before"],
-        "rpc_slot_after": artifact["rpc_slot_after"],
+        "provider_hops": artifact["parsed_quote"]["hop_count"],
+        "provider_path": artifact["parsed_quote"]["path"],
+        "provider_fee_bps": artifact["parsed_quote"]["provider_fee_bps"],
+        "verified_hops": verification["hop_count"],
+        "verification_slot_span": verification["verification_slot_span"],
+        "route_structure_verified": verification["route_structure_verified"],
+        "pool_state_verified": verification["pool_state_verified"],
+        "fee_math_verified": verification["fee_math_verified"],
+        "reserve_math_verified": verification["reserve_math_verified"],
+        "route_optimality_verified": verification["route_optimality_verified"],
         "read_only": True,
         "execution_authorized": False,
     }, sort_keys=True))
