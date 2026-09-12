@@ -185,7 +185,7 @@ class XDEXMultiHopProviderTests(unittest.TestCase):
     def test_parser_rejects_fee_transform_tampering(self):
         source = live_shape_observation()
         source["raw_response"]["data"]["output_amount_raw"] = "10474010"
-        with self.assertRaisesRegex(XDEXMultiHopError, "output_amount_raw transform"):
+        with self.assertRaisesRegex(XDEXMultiHopError, "raw-token value"):
             parse_multi_hop_quote_observation(source)
 
     def test_mixed_venue_quote_is_not_execution_evidence(self):
