@@ -9,6 +9,9 @@ No quote, impact, fee, route-quality, history-field, or fill semantic is promote
 
 import json
 import os
+from pathlib import Path
+import subprocess
+import sys
 import time
 import unittest
 from collections.abc import Mapping
@@ -181,6 +184,38 @@ class XDEXVerifiedNativePairLiveTests(unittest.TestCase):
         )
         # Scaling/field presence is observable. Meaning, fee decomposition, route quality,
         # fill semantics, and CMIS promotion remain unverified by this test.
+
+    def test_live_multi_hop_quote_probe_captures_current_route(self):
+        completed = subprocess.run(
+            [sys.executable, "scripts/probe_xdex_multi_hop_quote.py"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.stdout:
+            print("[XDEX multi-hop probe stdout] " + completed.stdout.strip())
+        if completed.stderr:
+            print("[XDEX multi-hop probe stderr] " + completed.stderr.strip())
+
+        artifact_path = Path("artifacts/xdex_multi_hop_probe.json")
+        self.assertTrue(artifact_path.exists(), "multi-hop probe did not write diagnostic evidence")
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        print(
+            "[XDEX multi-hop exact public evidence] "
+            + json.dumps(_public_evidence(artifact), sort_keys=True, default=str)
+        )
+
+        self.assertEqual(completed.returncode, 0, artifact)
+        self.assertTrue(artifact.get("read_only"))
+        self.assertFalse(artifact.get("prepare_called"))
+        self.assertFalse(artifact.get("execution_authorized"))
+        selected = artifact.get("selected")
+        self.assertIsInstance(selected, Mapping)
+        self.assertTrue(selected.get("success"))
+        self.assertGreaterEqual(len(selected.get("graph_path") or []), 3)
+        self.assertIsInstance(selected.get("response"), Mapping)
+        # This is discovery evidence only. Response-field semantics, route optimality,
+        # executed output, fee labels, and cross-DEX execution remain unverified here.
 
 
 if __name__ == "__main__":
