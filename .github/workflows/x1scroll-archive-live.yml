@@ -1,0 +1,62 @@
+name: X1Scroll Archive Live Qualification #458
+
+on:
+  pull_request:
+    paths:
+      - "liquidity_scout/providers/x1/x1scroll_archive.py"
+      - "tests/test_x1scroll_archive_provider.py"
+      - "tests/test_x1scroll_archive_live.py"
+      - ".github/workflows/x1scroll-archive-live.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Prove live X1Scroll archival getTransaction
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      X1SCROLL_API_KEY: ${{ secrets.X1SCROLL_API_KEY }}
+      RUN_LIVE_X1SCROLL_ARCHIVE_PROOF: "1"
+      X1SCROLL_LIVE_EVIDENCE_PATH: artifacts/x1scroll-archive-live-458.json
+    steps:
+      - name: Check out CMIS
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require runtime credential
+        shell: bash
+        run: |
+          if [ -z "${X1SCROLL_API_KEY}" ]; then
+            echo "X1SCROLL_API_KEY repository secret is required for Issue #458."
+            exit 1
+          fi
+
+      - name: Install bounded live dependencies
+        run: python -m pip install --disable-pip-version-check pytest requests
+
+      - name: Prove live archival contract
+        run: python -m pytest -q tests/test_x1scroll_archive_live.py
+
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x1scroll-archive-live-458
+          path: artifacts/*.json
+          if-no-files-found: warn
+
+      - name: Safety boundary
+        if: always()
+        run: |
+          echo "Known-signature historical transaction lookup only."
+          echo "Canonical X1 RPC remains primary discovery/current-state transport."
+          echo "No address-history discovery, archive completeness, lifetime coverage, or source-independence claim."
+          echo "No transaction construction, signing, broadcast, custody, swap, mint, burn, or value movement."
+          echo "EXECUTION_AUTHORIZED=FALSE"
